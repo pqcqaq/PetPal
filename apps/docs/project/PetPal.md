@@ -1588,6 +1588,7 @@ gantt
   - 页面指标改为使用后端聚合统计，避免前端基于单页数据估算。
 - 权限与菜单细化：
   - 新增系统权限码：`petpal.callback-audit.read`。
+  - 新增系统权限码：`petpal.callback-audit.export`。
   - 回调审计菜单改为绑定该权限码，避免 `MenuNode.permissionId` 唯一约束冲突。
 
 验证结果：
@@ -1600,13 +1601,15 @@ gantt
   - `GET /api/petpal/admin/callback-audits/stats`（统计字段与筛选条件）。
   - `GET /api/petpal/admin/callback-audits/export`（Excel 导出头与二进制响应）。
   - 非管理员访问管理端接口返回 403（列表/统计/导出）。
-  - 回归后 `petpal-api` 集成测试通过（7/7）。
+  - 运营经理（manager）可访问列表/统计，但导出返回 403（读导权限拆分）。
+  - 回归后 `petpal-api` 集成测试通过（8/8）。
 
 关键设计决策：
 
 - 统计接口与列表接口共享过滤条件解析，保证同一筛选条件下的数据一致性。
 - 导出优先复用现有 Excel 导出基础设施，降低维护成本。
 - 管理端回调审计接口统一启用 `petpal.callback-audit.read` 权限校验（列表/统计/导出）。
+- 管理端回调审计导出接口独立启用 `petpal.callback-audit.export` 权限校验。
 - 集成测试改用管理员账号（`admin/Admin123!`）覆盖受保护端点。
 
 ### 14.15 2026-04-01（P0 最终验收）

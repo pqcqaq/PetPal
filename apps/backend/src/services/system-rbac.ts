@@ -35,6 +35,7 @@ const managerExcludedPermissions = new Set([
   'menu.update',
   'menu.delete',
   'menu.assign-permission',
+  'petpal.callback-audit.export',
 ]);
 
 const buildSystemRoleSeeds = (permissions: Permission[]): SystemRoleSeed[] => {

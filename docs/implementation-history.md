@@ -400,6 +400,7 @@ Last updated: 2026-03-31
   - 接入 `ListExportButton` 调用导出接口。
 - 权限/菜单：
   - 新增权限码 `petpal.callback-audit.read`。
+  - 新增权限码 `petpal.callback-audit.export`。
   - 菜单节点 `callback-audit` 绑定新权限，修复 MenuNode 权限唯一约束冲突。
 
 验证结果：
@@ -415,7 +416,8 @@ Last updated: 2026-03-31
   - 覆盖 `/api/petpal/admin/callback-audits/stats` 聚合统计返回结构。
   - 覆盖 `/api/petpal/admin/callback-audits/export` Excel 导出响应（content-type/content-disposition/二进制体）。
   - 覆盖非管理员访问管理端回调审计接口返回 403（列表/统计/导出）。
-- `petpal-api` 集成测试总数由 5 提升到 7，回归结果 7/7 通过。
+  - 覆盖运营经理访问边界：可读列表/统计，禁止导出（403）。
+- `petpal-api` 集成测试总数由 5 提升到 8，回归结果 8/8 通过。
 
 关键设计决策：
 
@@ -426,6 +428,7 @@ Last updated: 2026-03-31
 
 - `apps/backend/src/routes/petpal.ts` 的管理端回调审计接口（列表/统计/导出）统一增加 `requirePermission('petpal.callback-audit.read')`。
 - 集成测试管理端用例改为使用管理员账号认证，确保权限边界可回归验证。
+- 在此基础上将导出接口权限从读取权限拆分，改为 `requirePermission('petpal.callback-audit.export')`。
 
 ## 25. PetPal P0 最终验收（本轮）
 

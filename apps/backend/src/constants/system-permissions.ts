@@ -9,6 +9,7 @@ export const systemPermissionCatalog: readonly SystemPermissionSeed[] = [
   { module: 'dashboard', code: 'dashboard.view', name: '查看仪表盘', action: 'read' },
   { module: 'audit', code: 'audit.read', name: '查看审计日志', action: 'read' },
   { module: 'petpal', code: 'petpal.callback-audit.read', name: '查看宠托帮回调审计', action: 'read' },
+  { module: 'petpal', code: 'petpal.callback-audit.export', name: '导出宠托帮回调审计', action: 'export' },
   { module: 'menu', code: 'menu.read', name: '查看菜单管理', action: 'read' },
   { module: 'menu', code: 'menu.create', name: '创建菜单节点', action: 'create' },
   { module: 'menu', code: 'menu.update', name: '编辑菜单节点', action: 'update' },

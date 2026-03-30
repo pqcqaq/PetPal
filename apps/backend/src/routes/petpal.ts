@@ -184,7 +184,7 @@ petpalRouter.get('/admin/callback-audits/stats', requirePermission('petpal.callb
 
 petpalRouter.get(
   '/admin/callback-audits/export',
-  requirePermission('petpal.callback-audit.read'),
+  requirePermission('petpal.callback-audit.export'),
   createExcelExportHandler({
     fileName: () => createTimestampedExcelFileName('petpal-callback-audits'),
     sheetName: 'PetPal Callback Audits',

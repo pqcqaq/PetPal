@@ -695,4 +695,26 @@ describe('PetPal API integration', () => {
       .set(authHeader)
       .expect(403);
   });
+
+  it('allows manager to read callback audits but forbids export', async () => {
+    const { app } = context;
+
+    const managerSession = await loginAs(app, 'manager', 'Manager123!');
+    const authHeader = { Authorization: `Bearer ${managerSession.tokens.accessToken}` };
+
+    await request(app)
+      .get('/api/petpal/admin/callback-audits')
+      .set(authHeader)
+      .expect(200);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-audits/stats')
+      .set(authHeader)
+      .expect(200);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-audits/export')
+      .set(authHeader)
+      .expect(403);
+  });
 });
