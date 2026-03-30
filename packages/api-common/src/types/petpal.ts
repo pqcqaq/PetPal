@@ -161,3 +161,58 @@ export interface MatchedCaregiverRecord {
 }
 
 export type MatchedCaregiverPage = PaginatedResult<MatchedCaregiverRecord>;
+
+export type CallbackType = 'PAYMENT_CALLBACK' | 'REFUND_CALLBACK';
+export type CallbackStatus = 'PENDING' | 'SUCCESS' | 'FAILURE' | 'ERROR';
+export type CallbackSourceMode = 'TOKEN' | 'WECHATPAY_HMAC' | 'WECHATPAY_SDK';
+
+export interface CallbackAuditRecord {
+  id: string;
+  callbackType: CallbackType;
+  paymentId?: string;
+  refundId?: string;
+  requestId: string;
+  callbackTimestamp: string;
+  callbackStatus: CallbackStatus;
+  sourceMode: CallbackSourceMode;
+  signatureDigest: string;
+  verificationResult: Record<string, unknown>;
+  rawPayload: string;
+  createdAt: string;
+  updatedAt: string;
+  payment?: {
+    payNo: string;
+    orderId: string;
+    amount: AmountValue;
+    status: PaymentStatus;
+  };
+  refund?: {
+    refundNo: string;
+    orderId: string;
+    amount: AmountValue;
+    status: RefundStatus;
+  };
+}
+
+export interface CallbackAuditQuery {
+  page?: number;
+  pageSize?: number;
+  callbackType?: CallbackType;
+  callbackStatus?: CallbackStatus;
+  sourceMode?: CallbackSourceMode;
+  requestId?: string;
+  paymentId?: string;
+  refundId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface CallbackAuditPage {
+  items: CallbackAuditRecord[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}

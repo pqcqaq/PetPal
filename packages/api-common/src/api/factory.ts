@@ -36,6 +36,8 @@ import type {
   UploadPrepareResult,
 } from '../types/files';
 import type {
+  CallbackAuditPage,
+  CallbackAuditQuery,
   CreatePetPayload,
   CreateServiceRequestPayload,
   MatchCaregiverQuery,
@@ -401,6 +403,13 @@ export const createApiFactory = (options: ClientOptions) => {
         caregivers: (query: MatchCaregiverQuery) =>
           client.request<MatchedCaregiverPage>({
             url: '/petpal/match/caregivers',
+            params: query as unknown as QueryParams,
+          }),
+      },
+      admin: {
+        callbackAudits: (query?: CallbackAuditQuery) =>
+          client.request<CallbackAuditPage>({
+            url: '/petpal/admin/callback-audits',
             params: query as unknown as QueryParams,
           }),
       },

@@ -217,6 +217,18 @@ const defaultMenuTree: SystemMenuSeedNode[] = [
           { code: 'attachments-delete', type: 'ACTION', title: '删除附件', icon: 'i-carbon-trash-can', sortOrder: 30, permissionCode: 'file.delete' },
         ],
       },
+      {
+        code: 'petpal-callback-audit',
+        type: 'PAGE',
+        title: '宠托帮回调审计',
+        caption: 'PetPal Audit',
+        description: '查看支付/退款回调审计记录，支持多维筛选与明细追踪。',
+        icon: 'i-carbon-data-check',
+        path: '/petpal/callback-audits',
+        viewKey: 'callback-audit',
+        sortOrder: 40,
+        permissionCode: 'audit.read',
+      },
     ],
   },
   {
