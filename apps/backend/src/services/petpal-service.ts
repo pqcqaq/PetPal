@@ -880,3 +880,19 @@ export const petpalService = {
     });
   },
 };
+
+export const purgeExpiredCallbackAudits = async (olderThanDays = 90) => {
+  const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
+  const result = await prisma.callbackAudit.deleteMany({
+    where: {
+      createdAt: {
+        lt: cutoff,
+      },
+    },
+  });
+
+  return {
+    cutoff,
+    deleted: result.count,
+  };
+};

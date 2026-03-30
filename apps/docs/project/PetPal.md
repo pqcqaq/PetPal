@@ -1639,6 +1639,31 @@ gantt
 - 页面操作显隐遵循最小权限原则，前后端权限语义保持一致。
 - 保持原有页面结构与组件体系，仅做权限语义增强，不引入额外交互分叉。
 
+### 14.17 2026-04-01（P1 Slice 1）
+
+**概述**：回调审计数据保留治理，新增定时清理任务，降低审计表长期增长风险。
+
+已完成：
+
+- 新增服务层清理函数：
+  - `apps/backend/src/services/petpal-service.ts`
+  - `purgeExpiredCallbackAudits(olderThanDays = 90)`，按 `createdAt` 清理过期回调审计记录。
+- 新增定时任务：
+  - `apps/backend/src/timers/petpal-callback-audit-retention.timer.ts`
+  - 每日 `03:20`（Asia/Shanghai）执行清理，默认保留 90 天数据。
+- 挂载定时任务到 timer registry：
+  - `apps/backend/src/timers/index.ts`。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（8/8）。
+
+关键设计决策：
+
+- 先采用“固定保留期 + 每日离峰清理”策略，快速控制数据规模风险。
+- 清理逻辑放在服务层，便于后续扩展为分级归档（热数据/冷数据）而不是直接删除。
+
 - 回调审计持久化：完成。
 - 管理端审计查询 API：完成。
 - 管理端审计 UI：完成。

@@ -463,4 +463,29 @@ Last updated: 2026-03-31
 - 结合既有后端集成测试（8/8）确认读导权限拆分边界保持稳定。
 
 Git commit：`feat(p0): align callback audit export button visibility with export permission`。
+
+## 27. PetPal 回调审计保留清理任务（P1 Slice 1）
+
+**内容**：新增 PetPal 回调审计保留治理任务，每日离峰清理超过 90 天的数据，降低审计表膨胀风险。
+
+变更摘要：
+
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增 `purgeExpiredCallbackAudits(olderThanDays = 90)`，按 `createdAt` 删除过期记录并返回删除统计。
+- `apps/backend/src/timers/petpal-callback-audit-retention.timer.ts`
+  - 新增 cron 定时任务（`20 3 * * *`，Asia/Shanghai），执行回调审计清理。
+- `apps/backend/src/timers/index.ts`
+  - 将新定时任务接入统一 timer registry。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（8/8）。
+
+风险与后续：
+
+- 当前策略为“过期删除”，后续可演进为“冷热分层 + 归档存储”。
+- 若业务需要长期取证，可在清理前先导出到对象存储并记录归档索引。
+
+Git commit：`feat(p1): add callback audit retention cleanup timer`。
 - 高增长场景下需要规划审计表分区与归档策略。
