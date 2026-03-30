@@ -1552,7 +1552,7 @@ gantt
 
 - 复用现有控制台工作台组件体系，避免引入新的视觉/交互范式。
 - UI 契约保持与后端一致：分页字段使用 `pagination`，避免 `PaginatedResult.meta` 混用。
-- 菜单权限暂复用 `audit.read`，后续可按 PetPal 运营权限拆分为独立权限码。
+- 菜单权限已切换为独立码 `petpal.callback-audit.read`，避免与系统审计菜单耦合。
 
 后续计划：
 
@@ -1599,7 +1599,8 @@ gantt
 - 新增集成测试覆盖：
   - `GET /api/petpal/admin/callback-audits/stats`（统计字段与筛选条件）。
   - `GET /api/petpal/admin/callback-audits/export`（Excel 导出头与二进制响应）。
-  - 回归后 `petpal-api` 集成测试通过（6/6）。
+  - 非管理员访问管理端接口返回 403（列表/统计/导出）。
+  - 回归后 `petpal-api` 集成测试通过（7/7）。
 
 关键设计决策：
 

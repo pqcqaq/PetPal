@@ -414,7 +414,8 @@ Last updated: 2026-03-31
 - `apps/backend/test/integration/petpal-api.test.ts` 新增用例：
   - 覆盖 `/api/petpal/admin/callback-audits/stats` 聚合统计返回结构。
   - 覆盖 `/api/petpal/admin/callback-audits/export` Excel 导出响应（content-type/content-disposition/二进制体）。
-- `petpal-api` 集成测试总数由 5 提升到 6，回归结果 6/6 通过。
+  - 覆盖非管理员访问管理端回调审计接口返回 403（列表/统计/导出）。
+- `petpal-api` 集成测试总数由 5 提升到 7，回归结果 7/7 通过。
 
 关键设计决策：
 
@@ -439,6 +440,6 @@ Last updated: 2026-03-31
 
 遗留风险（P1 关注）：
 
-- 统计/导出目前缺少独立接口测试覆盖。
+- 统计/导出已具备集成测试覆盖，后续需补充压力与边界数据规模测试。
 - 回调审计路由鉴权可继续按业务角色细分。
 - 高增长场景下需要规划审计表分区与归档策略。

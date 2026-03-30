@@ -673,4 +673,26 @@ describe('PetPal API integration', () => {
     assert.ok(Buffer.isBuffer(exportResponse.body));
     assert.ok(exportResponse.body.length > 0);
   });
+
+  it('forbids non-admin users from accessing callback audit admin endpoints', async () => {
+    const { app } = context;
+
+    const memberSession = await loginAs(app, 'user', 'User123!');
+    const authHeader = { Authorization: `Bearer ${memberSession.tokens.accessToken}` };
+
+    await request(app)
+      .get('/api/petpal/admin/callback-audits')
+      .set(authHeader)
+      .expect(403);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-audits/stats')
+      .set(authHeader)
+      .expect(403);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-audits/export')
+      .set(authHeader)
+      .expect(403);
+  });
 });
