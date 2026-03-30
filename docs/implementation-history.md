@@ -267,3 +267,35 @@ Last updated: 2026-03-31
 
 - 审计表增长快速，后续考虑引入分区、归档、或采样策略。
 - 下一步（Slice 11）：管理端查询 API 支持分页、过滤（按日期、sourceMode、callbackStatus）。
+
+## 21. PetPal 管理端回调审计查询 API（P0 Slice 11 Part 1）
+
+**内容**：后端查询接口支持审计日志的多维过滤、分页展示。
+
+核心实现：
+
+- 新增服务方法 `queryCallbackAuditLogs(filters)` - `apps/backend/src/services/petpal-service.ts`：
+  - 参数支持分页（page、pageSize）。
+  - 参数支持多维过滤（callbackType、callbackStatus、sourceMode、requestId、paymentId、refundId、startDate、endDate）。
+  - 查询包含 `payment` / `refund` 关联对象摘要。
+  - 排序：`createdAt desc`，支持后续扩展（sourceMode、callbackStatus）。
+- 新增管理端 API 路由 `/api/petpal/admin/callback-audits` - `apps/backend/src/routes/petpal.ts`：
+  - GET 方法，支持查询参数直接映射。
+  - 示例：`GET /api/petpal/admin/callback-audits?page=1&pageSize=20&callbackStatus=SUCCESS&sourceMode=TOKEN`。
+  - 返回 `{ items: [...], pagination: {...} }`。
+- 集成测试覆盖（5/5 tests pass）：
+  - 全查询、类型过滤、状态过滤、来源过滤、requestId 精确查询、分页。
+  - 断言返回结构正确、过滤条件生效、分页参数准确。
+
+验证与设计决策：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（5/5）。
+- Git commit：`feat(p0): add admin API for querying callback audit logs with filters (slice 11 part 1)`。
+- 关键设计：查询接口与管理端 UI 分离，API 层负责数据聚合，UI 层负责展示与交互。
+
+已识别的优化空间：
+
+- 后续可添加全文搜索（rawPayload 模糊匹配）。
+- 可添加导出（CSV/JSON）功能。
+- 可添加实时统计（按 sourceMode、callbackStatus 的聚合计数）。

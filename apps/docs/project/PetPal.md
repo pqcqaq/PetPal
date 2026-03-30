@@ -1432,3 +1432,44 @@ gantt
 1. 增加管理端回调审计查询接口（分页、过滤、排序）。
 2. 管理端 UI 展示审计日志列表与详情。
 3. 补充回调审计成功率与错误率统计指标。
+
+### 14.11 2026-03-31（P0 Slice 11 Part 1）
+
+**概述**：管理端回调审计查询接口 — 支持分页、多维过滤、关联数据展示。
+
+已完成（Part 1）：
+
+- 新增服务方法 `queryCallbackAuditLogs(filters)`：
+  - 支持分页：`page`、`pageSize`（默认 20，最大 100）。
+  - 支持过滤：
+    - `callbackType`：PAYMENT_CALLBACK|REFUND_CALLBACK
+    - `callbackStatus`：PENDING|SUCCESS|FAILURE|ERROR
+    - `sourceMode`：TOKEN|WECHATPAY_HMAC|WECHATPAY_SDK
+    - `requestId`：精确查询
+    - `paymentId`/`refundId`：关联查询
+    - `startDate`/`endDate`：日期范围
+  - 排序：默认按 `createdAt desc`。
+  - 关联加载：成功查询时包含 `payment` 和 `refund` 关联对象摘要（payNo、orderId、amount、status）。
+  - 返回格式：`{ items, pagination: { page, pageSize, total, totalPages } }`。
+- 新增管理端 API 路由 `/api/petpal/admin/callback-audits`（GET）：
+  - 查询参数映射直接传入服务方法。
+  - 支持链式查询：`?callbackType=PAYMENT_CALLBACK&callbackStatus=SUCCESS&sourceMode=TOKEN&page=1&pageSize=20`。
+- 集成测试验证（5 个 test case 全部通过）：
+  - 无过滤查询、按类型过滤、按状态过滤、按来源过滤、按 requestId 精确查询、分页查询。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（5/5）。
+- Git commit：`feat(p0): add admin API for querying callback audit logs with filters (slice 11 part 1)`。
+
+进行中：
+
+- P0 Slice 11 Part 2：管理端 UI 页面（Web 端）。
+- P0 Slice 11 Part 3：文档与统计指标。
+
+下一步：
+
+1. 管理端审计日志 UI 列表与搜索面板（Web）。
+2. 审计详情弹窗（JSON 展示 rawPayload、verificationResult）。
+3. 导出审计日志为 CSV 或 JSON。
