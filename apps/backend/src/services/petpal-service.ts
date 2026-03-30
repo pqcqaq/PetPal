@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import type {
+  CallbackAudit,
   CaregiverService,
   OrderMain,
   PetProfile,
@@ -349,6 +350,14 @@ export const petpalService = {
     success: boolean;
     paidAmount?: number;
     channelPayload?: unknown;
+    // Audit info (optional)
+    auditInfo?: {
+      requestId: string;
+      sourceMode: string;
+      signatureDigest: string | null;
+      callbackTimestamp: string | null;
+      rawPayload?: string;
+    };
   }) {
     return prisma.$transaction(async (tx) => {
       const payment = await tx.paymentRecord.findUnique({
@@ -370,6 +379,29 @@ export const petpalService = {
 
       if (payment.payStatus === 'PAID') {
         const idempotent = payment.channelTxnId === payload.channelTxnId;
+        
+        // Create audit record for retry/idempotent callback if auditInfo is provided
+        if (payload.auditInfo) {
+          await tx.callbackAudit.create({
+            data: withSnowflakeId({
+              callbackType: 'PAYMENT_CALLBACK',
+              paymentId: payment.id,
+              requestId: payload.auditInfo.requestId,
+              sourceMode: payload.auditInfo.sourceMode,
+              signatureDigest: payload.auditInfo.signatureDigest,
+              callbackTimestamp: payload.auditInfo.callbackTimestamp,
+              callbackStatus: idempotent ? 'SUCCESS' : 'FAILURE',
+              rawPayload: payload.auditInfo.rawPayload,
+              verificationResult: JSON.stringify({
+                idempotent,
+                alreadyProcessed: true,
+                channelTxnId: payload.channelTxnId,
+              }),
+              processedAt: new Date(),
+            }),
+          });
+        }
+        
         return {
           idempotent,
           paymentId: payment.id,
@@ -395,6 +427,27 @@ export const petpalService = {
           channelPayload: (payload.channelPayload ?? null) as Prisma.InputJsonValue,
         },
       });
+
+      // Create audit record if auditInfo is provided
+      if (payload.auditInfo) {
+        await tx.callbackAudit.create({
+          data: withSnowflakeId({
+            callbackType: 'PAYMENT_CALLBACK',
+            paymentId: payment.id,
+            requestId: payload.auditInfo.requestId,
+            sourceMode: payload.auditInfo.sourceMode,
+            signatureDigest: payload.auditInfo.signatureDigest,
+            callbackTimestamp: payload.auditInfo.callbackTimestamp,
+            callbackStatus: nextStatus === 'PAID' ? 'SUCCESS' : 'FAILURE',
+            rawPayload: payload.auditInfo.rawPayload,
+            verificationResult: JSON.stringify({
+              success: payload.success,
+              channelTxnId: payload.channelTxnId,
+            }),
+            processedAt: new Date(),
+          }),
+        });
+      }
 
       const [paidRows, refundedRows, order] = await Promise.all([
         tx.paymentRecord.findMany({
@@ -471,6 +524,14 @@ export const petpalService = {
     channelRefundId: string;
     success: boolean;
     channelPayload?: unknown;
+    // Audit info (optional)
+    auditInfo?: {
+      requestId: string;
+      sourceMode: string;
+      signatureDigest: string | null;
+      callbackTimestamp: string | null;
+      rawPayload?: string;
+    };
   }) {
     return prisma.$transaction(async (tx) => {
       const refund = await tx.refundRecord.findUnique({
@@ -491,6 +552,29 @@ export const petpalService = {
 
       if (refund.refundStatus === 'SUCCESS') {
         const idempotent = refund.channelRefundId === payload.channelRefundId;
+        
+        // Create audit record for retry/idempotent callback if auditInfo is provided
+        if (payload.auditInfo) {
+          await tx.callbackAudit.create({
+            data: withSnowflakeId({
+              callbackType: 'REFUND_CALLBACK',
+              refundId: refund.id,
+              requestId: payload.auditInfo.requestId,
+              sourceMode: payload.auditInfo.sourceMode,
+              signatureDigest: payload.auditInfo.signatureDigest,
+              callbackTimestamp: payload.auditInfo.callbackTimestamp,
+              callbackStatus: idempotent ? 'SUCCESS' : 'FAILURE',
+              rawPayload: payload.auditInfo.rawPayload,
+              verificationResult: JSON.stringify({
+                idempotent,
+                alreadyProcessed: true,
+                channelRefundId: payload.channelRefundId,
+              }),
+              processedAt: new Date(),
+            }),
+          });
+        }
+        
         return {
           idempotent,
           refundId: refund.id,
@@ -510,6 +594,27 @@ export const petpalService = {
           reviewedAt: payload.success ? new Date() : null,
         },
       });
+
+      // Create audit record if auditInfo is provided
+      if (payload.auditInfo) {
+        await tx.callbackAudit.create({
+          data: withSnowflakeId({
+            callbackType: 'REFUND_CALLBACK',
+            refundId: refund.id,
+            requestId: payload.auditInfo.requestId,
+            sourceMode: payload.auditInfo.sourceMode,
+            signatureDigest: payload.auditInfo.signatureDigest,
+            callbackTimestamp: payload.auditInfo.callbackTimestamp,
+            callbackStatus: nextStatus === 'SUCCESS' ? 'SUCCESS' : 'FAILURE',
+            rawPayload: payload.auditInfo.rawPayload,
+            verificationResult: JSON.stringify({
+              success: payload.success,
+              channelRefundId: payload.channelRefundId,
+            }),
+            processedAt: new Date(),
+          }),
+        });
+      }
 
       const [paidRows, refundedRows, order] = await Promise.all([
         tx.paymentRecord.findMany({

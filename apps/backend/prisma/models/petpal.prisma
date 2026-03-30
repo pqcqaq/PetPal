@@ -159,6 +159,7 @@ model PaymentRecord {
   deleteAt       DateTime?
   order          OrderMain    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   refunds        RefundRecord[]
+  callbackAudits CallbackAudit[]
 
   @@index([orderId, payStatus])
   @@index([deleteAt])
@@ -186,9 +187,38 @@ model RefundRecord {
   payment         PaymentRecord? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   applyUser       User         @relation("RefundApplyUser", fields: [applyUserId], references: [id], onDelete: Restrict)
   reviewer        User?        @relation("RefundReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  callbackAudits  CallbackAudit[]
 
   @@index([orderId, refundStatus])
   @@index([paymentId])
   @@index([applyUserId])
   @@index([deleteAt])
+}
+
+model CallbackAudit {
+  id                  String @id
+  createId            String?
+  updateId            String?
+  callbackType        String @default("PAYMENT_CALLBACK") // PAYMENT_CALLBACK | REFUND_CALLBACK
+  paymentId           String?
+  refundId            String?
+  requestId           String @unique
+  sourceMode          String @default("UNKNOWN") // TOKEN | WECHATPAY_HMAC | WECHATPAY_SDK
+  signatureDigest     String?
+  callbackTimestamp   String?
+  callbackStatus      String @default("PENDING") // PENDING | SUCCESS | FAILURE | ERROR
+  verificationResult  String? // JSON string of verification details
+  rawPayload          String? // Original callback body
+  processedAt         DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  payment             PaymentRecord? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  refund              RefundRecord? @relation(fields: [refundId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@index([callbackType, callbackStatus])
+  @@index([paymentId])
+  @@index([refundId])
+  @@index([createdAt])
+  @@index([sourceMode])
 }

@@ -338,4 +338,160 @@ describe('PetPal API integration', () => {
     assert.ok(amountPaid - amountRefunded >= 0);
     assert.ok(amountPaid >= amountTotal + amountAdjusted - amountRefunded);
   });
+
+  it('persists callback audit records for payment and refund callbacks', async () => {
+    const { app, prisma } = context;
+
+    // Setup: Get existing order from seed data
+    const baseOrder = await prisma.orderMain.findUnique({
+      where: { orderNo: 'PP202603300001' },
+      select: {
+        id: true,
+        ownerId: true,
+        caregiverId: true,
+      },
+    });
+    assert.ok(baseOrder, 'Base order should exist from seed data');
+
+    const auditPayment = await prisma.paymentRecord.create({
+      data: {
+        id: `pay-audit-${Date.now().toString(36)}`,
+        orderId: baseOrder.id,
+        payNo: `PAY-AUDIT-${Date.now()}`,
+        bizType: 'BALANCE',
+        payChannel: 'WECHAT',
+        payStatus: 'PENDING',
+        payAmount: 100,
+      },
+    });
+
+    // Execute: Send payment callback
+    const channelTxnId = `WXTXN-AUDIT-${Date.now()}`;
+    const paymentCallbackResponse = await request(app)
+      .post('/api/petpal/payments/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        payNo: auditPayment.payNo,
+        channelTxnId,
+        success: true,
+        paidAmount: 100,
+      })
+      .expect(200);
+
+    // Verify: Payment callback audit record exists
+    const paymentAudit = await prisma.callbackAudit.findFirst({
+      where: {
+        paymentId: auditPayment.id,
+        callbackType: 'PAYMENT_CALLBACK',
+      },
+    });
+
+    assert.ok(paymentAudit, 'Payment audit record should exist');
+    assert.equal(paymentAudit.callbackStatus, 'SUCCESS', 'Payment audit status should be SUCCESS');
+    assert.equal(paymentAudit.sourceMode, 'TOKEN', 'Payment audit should use TOKEN source mode');
+    assert.ok(paymentAudit.signatureDigest, 'Payment audit should have signature digest');
+    assert.ok(paymentAudit.requestId, 'Payment audit should have requestId');
+    assert.ok(paymentAudit.rawPayload, 'Payment audit should have raw payload');
+    assert.ok(paymentAudit.verificationResult, 'Payment audit should have verification result');
+
+    // Verify: Idempotent callback also creates audit record
+    const idempotentAuditResponse = await request(app)
+      .post('/api/petpal/payments/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        payNo: auditPayment.payNo,
+        channelTxnId,
+        success: true,
+        paidAmount: 100,
+      })
+      .expect(200);
+
+    assert.equal(idempotentAuditResponse.body.data.idempotent, true);
+
+    const idempotentAudits = await prisma.callbackAudit.findMany({
+      where: {
+        paymentId: auditPayment.id,
+        callbackType: 'PAYMENT_CALLBACK',
+      },
+    });
+
+    assert.equal(idempotentAudits.length, 2, 'Should have 2 audit records (initial + idempotent)');
+    assert.ok(idempotentAudits.every(a => a.callbackStatus === 'SUCCESS'));
+
+    // Setup: Create refund for audit testing
+    const refund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-audit-${Date.now().toString(36)}`,
+        orderId: baseOrder.id,
+        paymentId: auditPayment.id,
+        refundNo: `REF-AUDIT-${Date.now()}`,
+        applyUserId: baseOrder.ownerId,
+        refundType: 'PARTIAL',
+        refundReason: 'audit test',
+        refundAmount: 50,
+        refundStatus: 'PENDING',
+      },
+    });
+
+    // Execute: Send refund callback
+    const refundChannelTxnId = `WXREF-AUDIT-${Date.now()}`;
+    const refundCallbackResponse = await request(app)
+      .post('/api/petpal/refunds/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        refundNo: refund.refundNo,
+        channelRefundId: refundChannelTxnId,
+        success: true,
+      })
+      .expect(200);
+
+    // Verify: Refund callback audit record exists
+    const refundAudit = await prisma.callbackAudit.findFirst({
+      where: {
+        refundId: refund.id,
+        callbackType: 'REFUND_CALLBACK',
+      },
+    });
+
+    assert.ok(refundAudit, 'Refund audit record should exist');
+    assert.equal(refundAudit.callbackStatus, 'SUCCESS', 'Refund audit status should be SUCCESS');
+    assert.equal(refundAudit.sourceMode, 'TOKEN', 'Refund audit should use TOKEN source mode');
+    assert.ok(refundAudit.signatureDigest, 'Refund audit should have signature digest');
+    assert.ok(refundAudit.verificationResult, 'Refund audit should have verification result');
+
+    // Verify: Failed callbacks also create audit records
+    const failedRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-fail-${Date.now().toString(36)}`,
+        orderId: baseOrder.id,
+        paymentId: auditPayment.id,
+        refundNo: `REF-FAIL-${Date.now()}`,
+        applyUserId: baseOrder.ownerId,
+        refundType: 'PARTIAL',
+        refundReason: 'failed audit test',
+        refundAmount: 25,
+        refundStatus: 'PENDING',
+      },
+    });
+
+    const failedCallbackResponse = await request(app)
+      .post('/api/petpal/refunds/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        refundNo: failedRefund.refundNo,
+        channelRefundId: `WXREF-FAIL-${Date.now()}`,
+        success: false,
+      })
+      .expect(200);
+
+    const failedRefundAudit = await prisma.callbackAudit.findFirst({
+      where: {
+        refundId: failedRefund.id,
+        callbackType: 'REFUND_CALLBACK',
+      },
+    });
+
+    assert.ok(failedRefundAudit, 'Failed refund audit record should exist');
+    assert.equal(failedRefundAudit.callbackStatus, 'FAILURE', 'Failed audit status should be FAILURE');
+  });
 });

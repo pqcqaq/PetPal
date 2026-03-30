@@ -55,12 +55,22 @@ const petpalRouter = Router();
 petpalRouter.post('/payments/callback', asyncHandler(async (req, res) => {
   const authMeta = verifyPetpalCallbackAuth(req.headers, req.rawBody ?? JSON.stringify(req.body ?? {}));
   const payload = paymentCallbackSchema.parse(req.body);
-  const result = await petpalService.handlePaymentCallback(payload);
+  const requestId = getRequestId() || 'unknown';
+  const result = await petpalService.handlePaymentCallback({
+    ...payload,
+    auditInfo: {
+      requestId,
+      sourceMode: authMeta.sourceMode,
+      signatureDigest: authMeta.signatureDigest,
+      callbackTimestamp: authMeta.callbackTimestamp,
+      rawPayload: req.rawBody ?? JSON.stringify(req.body ?? {}),
+    },
+  });
   return ok(res, {
     ...result,
     callbackAuth: {
       ...authMeta,
-      requestId: getRequestId(),
+      requestId,
     },
   }, 'Payment callback handled');
 }));
@@ -68,12 +78,22 @@ petpalRouter.post('/payments/callback', asyncHandler(async (req, res) => {
 petpalRouter.post('/refunds/callback', asyncHandler(async (req, res) => {
   const authMeta = verifyPetpalCallbackAuth(req.headers, req.rawBody ?? JSON.stringify(req.body ?? {}));
   const payload = refundCallbackSchema.parse(req.body);
-  const result = await petpalService.handleRefundCallback(payload);
+  const requestId = getRequestId() || 'unknown';
+  const result = await petpalService.handleRefundCallback({
+    ...payload,
+    auditInfo: {
+      requestId,
+      sourceMode: authMeta.sourceMode,
+      signatureDigest: authMeta.signatureDigest,
+      callbackTimestamp: authMeta.callbackTimestamp,
+      rawPayload: req.rawBody ?? JSON.stringify(req.body ?? {}),
+    },
+  });
   return ok(res, {
     ...result,
     callbackAuth: {
       ...authMeta,
-      requestId: getRequestId(),
+      requestId,
     },
   }, 'Refund callback handled');
 }));
