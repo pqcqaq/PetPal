@@ -178,6 +178,10 @@ function pickPet(id: string) {
   requestForm.petId = id
 }
 
+function goToOrderDetail(orderId: string) {
+  uni.navigateTo({ url: `/pages/order-detail/index?id=${orderId}` })
+}
+
 onLoad(() => {
   void reloadAll(false)
 })
@@ -255,6 +259,8 @@ onPullDownRefresh(() => {
           :title="order.orderNo"
           :label="`状态：${order.orderStatus}`"
           :value="`实付 ${formatAmount(order.amountPaid)} / 已退 ${formatAmount(order.amountRefunded)}`"
+          is-link
+          @click="() => goToOrderDetail(order.id)"
         />
       </AppList>
       <AppStatus v-else text="暂无订单" />

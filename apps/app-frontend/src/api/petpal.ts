@@ -25,6 +25,10 @@ export function listOrders() {
   return appApi.petpal.orders.list()
 }
 
+export function getOrderDetail(id: string) {
+  return appApi.petpal.orders.detail(id)
+}
+
 export function matchCaregivers(query: MatchCaregiverQuery) {
   return appApi.petpal.match.caregivers(query)
 }

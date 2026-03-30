@@ -116,6 +116,13 @@
             <el-table-column prop="amountTotal" label="总额" min-width="100" />
             <el-table-column prop="amountPaid" label="已付" min-width="100" />
             <el-table-column prop="amountRefunded" label="已退" min-width="100" />
+            <el-table-column label="操作" min-width="100" fixed="right">
+              <template #default="scope">
+                <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
+                  <el-button link type="primary" size="small">查看详情</el-button>
+                </RouterLink>
+              </template>
+            </el-table-column>
           </el-table>
         </el-space>
       </article>

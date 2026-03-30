@@ -101,6 +101,19 @@ export interface RefundRecordBrief {
   reviewedAt: string | null;
 }
 
+export interface PaymentRecordDetail extends PaymentRecordBrief {
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RefundRecordDetail extends RefundRecordBrief {
+  applyUserId: string;
+  reviewedBy: string | null;
+  refundReason: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface OrderRecord {
   id: string;
   orderNo: string;

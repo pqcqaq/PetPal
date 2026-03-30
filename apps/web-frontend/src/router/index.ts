@@ -23,6 +23,12 @@ const routes = [
         meta: { publicPage: true, title: '宠托帮业主工作台' },
       },
       {
+        path: 'petpal/order-detail/:id',
+        name: 'frontend-petpal-order-detail',
+        component: () => import('@/pages/frontend/petpal/OrderDetailView.vue'),
+        meta: { publicPage: true, title: '订单详情' },
+      },
+      {
         path: 'architecture',
         name: 'frontend-architecture',
         component: () => import('@/pages/frontend/architecture/ArchitectureView.vue'),

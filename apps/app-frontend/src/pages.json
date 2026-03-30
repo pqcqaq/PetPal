@@ -59,6 +59,22 @@
       "style": {
         "navigationBarTitleText": "应用设置"
       }
+    },
+    {
+      "path": "pages/petpal/index",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "宠托帮",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/order-detail/index",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "订单详情",
+        "enablePullDownRefresh": true
+      }
     }
   ],
   "subPackages": [],
