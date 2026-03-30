@@ -299,3 +299,42 @@ Last updated: 2026-03-31
 - 后续可添加全文搜索（rawPayload 模糊匹配）。
 - 可添加导出（CSV/JSON）功能。
 - 可添加实时统计（按 sourceMode、callbackStatus 的聚合计数）。
+
+## 22. PetPal SDK 失败路径测试（P0 Slice 12）
+
+**内容**：后端 SDK 验证路径失败处理单元测试，确保当第三方 SDK 不可用时系统优雅降级。
+
+核心实现：
+
+- 新增单元测试用例（2 个） - `apps/backend/test/services/petpal-callback-auth.test.ts`：
+  1. `returns error when SDK provider is configured but SDK is unavailable`
+     - 场景：配置 WeChat Pay SDK 提供商，但 SDK 依赖不可用或密钥无效。
+     - 预期行为：抛出明确错误（OpenSSL 解码错误或依赖缺失）。
+     - 验证方式：`assert.throws()` 捕获错误，验证消息包含关键词。
+  2. `returns correct metadata with SDK mode in successful callback`
+     - 场景：SDK 模式验证成功。
+     - 预期行为：返回包含 `sourceMode=WECHATPAY_SDK` 的审计元数据。
+     - 验证方式：元数据字段完整性与类型检查。
+
+- 现有测试稳定性保证（6/6 tests pass）：
+  - 前 4 个测试继续通过（TOKEN、HMAC、无效签名、过期时间戳）。
+  - 修复签名生成格式错误（`\\n` → `\n`），确保消息体正确。
+
+验证与设计决策：
+
+- `pnpm --filter @rbac/backend exec node --import tsx --test test/services/petpal-callback-auth.test.ts` 通过（6/6）。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（5/5）。
+- `pnpm --filter @rbac/backend lint` 通过（Prisma + TypeScript）。
+- Git commit：`feat(p0): add SDK failure path tests and fix signature formatting (slice 12)`。
+
+关键设计决策：
+
+- **向后兼容性**：SDK 模式是可选配置项，TOKEN 与 HMAC 模式不受影响。
+- **测试环境与生产环境分离**：测试中 SDK 不可用（使用虚拟密钥触发 OpenSSL 错误），生产环境应使用官方 SDK 与有效公钥证书。
+- **审计链完整性**：无论 SDK 验证成功或失败，都会创建 CallbackAudit 记录（见 Slice 10），便于问题追踪。
+
+已识别的优化空间：
+
+- 后续可集成官方 WeChat Pay SDK，使用真实公钥进行端到端测试。
+- 可添加性能基准测试（SDK vs HMAC 验证耗时）。
+- 可添加 SDK 验证失败的重试与降级策略。

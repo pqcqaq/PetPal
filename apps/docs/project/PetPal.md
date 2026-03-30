@@ -1473,3 +1473,42 @@ gantt
 1. 管理端审计日志 UI 列表与搜索面板（Web）。
 2. 审计详情弹窗（JSON 展示 rawPayload、verificationResult）。
 3. 导出审计日志为 CSV 或 JSON。
+
+### 14.12 2026-04-01（P0 Slice 12）
+
+**概述**：SDK 失败路径测试验证 — 确保当 WeChat Pay 官方 SDK 无可用时优雅降级处理。
+
+已完成：
+
+- 新增单元测试用例（2 个）在 `test/services/petpal-callback-auth.test.ts`：
+  - 测试 1：`returns error when SDK provider is configured but SDK is unavailable`
+    - 场景：配置 mode 为 `WECHATPAY`，`wechatpayVerifyProvider` 为 `SDK`。
+    - 预期：SDK 初始化失败（无有效公钥或 SDK 库不可用）时抛出明确错误。
+    - 验证：`assert.throws()` 断言捕获错误，验证错误消息包含 "SDK"、"DECODER"、"unsupported" 等关键词。
+  - 测试 2：`returns correct metadata with SDK mode in successful callback`
+    - 场景：SDK 模式下回调验证成功。
+    - 预期：返回正确的审计元数据，包括 `sourceMode=WECHATPAY_SDK`、`signatureDigest`、`callbackTimestamp`。
+    - 验证：元数据字段完整性与类型正确性。
+
+- 现有测试维持稳定：
+  - 测试 1-4 继续通过（TOKEN 模式、HMAC 签名、无效签名、过期时间戳）。
+  - 修复签名生成格式：将 `${timestamp}\\n` 改为 `${timestamp}\n` 确保正确的签名消息体。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend exec node --import tsx --test test/services/petpal-callback-auth.test.ts` 通过（6/6）。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（5/5）。
+- `pnpm --filter @rbac/backend lint` 通过（Prisma + TypeScript）。
+- Git commit：`feat(p0): add SDK failure path tests and fix signature formatting (slice 12)`。
+
+关键设计决策：
+
+- **SDK 失败处理**：测试验证包括 OpenSSL 解码错误（DECODER routines::unsupported），实际生产环境中官方 WeChat Pay SDK 应包含有效的公钥证书。
+- **向后兼容性**：SDK 模式是可选配置（wechatpayVerifyProvider），现有 TOKEN 和 HMAC 模式不受影响。
+- **审计完整性**：无论 SDK 成功或失败，回调记录都会被持久化（见 Slice 10）。
+
+后续计划：
+
+- P0 Slice 11 Part 2：管理端审计日志 UI（Web 端列表、搜索、详情弹窗）。
+- P0 Slice 11 Part 3：统计聚合与导出功能（CSV/JSON）。
+- P0 最终验收：全量集成测试、文档同步、灰度部署计划。
