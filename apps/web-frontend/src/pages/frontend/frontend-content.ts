@@ -1,5 +1,6 @@
 export const frontendNavItems = [
   { label: '项目首页', to: '/', eyebrow: '概览' },
+  { label: '宠托帮', to: '/petpal', eyebrow: '业务' },
   { label: '系统结构', to: '/architecture', eyebrow: '结构' },
   { label: '登录方式', to: '/authentication', eyebrow: '认证' },
 ] as const;

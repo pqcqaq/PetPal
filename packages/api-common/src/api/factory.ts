@@ -36,6 +36,16 @@ import type {
   UploadPrepareResult,
 } from '../types/files';
 import type {
+  CreatePetPayload,
+  CreateServiceRequestPayload,
+  MatchCaregiverQuery,
+  MatchedCaregiverPage,
+  OrderDetailRecord,
+  OrderRecord,
+  PetProfileRecord,
+  ServiceRequestRecord,
+} from '../types/petpal';
+import type {
   AuthClientFormPayload,
   AuthClientRecord,
   DashboardSummary,
@@ -363,6 +373,37 @@ export const createApiFactory = (options: ClientOptions) => {
           method: 'POST',
           data: { content },
         }),
+    },
+    petpal: {
+      pets: {
+        list: () => client.request<PetProfileRecord[]>({ url: '/petpal/pets' }),
+        create: (payload: CreatePetPayload) =>
+          client.request<PetProfileRecord>({
+            url: '/petpal/pets',
+            method: 'POST',
+            data: payload,
+          }),
+      },
+      requests: {
+        list: () => client.request<ServiceRequestRecord[]>({ url: '/petpal/requests' }),
+        create: (payload: CreateServiceRequestPayload) =>
+          client.request<ServiceRequestRecord>({
+            url: '/petpal/requests',
+            method: 'POST',
+            data: payload,
+          }),
+      },
+      orders: {
+        list: () => client.request<OrderRecord[]>({ url: '/petpal/orders' }),
+        detail: (id: string) => client.request<OrderDetailRecord>({ url: `/petpal/orders/${id}` }),
+      },
+      match: {
+        caregivers: (query: MatchCaregiverQuery) =>
+          client.request<MatchedCaregiverPage>({
+            url: '/petpal/match/caregivers',
+            params: query as unknown as QueryParams,
+          }),
+      },
     },
   };
 };

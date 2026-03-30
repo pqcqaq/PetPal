@@ -1,6 +1,6 @@
 # Implementation History
 
-Last updated: 2026-03-29
+Last updated: 2026-03-31
 
 本文档记录最近一轮主要实现成果，用于帮助后续开发者快速恢复项目上下文。它不是计划，也不是宣传文案，而是“已经落地了什么”的摘要。
 
@@ -130,3 +130,13 @@ Last updated: 2026-03-29
 - `packages/api-common` 新增授权会话与决策类型，并在 API factory 中补充对应客户端调用。
 - web 前端新增 OAuth 授权确认页与错误页，实现会话加载、同意/拒绝提交和错误兜底跳转。
 - backend 旧的 OAuth 页面模板与 EJS 依赖已移除，授权流程职责收敛为“协议处理 + API 提供”。
+
+## 14. PetPal P0 前端首批落地
+
+- `packages/api-common` 新增 PetPal 共享契约与 API 工厂端点，统一 Web 与 Uni 的请求边界。
+- Web 前台新增 `'/petpal'` 业务页，提供宠物档案、需求发布、订单总览、照料者匹配的最小闭环。
+- Uni 端新增 `pages/petpal/index`，并在首页快捷入口挂载“宠托帮”。
+- 本轮验证通过：
+  - `pnpm --filter @rbac/api-common build`
+  - `pnpm --filter @rbac/web-frontend lint`
+  - `pnpm --filter @rbac/app-frontend type-check`

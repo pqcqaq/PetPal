@@ -88,6 +88,10 @@ function openSettings() {
   uni.navigateTo({ url: '/pages/settings/index' })
 }
 
+function openPetPal() {
+  uni.navigateTo({ url: '/pages/petpal/index' })
+}
+
 onLoad(() => {
   void loadSummary(false)
 })
@@ -113,6 +117,7 @@ onPullDownRefresh(() => {
 
     <AppSection title="快捷入口" description="常用功能入口。">
       <AppList>
+        <AppListItem title="宠托帮" label="管理宠物档案、照料需求和订单。" is-link clickable @click="openPetPal" />
         <AppListItem title="个人信息" label="查看账号资料、角色和权限。" is-link clickable @click="openProfile" />
         <AppListItem title="应用设置" label="配置主题、密度、门户布局和动效。" is-link clickable @click="openSettings" />
       </AppList>

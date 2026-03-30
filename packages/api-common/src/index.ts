@@ -3,6 +3,7 @@ export * from './types/common';
 export * from './types/oauth';
 export * from './types/rbac';
 export * from './types/files';
+export * from './types/petpal';
 export * from './types/realtime';
 export * from './client/core';
 export * from './client/adapters/fetch';

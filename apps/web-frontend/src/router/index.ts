@@ -17,6 +17,12 @@ const routes = [
         meta: { publicPage: true, title: '项目首页' },
       },
       {
+        path: 'petpal',
+        name: 'frontend-petpal',
+        component: () => import('@/pages/frontend/petpal/PetPalOwnerView.vue'),
+        meta: { publicPage: true, title: '宠托帮业主工作台' },
+      },
+      {
         path: 'architecture',
         name: 'frontend-architecture',
         component: () => import('@/pages/frontend/architecture/ArchitectureView.vue'),
