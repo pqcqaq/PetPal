@@ -140,3 +140,36 @@ Last updated: 2026-03-31
   - `pnpm --filter @rbac/api-common build`
   - `pnpm --filter @rbac/web-frontend lint`
   - `pnpm --filter @rbac/app-frontend type-check`
+
+## 15. PetPal 订单详情页与支付/退款时间线展示 (P0 Slice 5)
+
+- **后端 API**：已完成 `GET /api/petpal/orders/:id` 返回完整订单记录，包含 payments 和 refunds 数组。
+- **共享契约扩展**：
+  - `packages/api-common` 新增 `PaymentRecordDetail` 与 `RefundRecordDetail` 接口，扩展了时间戳、操作者和原因字段。
+  - `OrderDetailRecord` extends `OrderRecord`，确保兼容现有订单结构。
+- **Web 前台订单详情页**：
+  - 新建 `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`（476 行）。
+  - 布局为：订单基础信息卡 → 金额统计卡 → 支付时间线 → 退款时间线。
+  - 支付/退款记录以时间线形式展示，包含：编号、状态标签、金额、类型、完成时间。
+  - 状态类型映射 (TypeScript literal union) 用于 Element Plus 表签元素。
+  - `amountAdjusted` 通过 `Number()` 强制转换后参与大小比较，确保类型安全。
+  - 路由集成：`/petpal/order-detail/:id` 作为新路由入口。
+  - PetPalOwnerView.vue 订单表新增"操作"列，点击"查看详情"按钮导航。
+- **Uni 端订单详情页**：
+  - 新建 `apps/app-frontend/src/pages/order-detail/index.vue`（444 行）。
+  - 同步 Web 的页面结构与时间线展示逻辑。
+  - 使用 `onLoad` 生命周期钩子捕获页面参数（`?id=xxx`）。
+  - 自定义组件（AppPageShell / AppSection）替代 Element Plus 组件。
+  - 实施 `uni.navigateBack()` 导航 API 调用。
+  - pages.json 新增 `petpal` 和 `order-detail` 分页配置。
+  - pages/petpal/index.vue 订单列表新增导航跳转 (`goToOrderDetail` 方法)。
+  - 新增 `getOrderDetail` API 包装函数。
+- **验证与类型安全**：
+  - 全文关键问题：`AmountValue` 类型为 `number | string` 联合体，算术操作前必须 `Number()` 强制转换。
+  - `uni` 全局对象只能在脚本任务里直接调用，模板里需要通过方法代入而非行内表达式。
+  - 重构后验证通过：
+    - `pnpm --filter @rbac/api-common build` ✓
+    - `pnpm --filter @rbac/web-frontend lint` ✓
+    - `pnpm --filter @rbac/app-frontend type-check` ✓
+- **Git 提交**：`feat(p0): deliver petpal order-detail bilateral pages (slice 5)` 
+  - 8 files changed, 972 insertions(+), 创建 OrderDetailView.vue 与 order-detail/index.vue 两个详情页。
