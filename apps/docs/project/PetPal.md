@@ -1596,6 +1596,10 @@ gantt
 - `pnpm --filter @rbac/backend lint` 通过。
 - `pnpm --filter @rbac/web-frontend lint` 通过。
 - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（5/5）。
+- 新增集成测试覆盖：
+  - `GET /api/petpal/admin/callback-audits/stats`（统计字段与筛选条件）。
+  - `GET /api/petpal/admin/callback-audits/export`（Excel 导出头与二进制响应）。
+  - 回归后 `petpal-api` 集成测试通过（6/6）。
 
 关键设计决策：
 

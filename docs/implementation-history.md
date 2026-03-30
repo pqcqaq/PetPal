@@ -409,6 +409,13 @@ Last updated: 2026-03-31
 - `pnpm --filter @rbac/web-frontend lint` 通过。
 - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（5/5）。
 
+测试补强（本轮增量）：
+
+- `apps/backend/test/integration/petpal-api.test.ts` 新增用例：
+  - 覆盖 `/api/petpal/admin/callback-audits/stats` 聚合统计返回结构。
+  - 覆盖 `/api/petpal/admin/callback-audits/export` Excel 导出响应（content-type/content-disposition/二进制体）。
+- `petpal-api` 集成测试总数由 5 提升到 6，回归结果 6/6 通过。
+
 关键设计决策：
 
 - 统一过滤解析 + where 复用，确保列表与统计口径一致。

@@ -602,4 +602,75 @@ describe('PetPal API integration', () => {
     assert.equal(page2Response.body.data.pagination.page, 2);
     assert.equal(page2Response.body.data.pagination.pageSize, 5);
   });
+
+  it('admin can query callback audit stats and export audit logs', async () => {
+    const { app, prisma } = context;
+
+    const adminSession = await loginAs(app, 'user', 'User123!');
+
+    const baseOrder = await prisma.orderMain.findUnique({
+      where: { orderNo: 'PP202603300001' },
+      select: { id: true },
+    });
+    assert.ok(baseOrder);
+
+    const paymentForStats = await prisma.paymentRecord.create({
+      data: {
+        id: `pay-stats-${Date.now().toString(36)}`,
+        orderId: baseOrder.id,
+        payNo: `PAY-STATS-${Date.now()}`,
+        bizType: 'BALANCE',
+        payChannel: 'WECHAT',
+        payStatus: 'PENDING',
+        payAmount: 33,
+      },
+    });
+
+    await request(app)
+      .post('/api/petpal/payments/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        payNo: paymentForStats.payNo,
+        channelTxnId: `WXTXN-STATS-${Date.now()}`,
+        success: true,
+        paidAmount: 33,
+      })
+      .expect(200);
+
+    const statsResponse = await request(app)
+      .get('/api/petpal/admin/callback-audits/stats?sourceMode=TOKEN')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(typeof statsResponse.body.data.total === 'number');
+    assert.ok(typeof statsResponse.body.data.successRate === 'number');
+    assert.ok(typeof statsResponse.body.data.byStatus.SUCCESS === 'number');
+    assert.ok(typeof statsResponse.body.data.byType.PAYMENT_CALLBACK === 'number');
+    assert.ok(typeof statsResponse.body.data.bySourceMode.TOKEN === 'number');
+    assert.ok(statsResponse.body.data.total >= 1);
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/admin/callback-audits/export?sourceMode=TOKEN')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse((res, callback) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        res.on('end', () => callback(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+
+    const contentType = String(exportResponse.headers['content-type'] ?? '');
+    const contentDisposition = String(exportResponse.headers['content-disposition'] ?? '');
+
+    assert.match(
+      contentType,
+      /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/,
+    );
+    assert.match(contentDisposition, /attachment;\s*filename=/i);
+    assert.ok(Buffer.isBuffer(exportResponse.body));
+    assert.ok(exportResponse.body.length > 0);
+  });
 });
