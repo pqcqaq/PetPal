@@ -12,6 +12,7 @@ import { clientsRouter } from './clients';
 import { attachmentsRouter } from './attachments';
 import { oauthManagementRouter } from './oauth';
 import { realtimeTopicsRouter } from './realtime-topics';
+import { petpalRouter } from './petpal';
 import { ok } from '../utils/http';
 
 const apiRouter = Router();
@@ -30,6 +31,7 @@ apiRouter.use('/files', filesRouter);
 apiRouter.use('/attachments', attachmentsRouter);
 apiRouter.use('/realtime-topics', realtimeTopicsRouter);
 apiRouter.use('/realtime', realtimeRouter);
+apiRouter.use('/petpal', petpalRouter);
 
 export { apiRouter };
 
