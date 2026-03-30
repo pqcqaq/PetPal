@@ -1283,3 +1283,35 @@ gantt
 1. 在适配层引入微信支付官方 SDK 验签实现（按环境变量切换）。
 2. 为支付/退款回调新增乱序、重复、失败后成功恢复的集成测试。
 3. 补充回调审计字段（requestId、sourceMode、signatureDigest）并输出查询接口。
+
+### 14.7 2026-03-31（P0 Slice 7）
+
+已完成：
+
+- 扩展 PetPal 回调集成测试：`apps/backend/test/integration/petpal-api.test.ts`。
+- 在“payment/refund callback idempotency”场景中新增边界路径：
+  - 支付回调失败 -> 成功恢复（同 `payNo` 不同 `channelTxnId`）。
+  - 退款回调失败 -> 成功恢复（同 `refundNo` 不同 `channelRefundId`）。
+  - 覆盖失败状态到成功状态的状态机恢复行为，验证聚合金额约束仍成立。
+- 修正测试数据与 Prisma 枚举保持一致：
+  - `PaymentBizType`: `BALANCE`
+  - `RefundType`: `PARTIAL`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（3/3）。
+
+进行中：
+
+- P0 Slice 8：接入微信支付官方 SDK 验签器并保持当前适配层接口不变。
+
+风险与缓解：
+
+- 风险：当前 WECHATPAY 模式为接入路径实现，签名算法与证书链校验仍需官方 SDK 接管。
+- 缓解：保留 `verifyPetpalCallbackAuth` 统一入口，后续仅替换 WECHATPAY 分支实现，避免业务路由变更。
+
+下一步（1-3 项）：
+
+1. 引入微信支付官方 SDK 并封装为 `WECHATPAY` 鉴权实现。
+2. 增加验签失败与时间戳超时的回调拒绝测试。
+3. 增加回调审计明细字段并补查询接口。

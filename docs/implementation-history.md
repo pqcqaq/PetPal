@@ -190,3 +190,13 @@ Last updated: 2026-03-31
 - 本轮验证通过：
   - `pnpm --filter @rbac/backend lint`
   - `pnpm --filter @rbac/backend exec node --import tsx --test test/services/petpal-callback-auth.test.ts`
+
+## 17. PetPal 回调状态机边界测试加固（P0 Slice 7）
+
+- `apps/backend/test/integration/petpal-api.test.ts` 增加支付/退款回调边界用例：
+  - 支付失败后成功恢复。
+  - 退款失败后成功恢复。
+  - 幂等回调与恢复回调混合场景下金额守恒断言。
+- 测试数据枚举与 Prisma 模型保持一致（`BALANCE`、`PARTIAL`），避免无效枚举导致误报。
+- 本轮验证通过：
+  - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts`

@@ -157,6 +157,7 @@ describe('PetPal API integration', () => {
       where: { orderNo: 'PP202603300001' },
       select: {
         id: true,
+        ownerId: true,
       },
     });
     assert.ok(baseOrder);
@@ -210,6 +211,45 @@ describe('PetPal API integration', () => {
 
     assert.equal(idempotentPaymentCallback.body.data.idempotent, true);
 
+    const retryPayment = await prisma.paymentRecord.create({
+      data: {
+        id: `pay-retry-${Date.now().toString(36)}`,
+        orderId: baseOrder.id,
+        payNo: `PAY-RETRY-${Date.now()}`,
+        bizType: 'BALANCE',
+        payChannel: 'WECHAT',
+        payStatus: 'PENDING',
+        payAmount: 8,
+      },
+    });
+
+    const failedPaymentCallback = await request(app)
+      .post('/api/petpal/payments/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        payNo: retryPayment.payNo,
+        channelTxnId: `WXTXN-FAIL-${Date.now()}`,
+        success: false,
+      })
+      .expect(200);
+
+    assert.equal(failedPaymentCallback.body.data.idempotent, false);
+    assert.equal(failedPaymentCallback.body.data.payStatus, 'FAILED');
+
+    const recoveredPaymentCallback = await request(app)
+      .post('/api/petpal/payments/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        payNo: retryPayment.payNo,
+        channelTxnId: `WXTXN-RECOVER-${Date.now()}`,
+        success: true,
+        paidAmount: 8,
+      })
+      .expect(200);
+
+    assert.equal(recoveredPaymentCallback.body.data.idempotent, false);
+    assert.equal(recoveredPaymentCallback.body.data.payStatus, 'PAID');
+
     const refund = await prisma.refundRecord.findUnique({
       where: {
         refundNo: 'REF202603300001',
@@ -232,6 +272,46 @@ describe('PetPal API integration', () => {
       .expect(200);
 
     assert.equal(typeof refundCallback.body.data.idempotent, 'boolean');
+
+    const retryRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-retry-${Date.now().toString(36)}`,
+        orderId: baseOrder.id,
+        paymentId: retryPayment.id,
+        refundNo: `REF-RETRY-${Date.now()}`,
+        applyUserId: baseOrder.ownerId,
+        refundType: 'PARTIAL',
+        refundReason: 'retry case',
+        refundAmount: 2,
+        refundStatus: 'PENDING',
+      },
+    });
+
+    const failedRefundCallback = await request(app)
+      .post('/api/petpal/refunds/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        refundNo: retryRefund.refundNo,
+        channelRefundId: `WXREF-FAIL-${Date.now()}`,
+        success: false,
+      })
+      .expect(200);
+
+    assert.equal(failedRefundCallback.body.data.idempotent, false);
+    assert.equal(failedRefundCallback.body.data.refundStatus, 'FAILED');
+
+    const recoveredRefundCallback = await request(app)
+      .post('/api/petpal/refunds/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        refundNo: retryRefund.refundNo,
+        channelRefundId: `WXREF-RECOVER-${Date.now()}`,
+        success: true,
+      })
+      .expect(200);
+
+    assert.equal(recoveredRefundCallback.body.data.idempotent, false);
+    assert.equal(recoveredRefundCallback.body.data.refundStatus, 'SUCCESS');
 
     const order = await prisma.orderMain.findUnique({
       where: {
