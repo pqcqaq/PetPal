@@ -1540,7 +1540,7 @@ gantt
   - `apps/backend/src/services/system-rbac.ts` 增加菜单节点：
     - `path: /petpal/callback-audits`
     - `viewKey: callback-audit`
-    - `permissionCode: audit.read`
+    - `permissionCode: petpal.callback-audit.read`
 
 验证结果：
 
@@ -1558,3 +1558,72 @@ gantt
 
 - P0 Slice 11 Part 3：统计聚合接口 + CSV/JSON 导出。
 - P0 最终验收：端到端冒烟、菜单可见性与权限校验、文档收口。
+
+### 14.14 2026-04-01（P0 Slice 11 Part 3）
+
+**概述**：补全回调审计统计与导出能力，形成“查询 + 统计 + 导出”闭环。
+
+已完成：
+
+- 后端服务层扩展（`apps/backend/src/services/petpal-service.ts`）：
+  - 新增 `queryCallbackAuditStats(filters)`：
+    - 统计总量 `total`。
+    - 按状态统计 `byStatus`（PENDING/SUCCESS/FAILURE/ERROR）。
+    - 按类型统计 `byType`（PAYMENT_CALLBACK/REFUND_CALLBACK）。
+    - 按来源统计 `bySourceMode`（TOKEN/WECHATPAY_HMAC/WECHATPAY_SDK）。
+    - 输出 `successRate` 百分比。
+  - 新增 `listCallbackAuditExportRows(filters)`：
+    - 按过滤条件导出审计记录（最多 5000 条）。
+    - 包含支付/退款关联字段。
+- 后端路由扩展（`apps/backend/src/routes/petpal.ts`）：
+  - `GET /api/petpal/admin/callback-audits/stats`
+  - `GET /api/petpal/admin/callback-audits/export`
+  - 共用 `parseCallbackAuditQuery`，确保查询、统计、导出过滤行为一致。
+- 前端与共享契约扩展：
+  - `packages/api-common/src/types/petpal.ts` 新增 `CallbackAuditStats`。
+  - `packages/api-common/src/api/factory.ts` 新增：
+    - `api.petpal.admin.callbackAuditStats(query)`
+    - `api.petpal.admin.exportCallbackAudits(query)`
+  - `CallbackAuditView.vue` 接入统计 API 与导出按钮 `ListExportButton`。
+  - 页面指标改为使用后端聚合统计，避免前端基于单页数据估算。
+- 权限与菜单细化：
+  - 新增系统权限码：`petpal.callback-audit.read`。
+  - 回调审计菜单改为绑定该权限码，避免 `MenuNode.permissionId` 唯一约束冲突。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（5/5）。
+
+关键设计决策：
+
+- 统计接口与列表接口共享过滤条件解析，保证同一筛选条件下的数据一致性。
+- 导出优先复用现有 Excel 导出基础设施，降低维护成本。
+- 保持管理端接口鉴权行为与现有测试基线一致，权限细化先落在菜单展示层。
+
+### 14.15 2026-04-01（P0 最终验收）
+
+验收结论：**P0 当前范围已完成**（Slice 10、Slice 11 Part 1/2/3、Slice 12）。
+
+验收清单：
+
+- 回调审计持久化：完成。
+- 管理端审计查询 API：完成。
+- 管理端审计 UI：完成。
+- 统计与导出能力：完成。
+- SDK 失败路径测试：完成。
+- 编译与测试验证：完成。
+
+本轮最终验证证据：
+
+- 后端 lint：通过。
+- Web 前端 lint：通过。
+- PetPal 集成测试：通过（5/5）。
+
+后续建议（进入 P1）：
+
+1. 对管理端回调审计接口补充更细粒度接口权限校验。
+2. 为统计与导出补充接口级自动化测试。
+3. 评估 CallbackAudit 表分区与归档策略。

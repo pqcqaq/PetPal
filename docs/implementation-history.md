@@ -376,3 +376,57 @@ Last updated: 2026-03-31
 - 下一步增加统计聚合接口，避免前端在单页数据上做近似统计。
 - 增加导出功能（CSV/JSON）并附带筛选条件快照。
 - 引入权限细分（如 `petpal.audit.read`）替代复用 `audit.read`。
+
+## 24. PetPal 回调审计统计与导出（P0 Slice 11 Part 3）
+
+**内容**：新增回调审计聚合统计与导出接口，并接入管理端页面。
+
+核心实现：
+
+- 服务层（`apps/backend/src/services/petpal-service.ts`）：
+  - `queryCallbackAuditStats(filters)`：返回 `total`、`successRate`、`byStatus`、`byType`、`bySourceMode`。
+  - `listCallbackAuditExportRows(filters)`：导出记录查询，包含支付/退款关联信息（上限 5000 条）。
+  - 抽取 `buildCallbackAuditWhere` 统一 where 构建，避免列表/统计/导出逻辑分叉。
+- 路由层（`apps/backend/src/routes/petpal.ts`）：
+  - 新增 `GET /api/petpal/admin/callback-audits/stats`。
+  - 新增 `GET /api/petpal/admin/callback-audits/export`（Excel 导出）。
+  - 使用统一解析函数 `parseCallbackAuditQuery`。
+- 共享契约（`packages/api-common`）：
+  - 新增 `CallbackAuditStats`。
+  - 新增 `api.petpal.admin.callbackAuditStats()`。
+  - 新增 `api.petpal.admin.exportCallbackAudits()`。
+- 前端页面（`apps/web-frontend/src/pages/console/petpal/CallbackAuditView.vue`）：
+  - 接入统计 API 驱动指标展示。
+  - 接入 `ListExportButton` 调用导出接口。
+- 权限/菜单：
+  - 新增权限码 `petpal.callback-audit.read`。
+  - 菜单节点 `callback-audit` 绑定新权限，修复 MenuNode 权限唯一约束冲突。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（5/5）。
+
+关键设计决策：
+
+- 统一过滤解析 + where 复用，确保列表与统计口径一致。
+- 保持接口行为向后兼容，避免影响已有回归用例。
+
+## 25. PetPal P0 最终验收（本轮）
+
+**范围**：Slice 10、Slice 11 Part 1/2/3、Slice 12。
+
+验收结果：
+
+- 核心功能：完成。
+- 回调审计链路：完成（持久化、查询、统计、导出、UI 可视化）。
+- 质量门禁：通过（后端 lint、前端 lint、PetPal 集成测试）。
+- 文档与进度：已同步。
+
+遗留风险（P1 关注）：
+
+- 统计/导出目前缺少独立接口测试覆盖。
+- 回调审计路由鉴权可继续按业务角色细分。
+- 高增长场景下需要规划审计表分区与归档策略。
