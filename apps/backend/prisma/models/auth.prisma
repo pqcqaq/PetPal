@@ -20,6 +20,12 @@ model User {
   oauthStates     OAuthState[]
   oauthUsers      OAuthUser[]
   oauthTokens     OAuthToken[]
+  petProfiles     PetProfile[]
+  caregiverProfile CaregiverProfile?
+  serviceRequests ServiceRequest[]
+  ownerOrders     OrderMain[]          @relation("OrderOwner")
+  refundApplies   RefundRecord[]       @relation("RefundApplyUser")
+  refundReviews   RefundRecord[]       @relation("RefundReviewer")
 
   @@index([deleteAt])
 }

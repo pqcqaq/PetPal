@@ -96,3 +96,72 @@ enum MenuNodeType {
   PAGE
   ACTION
 }
+
+enum PetSpecies {
+  DOG
+  CAT
+  OTHER
+}
+
+enum PetGender {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+enum CaregiverAuditStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PetServiceType {
+  BOARDING
+  WALKING
+  FEEDING
+  DOOR_VISIT
+}
+
+enum ServiceRequestStatus {
+  OPEN
+  MATCHED
+  CLOSED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING_ACCEPT
+  ACCEPTED
+  SERVING
+  COMPLETED
+  CANCELLED
+  DISPUTED
+  PARTIAL_REFUNDED
+  REFUNDED
+}
+
+enum PaymentBizType {
+  DEPOSIT
+  BALANCE
+  ADJUSTMENT
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CLOSED
+}
+
+enum RefundType {
+  FULL
+  PARTIAL
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUCCESS
+  FAILED
+}

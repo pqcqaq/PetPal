@@ -10,6 +10,13 @@ import { syncUserRoles } from '../src/services/rbac-write';
 export async function seedDatabase(prisma: PrismaClient) {
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      "RefundRecord",
+      "PaymentRecord",
+      "OrderMain",
+      "ServiceRequest",
+      "CaregiverService",
+      "CaregiverProfile",
+      "PetProfile",
       "VerificationCode",
       "UserAuthentication",
       "AuthStrategy",
@@ -141,6 +148,155 @@ export async function seedDatabase(prisma: PrismaClient) {
     }),
   });
   await syncUserRoles(member.id, [userRole.id]);
+
+  const managerCaregiverProfile = await prisma.caregiverProfile.create({
+    data: withSnowflakeId({
+      userId: manager.id,
+      intro: '5 年宠物照料经验，擅长犬猫日常照料。',
+      experienceYears: 5,
+      serviceRadiusKm: 8,
+      serviceCity: '杭州',
+      ratingAvg: 4.8,
+      ratingCount: 126,
+      auditStatus: 'APPROVED',
+    }),
+  });
+
+  await prisma.caregiverService.createMany({
+    data: withSnowflakeIds([
+      {
+        caregiverId: managerCaregiverProfile.id,
+        serviceType: 'WALKING',
+        petSpecies: 'DOG',
+        pricePerUnit: 39.9,
+        unitType: 'times',
+        minNoticeHours: 2,
+        availableSlots: {
+          weekdays: ['09:00-11:00', '18:00-21:00'],
+          weekends: ['10:00-20:00'],
+        },
+        serviceCity: '杭州',
+        serviceLat: 30.2741,
+        serviceLng: 120.1551,
+        isActive: true,
+      },
+      {
+        caregiverId: managerCaregiverProfile.id,
+        serviceType: 'FEEDING',
+        petSpecies: 'CAT',
+        pricePerUnit: 29.9,
+        unitType: 'times',
+        minNoticeHours: 1,
+        availableSlots: {
+          weekdays: ['07:00-09:00', '19:00-22:00'],
+        },
+        serviceCity: '杭州',
+        serviceLat: 30.2735,
+        serviceLng: 120.152,
+        isActive: true,
+      },
+    ]),
+  });
+
+  const memberPet = await prisma.petProfile.create({
+    data: withSnowflakeId({
+      ownerId: member.id,
+      name: '豆包',
+      species: 'DOG',
+      breed: '柯基',
+      gender: 'MALE',
+      weightKg: 12.3,
+      neutered: true,
+      temperamentTags: ['friendly', 'active'],
+      feedingNote: '早晚各一次，避免乳制品。',
+      emergencyContact: {
+        name: '张三',
+        phone: '13800009999',
+      },
+    }),
+  });
+
+  const request = await prisma.serviceRequest.create({
+    data: withSnowflakeId({
+      ownerId: member.id,
+      petId: memberPet.id,
+      serviceType: 'WALKING',
+      startTime: new Date('2026-04-01T09:00:00.000Z'),
+      endTime: new Date('2026-04-01T10:00:00.000Z'),
+      locationText: '杭州市上城区',
+      locationLat: 30.255,
+      locationLng: 120.182,
+      budgetAmount: 80,
+      demandTags: ['dog', 'morning'],
+      status: 'MATCHED',
+      matchedCaregiverId: managerCaregiverProfile.id,
+    }),
+  });
+
+  const order = await prisma.orderMain.create({
+    data: withSnowflakeId({
+      orderNo: 'PP202603300001',
+      ownerId: member.id,
+      caregiverId: managerCaregiverProfile.id,
+      serviceRequestId: request.id,
+      serviceType: 'WALKING',
+      appointmentStart: new Date('2026-04-01T09:00:00.000Z'),
+      appointmentEnd: new Date('2026-04-01T10:00:00.000Z'),
+      amountTotal: 80,
+      amountAdjusted: 10,
+      amountPaid: 90,
+      amountRefunded: 20,
+      orderStatus: 'PARTIAL_REFUNDED',
+    }),
+  });
+
+  const firstPayment = await prisma.paymentRecord.create({
+    data: withSnowflakeId({
+      orderId: order.id,
+      payNo: 'PAY202603300001',
+      bizType: 'DEPOSIT',
+      payChannel: 'WECHAT',
+      payStatus: 'PAID',
+      payAmount: 80,
+      channelTxnId: 'WXTXN202603300001',
+      paidAt: new Date('2026-03-30T10:01:00.000Z'),
+      channelPayload: {
+        tradeState: 'SUCCESS',
+      },
+    }),
+  });
+
+  await prisma.paymentRecord.create({
+    data: withSnowflakeId({
+      orderId: order.id,
+      payNo: 'PAY202603300002',
+      bizType: 'ADJUSTMENT',
+      payChannel: 'WECHAT',
+      payStatus: 'PAID',
+      payAmount: 10,
+      channelTxnId: 'WXTXN202603300002',
+      paidAt: new Date('2026-03-30T10:02:00.000Z'),
+      channelPayload: {
+        tradeState: 'SUCCESS',
+      },
+    }),
+  });
+
+  await prisma.refundRecord.create({
+    data: withSnowflakeId({
+      orderId: order.id,
+      paymentId: firstPayment.id,
+      refundNo: 'REF202603300001',
+      applyUserId: member.id,
+      refundType: 'PARTIAL',
+      refundReason: '服务提前结束，申请部分退款。',
+      refundAmount: 20,
+      refundStatus: 'SUCCESS',
+      channelRefundId: 'WXREF202603300001',
+      reviewedBy: admin.id,
+      reviewedAt: new Date('2026-03-30T10:10:00.000Z'),
+    }),
+  });
 
   const passwordSecrets = await Promise.all([
     hashPassword('Admin123!'),
