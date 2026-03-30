@@ -53,8 +53,13 @@ const envSchema = z.object({
   UPLOAD_RECONCILE_BATCH_SIZE: z.coerce.number().int().positive().default(100),
   PETPAL_CALLBACK_AUTH_MODE: z.enum(['TOKEN', 'WECHATPAY']).default('TOKEN'),
   PETPAL_CALLBACK_TOKEN: z.string().default('petpal-dev-callback-token'),
+  PETPAL_WECHATPAY_VERIFY_PROVIDER: z.enum(['HMAC', 'SDK']).default('HMAC'),
   PETPAL_WECHATPAY_NOTIFY_SECRET: z.string().optional().default(''),
   PETPAL_WECHATPAY_TIMESTAMP_TOLERANCE_SECONDS: z.coerce.number().int().positive().default(300),
+  PETPAL_WECHATPAY_MERCHANT_ID: z.string().optional().default(''),
+  PETPAL_WECHATPAY_APP_ID: z.string().optional().default(''),
+  PETPAL_WECHATPAY_CERT_SERIAL_NO: z.string().optional().default(''),
+  PETPAL_WECHATPAY_PLATFORM_PUBLIC_KEY: z.string().optional().default(''),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173,http://localhost:9000,http://127.0.0.1:9000,http://localhost:3300,http://127.0.0.1:3300'),
 });
 

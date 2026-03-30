@@ -2,14 +2,20 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { IncomingHttpHeaders } from 'node:http';
 import { env } from '../config/env';
 import { forbidden } from '../utils/errors';
+import { verifyWechatpayBySdkPath } from './petpal-wechatpay-sdk-adapter';
 
 type CallbackAuthMode = 'TOKEN' | 'WECHATPAY';
 
 type CallbackAuthConfig = {
   mode: CallbackAuthMode;
   callbackToken: string;
+  wechatpayVerifyProvider: 'HMAC' | 'SDK';
   wechatpayNotifySecret: string;
   wechatpayTimestampToleranceSeconds: number;
+  wechatpayMerchantId: string;
+  wechatpayAppId: string;
+  wechatpayCertSerialNo: string;
+  wechatpayPlatformPublicKey: string;
 };
 
 const normalizeHeader = (value: string | string[] | undefined) => {
@@ -41,18 +47,20 @@ const safeEquals = (left: string, right: string) => {
 const assertWechatpayAuthorized = (
   headers: IncomingHttpHeaders,
   rawBody: string,
-  config: Pick<CallbackAuthConfig, 'wechatpayNotifySecret' | 'wechatpayTimestampToleranceSeconds'>,
+  config: Pick<
+    CallbackAuthConfig,
+    | 'wechatpayVerifyProvider'
+    | 'wechatpayNotifySecret'
+    | 'wechatpayTimestampToleranceSeconds'
+    | 'wechatpayMerchantId'
+    | 'wechatpayAppId'
+    | 'wechatpayCertSerialNo'
+    | 'wechatpayPlatformPublicKey'
+  >,
 ) => {
-  if (!config.wechatpayNotifySecret) {
-    throw forbidden('WeChat Pay callback secret is not configured');
-  }
-
-  const signature = normalizeHeader(headers['x-wechatpay-signature']);
   const timestampRaw = normalizeHeader(headers['x-wechatpay-timestamp']);
-  const nonce = normalizeHeader(headers['x-wechatpay-nonce']);
-
-  if (!signature || !timestampRaw || !nonce) {
-    throw forbidden('Invalid wechatpay callback signature headers');
+  if (!timestampRaw) {
+    throw forbidden('Invalid wechatpay callback timestamp');
   }
 
   const timestamp = Number(timestampRaw);
@@ -63,6 +71,27 @@ const assertWechatpayAuthorized = (
   const driftSeconds = Math.abs(Math.floor(Date.now() / 1000) - timestamp);
   if (driftSeconds > config.wechatpayTimestampToleranceSeconds) {
     throw forbidden('Wechatpay callback timestamp expired');
+  }
+
+  if (config.wechatpayVerifyProvider === 'SDK') {
+    verifyWechatpayBySdkPath(headers, rawBody, {
+      merchantId: config.wechatpayMerchantId,
+      appId: config.wechatpayAppId,
+      certSerialNo: config.wechatpayCertSerialNo,
+      platformPublicKey: config.wechatpayPlatformPublicKey,
+    });
+    return;
+  }
+
+  if (!config.wechatpayNotifySecret) {
+    throw forbidden('WeChat Pay callback secret is not configured');
+  }
+
+  const signature = normalizeHeader(headers['x-wechatpay-signature']);
+  const nonce = normalizeHeader(headers['x-wechatpay-nonce']);
+
+  if (!signature || !nonce) {
+    throw forbidden('Invalid wechatpay callback signature headers');
   }
 
   const signPayload = `${timestampRaw}\n${nonce}\n${rawBody}\n`;
@@ -78,8 +107,13 @@ const assertWechatpayAuthorized = (
 const getAuthConfig = (): CallbackAuthConfig => ({
   mode: env.PETPAL_CALLBACK_AUTH_MODE,
   callbackToken: env.PETPAL_CALLBACK_TOKEN,
+  wechatpayVerifyProvider: env.PETPAL_WECHATPAY_VERIFY_PROVIDER,
   wechatpayNotifySecret: env.PETPAL_WECHATPAY_NOTIFY_SECRET,
   wechatpayTimestampToleranceSeconds: env.PETPAL_WECHATPAY_TIMESTAMP_TOLERANCE_SECONDS,
+  wechatpayMerchantId: env.PETPAL_WECHATPAY_MERCHANT_ID,
+  wechatpayAppId: env.PETPAL_WECHATPAY_APP_ID,
+  wechatpayCertSerialNo: env.PETPAL_WECHATPAY_CERT_SERIAL_NO,
+  wechatpayPlatformPublicKey: env.PETPAL_WECHATPAY_PLATFORM_PUBLIC_KEY,
 });
 
 export const verifyPetpalCallbackAuth = (

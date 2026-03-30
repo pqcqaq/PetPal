@@ -4,6 +4,7 @@ import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'node:path';
+import type { Request } from 'express';
 import { clientOrigins } from './config/env';
 import { errorHandler } from './middlewares/error-handler';
 import { requestContextMiddleware } from './middlewares/request-context';
@@ -21,7 +22,12 @@ export const createApp = () => {
   );
   app.use(helmet());
   app.use(requestContextMiddleware);
-  app.use(express.json({ limit: '3mb' }));
+  app.use(express.json({
+    limit: '3mb',
+    verify: (req, _res, buf) => {
+      (req as Request).rawBody = buf.toString('utf8');
+    },
+  }));
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
   app.use(morgan('dev'));

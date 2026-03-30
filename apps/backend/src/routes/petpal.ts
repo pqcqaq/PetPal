@@ -52,14 +52,14 @@ const refundCallbackSchema = z.object({
 const petpalRouter = Router();
 
 petpalRouter.post('/payments/callback', asyncHandler(async (req, res) => {
-  verifyPetpalCallbackAuth(req.headers, JSON.stringify(req.body ?? {}));
+  verifyPetpalCallbackAuth(req.headers, req.rawBody ?? JSON.stringify(req.body ?? {}));
   const payload = paymentCallbackSchema.parse(req.body);
   const result = await petpalService.handlePaymentCallback(payload);
   return ok(res, result, 'Payment callback handled');
 }));
 
 petpalRouter.post('/refunds/callback', asyncHandler(async (req, res) => {
-  verifyPetpalCallbackAuth(req.headers, JSON.stringify(req.body ?? {}));
+  verifyPetpalCallbackAuth(req.headers, req.rawBody ?? JSON.stringify(req.body ?? {}));
   const payload = refundCallbackSchema.parse(req.body);
   const result = await petpalService.handleRefundCallback(payload);
   return ok(res, result, 'Refund callback handled');

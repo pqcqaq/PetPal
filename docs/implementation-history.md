@@ -200,3 +200,17 @@ Last updated: 2026-03-31
 - 测试数据枚举与 Prisma 模型保持一致（`BALANCE`、`PARTIAL`），避免无效枚举导致误报。
 - 本轮验证通过：
   - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts`
+
+## 18. PetPal WeChat Pay 验签路径与原始请求体基线（P0 Slice 8）
+
+- `petpal-callback-auth` 新增 WeChat Pay 验签 provider 切换：`HMAC` / `SDK`。
+- 新增 `petpal-wechatpay-sdk-adapter` 作为 SDK 集成路径，保持业务侧调用入口不变。
+- Express JSON 解析增加 raw body 保存，回调验签改为优先使用原始请求体。
+- 环境模板补齐 SDK 路径配置项（商户号、应用号、证书序列号、平台公钥）。
+- 回调鉴权单测新增失败路径：
+  - 无效签名拒绝。
+  - 时间戳超时拒绝。
+- 本轮验证通过：
+  - `pnpm --filter @rbac/backend lint`
+  - `pnpm --filter @rbac/backend exec node --import tsx --test test/services/petpal-callback-auth.test.ts`
+  - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts`

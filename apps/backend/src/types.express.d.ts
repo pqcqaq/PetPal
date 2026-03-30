@@ -6,6 +6,7 @@ declare global {
       auth?: CurrentUser;
       authClient?: AuthClientSummary;
       authMode?: 'local' | 'oauth';
+      rawBody?: string;
       oauthApplication?: {
         id: string;
         code: string;

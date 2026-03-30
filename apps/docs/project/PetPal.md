@@ -1315,3 +1315,41 @@ gantt
 1. 引入微信支付官方 SDK 并封装为 `WECHATPAY` 鉴权实现。
 2. 增加验签失败与时间戳超时的回调拒绝测试。
 3. 增加回调审计明细字段并补查询接口。
+
+### 14.8 2026-03-31（P0 Slice 8）
+
+已完成：
+
+- 回调鉴权增加 SDK 集成路径与配置开关：
+  - 新增 `PETPAL_WECHATPAY_VERIFY_PROVIDER=HMAC|SDK`。
+  - 新增 SDK 路径配置项：`PETPAL_WECHATPAY_MERCHANT_ID`、`PETPAL_WECHATPAY_APP_ID`、`PETPAL_WECHATPAY_CERT_SERIAL_NO`、`PETPAL_WECHATPAY_PLATFORM_PUBLIC_KEY`。
+- 新增 SDK 适配器：`apps/backend/src/services/petpal-wechatpay-sdk-adapter.ts`。
+  - 保持 `verifyPetpalCallbackAuth` 统一入口不变。
+  - `SDK` 模式下走适配器路径，满足后续官方 SDK 替换扩展点。
+- 签名基线修正为“原始请求体”：
+  - `app.ts` 在 JSON 解析阶段保存 `req.rawBody`。
+  - `petpal` 回调路由验签时优先使用 `req.rawBody`，避免对象序列化差异导致签名误判。
+- 单元测试增强：`apps/backend/test/services/petpal-callback-auth.test.ts`
+  - 新增“无效签名拒绝”测试。
+  - 新增“时间戳超时拒绝”测试。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test test/services/petpal-callback-auth.test.ts` 通过（4/4）。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（3/3）。
+
+进行中：
+
+- P0 Slice 9：回调审计明细字段与查询接口（requestId/sourceMode/signatureDigest）。
+
+风险与缓解：
+
+- 风险：SDK 模式当前为可插拔接入路径，官方 SDK 证书自动轮转能力尚未实装。
+- 缓解：已固定统一适配层接口，下一切片直接替换 SDK 分支实现，不影响业务路由和服务层。
+
+下一步（1-3 项）：
+
+1. 将 SDK 路径替换为官方 SDK 证书管理与验签实现。
+2. 增加 SDK 模式下验签失败集成测试。
+3. 落地回调审计明细模型与管理端查询接口。
