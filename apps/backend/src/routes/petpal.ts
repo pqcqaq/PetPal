@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../middlewares/auth';
+import { requirePermission } from '../middlewares/require-permission';
 import { asyncHandler, ok, parsePagination } from '../utils/http';
 import { createExcelExportHandler, createTimestampedExcelFileName } from '../utils/excel-export';
 import { petpalService } from '../services/petpal-service';
@@ -162,7 +163,7 @@ petpalRouter.get('/match/caregivers', asyncHandler(async (req, res) => {
 }));
 
 // Admin endpoints (require authentication)
-petpalRouter.get('/admin/callback-audits', asyncHandler(async (req, res) => {
+petpalRouter.get('/admin/callback-audits', requirePermission('petpal.callback-audit.read'), asyncHandler(async (req, res) => {
   // Note: In production, add role/permission check here
   const { page, pageSize } = parsePagination(req.query);
   const filterQuery = parseCallbackAuditQuery(req.query as Record<string, unknown>);
@@ -175,7 +176,7 @@ petpalRouter.get('/admin/callback-audits', asyncHandler(async (req, res) => {
   return ok(res, result, 'Callback audit logs');
 }));
 
-petpalRouter.get('/admin/callback-audits/stats', asyncHandler(async (req, res) => {
+petpalRouter.get('/admin/callback-audits/stats', requirePermission('petpal.callback-audit.read'), asyncHandler(async (req, res) => {
   const filters = parseCallbackAuditQuery(req.query as Record<string, unknown>);
   const result = await petpalService.queryCallbackAuditStats(filters);
   return ok(res, result, 'Callback audit stats');
@@ -183,6 +184,7 @@ petpalRouter.get('/admin/callback-audits/stats', asyncHandler(async (req, res) =
 
 petpalRouter.get(
   '/admin/callback-audits/export',
+  requirePermission('petpal.callback-audit.read'),
   createExcelExportHandler({
     fileName: () => createTimestampedExcelFileName('petpal-callback-audits'),
     sheetName: 'PetPal Callback Audits',

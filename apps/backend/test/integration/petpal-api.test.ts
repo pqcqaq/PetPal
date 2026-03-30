@@ -499,7 +499,7 @@ describe('PetPal API integration', () => {
     const { app, prisma } = context;
 
     // Login as admin user
-    const adminSession = await loginAs(app, 'user', 'User123!');
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
 
     // Setup: Get existing order
     const baseOrder = await prisma.orderMain.findUnique({
@@ -606,7 +606,7 @@ describe('PetPal API integration', () => {
   it('admin can query callback audit stats and export audit logs', async () => {
     const { app, prisma } = context;
 
-    const adminSession = await loginAs(app, 'user', 'User123!');
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
 
     const baseOrder = await prisma.orderMain.findUnique({
       where: { orderNo: 'PP202603300001' },

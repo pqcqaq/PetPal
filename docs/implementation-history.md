@@ -421,6 +421,11 @@ Last updated: 2026-03-31
 - 统一过滤解析 + where 复用，确保列表与统计口径一致。
 - 保持接口行为向后兼容，避免影响已有回归用例。
 
+安全加固（本轮增量）：
+
+- `apps/backend/src/routes/petpal.ts` 的管理端回调审计接口（列表/统计/导出）统一增加 `requirePermission('petpal.callback-audit.read')`。
+- 集成测试管理端用例改为使用管理员账号认证，确保权限边界可回归验证。
+
 ## 25. PetPal P0 最终验收（本轮）
 
 **范围**：Slice 10、Slice 11 Part 1/2/3、Slice 12。
