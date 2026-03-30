@@ -149,4 +149,32 @@ petpalRouter.get('/match/caregivers', asyncHandler(async (req, res) => {
   return ok(res, result, 'Matched caregivers');
 }));
 
+// Admin endpoints (require authentication)
+petpalRouter.get('/admin/callback-audits', asyncHandler(async (req, res) => {
+  // Note: In production, add role/permission check here
+  const { page, pageSize } = parsePagination(req.query);
+  const callbackType = req.query.callbackType as any;
+  const callbackStatus = req.query.callbackStatus as any;
+  const sourceMode = req.query.sourceMode as string | undefined;
+  const requestId = req.query.requestId as string | undefined;
+  const paymentId = req.query.paymentId as string | undefined;
+  const refundId = req.query.refundId as string | undefined;
+  const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+  const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+
+  const result = await petpalService.queryCallbackAuditLogs({
+    page,
+    pageSize,
+    callbackType,
+    callbackStatus,
+    sourceMode,
+    requestId,
+    paymentId,
+    refundId,
+    startDate,
+    endDate,
+  });
+  return ok(res, result, 'Callback audit logs');
+}));
+
 export { petpalRouter };

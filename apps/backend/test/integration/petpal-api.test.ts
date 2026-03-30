@@ -494,4 +494,112 @@ describe('PetPal API integration', () => {
     assert.ok(failedRefundAudit, 'Failed refund audit record should exist');
     assert.equal(failedRefundAudit.callbackStatus, 'FAILURE', 'Failed audit status should be FAILURE');
   });
+
+  it('admin can query callback audit logs with filters', async () => {
+    const { app, prisma } = context;
+
+    // Login as admin user
+    const adminSession = await loginAs(app, 'user', 'User123!');
+
+    // Setup: Get existing order
+    const baseOrder = await prisma.orderMain.findUnique({
+      where: { orderNo: 'PP202603300001' },
+      select: { id: true },
+    });
+    assert.ok(baseOrder);
+
+    // Create a test payment and callback for audit query
+    const testPayment = await prisma.paymentRecord.create({
+      data: {
+        id: `pay-query-${Date.now().toString(36)}`,
+        orderId: baseOrder.id,
+        payNo: `PAY-QUERY-${Date.now()}`,
+        bizType: 'BALANCE',
+        payChannel: 'WECHAT',
+        payStatus: 'PENDING',
+        payAmount: 50,
+      },
+    });
+
+    // Send callback
+    const channelTxnId = `WXTXN-QUERY-${Date.now()}`;
+    await request(app)
+      .post('/api/petpal/payments/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        payNo: testPayment.payNo,
+        channelTxnId,
+        success: true,
+        paidAmount: 50,
+      })
+      .expect(200);
+
+    // Test: Query all audit logs (no filter)
+    const allAuditsResponse = await request(app)
+      .get('/api/petpal/admin/callback-audits')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(Array.isArray(allAuditsResponse.body.data.items));
+    assert.ok(allAuditsResponse.body.data.pagination.total > 0);
+    assert.ok(allAuditsResponse.body.data.pagination.page === 1);
+    assert.ok(allAuditsResponse.body.data.pagination.pageSize > 0);
+
+    // Test: Query with callback type filter
+    const paymentAuditsResponse = await request(app)
+      .get('/api/petpal/admin/callback-audits?callbackType=PAYMENT_CALLBACK')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(Array.isArray(paymentAuditsResponse.body.data.items));
+    assert.ok(paymentAuditsResponse.body.data.items.every((a: any) => a.callbackType === 'PAYMENT_CALLBACK'));
+
+    // Test: Query with status filter
+    const successAuditsResponse = await request(app)
+      .get('/api/petpal/admin/callback-audits?callbackStatus=SUCCESS')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(Array.isArray(successAuditsResponse.body.data.items));
+    assert.ok(successAuditsResponse.body.data.items.length > 0);
+    assert.ok(successAuditsResponse.body.data.items.every((a: any) => a.callbackStatus === 'SUCCESS'));
+
+    // Test: Query with source mode filter
+    const tokenAuditsResponse = await request(app)
+      .get('/api/petpal/admin/callback-audits?sourceMode=TOKEN')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(Array.isArray(tokenAuditsResponse.body.data.items));
+    assert.ok(tokenAuditsResponse.body.data.items.every((a: any) => a.sourceMode === 'TOKEN'));
+
+    // Test: Query with requestId
+    const createdAudit = await prisma.callbackAudit.findFirst({
+      where: {
+        paymentId: testPayment.id,
+      },
+      select: {
+        requestId: true,
+      },
+    });
+
+    assert.ok(createdAudit);
+
+    const requestIdQueryResponse = await request(app)
+      .get(`/api/petpal/admin/callback-audits?requestId=${createdAudit.requestId}`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(requestIdQueryResponse.body.data.items.length === 1);
+    assert.equal(requestIdQueryResponse.body.data.items[0].requestId, createdAudit.requestId);
+
+    // Test: Query with pagination
+    const page2Response = await request(app)
+      .get('/api/petpal/admin/callback-audits?page=2&pageSize=5')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(page2Response.body.data.pagination.page, 2);
+    assert.equal(page2Response.body.data.pagination.pageSize, 5);
+  });
 });

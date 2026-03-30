@@ -682,4 +682,95 @@ export const petpalService = {
       };
     });
   },
+
+  async queryCallbackAuditLogs(filters: {
+    page?: number;
+    pageSize?: number;
+    callbackType?: 'PAYMENT_CALLBACK' | 'REFUND_CALLBACK';
+    callbackStatus?: 'PENDING' | 'SUCCESS' | 'FAILURE' | 'ERROR';
+    sourceMode?: string;
+    startDate?: Date;
+    endDate?: Date;
+    requestId?: string;
+    paymentId?: string;
+    refundId?: string;
+  }) {
+    const page = Math.max(1, filters.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 20));
+    const skip = (page - 1) * pageSize;
+
+    // Build where clause
+    const where: Prisma.CallbackAuditWhereInput = {};
+
+    if (filters.callbackType) {
+      where.callbackType = filters.callbackType;
+    }
+    if (filters.callbackStatus) {
+      where.callbackStatus = filters.callbackStatus;
+    }
+    if (filters.sourceMode) {
+      where.sourceMode = filters.sourceMode;
+    }
+    if (filters.requestId) {
+      where.requestId = filters.requestId;
+    }
+    if (filters.paymentId) {
+      where.paymentId = filters.paymentId;
+    }
+    if (filters.refundId) {
+      where.refundId = filters.refundId;
+    }
+
+    // Date range filter
+    if (filters.startDate || filters.endDate) {
+      where.createdAt = {};
+      if (filters.startDate) {
+        (where.createdAt as any).gte = filters.startDate;
+      }
+      if (filters.endDate) {
+        (where.createdAt as any).lte = filters.endDate;
+      }
+    }
+
+    // Query with pagination
+    const [total, records] = await Promise.all([
+      prisma.callbackAudit.count({ where }),
+      prisma.callbackAudit.findMany({
+        where,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip,
+        take: pageSize,
+        include: {
+          payment: {
+            select: {
+              payNo: true,
+              orderId: true,
+              payAmount: true,
+              payStatus: true,
+            },
+          },
+          refund: {
+            select: {
+              refundNo: true,
+              orderId: true,
+              refundAmount: true,
+              refundStatus: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      items: records,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    };
+  },
 };
