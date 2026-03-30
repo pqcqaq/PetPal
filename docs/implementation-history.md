@@ -227,3 +227,43 @@ Last updated: 2026-03-31
   - `pnpm --filter @rbac/backend lint`
   - `pnpm --filter @rbac/backend exec node --import tsx --test test/services/petpal-callback-auth.test.ts`
   - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts`
+
+## 20. PetPal 回调审计持久化（P0 Slice 10）
+
+**内容**：从 API 响应级审计元数据到数据库模型持久化，支持事务内记录每一次回调处理。
+
+核心实现：
+
+- 新增 `CallbackAudit` 数据模型（`apps/backend/prisma/models/petpal.prisma`）：
+  - 字段：`callbackType`（PAYMENT_CALLBACK|REFUND_CALLBACK）、`paymentId`/`refundId` 外键、`requestId` 唯一、`sourceMode`、`signatureDigest`、`callbackTimestamp`、`callbackStatus`（PENDING|SUCCESS|FAILURE|ERROR）、`verificationResult`（JSON）、`rawPayload`。
+  - 索引：`(requestId)` unique、`(callbackType, callbackStatus)` 复合、`(paymentId)`、`(refundId)`、`(createdAt)`、`(sourceMode)`。
+- 数据库迁移文件 `20260330170919_add_callback_audit_table`：
+  - 创建 `CallbackAudit` 表、定义外键约束。
+  - `PaymentRecord` / `RefundRecord` 反向关系添加 `callbackAudits` 字段。
+- 服务层调整（`apps/backend/src/services/petpal-service.ts`）：
+  - `handlePaymentCallback()` / `handleRefundCallback()` 方法扩展参数，新增可选 `auditInfo` 对象，包含 `requestId`、`sourceMode`、`signatureDigest`、`callbackTimestamp`、`rawPayload`。
+  - 在事务内创建 `CallbackAudit` 记录：成功/失败/重试（idempotent）均记录，`callbackStatus` 自动判定。
+- 路由层调整（`apps/backend/src/routes/petpal.ts`）：
+  - `/api/petpal/payments/callback` 与 `/api/petpal/refunds/callback` 从 `authMeta` 和 `requestId` 构建 `auditInfo`，传入服务方法。
+  - 保持响应格式不变，仍输出 `callbackAuth`。
+- 集成测试扩展（`apps/backend/test/integration/petpal-api.test.ts`）：
+  - 新增断言：支付回调创建 `CallbackAudit`、失败回调创建失败审计、重试回调也记录。
+  - 验证 `callbackType`、`callbackStatus`、`sourceMode`、`signatureDigest` 等字段正确性。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（4/4 tests，新增审计测试）。
+- Git commit：`feat(p0): implement callback audit persistence with DB model, service layer, and tests (slice 10)`。
+
+关键设计决策：
+
+- 审计责任从 API 响应级转移至数据库持久化级，支持后续查询、统计、告警。
+- `rawPayload` 保留原始回调 body，便于问题诊断。
+- `verificationResult` 以 JSON 存储验证结果详情，包括成功/失败/idempotent 标志。
+- `requestId` 唯一索引确保审计链可追溯。
+
+风险与后续：
+
+- 审计表增长快速，后续考虑引入分区、归档、或采样策略。
+- 下一步（Slice 11）：管理端查询 API 支持分页、过滤（按日期、sourceMode、callbackStatus）。

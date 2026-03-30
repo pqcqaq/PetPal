@@ -1387,3 +1387,48 @@ gantt
 1. 增加回调审计持久化字段与最小迁移。
 2. 增加管理端回调审计查询 API。
 3. 增加 SDK provider 模式的失败路径集成测试。
+
+### 14.10 2026-03-31（P0 Slice 10）
+
+**概述**：回调审计持久化 — 从响应级审计元数据到数据库模型持久化，支持管理端审计日志查询。
+
+已完成：
+
+- 新增 `CallbackAudit` 数据模型：
+  - 关键字段：`callbackType`（PAYMENT_CALLBACK|REFUND_CALLBACK）、`paymentId`/`refundId`、`requestId`（唯一）、`sourceMode`、`signatureDigest`、`callbackTimestamp`、`callbackStatus`（PENDING|SUCCESS|FAILURE|ERROR）、`verificationResult`（JSON）、`rawPayload`。
+  - 索引策略：`(requestId)` unique、`(callbackType, callbackStatus)`、`(paymentId)`、`(refundId)`、`(createdAt)`、`(sourceMode)`。
+- 数据库迁移与关系配置：
+  - Prisma migration 创建 `CallbackAudit` 表、外键约束 → `PaymentRecord` / `RefundRecord`。
+  - `PaymentRecord` / `RefundRecord` 反向关系 → `callbackAudits` 字段，支持从支付/退款查询审计记录。
+- 服务层审计持久化：
+  - `handlePaymentCallback()` / `handleRefundCallback()` 方法签名扩展：新增可选 `auditInfo` 参数包含 `requestId`、`sourceMode`、`signatureDigest`、`callbackTimestamp`、`rawPayload`。
+  - 事务内创建 `CallbackAudit` 记录：成功/失败/重试场景均记录。
+  - 支持成功和失败回调的审计、idempotent重试的审计标记。
+- 路由层审计传递：
+  - `/api/petpal/payments/callback` 与 `/api/petpal/refunds/callback` 从 `PetpalCallbackAuthMeta` 和 `requestId` 构建 `auditInfo`，传入服务方法。
+  - 保持向后兼容：响应结构不变，`callbackAuth` 仍在响应中。
+- 审计持久化集成测试：
+  - 新增测试 case：验证支付回调创建 `CallbackAudit` 记录、验证重试/idempotent 回调也创建记录、验证退款回调与失败回调的审计。
+  - 测试断言：`callbackType`、`callbackStatus`、`sourceMode`、`signatureDigest`、`verificationResult` 等字段。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过（Prisma generated + TypeScript）。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（4/4，新增审计测试 case）。
+- 迁移文件：`20260330170919_add_callback_audit_table` 已应用。
+- Git commit：`feat(p0): implement callback audit persistence with DB model, service layer, and tests (slice 10)`。
+
+风险与缓解：
+
+- 风险：审计记录增长可能导致表变大，查询性能下降。
+- 缓解：下一步添加分页查询 API 时引入日期范围过滤、合理索引。
+
+进行中：
+
+- P0 Slice 11：管理端回调审计查询 API。
+
+下一步（1-3 项）：
+
+1. 增加管理端回调审计查询接口（分页、过滤、排序）。
+2. 管理端 UI 展示审计日志列表与详情。
+3. 补充回调审计成功率与错误率统计指标。
