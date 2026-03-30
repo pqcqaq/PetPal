@@ -1204,3 +1204,42 @@ gantt
 1. 新增订单详情页并接入支付/退款记录明细查询。
 2. 增加前端联调测试（至少覆盖创建宠物、发布需求、列表刷新主路径）。
 3. 对接微信支付 SDK 验签适配层并补回调异常路径测试。
+
+### 14.5 2026-03-31（P0 Slice 5）
+
+已完成：
+
+- 订单详情能力在 Web + Uni 双端完成落地：
+  - Web：新增 `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`。
+  - Uni：新增 `apps/app-frontend/src/pages/order-detail/index.vue`。
+- 页面能力覆盖：
+  - 订单基础信息展示（订单号、状态、服务类型、服务时间、创建时间）。
+  - 金额统计展示（总额、调整金额、已支付、已退款）。
+  - 支付记录时间线（状态、金额、业务类型、支付完成时间）。
+  - 退款记录时间线（状态、金额、退款类型、审核时间）。
+- 跳转链路完成：
+  - Web 订单列表新增“查看详情”操作。
+  - Uni 订单总览新增跳转详情页能力。
+- 共享契约补齐：
+  - `packages/api-common` 新增 `PaymentRecordDetail`、`RefundRecordDetail` 细化类型。
+- 构建验证通过：
+  - `pnpm --filter @rbac/api-common build`
+  - `pnpm --filter @rbac/web-frontend lint`
+  - `pnpm --filter @rbac/app-frontend type-check`
+- 集成测试证据：
+  - PetPal 相关集成场景通过（owner pet/request workflow、caregiver matching + order detail、payment/refund callback idempotency）。
+
+进行中：
+
+- P0 Slice 6：微信支付回调验签适配与支付状态机边界加固（乱序、重复、失败重试）。
+
+风险与缓解：
+
+- 风险：后端全量测试集中存在与 PetPal 切片无关的历史失败用例，影响“一键全绿”稳定性。
+- 缓解：本切片先以 PetPal 相关集成用例作为验收证据；后续安排独立稳定性修复切片清理非 PetPal 失败项。
+
+下一步（1-3 项）：
+
+1. 落地微信支付回调验签与环境变量配置模板，补充最小联调脚本。
+2. 增加支付/退款回调乱序与重复场景测试，确保幂等与金额守恒。
+3. 补齐订单状态流转审计查询接口并在管理端可视化。
