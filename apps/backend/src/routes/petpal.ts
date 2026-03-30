@@ -3,8 +3,7 @@ import { z } from 'zod';
 import { authMiddleware } from '../middlewares/auth';
 import { asyncHandler, ok, parsePagination } from '../utils/http';
 import { petpalService } from '../services/petpal-service';
-import { forbidden } from '../utils/errors';
-import { env } from '../config/env';
+import { verifyPetpalCallbackAuth } from '../services/petpal-callback-auth';
 
 const petSchema = z.object({
   name: z.string().trim().min(1).max(50),
@@ -50,24 +49,17 @@ const refundCallbackSchema = z.object({
   channelPayload: z.unknown().optional(),
 });
 
-const assertCallbackToken = (headerValue?: string | string[]) => {
-  const token = Array.isArray(headerValue) ? headerValue[0] : headerValue;
-  if (!token || token !== env.PETPAL_CALLBACK_TOKEN) {
-    throw forbidden('Invalid callback token');
-  }
-};
-
 const petpalRouter = Router();
 
 petpalRouter.post('/payments/callback', asyncHandler(async (req, res) => {
-  assertCallbackToken(req.headers['x-petpal-callback-token']);
+  verifyPetpalCallbackAuth(req.headers, JSON.stringify(req.body ?? {}));
   const payload = paymentCallbackSchema.parse(req.body);
   const result = await petpalService.handlePaymentCallback(payload);
   return ok(res, result, 'Payment callback handled');
 }));
 
 petpalRouter.post('/refunds/callback', asyncHandler(async (req, res) => {
-  assertCallbackToken(req.headers['x-petpal-callback-token']);
+  verifyPetpalCallbackAuth(req.headers, JSON.stringify(req.body ?? {}));
   const payload = refundCallbackSchema.parse(req.body);
   const result = await petpalService.handleRefundCallback(payload);
   return ok(res, result, 'Refund callback handled');

@@ -1243,3 +1243,43 @@ gantt
 1. 落地微信支付回调验签与环境变量配置模板，补充最小联调脚本。
 2. 增加支付/退款回调乱序与重复场景测试，确保幂等与金额守恒。
 3. 补齐订单状态流转审计查询接口并在管理端可视化。
+
+### 14.6 2026-03-31（P0 Slice 6）
+
+已完成：
+
+- 新增 PetPal 回调鉴权适配服务：`apps/backend/src/services/petpal-callback-auth.ts`。
+  - 支持 `TOKEN` 与 `WECHATPAY` 两种模式。
+  - `TOKEN` 模式沿用 `x-petpal-callback-token`，保持已有联调兼容。
+  - `WECHATPAY` 模式支持：`x-wechatpay-signature`、`x-wechatpay-timestamp`、`x-wechatpay-nonce` 校验。
+  - 提供回调时间窗校验，降低重放风险。
+- 回调路由接入适配层：`apps/backend/src/routes/petpal.ts`。
+  - 支付与退款回调统一走 `verifyPetpalCallbackAuth`。
+- 环境变量与模板补齐：
+  - `PETPAL_CALLBACK_AUTH_MODE=TOKEN|WECHATPAY`
+  - `PETPAL_WECHATPAY_NOTIFY_SECRET`
+  - `PETPAL_WECHATPAY_TIMESTAMP_TOLERANCE_SECONDS`
+  - 已同步到 `apps/backend/.env.example`。
+- 新增单元测试：`apps/backend/test/services/petpal-callback-auth.test.ts`。
+  - 覆盖 TOKEN 成功路径。
+  - 覆盖 WECHATPAY 签名成功路径。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test test/services/petpal-callback-auth.test.ts` 通过（2/2）。
+
+进行中：
+
+- P0 Slice 7：支付回调乱序/重复/失败重试的扩展集成测试与状态机边界加固。
+
+风险与缓解：
+
+- 风险：当前 WECHATPAY 验签为接入路径实现，尚未接入官方 SDK 的证书链校验。
+- 缓解：下一切片引入官方 SDK 验签器并保留现有适配层接口，避免路由层改动扩散。
+
+下一步（1-3 项）：
+
+1. 在适配层引入微信支付官方 SDK 验签实现（按环境变量切换）。
+2. 为支付/退款回调新增乱序、重复、失败后成功恢复的集成测试。
+3. 补充回调审计字段（requestId、sourceMode、signatureDigest）并输出查询接口。

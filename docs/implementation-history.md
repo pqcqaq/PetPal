@@ -173,3 +173,20 @@ Last updated: 2026-03-31
     - `pnpm --filter @rbac/app-frontend type-check` ✓
 - **Git 提交**：`feat(p0): deliver petpal order-detail bilateral pages (slice 5)` 
   - 8 files changed, 972 insertions(+), 创建 OrderDetailView.vue 与 order-detail/index.vue 两个详情页。
+
+## 16. PetPal 回调鉴权适配层（P0 Slice 6）
+
+- backend 新增 `petpal-callback-auth` 服务，将 PetPal 回调鉴权从路由层抽离为独立适配层。
+- 鉴权模式支持：
+  - `TOKEN`：兼容既有 `x-petpal-callback-token`。
+  - `WECHATPAY`：基于签名、时间戳、nonce 的回调校验流程（接入路径）。
+- `apps/backend/src/routes/petpal.ts` 的支付/退款回调均改为统一调用 `verifyPetpalCallbackAuth`。
+- 环境配置新增：
+  - `PETPAL_CALLBACK_AUTH_MODE`
+  - `PETPAL_WECHATPAY_NOTIFY_SECRET`
+  - `PETPAL_WECHATPAY_TIMESTAMP_TOLERANCE_SECONDS`
+- `apps/backend/.env.example` 已补齐变量模板，避免硬编码。
+- 新增测试 `apps/backend/test/services/petpal-callback-auth.test.ts`，覆盖 TOKEN 与 WECHATPAY 成功路径。
+- 本轮验证通过：
+  - `pnpm --filter @rbac/backend lint`
+  - `pnpm --filter @rbac/backend exec node --import tsx --test test/services/petpal-callback-auth.test.ts`
