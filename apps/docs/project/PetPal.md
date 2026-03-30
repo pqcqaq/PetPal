@@ -1664,6 +1664,30 @@ gantt
 - 先采用“固定保留期 + 每日离峰清理”策略，快速控制数据规模风险。
 - 清理逻辑放在服务层，便于后续扩展为分级归档（热数据/冷数据）而不是直接删除。
 
+### 14.18 2026-04-01（P1 Slice 2）
+
+**概述**：回调审计保留清理任务生产化配置，支持环境级开关与调度参数。
+
+已完成：
+
+- 后端环境变量扩展（`apps/backend/src/config/env.ts`）：
+  - `PETPAL_CALLBACK_AUDIT_RETENTION_ENABLED`
+  - `PETPAL_CALLBACK_AUDIT_RETENTION_DAYS`
+  - `PETPAL_CALLBACK_AUDIT_RETENTION_CRON`
+- 定时任务改造（`apps/backend/src/timers/petpal-callback-audit-retention.timer.ts`）：
+  - 读取 env 配置控制启停、保留天数与 cron。
+- 环境模板同步（`apps/backend/.env.example`）：
+  - 补充上述 3 个变量默认值，便于部署配置。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+
+关键设计决策：
+
+- 运维参数配置化优先于硬编码，支持不同环境保留策略差异化。
+- 默认值保持与上一切片一致（启用、90 天、每日 03:20）以避免行为突变。
+
 - 回调审计持久化：完成。
 - 管理端审计查询 API：完成。
 - 管理端审计 UI：完成。

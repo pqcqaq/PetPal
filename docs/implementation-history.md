@@ -488,4 +488,26 @@ Git commit：`feat(p0): align callback audit export button visibility with expor
 - 若业务需要长期取证，可在清理前先导出到对象存储并记录归档索引。
 
 Git commit：`feat(p1): add callback audit retention cleanup timer`。
+
+## 28. PetPal 回调审计清理任务配置化（P1 Slice 2）
+
+**内容**：将回调审计清理任务从硬编码升级为可配置运行，便于多环境部署与运维调优。
+
+变更摘要：
+
+- `apps/backend/src/config/env.ts`
+  - 新增环境变量：
+    - `PETPAL_CALLBACK_AUDIT_RETENTION_ENABLED`
+    - `PETPAL_CALLBACK_AUDIT_RETENTION_DAYS`
+    - `PETPAL_CALLBACK_AUDIT_RETENTION_CRON`
+- `apps/backend/src/timers/petpal-callback-audit-retention.timer.ts`
+  - 定时任务启停、保留天数、cron 表达式改为读取 env。
+- `apps/backend/.env.example`
+  - 同步新增变量模板与默认值。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+
+Git commit：`feat(p1): make callback audit retention timer configurable`。
 - 高增长场景下需要规划审计表分区与归档策略。
