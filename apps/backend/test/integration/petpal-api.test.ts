@@ -186,6 +186,9 @@ describe('PetPal API integration', () => {
       .expect(200);
 
     assert.equal(paymentCallback.body.data.idempotent, false);
+    assert.equal(paymentCallback.body.data.callbackAuth.sourceMode, 'TOKEN');
+    assert.ok(typeof paymentCallback.body.data.callbackAuth.signatureDigest === 'string');
+    assert.ok(typeof paymentCallback.body.data.callbackAuth.requestId === 'string');
 
     const persistedPayment = await prisma.paymentRecord.findUnique({
       where: {
@@ -272,6 +275,8 @@ describe('PetPal API integration', () => {
       .expect(200);
 
     assert.equal(typeof refundCallback.body.data.idempotent, 'boolean');
+    assert.equal(refundCallback.body.data.callbackAuth.sourceMode, 'TOKEN');
+    assert.ok(typeof refundCallback.body.data.callbackAuth.signatureDigest === 'string');
 
     const retryRefund = await prisma.refundRecord.create({
       data: {

@@ -1353,3 +1353,37 @@ gantt
 1. 将 SDK 路径替换为官方 SDK 证书管理与验签实现。
 2. 增加 SDK 模式下验签失败集成测试。
 3. 落地回调审计明细模型与管理端查询接口。
+
+### 14.9 2026-03-31（P0 Slice 9）
+
+已完成：
+
+- 回调审计明细最小落地（不改数据库）：
+  - `verifyPetpalCallbackAuth` 返回标准审计元数据：`sourceMode`、`signatureDigest`、`callbackTimestamp`。
+  - 支付与退款回调响应中新增 `callbackAuth`，并附带 `requestId`。
+- 回调鉴权逻辑增强：
+  - `TOKEN` 模式与 `WECHATPAY` 模式统一产出审计元数据。
+  - `WECHATPAY` 的 `HMAC` 与 `SDK` provider 分支均纳入统一出口。
+- 集成测试增强：
+  - `petpal-api` 回调场景新增 `callbackAuth` 字段断言（`sourceMode`、`signatureDigest`、`requestId`）。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test test/services/petpal-callback-auth.test.ts` 通过（4/4）。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（3/3）。
+
+进行中：
+
+- P0 Slice 10：回调审计明细持久化与查询接口（管理端可追溯）。
+
+风险与缓解：
+
+- 风险：当前回调审计明细在 API 响应可观测，但尚未持久化到专用审计模型。
+- 缓解：下一切片新增持久化字段与查询接口，保持现有响应结构向后兼容。
+
+下一步（1-3 项）：
+
+1. 增加回调审计持久化字段与最小迁移。
+2. 增加管理端回调审计查询 API。
+3. 增加 SDK provider 模式的失败路径集成测试。

@@ -214,3 +214,16 @@ Last updated: 2026-03-31
   - `pnpm --filter @rbac/backend lint`
   - `pnpm --filter @rbac/backend exec node --import tsx --test test/services/petpal-callback-auth.test.ts`
   - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts`
+
+## 19. PetPal 回调审计明细响应化（P0 Slice 9）
+
+- `verifyPetpalCallbackAuth` 增加返回值，输出回调鉴权元数据：
+  - `sourceMode`
+  - `signatureDigest`
+  - `callbackTimestamp`
+- `apps/backend/src/routes/petpal.ts` 在支付/退款回调成功响应中新增 `callbackAuth`，并附带 `requestId`。
+- `petpal-api` 集成测试新增回调审计字段断言，确保鉴权与可追踪信息随主流程稳定输出。
+- 本轮验证通过：
+  - `pnpm --filter @rbac/backend lint`
+  - `pnpm --filter @rbac/backend exec node --import tsx --test test/services/petpal-callback-auth.test.ts`
+  - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts`

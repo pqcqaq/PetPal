@@ -4,6 +4,7 @@ import { authMiddleware } from '../middlewares/auth';
 import { asyncHandler, ok, parsePagination } from '../utils/http';
 import { petpalService } from '../services/petpal-service';
 import { verifyPetpalCallbackAuth } from '../services/petpal-callback-auth';
+import { getRequestId } from '../utils/request-context';
 
 const petSchema = z.object({
   name: z.string().trim().min(1).max(50),
@@ -52,17 +53,29 @@ const refundCallbackSchema = z.object({
 const petpalRouter = Router();
 
 petpalRouter.post('/payments/callback', asyncHandler(async (req, res) => {
-  verifyPetpalCallbackAuth(req.headers, req.rawBody ?? JSON.stringify(req.body ?? {}));
+  const authMeta = verifyPetpalCallbackAuth(req.headers, req.rawBody ?? JSON.stringify(req.body ?? {}));
   const payload = paymentCallbackSchema.parse(req.body);
   const result = await petpalService.handlePaymentCallback(payload);
-  return ok(res, result, 'Payment callback handled');
+  return ok(res, {
+    ...result,
+    callbackAuth: {
+      ...authMeta,
+      requestId: getRequestId(),
+    },
+  }, 'Payment callback handled');
 }));
 
 petpalRouter.post('/refunds/callback', asyncHandler(async (req, res) => {
-  verifyPetpalCallbackAuth(req.headers, req.rawBody ?? JSON.stringify(req.body ?? {}));
+  const authMeta = verifyPetpalCallbackAuth(req.headers, req.rawBody ?? JSON.stringify(req.body ?? {}));
   const payload = refundCallbackSchema.parse(req.body);
   const result = await petpalService.handleRefundCallback(payload);
-  return ok(res, result, 'Refund callback handled');
+  return ok(res, {
+    ...result,
+    callbackAuth: {
+      ...authMeta,
+      requestId: getRequestId(),
+    },
+  }, 'Refund callback handled');
 }));
 
 petpalRouter.use(authMiddleware);
