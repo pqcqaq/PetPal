@@ -54,6 +54,52 @@ const assertOrderAmountInvariant = (order: {
   }
 };
 
+type CallbackAuditQueryFilters = {
+  callbackType?: 'PAYMENT_CALLBACK' | 'REFUND_CALLBACK';
+  callbackStatus?: 'PENDING' | 'SUCCESS' | 'FAILURE' | 'ERROR';
+  sourceMode?: string;
+  startDate?: Date;
+  endDate?: Date;
+  requestId?: string;
+  paymentId?: string;
+  refundId?: string;
+};
+
+const buildCallbackAuditWhere = (filters: CallbackAuditQueryFilters): Prisma.CallbackAuditWhereInput => {
+  const where: Prisma.CallbackAuditWhereInput = {};
+
+  if (filters.callbackType) {
+    where.callbackType = filters.callbackType;
+  }
+  if (filters.callbackStatus) {
+    where.callbackStatus = filters.callbackStatus;
+  }
+  if (filters.sourceMode) {
+    where.sourceMode = filters.sourceMode;
+  }
+  if (filters.requestId) {
+    where.requestId = filters.requestId;
+  }
+  if (filters.paymentId) {
+    where.paymentId = filters.paymentId;
+  }
+  if (filters.refundId) {
+    where.refundId = filters.refundId;
+  }
+
+  if (filters.startDate || filters.endDate) {
+    where.createdAt = {};
+    if (filters.startDate) {
+      (where.createdAt as Prisma.DateTimeFilter).gte = filters.startDate;
+    }
+    if (filters.endDate) {
+      (where.createdAt as Prisma.DateTimeFilter).lte = filters.endDate;
+    }
+  }
+
+  return where;
+};
+
 export const petpalService = {
   async listPets(ownerId: string) {
     return prisma.petProfile.findMany({
@@ -698,39 +744,7 @@ export const petpalService = {
     const page = Math.max(1, filters.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 20));
     const skip = (page - 1) * pageSize;
-
-    // Build where clause
-    const where: Prisma.CallbackAuditWhereInput = {};
-
-    if (filters.callbackType) {
-      where.callbackType = filters.callbackType;
-    }
-    if (filters.callbackStatus) {
-      where.callbackStatus = filters.callbackStatus;
-    }
-    if (filters.sourceMode) {
-      where.sourceMode = filters.sourceMode;
-    }
-    if (filters.requestId) {
-      where.requestId = filters.requestId;
-    }
-    if (filters.paymentId) {
-      where.paymentId = filters.paymentId;
-    }
-    if (filters.refundId) {
-      where.refundId = filters.refundId;
-    }
-
-    // Date range filter
-    if (filters.startDate || filters.endDate) {
-      where.createdAt = {};
-      if (filters.startDate) {
-        (where.createdAt as any).gte = filters.startDate;
-      }
-      if (filters.endDate) {
-        (where.createdAt as any).lte = filters.endDate;
-      }
-    }
+    const where = buildCallbackAuditWhere(filters);
 
     // Query with pagination
     const [total, records] = await Promise.all([
@@ -772,5 +786,97 @@ export const petpalService = {
         totalPages: Math.ceil(total / pageSize),
       },
     };
+  },
+
+  async queryCallbackAuditStats(filters: CallbackAuditQueryFilters) {
+    const where = buildCallbackAuditWhere(filters);
+
+    const [
+      total,
+      byStatusRows,
+      byTypeRows,
+      bySourceModeRows,
+    ] = await Promise.all([
+      prisma.callbackAudit.count({ where }),
+      prisma.callbackAudit.groupBy({
+        by: ['callbackStatus'],
+        where,
+        _count: { _all: true },
+      }),
+      prisma.callbackAudit.groupBy({
+        by: ['callbackType'],
+        where,
+        _count: { _all: true },
+      }),
+      prisma.callbackAudit.groupBy({
+        by: ['sourceMode'],
+        where,
+        _count: { _all: true },
+      }),
+    ]);
+
+    const byStatus = {
+      PENDING: 0,
+      SUCCESS: 0,
+      FAILURE: 0,
+      ERROR: 0,
+    };
+    const byType = {
+      PAYMENT_CALLBACK: 0,
+      REFUND_CALLBACK: 0,
+    };
+    const bySourceMode = {
+      TOKEN: 0,
+      WECHATPAY_HMAC: 0,
+      WECHATPAY_SDK: 0,
+    };
+
+    byStatusRows.forEach((item) => {
+      byStatus[item.callbackStatus] = item._count._all;
+    });
+    byTypeRows.forEach((item) => {
+      byType[item.callbackType] = item._count._all;
+    });
+    bySourceModeRows.forEach((item) => {
+      bySourceMode[item.sourceMode as keyof typeof bySourceMode] = item._count._all;
+    });
+
+    return {
+      total,
+      successRate: total > 0 ? Number(((byStatus.SUCCESS / total) * 100).toFixed(2)) : 0,
+      byStatus,
+      byType,
+      bySourceMode,
+    };
+  },
+
+  async listCallbackAuditExportRows(filters: CallbackAuditQueryFilters) {
+    const where = buildCallbackAuditWhere(filters);
+
+    return prisma.callbackAudit.findMany({
+      where,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        payment: {
+          select: {
+            payNo: true,
+            orderId: true,
+            payAmount: true,
+            payStatus: true,
+          },
+        },
+        refund: {
+          select: {
+            refundNo: true,
+            orderId: true,
+            refundAmount: true,
+            refundStatus: true,
+          },
+        },
+      },
+      take: 5000,
+    });
   },
 };

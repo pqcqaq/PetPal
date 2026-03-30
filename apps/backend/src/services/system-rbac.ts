@@ -227,7 +227,7 @@ const defaultMenuTree: SystemMenuSeedNode[] = [
         path: '/petpal/callback-audits',
         viewKey: 'callback-audit',
         sortOrder: 40,
-        permissionCode: 'audit.read',
+        permissionCode: 'petpal.callback-audit.read',
       },
     ],
   },

@@ -38,6 +38,7 @@ import type {
 import type {
   CallbackAuditPage,
   CallbackAuditQuery,
+  CallbackAuditStats,
   CreatePetPayload,
   CreateServiceRequestPayload,
   MatchCaregiverQuery,
@@ -412,6 +413,15 @@ export const createApiFactory = (options: ClientOptions) => {
             url: '/petpal/admin/callback-audits',
             params: query as unknown as QueryParams,
           }),
+        callbackAuditStats: (query?: CallbackAuditQuery) =>
+          client.request<CallbackAuditStats>({
+            url: '/petpal/admin/callback-audits/stats',
+            params: query as unknown as QueryParams,
+          }),
+        exportCallbackAudits: createDownloadEndpoint<CallbackAuditQuery>(
+          '/petpal/admin/callback-audits/export',
+          'petpal-callback-audits.xlsx',
+        ),
       },
     },
   };

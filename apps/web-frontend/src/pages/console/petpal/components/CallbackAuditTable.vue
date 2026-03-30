@@ -69,7 +69,6 @@ import type { CallbackAuditRecord } from '@rbac/api-common';
 import {
   formatAuditTimestamp,
   resolveCallbackStatusLabel,
-  resolveCallbackStatusTone,
   resolveCallbackTypeLabel,
   resolveSourceModeLabel,
 } from '../callback-audit-display';

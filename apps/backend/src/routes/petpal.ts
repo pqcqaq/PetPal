@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../middlewares/auth';
 import { asyncHandler, ok, parsePagination } from '../utils/http';
+import { createExcelExportHandler, createTimestampedExcelFileName } from '../utils/excel-export';
 import { petpalService } from '../services/petpal-service';
 import { verifyPetpalCallbackAuth } from '../services/petpal-callback-auth';
 import { getRequestId } from '../utils/request-context';
@@ -51,6 +52,17 @@ const refundCallbackSchema = z.object({
 });
 
 const petpalRouter = Router();
+
+const parseCallbackAuditQuery = (query: Record<string, unknown>) => ({
+  callbackType: query.callbackType as 'PAYMENT_CALLBACK' | 'REFUND_CALLBACK' | undefined,
+  callbackStatus: query.callbackStatus as 'PENDING' | 'SUCCESS' | 'FAILURE' | 'ERROR' | undefined,
+  sourceMode: query.sourceMode as string | undefined,
+  requestId: query.requestId as string | undefined,
+  paymentId: query.paymentId as string | undefined,
+  refundId: query.refundId as string | undefined,
+  startDate: query.startDate ? new Date(String(query.startDate)) : undefined,
+  endDate: query.endDate ? new Date(String(query.endDate)) : undefined,
+});
 
 petpalRouter.post('/payments/callback', asyncHandler(async (req, res) => {
   const authMeta = verifyPetpalCallbackAuth(req.headers, req.rawBody ?? JSON.stringify(req.body ?? {}));
@@ -153,28 +165,42 @@ petpalRouter.get('/match/caregivers', asyncHandler(async (req, res) => {
 petpalRouter.get('/admin/callback-audits', asyncHandler(async (req, res) => {
   // Note: In production, add role/permission check here
   const { page, pageSize } = parsePagination(req.query);
-  const callbackType = req.query.callbackType as any;
-  const callbackStatus = req.query.callbackStatus as any;
-  const sourceMode = req.query.sourceMode as string | undefined;
-  const requestId = req.query.requestId as string | undefined;
-  const paymentId = req.query.paymentId as string | undefined;
-  const refundId = req.query.refundId as string | undefined;
-  const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
-  const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+  const filterQuery = parseCallbackAuditQuery(req.query as Record<string, unknown>);
 
   const result = await petpalService.queryCallbackAuditLogs({
     page,
     pageSize,
-    callbackType,
-    callbackStatus,
-    sourceMode,
-    requestId,
-    paymentId,
-    refundId,
-    startDate,
-    endDate,
+    ...filterQuery,
   });
   return ok(res, result, 'Callback audit logs');
 }));
+
+petpalRouter.get('/admin/callback-audits/stats', asyncHandler(async (req, res) => {
+  const filters = parseCallbackAuditQuery(req.query as Record<string, unknown>);
+  const result = await petpalService.queryCallbackAuditStats(filters);
+  return ok(res, result, 'Callback audit stats');
+}));
+
+petpalRouter.get(
+  '/admin/callback-audits/export',
+  createExcelExportHandler({
+    fileName: () => createTimestampedExcelFileName('petpal-callback-audits'),
+    sheetName: 'PetPal Callback Audits',
+    parseQuery: (query) => parseCallbackAuditQuery(query as Record<string, unknown>),
+    queryRows: (query) => petpalService.listCallbackAuditExportRows(query),
+    columns: [
+      { header: '回调类型', width: 16, value: row => row.callbackType },
+      { header: '回调状态', width: 14, value: row => row.callbackStatus },
+      { header: '验证来源', width: 18, value: row => row.sourceMode },
+      { header: 'RequestId', width: 28, value: row => row.requestId },
+      { header: '支付单号', width: 22, value: row => row.payment?.payNo ?? '' },
+      { header: '退款单号', width: 22, value: row => row.refund?.refundNo ?? '' },
+      { header: '签名摘要', width: 28, value: row => row.signatureDigest },
+      { header: '回调时间', width: 24, value: row => row.callbackTimestamp },
+      { header: '创建时间', width: 24, value: row => row.createdAt },
+      { header: '原始载荷', width: 60, value: row => row.rawPayload },
+    ],
+  }),
+);
 
 export { petpalRouter };

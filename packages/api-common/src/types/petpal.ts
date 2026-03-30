@@ -195,6 +195,7 @@ export interface CallbackAuditRecord {
 }
 
 export interface CallbackAuditQuery {
+  [key: string]: string | number | boolean | undefined;
   page?: number;
   pageSize?: number;
   callbackType?: CallbackType;
@@ -215,4 +216,12 @@ export interface CallbackAuditPage {
     total: number;
     totalPages: number;
   };
+}
+
+export interface CallbackAuditStats {
+  total: number;
+  successRate: number;
+  byStatus: Record<CallbackStatus, number>;
+  byType: Record<CallbackType, number>;
+  bySourceMode: Record<CallbackSourceMode, number>;
 }

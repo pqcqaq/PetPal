@@ -3,6 +3,7 @@
     <template #actions>
       <el-space>
         <el-button @click="loadLogs">刷新</el-button>
+        <ListExportButton :request="buildExportRequest" error-message="导出回调审计失败" />
       </el-space>
     </template>
 
@@ -44,7 +45,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import type { CallbackAuditRecord, CallbackAuditQuery } from '@rbac/api-common';
+import type {
+  CallbackAuditQuery,
+  CallbackAuditRecord,
+  CallbackAuditStats,
+} from '@rbac/api-common';
+import ListExportButton from '@/components/download/ListExportButton.vue';
 import PageScaffold from '@/components/workbench/PageScaffold.vue';
 import { usePageState } from '@/composables/use-page-state';
 import { api } from '@/api/client';
@@ -77,6 +83,25 @@ const drawerVisible = ref(false);
 const loading = ref(false);
 const total = ref(0);
 const pageSize = 10;
+const statsData = ref<CallbackAuditStats>({
+  total: 0,
+  successRate: 0,
+  byStatus: {
+    PENDING: 0,
+    SUCCESS: 0,
+    FAILURE: 0,
+    ERROR: 0,
+  },
+  byType: {
+    PAYMENT_CALLBACK: 0,
+    REFUND_CALLBACK: 0,
+  },
+  bySourceMode: {
+    TOKEN: 0,
+    WECHATPAY_HMAC: 0,
+    WECHATPAY_SDK: 0,
+  },
+});
 
 const { state: pageState } = usePageState<AuditPageState>('page:petpal:callback-audit', {
   filters: {
@@ -95,10 +120,9 @@ const selectedLog = computed(() =>
   ?? logs.value[0]
   ?? null);
 
-const successCount = computed(() => logs.value.filter(item => item.callbackStatus === 'SUCCESS').length);
-const failureCount = computed(() => logs.value.filter(item => item.callbackStatus === 'FAILURE' || item.callbackStatus === 'ERROR').length);
-const paymentCallbackCount = computed(() => logs.value.filter(item => item.callbackType === 'PAYMENT_CALLBACK').length);
-const refundCallbackCount = computed(() => logs.value.filter(item => item.callbackType === 'REFUND_CALLBACK').length);
+const failureCount = computed(() => statsData.value.byStatus.FAILURE + statsData.value.byStatus.ERROR);
+const paymentCallbackCount = computed(() => statsData.value.byType.PAYMENT_CALLBACK);
+const refundCallbackCount = computed(() => statsData.value.byType.REFUND_CALLBACK);
 
 const activeKeyword = computed(() => {
   const filters = getActiveAuditFilterTokens(pageState.filters);
@@ -108,8 +132,8 @@ const activeKeyword = computed(() => {
 });
 
 const stats = computed(() => [
-  { label: '回调总量', value: total.value },
-  { label: '成功回调', value: successCount.value },
+  { label: '回调总量', value: statsData.value.total },
+  { label: '成功回调', value: statsData.value.byStatus.SUCCESS },
   { label: '失败回调', value: failureCount.value },
   { label: '支付回调', value: paymentCallbackCount.value },
   { label: '当前过滤', value: activeKeyword.value },
@@ -128,16 +152,12 @@ const pageSignals = computed<AuditSignalItem[]>(() => [
   },
   {
     label: '成功率',
-    value: `${logs.value.length
-      ? Math.round((successCount.value / logs.value.length) * 100)
-      : 0}%`,
+    value: `${statsData.value.successRate}%`,
     tone: 'accent',
   },
 ]);
 
-const buildFilterParams = (): CallbackAuditQuery => ({
-  page: pageState.page,
-  pageSize,
+const buildFilterQuery = (): CallbackAuditQuery => ({
   callbackType: pageState.filters.callbackType as any || undefined,
   callbackStatus: pageState.filters.callbackStatus as any || undefined,
   sourceMode: pageState.filters.sourceMode as any || undefined,
@@ -145,6 +165,14 @@ const buildFilterParams = (): CallbackAuditQuery => ({
   startDate: pageState.filters.startDate || undefined,
   endDate: pageState.filters.endDate || undefined,
 });
+
+const buildFilterParams = (): CallbackAuditQuery => ({
+  ...buildFilterQuery(),
+  page: pageState.page,
+  pageSize,
+});
+
+const buildExportRequest = () => api.petpal.admin.exportCallbackAudits(buildFilterQuery());
 
 const syncSelectedLog = () => {
   if (!logs.value.length) {
@@ -163,10 +191,14 @@ const syncSelectedLog = () => {
 const loadLogs = async () => {
   try {
     loading.value = true;
-    const response = await api.petpal.admin.callbackAudits(buildFilterParams());
+    const [response, statsResponse] = await Promise.all([
+      api.petpal.admin.callbackAudits(buildFilterParams()),
+      api.petpal.admin.callbackAuditStats(buildFilterQuery()),
+    ]);
 
     logs.value = [...response.items].sort(compareCallbackAuditRecency);
     total.value = response.pagination.total;
+    statsData.value = statsResponse;
     syncSelectedLog();
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '加载回调审计日志失败'));

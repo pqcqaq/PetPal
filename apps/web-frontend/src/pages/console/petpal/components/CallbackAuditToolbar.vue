@@ -92,7 +92,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
 import type { CallbackAuditFilters } from '../callback-audit-display';
 
 defineProps<{
@@ -104,8 +103,6 @@ const emits = defineEmits<{
   apply: [];
   reset: [];
 }>();
-
-const localFilters = ref<CallbackAuditFilters>({ ...{} });
 
 const onApply = () => {
   emits('apply');
