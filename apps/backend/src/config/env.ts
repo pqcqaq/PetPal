@@ -51,6 +51,7 @@ const envSchema = z.object({
   UPLOAD_RECONCILE_INTERVAL_MINUTES: z.coerce.number().int().positive().default(60),
   UPLOAD_PENDING_TIMEOUT_MINUTES: z.coerce.number().int().positive().default(60),
   UPLOAD_RECONCILE_BATCH_SIZE: z.coerce.number().int().positive().default(100),
+  PETPAL_CALLBACK_TOKEN: z.string().default('petpal-dev-callback-token'),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173,http://localhost:9000,http://127.0.0.1:9000,http://localhost:3300,http://127.0.0.1:3300'),
 });
 

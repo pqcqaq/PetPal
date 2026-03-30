@@ -149,4 +149,108 @@ describe('PetPal API integration', () => {
     assert.ok(amountPaid - amountRefunded >= 0);
     assert.ok(amountPaid >= amountTotal + amountAdjusted - amountRefunded);
   });
+
+  it('handles payment and refund callbacks with idempotency', async () => {
+    const { app, prisma } = context;
+
+    const baseOrder = await prisma.orderMain.findUnique({
+      where: { orderNo: 'PP202603300001' },
+      select: {
+        id: true,
+      },
+    });
+    assert.ok(baseOrder);
+
+    const callbackPayment = await prisma.paymentRecord.create({
+      data: {
+        id: `pay-callback-${Date.now().toString(36)}`,
+        orderId: baseOrder.id,
+        payNo: `PAY-CB-${Date.now()}`,
+        bizType: 'BALANCE',
+        payChannel: 'WECHAT',
+        payStatus: 'PENDING',
+        payAmount: 5,
+      },
+    });
+
+    const paymentCallback = await request(app)
+      .post('/api/petpal/payments/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        payNo: callbackPayment.payNo,
+        channelTxnId: `WXTXN-CB-${Date.now()}`,
+        success: true,
+        paidAmount: 5,
+      })
+      .expect(200);
+
+    assert.equal(paymentCallback.body.data.idempotent, false);
+
+    const persistedPayment = await prisma.paymentRecord.findUnique({
+      where: {
+        payNo: callbackPayment.payNo,
+      },
+      select: {
+        channelTxnId: true,
+      },
+    });
+
+    assert.ok(persistedPayment?.channelTxnId);
+
+    const idempotentPaymentCallback = await request(app)
+      .post('/api/petpal/payments/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        payNo: callbackPayment.payNo,
+        channelTxnId: persistedPayment.channelTxnId,
+        success: true,
+        paidAmount: 5,
+      })
+      .expect(200);
+
+    assert.equal(idempotentPaymentCallback.body.data.idempotent, true);
+
+    const refund = await prisma.refundRecord.findUnique({
+      where: {
+        refundNo: 'REF202603300001',
+      },
+      select: {
+        refundNo: true,
+      },
+    });
+
+    assert.ok(refund);
+
+    const refundCallback = await request(app)
+      .post('/api/petpal/refunds/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        refundNo: refund.refundNo,
+        channelRefundId: `WXREF-CB-${Date.now()}`,
+        success: true,
+      })
+      .expect(200);
+
+    assert.equal(typeof refundCallback.body.data.idempotent, 'boolean');
+
+    const order = await prisma.orderMain.findUnique({
+      where: {
+        id: baseOrder.id,
+      },
+      select: {
+        amountTotal: true,
+        amountAdjusted: true,
+        amountPaid: true,
+        amountRefunded: true,
+      },
+    });
+
+    assert.ok(order);
+    const amountTotal = Number(order.amountTotal);
+    const amountAdjusted = Number(order.amountAdjusted);
+    const amountPaid = Number(order.amountPaid);
+    const amountRefunded = Number(order.amountRefunded);
+    assert.ok(amountPaid - amountRefunded >= 0);
+    assert.ok(amountPaid >= amountTotal + amountAdjusted - amountRefunded);
+  });
 });

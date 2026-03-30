@@ -342,4 +342,239 @@ export const petpalService = {
       },
     };
   },
+
+  async handlePaymentCallback(payload: {
+    payNo: string;
+    channelTxnId: string;
+    success: boolean;
+    paidAmount?: number;
+    channelPayload?: unknown;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const payment = await tx.paymentRecord.findUnique({
+        where: {
+          payNo: payload.payNo,
+        },
+        select: {
+          id: true,
+          orderId: true,
+          payStatus: true,
+          channelTxnId: true,
+          payAmount: true,
+        },
+      });
+
+      if (!payment) {
+        throw notFound('Payment not found');
+      }
+
+      if (payment.payStatus === 'PAID') {
+        const idempotent = payment.channelTxnId === payload.channelTxnId;
+        return {
+          idempotent,
+          paymentId: payment.id,
+          orderId: payment.orderId,
+          payStatus: payment.payStatus,
+        };
+      }
+
+      const nextStatus = payload.success ? 'PAID' : 'FAILED';
+      const nextPaidAmount = payload.success && payload.paidAmount != null
+        ? payload.paidAmount
+        : toNumber(payment.payAmount);
+
+      await tx.paymentRecord.update({
+        where: {
+          id: payment.id,
+        },
+        data: {
+          payStatus: nextStatus,
+          payAmount: nextPaidAmount,
+          channelTxnId: payload.channelTxnId,
+          paidAt: payload.success ? new Date() : null,
+          channelPayload: (payload.channelPayload ?? null) as Prisma.InputJsonValue,
+        },
+      });
+
+      const [paidRows, refundedRows, order] = await Promise.all([
+        tx.paymentRecord.findMany({
+          where: {
+            orderId: payment.orderId,
+            payStatus: 'PAID',
+            deleteAt: null,
+          },
+          select: {
+            payAmount: true,
+          },
+        }),
+        tx.refundRecord.findMany({
+          where: {
+            orderId: payment.orderId,
+            refundStatus: 'SUCCESS',
+            deleteAt: null,
+          },
+          select: {
+            refundAmount: true,
+          },
+        }),
+        tx.orderMain.findUnique({
+          where: {
+            id: payment.orderId,
+          },
+          select: {
+            id: true,
+            amountTotal: true,
+            amountAdjusted: true,
+            amountRefunded: true,
+            orderStatus: true,
+          },
+        }),
+      ]);
+
+      if (!order) {
+        throw notFound('Order not found');
+      }
+
+      const amountPaid = paidRows.reduce((sum, row) => sum + toNumber(row.payAmount), 0);
+      const amountRefunded = refundedRows.reduce((sum, row) => sum + toNumber(row.refundAmount), 0);
+      const required = toNumber(order.amountTotal) + toNumber(order.amountAdjusted) - amountRefunded;
+
+      const nextOrderStatus = amountRefunded > 0
+        ? (amountRefunded >= toNumber(order.amountTotal) + toNumber(order.amountAdjusted)
+          ? 'REFUNDED'
+          : 'PARTIAL_REFUNDED')
+        : (amountPaid >= required ? 'ACCEPTED' : order.orderStatus);
+
+      await tx.orderMain.update({
+        where: {
+          id: order.id,
+        },
+        data: {
+          amountPaid,
+          amountRefunded,
+          orderStatus: nextOrderStatus,
+        },
+      });
+
+      return {
+        idempotent: false,
+        paymentId: payment.id,
+        orderId: payment.orderId,
+        payStatus: nextStatus,
+        orderStatus: nextOrderStatus,
+      };
+    });
+  },
+
+  async handleRefundCallback(payload: {
+    refundNo: string;
+    channelRefundId: string;
+    success: boolean;
+    channelPayload?: unknown;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const refund = await tx.refundRecord.findUnique({
+        where: {
+          refundNo: payload.refundNo,
+        },
+        select: {
+          id: true,
+          orderId: true,
+          refundStatus: true,
+          channelRefundId: true,
+        },
+      });
+
+      if (!refund) {
+        throw notFound('Refund not found');
+      }
+
+      if (refund.refundStatus === 'SUCCESS') {
+        const idempotent = refund.channelRefundId === payload.channelRefundId;
+        return {
+          idempotent,
+          refundId: refund.id,
+          orderId: refund.orderId,
+          refundStatus: refund.refundStatus,
+        };
+      }
+
+      const nextStatus = payload.success ? 'SUCCESS' : 'FAILED';
+      await tx.refundRecord.update({
+        where: {
+          id: refund.id,
+        },
+        data: {
+          refundStatus: nextStatus,
+          channelRefundId: payload.channelRefundId,
+          reviewedAt: payload.success ? new Date() : null,
+        },
+      });
+
+      const [paidRows, refundedRows, order] = await Promise.all([
+        tx.paymentRecord.findMany({
+          where: {
+            orderId: refund.orderId,
+            payStatus: 'PAID',
+            deleteAt: null,
+          },
+          select: {
+            payAmount: true,
+          },
+        }),
+        tx.refundRecord.findMany({
+          where: {
+            orderId: refund.orderId,
+            refundStatus: 'SUCCESS',
+            deleteAt: null,
+          },
+          select: {
+            refundAmount: true,
+          },
+        }),
+        tx.orderMain.findUnique({
+          where: {
+            id: refund.orderId,
+          },
+          select: {
+            id: true,
+            amountTotal: true,
+            amountAdjusted: true,
+            orderStatus: true,
+          },
+        }),
+      ]);
+
+      if (!order) {
+        throw notFound('Order not found');
+      }
+
+      const amountPaid = paidRows.reduce((sum, row) => sum + toNumber(row.payAmount), 0);
+      const amountRefunded = refundedRows.reduce((sum, row) => sum + toNumber(row.refundAmount), 0);
+      const gross = toNumber(order.amountTotal) + toNumber(order.amountAdjusted);
+
+      const nextOrderStatus = amountRefunded > 0
+        ? (amountRefunded >= gross ? 'REFUNDED' : 'PARTIAL_REFUNDED')
+        : order.orderStatus;
+
+      await tx.orderMain.update({
+        where: {
+          id: order.id,
+        },
+        data: {
+          amountPaid,
+          amountRefunded,
+          orderStatus: nextOrderStatus,
+        },
+      });
+
+      return {
+        idempotent: false,
+        refundId: refund.id,
+        orderId: refund.orderId,
+        refundStatus: nextStatus,
+        orderStatus: nextOrderStatus,
+      };
+    });
+  },
 };
