@@ -445,4 +445,22 @@ Last updated: 2026-03-31
 
 - 统计/导出已具备集成测试覆盖，后续需补充压力与边界数据规模测试。
 - 回调审计路由鉴权可继续按业务角色细分。
+
+## 26. PetPal 回调审计 UI 导出权限对齐（P0 Slice 11 Part 4）
+
+**内容**：将管理端回调审计页面导出按钮与后端导出权限进行前端显隐对齐，减少无权限用户误操作。
+
+变更摘要：
+
+- 前端页面 `apps/web-frontend/src/pages/console/petpal/CallbackAuditView.vue`：
+  - 导出按钮 `ListExportButton` 增加 `v-permission="'petpal.callback-audit.export'"`。
+- 权限边界一致性：
+  - 具备 `petpal.callback-audit.read` 但不具备 `petpal.callback-audit.export` 的角色（如 manager）可继续使用查询/统计；导出入口不再展示。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- 结合既有后端集成测试（8/8）确认读导权限拆分边界保持稳定。
+
+Git commit：`feat(p0): align callback audit export button visibility with export permission`。
 - 高增长场景下需要规划审计表分区与归档策略。

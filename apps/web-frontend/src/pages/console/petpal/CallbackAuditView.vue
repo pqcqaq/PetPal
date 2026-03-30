@@ -3,7 +3,11 @@
     <template #actions>
       <el-space>
         <el-button @click="loadLogs">刷新</el-button>
-        <ListExportButton :request="buildExportRequest" error-message="导出回调审计失败" />
+        <ListExportButton
+          v-permission="'petpal.callback-audit.export'"
+          :request="buildExportRequest"
+          error-message="导出回调审计失败"
+        />
       </el-space>
     </template>
 
