@@ -13,6 +13,25 @@ export default defineConfig({
     ['meta', { name: 'keywords', content: 'QC-RBAC, RBAC, OAuth2, OIDC, VitePress, Vue, Express, uni-app' }],
     ['link', { rel: 'icon', href: '/mark.svg' }],
   ],
+  markdown: {
+    config(md) {
+      const originalFence = md.renderer.rules.fence;
+      md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+        const token = tokens[idx];
+        const language = token.info.trim().split(/\s+/u)[0];
+        if (language === 'mermaid') {
+          const encoded = encodeURIComponent(token.content.trim());
+          return `<MermaidDiagram code="${encoded}" :encoded="true" />`;
+        }
+
+        if (originalFence) {
+          return originalFence(tokens, idx, options, env, self);
+        }
+
+        return self.renderToken(tokens, idx, options);
+      };
+    },
+  },
   themeConfig: {
     siteTitle: 'QC-RBAC',
     logo: '/mark.svg',
@@ -24,6 +43,7 @@ export default defineConfig({
       { text: '介绍', link: '/guide/introduction' },
       { text: '快速开始', link: '/guide/quick-start' },
       { text: '开发指南', link: '/guide/development' },
+      { text: '项目设计', link: '/project/PetPal' },
       { text: '实时通信', link: '/guide/realtime' },
       { text: '内置组件', link: '/components/' },
       { text: '测试', link: '/guide/testing' },
@@ -88,6 +108,14 @@ export default defineConfig({
           text: '架构',
           items: [
             { text: '技术选型', link: '/architecture/tech-stack' },
+          ],
+        },
+      ],
+      '/project/': [
+        {
+          text: '项目设计',
+          items: [
+            { text: 'PetPal 平台设计', link: '/project/PetPal' },
           ],
         },
       ],

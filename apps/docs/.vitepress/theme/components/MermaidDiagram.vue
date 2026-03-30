@@ -1,10 +1,23 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 const props = defineProps<{
   code: string;
   label?: string;
+  encoded?: boolean;
 }>();
+
+const diagramCode = computed(() => {
+  if (!props.encoded) {
+    return props.code;
+  }
+
+  try {
+    return decodeURIComponent(props.code);
+  } catch {
+    return props.code;
+  }
+});
 
 const renderedSvg = ref('');
 const errorMessage = ref('');
@@ -45,7 +58,7 @@ const renderDiagram = async () => {
     });
 
     renderCount += 1;
-    const { svg } = await mermaid.render(`rbac-docs-mermaid-${renderCount}`, props.code.trim());
+    const { svg } = await mermaid.render(`rbac-docs-mermaid-${renderCount}`, diagramCode.value.trim());
     renderedSvg.value = svg;
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Failed to render Mermaid diagram.';
@@ -60,7 +73,7 @@ onMounted(() => {
 });
 
 watch(
-  () => props.code,
+  () => [props.code, props.encoded],
   () => {
     if (ready) {
       void renderDiagram();
