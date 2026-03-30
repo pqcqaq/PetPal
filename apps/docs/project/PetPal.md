@@ -1512,3 +1512,49 @@ gantt
 - P0 Slice 11 Part 2：管理端审计日志 UI（Web 端列表、搜索、详情弹窗）。
 - P0 Slice 11 Part 3：统计聚合与导出功能（CSV/JSON）。
 - P0 最终验收：全量集成测试、文档同步、灰度部署计划。
+
+### 14.13 2026-04-01（P0 Slice 11 Part 2）
+
+**概述**：管理端回调审计 UI 页面落地（Web 端），实现查询面板、列表、详情抽屉与侧边指标面板。
+
+已完成：
+
+- 新增 PetPal 回调审计页面：`apps/web-frontend/src/pages/console/petpal/CallbackAuditView.vue`
+  - 使用 `PageScaffold` 复用控制台工作台框架。
+  - 查询条件与分页状态持久化到 `usePageState('page:petpal:callback-audit')`。
+  - 调用 `api.petpal.admin.callbackAudits()` 拉取数据。
+  - 实现回调成功率、失败量、支付/退款回调占比等页面指标。
+- 新增页面展示逻辑：`callback-audit-display.ts`
+  - 回调类型、状态、来源模式标签映射。
+  - 时间格式化与过滤 token 生成。
+  - 按创建时间倒序比较器。
+- 新增组件：
+  - `CallbackAuditToolbar.vue`：回调类型/状态/来源/RequestId/时间范围筛选。
+  - `CallbackAuditTable.vue`：审计列表、状态标签、详情入口、分页。
+  - `CallbackAuditDetailDrawer.vue`：详情抽屉，展示关联支付/退款、签名摘要、原始 payload、验证结果树。
+  - `CallbackAuditWorkbenchSidebar.vue`：当前选中记录摘要与关键指标卡片。
+- 新增共享 API 契约：
+  - `packages/api-common/src/types/petpal.ts` 增加 `CallbackAuditRecord`、`CallbackAuditQuery`、`CallbackAuditPage`。
+  - `packages/api-common/src/api/factory.ts` 增加 `api.petpal.admin.callbackAudits(query)`。
+- 新增菜单接入：
+  - `apps/backend/src/services/system-rbac.ts` 增加菜单节点：
+    - `path: /petpal/callback-audits`
+    - `viewKey: callback-audit`
+    - `permissionCode: audit.read`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+
+关键设计决策：
+
+- 复用现有控制台工作台组件体系，避免引入新的视觉/交互范式。
+- UI 契约保持与后端一致：分页字段使用 `pagination`，避免 `PaginatedResult.meta` 混用。
+- 菜单权限暂复用 `audit.read`，后续可按 PetPal 运营权限拆分为独立权限码。
+
+后续计划：
+
+- P0 Slice 11 Part 3：统计聚合接口 + CSV/JSON 导出。
+- P0 最终验收：端到端冒烟、菜单可见性与权限校验、文档收口。

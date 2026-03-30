@@ -338,3 +338,41 @@ Last updated: 2026-03-31
 - 后续可集成官方 WeChat Pay SDK，使用真实公钥进行端到端测试。
 - 可添加性能基准测试（SDK vs HMAC 验证耗时）。
 - 可添加 SDK 验证失败的重试与降级策略。
+
+## 23. PetPal 管理端回调审计 UI（P0 Slice 11 Part 2）
+
+**内容**：完成 Web 控制台回调审计页面，打通后端查询 API 与前端可视化查询能力。
+
+核心实现：
+
+- 新增页面 `apps/web-frontend/src/pages/console/petpal/CallbackAuditView.vue`：
+  - 列表 + 侧栏双栏工作台布局。
+  - 筛选条件、分页状态通过 `usePageState` 维持。
+  - 页面指标：总量、成功/失败回调、支付/退款占比、过滤摘要。
+- 新增组件：
+  - `CallbackAuditToolbar.vue`：多维筛选（类型/状态/来源/RequestId/时间范围）。
+  - `CallbackAuditTable.vue`：分页列表与详情入口。
+  - `CallbackAuditDetailDrawer.vue`：回调详情、关联支付/退款、验证结果树、原始载荷。
+  - `CallbackAuditWorkbenchSidebar.vue`：选中记录摘要与关键指标卡。
+- 新增展示辅助 `callback-audit-display.ts`：
+  - 类型/状态/来源文案映射。
+  - 时间格式化、过滤 token 生成、回调时间排序。
+- 共享契约扩展（`packages/api-common`）：
+  - 类型：`CallbackAuditRecord`、`CallbackAuditQuery`、`CallbackAuditPage`。
+  - API：`api.petpal.admin.callbackAudits(query)`。
+- 菜单接入（后端默认系统菜单）：
+  - `apps/backend/src/services/system-rbac.ts` 新增 `viewKey: callback-audit` 菜单项。
+  - 路径 `/petpal/callback-audits`，权限复用 `audit.read`。
+
+验证与设计决策：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- 关键设计：严格对齐后端返回结构（`pagination`）避免前后端分页字段错配。
+
+已识别的优化空间：
+
+- 下一步增加统计聚合接口，避免前端在单页数据上做近似统计。
+- 增加导出功能（CSV/JSON）并附带筛选条件快照。
+- 引入权限细分（如 `petpal.audit.read`）替代复用 `audit.read`。
