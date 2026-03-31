@@ -203,6 +203,68 @@ const getServiceLogDetails = (log: ServiceLogRecord) => {
   return details
 }
 
+const isPreviewableImage = (url: string) => /\.(apng|avif|bmp|gif|jpe?g|png|svg|webp)$/i.test(
+  url.split(/[?#]/)[0] ?? '',
+)
+
+const getMediaLinkLabel = (url: string, index: number) => {
+  const pathSegment = url.split(/[?#]/)[0]?.split('/').pop()
+  if (!pathSegment) {
+    return `附件 ${index + 1}`
+  }
+
+  try {
+    return decodeURIComponent(pathSegment)
+  }
+  catch {
+    return pathSegment
+  }
+}
+
+const previewServiceLogImage = (log: ServiceLogRecord, currentUrl: string) => {
+  const imageUrls = log.mediaUrls.filter((item) => isPreviewableImage(item))
+  if (imageUrls.length === 0) {
+    return
+  }
+
+  uni.previewImage({
+    current: currentUrl,
+    urls: imageUrls,
+  })
+}
+
+const copyServiceLogMediaUrl = (url: string) => {
+  uni.setClipboardData({
+    data: url,
+    success: () => {
+      uni.showToast({
+        title: '媒体链接已复制',
+        icon: 'none',
+      })
+    },
+    fail: () => {
+      uni.showToast({
+        title: '当前环境暂不支持打开该附件',
+        icon: 'none',
+      })
+    },
+  })
+}
+
+const openServiceLogMedia = (log: ServiceLogRecord, url: string) => {
+  if (isPreviewableImage(url)) {
+    previewServiceLogImage(log, url)
+    return
+  }
+
+  // #ifdef H5
+  window.open(url, '_blank', 'noopener,noreferrer')
+  return
+  // #endif
+
+  copyServiceLogMediaUrl(url)
+}
+
 async function loadOrderDetail() {
   if (!orderId.value) return
 
@@ -350,6 +412,27 @@ onLoad((options: Record<string, any>) => {
                   </view>
                   <view v-for="detail in getServiceLogDetails(log)" :key="`${log.id}-${detail}`" class="petpal-detail-line">
                     <text>{{ detail }}</text>
+                  </view>
+                  <view v-if="log.mediaUrls.length > 0" class="petpal-service-log-media">
+                    <view
+                      v-for="(url, index) in log.mediaUrls"
+                      :key="`${log.id}-${url}`"
+                      class="petpal-service-log-media-item"
+                      @tap="openServiceLogMedia(log, url)"
+                    >
+                      <image
+                        v-if="isPreviewableImage(url)"
+                        :src="url"
+                        mode="aspectFill"
+                        class="petpal-service-log-media-image"
+                      />
+                      <view v-else class="petpal-service-log-media-file">
+                        <text>{{ getMediaLinkLabel(url, index) }}</text>
+                      </view>
+                      <text class="petpal-service-log-media-meta">
+                        {{ isPreviewableImage(url) ? '点击预览' : '点击打开或复制链接' }}
+                      </text>
+                    </view>
                   </view>
                 </view>
               </view>
@@ -632,6 +715,51 @@ onLoad((options: Record<string, any>) => {
   background: #f5f7fa;
   color: #333;
   line-height: 1.6;
+}
+
+.petpal-service-log-media {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.petpal-service-log-media-item {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e5ebf3;
+}
+
+.petpal-service-log-media-image,
+.petpal-service-log-media-file {
+  width: 100%;
+  height: 128px;
+  border-radius: 10px;
+}
+
+.petpal-service-log-media-image {
+  background: #eef4fb;
+}
+
+.petpal-service-log-media-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: linear-gradient(135deg, #f6f8fb 0%, #edf4ff 100%);
+  color: #2f4668;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.petpal-service-log-media-meta {
+  color: #6b7280;
+  font-size: 11px;
 }
 
 .petpal-empty {

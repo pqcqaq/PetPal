@@ -989,6 +989,24 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 56. PetPal Uni 服务记录媒体预览（P1-M2 Slice 29）
+
+**内容**：为 Uni 端订单详情补齐服务记录媒体展示与交互，移动端不再停留在“媒体数量”层面。
+
+变更摘要：
+
+- `apps/app-frontend/src/pages/order-detail/index.vue`
+  - 服务记录区新增媒体卡片网格。
+  - 图片媒体支持 `uni.previewImage(...)` 预览。
+  - 非图片媒体展示附件名称，并在 H5 端直接打开、非 H5 端复制链接兜底。
+  - 新增移动端媒体卡片样式，保证缩略图、文件名和提示文案可读。
+
+验证结果：
+
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。
