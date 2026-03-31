@@ -129,6 +129,34 @@ type OwnerTransactionExportRow = {
   closedAt: Date | null;
 };
 
+type OwnerRefundProgressStage =
+  | 'NONE'
+  | 'PENDING_REVIEW'
+  | 'APPROVED_WAITING'
+  | 'PARTIAL_SUCCESS'
+  | 'FULL_SUCCESS'
+  | 'REJECTED'
+  | 'FAILED';
+
+type OwnerRefundProgressRecord = {
+  stage: OwnerRefundProgressStage;
+  latestRefundNo: string | null;
+  latestRefundStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED' | null;
+  latestRefundAmount: number | null;
+  latestRefundReason: string | null;
+  latestAppliedAt: Date | null;
+  latestReviewedAt: Date | null;
+  totalRefundCount: number;
+  pendingCount: number;
+  approvedCount: number;
+  successCount: number;
+  rejectedCount: number;
+  failedCount: number;
+  requestedRefundAmount: number;
+  settledRefundAmount: number;
+  refundableBalance: number;
+};
+
 const OWNER_TRANSACTION_EXPORT_DEFAULT_DAYS = 365;
 const OWNER_TRANSACTION_EXPORT_MAX_DAYS = 366;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -430,6 +458,63 @@ const loadOrderComplaintsByOrderId = async (
     createdAt: 'desc',
   },
 });
+
+const buildOwnerRefundProgress = (order: {
+  amountPaid: Prisma.Decimal | number;
+  amountRefunded: Prisma.Decimal | number;
+  orderStatus: 'PENDING_ACCEPT' | 'ACCEPTED' | 'SERVING' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'PARTIAL_REFUNDED' | 'REFUNDED';
+  refunds: Array<{
+    refundNo: string;
+    refundAmount: Prisma.Decimal | number;
+    refundStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
+    refundReason: string;
+    createdAt: Date;
+    reviewedAt: Date | null;
+  }>;
+}): OwnerRefundProgressRecord => {
+  const refunds = order.refunds;
+  const latestRefund = refunds[refunds.length - 1] ?? null;
+  const pendingCount = refunds.filter(item => item.refundStatus === 'PENDING').length;
+  const approvedCount = refunds.filter(item => item.refundStatus === 'APPROVED').length;
+  const successCount = refunds.filter(item => item.refundStatus === 'SUCCESS').length;
+  const rejectedCount = refunds.filter(item => item.refundStatus === 'REJECTED').length;
+  const failedCount = refunds.filter(item => item.refundStatus === 'FAILED').length;
+  const requestedRefundAmount = refunds.reduce((sum, item) => sum + toNumber(item.refundAmount), 0);
+  const settledRefundAmount = toNumber(order.amountRefunded);
+  const refundableBalance = Number(Math.max(0, toNumber(order.amountPaid) - settledRefundAmount).toFixed(2));
+
+  let stage: OwnerRefundProgressStage = 'NONE';
+  if (approvedCount > 0) {
+    stage = 'APPROVED_WAITING';
+  } else if (pendingCount > 0) {
+    stage = 'PENDING_REVIEW';
+  } else if (successCount > 0) {
+    stage = order.orderStatus === 'REFUNDED' || refundableBalance <= 0 ? 'FULL_SUCCESS' : 'PARTIAL_SUCCESS';
+  } else if (latestRefund?.refundStatus === 'REJECTED') {
+    stage = 'REJECTED';
+  } else if (latestRefund?.refundStatus === 'FAILED') {
+    stage = 'FAILED';
+  }
+
+  return {
+    stage,
+    latestRefundNo: latestRefund?.refundNo ?? null,
+    latestRefundStatus: latestRefund?.refundStatus ?? null,
+    latestRefundAmount: latestRefund ? toNumber(latestRefund.refundAmount) : null,
+    latestRefundReason: latestRefund?.refundReason ?? null,
+    latestAppliedAt: latestRefund?.createdAt ?? null,
+    latestReviewedAt: latestRefund?.reviewedAt ?? null,
+    totalRefundCount: refunds.length,
+    pendingCount,
+    approvedCount,
+    successCount,
+    rejectedCount,
+    failedCount,
+    requestedRefundAmount: Number(requestedRefundAmount.toFixed(2)),
+    settledRefundAmount: Number(settledRefundAmount.toFixed(2)),
+    refundableBalance,
+  };
+};
 
 const writeCallbackAlertReplayLog = async (input: {
   outboxIds: string[];
@@ -1033,6 +1118,44 @@ export const petpalService = {
 
     assertOrderAmountInvariant(order);
     return toOrderDetailRecord(order);
+  },
+
+  async getOwnerOrderRefundProgress(ownerId: string, orderId: string): Promise<OwnerRefundProgressRecord> {
+    const order = await prisma.orderMain.findFirst({
+      where: {
+        id: orderId,
+        ownerId,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+        amountPaid: true,
+        amountRefunded: true,
+        orderStatus: true,
+        refunds: {
+          where: {
+            deleteAt: null,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+          select: {
+            refundNo: true,
+            refundAmount: true,
+            refundStatus: true,
+            refundReason: true,
+            createdAt: true,
+            reviewedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw notFound('Order not found');
+    }
+
+    return buildOwnerRefundProgress(order);
   },
 
   async acceptCaregiverOrder(userId: string, orderId: string) {

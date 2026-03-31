@@ -17,6 +17,14 @@ export type PaymentBizType = 'DEPOSIT' | 'BALANCE' | 'ADJUSTMENT';
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'CLOSED';
 export type RefundType = 'FULL' | 'PARTIAL';
 export type RefundStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
+export type RefundProgressStage =
+  | 'NONE'
+  | 'PENDING_REVIEW'
+  | 'APPROVED_WAITING'
+  | 'PARTIAL_SUCCESS'
+  | 'FULL_SUCCESS'
+  | 'REJECTED'
+  | 'FAILED';
 export type CaregiverAuditStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type OrderTimelineEventType =
   | 'CREATED'
@@ -131,6 +139,25 @@ export interface RefundRecordDetail extends RefundRecordBrief {
   refundReason: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface OrderRefundProgressRecord {
+  stage: RefundProgressStage;
+  latestRefundNo: string | null;
+  latestRefundStatus: RefundStatus | null;
+  latestRefundAmount: AmountValue | null;
+  latestRefundReason: string | null;
+  latestAppliedAt: string | null;
+  latestReviewedAt: string | null;
+  totalRefundCount: number;
+  pendingCount: number;
+  approvedCount: number;
+  successCount: number;
+  rejectedCount: number;
+  failedCount: number;
+  requestedRefundAmount: AmountValue;
+  settledRefundAmount: AmountValue;
+  refundableBalance: AmountValue;
 }
 
 export interface OrderTimelineRecord {

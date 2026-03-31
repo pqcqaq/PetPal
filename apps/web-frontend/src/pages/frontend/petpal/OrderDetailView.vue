@@ -235,6 +235,64 @@
           </div>
         </article>
 
+        <article v-if="isOwnerView" class="frontend-card petpal-order-detail__refund-progress">
+          <span class="frontend-card__eyebrow">退款进度</span>
+          <div class="petpal-refund-progress__header">
+            <div class="petpal-refund-progress__headline">
+              <h3>{{ refundProgress ? getRefundProgressStageLabel(refundProgress.stage) : '暂无退款进度' }}</h3>
+              <p>{{ refundProgress ? getRefundProgressStageHint(refundProgress.stage) : '当前暂无退款进度可展示' }}</p>
+            </div>
+            <el-tag v-if="refundProgress" :type="getRefundProgressStageType(refundProgress.stage)">
+              {{ getRefundProgressStageLabel(refundProgress.stage) }}
+            </el-tag>
+          </div>
+
+          <template v-if="refundProgress">
+            <div class="petpal-refund-progress__stats">
+              <div class="petpal-refund-progress__stat">
+                <span>退款申请数</span>
+                <strong>{{ refundProgress.totalRefundCount }}</strong>
+              </div>
+              <div class="petpal-refund-progress__stat">
+                <span>处理中</span>
+                <strong>{{ refundProgress.pendingCount + refundProgress.approvedCount }}</strong>
+              </div>
+              <div class="petpal-refund-progress__stat">
+                <span>已退款</span>
+                <strong>{{ refundProgress.successCount }}</strong>
+              </div>
+              <div class="petpal-refund-progress__stat">
+                <span>可退余额</span>
+                <strong>¥{{ formatAmount(refundProgress.refundableBalance) }}</strong>
+              </div>
+            </div>
+
+            <div v-if="refundProgress.latestRefundNo" class="petpal-refund-progress__latest">
+              <div class="petpal-refund-progress__latest-header">
+                <h4>{{ refundProgress.latestRefundNo }}</h4>
+                <el-tag
+                  v-if="refundProgress.latestRefundStatus"
+                  size="small"
+                  :type="getRefundStatusType(refundProgress.latestRefundStatus)"
+                >
+                  {{ getRefundStatusLabel(refundProgress.latestRefundStatus) }}
+                </el-tag>
+              </div>
+              <div class="petpal-refund-progress__latest-meta">
+                <span><strong>申请金额：</strong>¥{{ formatAmount(refundProgress.latestRefundAmount ?? 0) }}</span>
+                <span v-if="refundProgress.latestAppliedAt"><strong>申请时间：</strong>{{ formatDateTime(refundProgress.latestAppliedAt) }}</span>
+                <span v-if="refundProgress.latestReviewedAt"><strong>审核时间：</strong>{{ formatDateTime(refundProgress.latestReviewedAt) }}</span>
+              </div>
+              <p v-if="refundProgress.latestRefundReason" class="petpal-refund-progress__reason">
+                <strong>退款原因：</strong>{{ refundProgress.latestRefundReason }}
+              </p>
+            </div>
+          </template>
+          <div v-else class="petpal-empty">
+            <p>当前没有退款申请，后续售后处理进度会显示在这里。</p>
+          </div>
+        </article>
+
         <article v-if="isOwnerView" class="frontend-card petpal-order-detail__complaints">
           <span class="frontend-card__eyebrow">投诉与进度</span>
           <div class="petpal-complaint-panel__header">
@@ -556,6 +614,7 @@ import type {
   CreateOrderReviewPayload,
   OrderDetailRecord,
   OrderOperatorRole,
+  OrderRefundProgressRecord,
   OrderStatus,
   OrderTimelineEventType,
   OrderTimelineRecord,
@@ -575,6 +634,7 @@ const auth = useAuthStore();
 const order = ref<OrderDetailRecord | null>(null);
 const orderNo = ref('');
 const complaints = ref<ComplaintRecord[]>([]);
+const refundProgress = ref<OrderRefundProgressRecord | null>(null);
 const loading = ref(false);
 const reviewDialogVisible = ref(false);
 const reviewSubmitting = ref(false);
@@ -853,6 +913,47 @@ const getRefundTypeLabel = (type: RefundType): string => {
   return labels[type] || type;
 };
 
+const getRefundProgressStageLabel = (stage: OrderRefundProgressRecord['stage']) => {
+  const labels: Record<OrderRefundProgressRecord['stage'], string> = {
+    NONE: '暂无退款',
+    PENDING_REVIEW: '待审核',
+    APPROVED_WAITING: '待退款',
+    PARTIAL_SUCCESS: '部分退款成功',
+    FULL_SUCCESS: '退款完成',
+    REJECTED: '已驳回',
+    FAILED: '退款失败',
+  };
+  return labels[stage] ?? stage;
+};
+
+const getRefundProgressStageType = (
+  stage: OrderRefundProgressRecord['stage'],
+): 'primary' | 'success' | 'warning' | 'info' | 'danger' => {
+  const types: Record<OrderRefundProgressRecord['stage'], 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
+    NONE: 'info',
+    PENDING_REVIEW: 'warning',
+    APPROVED_WAITING: 'primary',
+    PARTIAL_SUCCESS: 'warning',
+    FULL_SUCCESS: 'success',
+    REJECTED: 'info',
+    FAILED: 'danger',
+  };
+  return types[stage] ?? 'info';
+};
+
+const getRefundProgressStageHint = (stage: OrderRefundProgressRecord['stage']) => {
+  const hints: Record<OrderRefundProgressRecord['stage'], string> = {
+    NONE: '当前暂无退款申请，后续售后进度会在这里同步展示。',
+    PENDING_REVIEW: '退款申请已提交，等待平台审核处理。',
+    APPROVED_WAITING: '退款申请已审核通过，等待退款渠道回调。',
+    PARTIAL_SUCCESS: '订单已完成部分退款，可继续查看剩余可退余额。',
+    FULL_SUCCESS: '退款已完成，订单售后金额已经结清。',
+    REJECTED: '最近一笔退款申请已被驳回，可根据原因补充说明后再次联系平台。',
+    FAILED: '退款处理失败，建议尽快联系平台核查渠道回执。',
+  };
+  return hints[stage] ?? stage;
+};
+
 const getComplaintTargetRoleLabel = (role: ComplaintTargetRole): string => {
   const labels: Record<ComplaintTargetRole, string> = {
     CAREGIVER: '照料者',
@@ -1057,14 +1158,27 @@ const reload = async () => {
     orderNo.value = detail.orderNo;
 
     if (auth.user?.id && detail.ownerId === auth.user.id) {
-      try {
-        complaints.value = await api.petpal.orders.complaints(orderId);
-      } catch (error) {
+      const [complaintsResult, refundProgressResult] = await Promise.allSettled([
+        api.petpal.orders.complaints(orderId),
+        api.petpal.orders.refundProgress(orderId),
+      ]);
+
+      if (complaintsResult.status === 'fulfilled') {
+        complaints.value = complaintsResult.value;
+      } else {
         complaints.value = [];
-        ElMessage.error(getErrorMessage(error, '加载投诉进度失败'));
+        ElMessage.error(getErrorMessage(complaintsResult.reason, '加载投诉进度失败'));
+      }
+
+      if (refundProgressResult.status === 'fulfilled') {
+        refundProgress.value = refundProgressResult.value;
+      } else {
+        refundProgress.value = null;
+        ElMessage.error(getErrorMessage(refundProgressResult.reason, '加载退款进度失败'));
       }
     } else {
       complaints.value = [];
+      refundProgress.value = null;
     }
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '加载订单详情失败'));
@@ -1344,6 +1458,88 @@ onMounted(() => {
   border-radius: 10px;
   background: #fafafa;
   color: #666;
+}
+
+.petpal-refund-progress__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.petpal-refund-progress__headline h3 {
+  margin: 0;
+  color: #333;
+}
+
+.petpal-refund-progress__headline p {
+  margin: 0.5rem 0 0;
+  color: #666;
+  line-height: 1.6;
+}
+
+.petpal-refund-progress__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.875rem;
+  margin-top: 1rem;
+}
+
+.petpal-refund-progress__stat {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid #e6eef8;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+}
+
+.petpal-refund-progress__stat span {
+  font-size: 0.875rem;
+  color: #667085;
+}
+
+.petpal-refund-progress__stat strong {
+  font-size: 1.1rem;
+  color: #1f2937;
+}
+
+.petpal-refund-progress__latest {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: #f7faff;
+  border: 1px solid #dbeafe;
+}
+
+.petpal-refund-progress__latest-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.petpal-refund-progress__latest-header h4 {
+  margin: 0;
+  color: #1f2937;
+}
+
+.petpal-refund-progress__latest-meta {
+  display: flex;
+  gap: 0.875rem;
+  flex-wrap: wrap;
+  color: #475467;
+  font-size: 0.875rem;
+}
+
+.petpal-refund-progress__reason {
+  margin: 0;
+  color: #334155;
+  line-height: 1.7;
 }
 
 .petpal-complaint-panel__header {

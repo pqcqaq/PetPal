@@ -323,6 +323,12 @@ petpalRouter.get('/orders/:id', asyncHandler(async (req, res) => {
   return ok(res, order, 'Order detail');
 }));
 
+petpalRouter.get('/orders/:id/refund-progress', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const progress = await petpalService.getOwnerOrderRefundProgress(auth.id, String(req.params.id));
+  return ok(res, progress, 'Refund progress');
+}));
+
 petpalRouter.post('/orders/:id/confirm-complete', asyncHandler(async (req, res) => {
   const auth = req.auth!;
   const order = await petpalService.confirmOwnerOrderComplete(auth.id, String(req.params.id));

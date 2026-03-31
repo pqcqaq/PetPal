@@ -1176,6 +1176,48 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 61. PetPal 主人退款进度查询与展示（P1-M3 Slice 34）
+
+**内容**：继续推进 P1-M3 售后透明化，本轮补齐“主人退款进度查询与状态展示”能力，让退款申请在待审核、已批准、部分成功、全额完成等阶段都能被清晰查看。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 新增 `RefundProgressStage` 与 `OrderRefundProgressRecord`，统一共享退款阶段与聚合字段契约。
+- `packages/api-common/src/api/factory.ts`
+  - 新增 `api.petpal.orders.refundProgress(id)` 客户端调用入口。
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增 `buildOwnerRefundProgress()` 聚合逻辑。
+  - 新增 `getOwnerOrderRefundProgress(ownerId, orderId)`，按订单主人作用域返回退款摘要。
+  - 聚合摘要覆盖最新退款单、阶段、处理中数量、成功/失败数量、累计申请金额、已退款金额与剩余可退余额。
+- `apps/backend/src/routes/petpal.ts`
+  - 新增 `GET /api/petpal/orders/:id/refund-progress`。
+  - 接口严格按 `ownerId` 限定查询范围，非订单主人访问返回 `404`。
+- `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+  - 主人端订单详情新增“退款进度”卡片。
+  - 展示阶段标签、阶段说明、关键统计以及最近一笔退款申请详情。
+  - 退款进度与投诉进度并行加载，避免次要数据阻塞详情主链路。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增退款进度集成测试，覆盖：
+    - `PENDING_REVIEW`
+    - `APPROVED_WAITING`
+    - `PARTIAL_SUCCESS`
+    - 非订单主人访问返回 `404`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（16/16）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认退款阶段聚合优先级正确，不会被历史退款状态覆盖当前进行中的退款。
+- 已确认退款进度接口按 `ownerId` 做范围裁剪，不会向照料者或其他用户泄露订单售后信息。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。

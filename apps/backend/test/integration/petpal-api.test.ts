@@ -811,6 +811,93 @@ describe('PetPal API integration', () => {
     assert.equal(oversizeRangeResponse.body.message, 'Export date range cannot exceed 366 days');
   });
 
+  it('returns owner refund progress snapshots for pending, approved and successful refunds', async () => {
+    const {
+      app,
+      prisma,
+      ownerSession,
+      caregiverSession,
+      order,
+    } = await createFulfillmentScenario();
+
+    const refund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-progress-${Date.now().toString(36)}`,
+        orderId: order.id,
+        refundNo: `REF-PROGRESS-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '服务时段缩短，需要退回部分费用',
+        refundAmount: 20,
+        refundStatus: 'PENDING',
+      },
+    });
+
+    const pendingResponse = await request(app)
+      .get(`/api/petpal/orders/${order.id}/refund-progress`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(pendingResponse.body.data.stage, 'PENDING_REVIEW');
+    assert.equal(pendingResponse.body.data.totalRefundCount, 1);
+    assert.equal(pendingResponse.body.data.pendingCount, 1);
+    assert.equal(pendingResponse.body.data.latestRefundNo, refund.refundNo);
+    assert.equal(pendingResponse.body.data.latestRefundReason, '服务时段缩短，需要退回部分费用');
+
+    await prisma.refundRecord.update({
+      where: {
+        id: refund.id,
+      },
+      data: {
+        refundStatus: 'APPROVED',
+        reviewedAt: new Date('2026-04-05T10:00:00.000Z'),
+      },
+    });
+
+    const approvedResponse = await request(app)
+      .get(`/api/petpal/orders/${order.id}/refund-progress`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(approvedResponse.body.data.stage, 'APPROVED_WAITING');
+    assert.equal(approvedResponse.body.data.approvedCount, 1);
+    assert.equal(approvedResponse.body.data.latestRefundStatus, 'APPROVED');
+
+    await prisma.refundRecord.update({
+      where: {
+        id: refund.id,
+      },
+      data: {
+        refundStatus: 'SUCCESS',
+      },
+    });
+
+    await prisma.orderMain.update({
+      where: {
+        id: order.id,
+      },
+      data: {
+        amountRefunded: 20,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    const successResponse = await request(app)
+      .get(`/api/petpal/orders/${order.id}/refund-progress`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(successResponse.body.data.stage, 'PARTIAL_SUCCESS');
+    assert.equal(successResponse.body.data.successCount, 1);
+    assert.equal(Number(successResponse.body.data.settledRefundAmount), 20);
+    assert.equal(Number(successResponse.body.data.refundableBalance), 68);
+
+    await request(app)
+      .get(`/api/petpal/orders/${order.id}/refund-progress`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(404);
+  });
+
   it('handles payment and refund callbacks with idempotency', async () => {
     const { app, prisma } = context;
 

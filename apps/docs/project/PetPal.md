@@ -3248,3 +3248,68 @@ gantt
 1. 补齐主人端退款进度查询与状态展示，继续完成售后信息透明化。
 2. 为管理端补投诉处理动作、指派与结案能力，形成纠纷处置闭环。
 3. 评估是否为交易导出增加筛选条件面板，例如订单状态、服务类型与时间口径切换。
+
+### 14.51 2026-04-01（P1-M3 Slice 34）
+
+**概述**：继续推进 P1-M3 售后透明化，本轮补齐“主人退款进度查询与状态展示”能力，让退款申请在待审核、已批准、部分成功、全额完成等阶段都能被清晰查看。
+
+已完成：
+
+- API 契约：
+  - `packages/api-common/src/types/petpal.ts`
+  - `packages/api-common/src/api/factory.ts`
+    - 新增 `RefundProgressStage`。
+    - 新增 `OrderRefundProgressRecord`。
+    - 新增 `api.petpal.orders.refundProgress(id)`。
+- 后端聚合服务与接口：
+  - `apps/backend/src/services/petpal-service.ts`
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `GET /api/petpal/orders/:id/refund-progress`。
+    - 仅订单主人可查询，其他角色访问同订单返回 `404`。
+    - 聚合字段覆盖：
+      - 当前退款阶段
+      - 最近一笔退款单号、状态、金额、原因、申请/审核时间
+      - 退款申请总数
+      - 待审核数、待退款数、成功数、驳回数、失败数
+      - 累计申请金额、已结算退款金额、剩余可退余额
+    - 阶段聚合规则：
+      - `PENDING_REVIEW`
+      - `APPROVED_WAITING`
+      - `PARTIAL_SUCCESS`
+      - `FULL_SUCCESS`
+      - `REJECTED`
+      - `FAILED`
+      - `NONE`
+- Web 主人端订单详情：
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+    - 新增“退款进度”卡片，仅主人视角显示。
+    - 展示退款阶段标签、阶段说明、关键统计卡片与最近一笔退款详情。
+    - 与投诉进度一起在订单详情页并行加载，不阻塞主订单详情。
+- 定向测试与代码审计：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增退款进度集成测试，覆盖：
+      - 待审核阶段
+      - 审核通过待退款阶段
+      - 部分退款成功阶段
+      - 非订单主人不可访问
+    - 审计重点确认：
+      - 聚合阶段优先级正确，不会被历史退款状态覆盖
+      - 退款进度接口严格按 `ownerId` 做范围控制
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（16/16）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+风险与缓解：
+
+- 风险：当前退款进度仍以“订单级摘要 + 最近一笔详情”为主，尚未支持多笔退款的独立详情页或导出。
+- 缓解：本轮先保证主人能快速判断售后当前所处阶段；后续如需要财务/客服对账，再补“退款明细导出”或“多笔退款详情”页。
+
+下一步（1-3）：
+
+1. 补管理端投诉处理动作、指派与结案能力，完成纠纷处置闭环。
+2. 评估是否为主人端补“退款明细导出”或“售后操作时间线”。
+3. 将退款进度摘要能力复用到 Uni 端订单详情，保持双端售后体验一致。

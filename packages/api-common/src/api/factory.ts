@@ -62,6 +62,7 @@ import type {
   MatchedCaregiverPage,
   OrderDetailRecord,
   OrderRecord,
+  OrderRefundProgressRecord,
   OwnerTransactionExportQuery,
   PetProfileRecord,
   ServiceRequestRecord,
@@ -419,6 +420,10 @@ export const createApiFactory = (options: ClientOptions) => {
       orders: {
         list: () => client.request<OrderRecord[]>({ url: '/petpal/orders' }),
         detail: (id: string) => client.request<OrderDetailRecord>({ url: `/petpal/orders/${id}` }),
+        refundProgress: (id: string) =>
+          client.request<OrderRefundProgressRecord>({
+            url: `/petpal/orders/${id}/refund-progress`,
+          }),
         confirmComplete: (id: string) =>
           client.request<OrderDetailRecord>({
             url: `/petpal/orders/${id}/confirm-complete`,
