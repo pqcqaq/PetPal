@@ -2,6 +2,15 @@
   <PageScaffold :stats="stats">
     <template #actions>
       <el-space>
+        <el-button
+          v-permission="'petpal.complaint.manage'"
+          type="primary"
+          plain
+          :disabled="selectedActionableComplaints.length === 0"
+          @click="openBatchAssignDialog"
+        >
+          批量分配
+        </el-button>
         <el-button @click="loadRows">刷新</el-button>
       </el-space>
     </template>
@@ -59,7 +68,15 @@
       </el-space>
     </template>
 
-    <el-table :data="rows" v-loading="loading" border row-key="id">
+    <el-table
+      ref="tableRef"
+      :data="rows"
+      v-loading="loading"
+      border
+      row-key="id"
+      @selection-change="handleSelectionChange"
+    >
+      <el-table-column type="selection" width="48" :selectable="isSelectableComplaint" />
       <el-table-column type="expand">
         <template #default="scope">
           <div class="complaint-expand">
@@ -173,6 +190,48 @@
     </div>
 
     <el-dialog
+      v-model="batchAssignDialogVisible"
+      title="批量分配投诉工单"
+      width="520px"
+      :close-on-click-modal="!batchAssignSubmitting"
+      :close-on-press-escape="!batchAssignSubmitting"
+      @closed="resetBatchAssignDialog"
+    >
+      <el-form label-position="top">
+        <el-form-item label="已选工单">
+          <div class="complaint-batch-summary">
+            已选择 {{ selectedActionableComplaints.length }} 条可处理工单，将统一指派给同一位负责人。
+          </div>
+        </el-form-item>
+        <el-form-item label="负责人">
+          <el-select v-model="batchAssignForm.assigneeId" filterable style="width: 100%">
+            <el-option
+              v-for="admin in adminOptions"
+              :key="admin.id"
+              :label="admin.nickname"
+              :value="admin.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="统一备注">
+          <el-input
+            v-model="batchAssignForm.note"
+            type="textarea"
+            :rows="4"
+            maxlength="1000"
+            show-word-limit
+            placeholder="可选：补充本次批量分配的说明"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button :disabled="batchAssignSubmitting" @click="batchAssignDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="batchAssignSubmitting" @click="submitBatchAssign">提交</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="actionDialogVisible"
       title="处理投诉工单"
       width="560px"
@@ -260,7 +319,7 @@ import type {
   ManageComplaintPayload,
   UserRecord,
 } from '@rbac/api-common';
-import { ElMessage } from 'element-plus';
+import { ElMessage, type TableInstance } from 'element-plus';
 import PageScaffold from '@/components/workbench/PageScaffold.vue';
 import { usePageState } from '@/composables/use-page-state';
 import { api } from '@/api/client';
@@ -298,9 +357,13 @@ type ActionForm = {
 };
 
 const pageSize = 10;
+const tableRef = ref<TableInstance>();
 const rows = ref<ComplaintAdminRecord[]>([]);
 const total = ref(0);
 const loading = ref(false);
+const selectedComplaints = ref<ComplaintAdminRecord[]>([]);
+const batchAssignDialogVisible = ref(false);
+const batchAssignSubmitting = ref(false);
 const actionDialogVisible = ref(false);
 const actionSubmitting = ref(false);
 const quickAssigningId = ref('');
@@ -330,12 +393,19 @@ const createEmptyActionForm = (): ActionForm => ({
 });
 
 const actionForm = reactive<ActionForm>(createEmptyActionForm());
+const batchAssignForm = reactive({
+  assigneeId: '',
+  note: '',
+});
 const currentAdminId = computed(() => auth.user?.id ?? '');
 const currentAdminNickname = computed(() => auth.user?.nickname ?? '当前管理员');
 const isMineFilterActive = computed(() =>
   Boolean(currentAdminId.value)
   && !pageState.filters.unassignedOnly
   && pageState.filters.assignedAdminId === currentAdminId.value,
+);
+const selectedActionableComplaints = computed(() =>
+  selectedComplaints.value.filter(item => !isClosedComplaint(item)),
 );
 
 const stats = computed(() => {
@@ -359,6 +429,10 @@ const stats = computed(() => {
 
 const isClosedComplaint = (complaint: Pick<ComplaintAdminRecord, 'status'>) => {
   return complaint.status === 'RESOLVED' || complaint.status === 'REJECTED';
+};
+
+const isSelectableComplaint = (complaint: ComplaintAdminRecord) => {
+  return !isClosedComplaint(complaint);
 };
 
 const getStatusLabel = (status: ComplaintStatus) => {
@@ -499,11 +573,17 @@ const loadRows = async () => {
     const response = await api.petpal.admin.complaints(buildQuery());
     rows.value = response.items;
     total.value = response.pagination.total;
+    selectedComplaints.value = [];
+    tableRef.value?.clearSelection();
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '加载投诉工单失败'));
   } finally {
     loading.value = false;
   }
+};
+
+const handleSelectionChange = (selection: ComplaintAdminRecord[]) => {
+  selectedComplaints.value = selection;
 };
 
 const applyFilters = async () => {
@@ -544,9 +624,24 @@ const changePage = async (page: number) => {
   await loadRows();
 };
 
+const resetBatchAssignDialog = () => {
+  batchAssignForm.assigneeId = '';
+  batchAssignForm.note = '';
+};
+
 const resetActionDialog = () => {
   activeComplaint.value = null;
   Object.assign(actionForm, createEmptyActionForm());
+};
+
+const openBatchAssignDialog = () => {
+  if (selectedActionableComplaints.value.length === 0) {
+    ElMessage.warning('请先选择至少一条可处理的投诉工单');
+    return;
+  }
+
+  resetBatchAssignDialog();
+  batchAssignDialogVisible.value = true;
 };
 
 const openActionDialog = (complaint: ComplaintAdminRecord) => {
@@ -578,6 +673,53 @@ const assignComplaintToMe = async (complaint: ComplaintAdminRecord) => {
     ElMessage.error(getErrorMessage(error, '快捷接手投诉工单失败'));
   } finally {
     quickAssigningId.value = '';
+  }
+};
+
+const submitBatchAssign = async () => {
+  if (selectedActionableComplaints.value.length === 0) {
+    ElMessage.warning('请先选择至少一条可处理的投诉工单');
+    return;
+  }
+
+  const assigneeId = batchAssignForm.assigneeId.trim();
+  if (!assigneeId) {
+    ElMessage.error('请选择负责人');
+    return;
+  }
+
+  const note = batchAssignForm.note.trim() || undefined;
+  try {
+    batchAssignSubmitting.value = true;
+    const results = await Promise.allSettled(
+      selectedActionableComplaints.value.map(item =>
+        api.petpal.admin.handleComplaint(item.id, {
+          actionType: 'ASSIGN',
+          assigneeId,
+          note,
+        }),
+      ),
+    );
+
+    const successCount = results.filter(item => item.status === 'fulfilled').length;
+    const failedCount = results.length - successCount;
+
+    if (successCount === 0) {
+      throw (results.find(item => item.status === 'rejected') as PromiseRejectedResult | undefined)?.reason
+        ?? new Error('批量分配失败');
+    }
+
+    batchAssignDialogVisible.value = false;
+    if (failedCount === 0) {
+      ElMessage.success(`已完成 ${successCount} 条投诉工单分配`);
+    } else {
+      ElMessage.warning(`已完成 ${successCount} 条投诉工单分配，另有 ${failedCount} 条失败`);
+    }
+    await loadRows();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '批量分配投诉工单失败'));
+  } finally {
+    batchAssignSubmitting.value = false;
   }
 };
 
@@ -717,6 +859,15 @@ onMounted(async () => {
 .complaint-dialog__summary p {
   margin: 6px 0 0;
   color: #667085;
+}
+
+.complaint-batch-summary {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e4e7ec;
+  color: #344054;
+  line-height: 1.7;
 }
 
 .complaint-sla {
