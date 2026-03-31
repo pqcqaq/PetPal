@@ -1,4 +1,5 @@
 import type {
+  ComplaintRecord,
   CreatePetPayload,
   CreateServiceRequestPayload,
   MatchCaregiverQuery,
@@ -32,6 +33,10 @@ export function getOrderDetail(id: string) {
 
 export function getOrderRefundProgress(id: string): Promise<OrderRefundProgressRecord> {
   return appApi.petpal.orders.refundProgress(id)
+}
+
+export function getOrderComplaints(id: string): Promise<ComplaintRecord[]> {
+  return appApi.petpal.orders.complaints(id)
 }
 
 export function matchCaregivers(query: MatchCaregiverQuery) {

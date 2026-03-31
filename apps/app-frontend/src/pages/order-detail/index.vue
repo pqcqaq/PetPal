@@ -1,5 +1,10 @@
 <script lang="ts" setup>
 import type {
+  ComplaintActionType,
+  ComplaintRecord,
+  ComplaintStatus,
+  ComplaintTargetRole,
+  ComplaintType,
   OrderDetailRecord,
   OrderOperatorRole,
   OrderRefundProgressRecord,
@@ -14,7 +19,7 @@ import { ref, watch } from 'vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
 import AppSection from '@/components/app-section/app-section.vue'
 import AppButton from '@/components/app-button/app-button.vue'
-import { getOrderDetail, getOrderRefundProgress } from '@/api/petpal'
+import { getOrderComplaints, getOrderDetail, getOrderRefundProgress } from '@/api/petpal'
 import { getErrorMessage } from '@/utils/error'
 
 defineOptions({
@@ -31,6 +36,7 @@ definePage({
 const orderId = ref('')
 const order = ref<OrderDetailRecord | null>(null)
 const refundProgress = ref<OrderRefundProgressRecord | null>(null)
+const complaints = ref<ComplaintRecord[]>([])
 const loading = ref(false)
 const error = ref('')
 
@@ -109,6 +115,31 @@ const labels = {
     CHECK_OUT: '签退记录',
     NOTE: '服务备注',
   } as Record<string, string>,
+  complaintTargetRole: {
+    CAREGIVER: '照料者',
+    PLATFORM: '平台',
+  } as Record<string, string>,
+  complaintType: {
+    SAFETY: '安全问题',
+    FEE: '费用争议',
+    SERVICE: '服务质量',
+    FRAUD: '欺诈风险',
+    OTHER: '其他问题',
+  } as Record<string, string>,
+  complaintStatus: {
+    OPEN: '待受理',
+    PROCESSING: '处理中',
+    RESOLVED: '已解决',
+    REJECTED: '已驳回',
+  } as Record<string, string>,
+  complaintAction: {
+    OPEN: '发起投诉',
+    ASSIGN: '指派负责人',
+    INVESTIGATE: '补充调查',
+    CALL_USER: '联系用户',
+    PENALTY: '处罚记录',
+    CLOSE: '结案',
+  } as Record<string, string>,
 }
 
 const formatAmount = (value: unknown) => {
@@ -152,6 +183,32 @@ const getRefundProgressStageClass = (stage: OrderRefundProgressRecord['stage']) 
     FAILED: 'error',
   }
   return classes[stage] || 'closed'
+}
+
+const getComplaintTargetRoleLabel = (role: ComplaintTargetRole) => {
+  return labels.complaintTargetRole[role] || role
+}
+
+const getComplaintTypeLabel = (type: ComplaintType) => {
+  return labels.complaintType[type] || type
+}
+
+const getComplaintStatusLabel = (status: ComplaintStatus) => {
+  return labels.complaintStatus[status] || status
+}
+
+const getComplaintStatusClass = (status: ComplaintStatus) => {
+  const classes: Record<ComplaintStatus, string> = {
+    OPEN: 'warning',
+    PROCESSING: 'primary',
+    RESOLVED: 'success',
+    REJECTED: 'closed',
+  }
+  return classes[status] || 'closed'
+}
+
+const getComplaintActionLabel = (actionType: ComplaintActionType) => {
+  return labels.complaintAction[actionType] || actionType
 }
 
 const getRecordString = (record: Record<string, unknown> | null | undefined, key: string) => {
@@ -264,8 +321,8 @@ const getMediaLinkLabel = (url: string, index: number) => {
   }
 }
 
-const previewServiceLogImage = (log: ServiceLogRecord, currentUrl: string) => {
-  const imageUrls = log.mediaUrls.filter((item) => isPreviewableImage(item))
+const previewMediaImage = (mediaUrls: string[], currentUrl: string) => {
+  const imageUrls = mediaUrls.filter((item) => isPreviewableImage(item))
   if (imageUrls.length === 0) {
     return
   }
@@ -294,9 +351,9 @@ const copyServiceLogMediaUrl = (url: string) => {
   })
 }
 
-const openServiceLogMedia = (log: ServiceLogRecord, url: string) => {
+const openMediaUrl = (mediaUrls: string[], url: string) => {
   if (isPreviewableImage(url)) {
-    previewServiceLogImage(log, url)
+    previewMediaImage(mediaUrls, url)
     return
   }
 
@@ -308,15 +365,24 @@ const openServiceLogMedia = (log: ServiceLogRecord, url: string) => {
   copyServiceLogMediaUrl(url)
 }
 
+const openServiceLogMedia = (log: ServiceLogRecord, url: string) => {
+  openMediaUrl(log.mediaUrls, url)
+}
+
+const openComplaintEvidence = (evidenceUrls: string[], url: string) => {
+  openMediaUrl(evidenceUrls, url)
+}
+
 async function loadOrderDetail() {
   if (!orderId.value) return
 
   loading.value = true
   error.value = ''
   try {
-    const [detailResult, refundProgressResult] = await Promise.allSettled([
+    const [detailResult, refundProgressResult, complaintsResult] = await Promise.allSettled([
       getOrderDetail(orderId.value),
       getOrderRefundProgress(orderId.value),
+      getOrderComplaints(orderId.value),
     ])
 
     if (detailResult.status !== 'fulfilled') {
@@ -329,8 +395,13 @@ async function loadOrderDetail() {
     refundProgress.value = refundProgressResult.status === 'fulfilled'
       ? refundProgressResult.value
       : null
+
+    complaints.value = complaintsResult.status === 'fulfilled'
+      ? complaintsResult.value
+      : []
   } catch (err) {
     refundProgress.value = null
+    complaints.value = []
     error.value = getErrorMessage(err, '加载订单详情失败')
   } finally {
     loading.value = false
@@ -470,6 +541,86 @@ onLoad((options: Record<string, any>) => {
                 <text>退款原因：{{ refundProgress.latestRefundReason }}</text>
               </view>
             </view>
+          </view>
+        </AppSection>
+
+        <AppSection :title="complaints.length > 0 ? `投诉与进度 (${complaints.length})` : '投诉与进度'">
+          <template v-if="complaints.length > 0">
+            <view class="petpal-complaint-list">
+              <view
+                v-for="complaint in complaints"
+                :key="complaint.id"
+                class="petpal-complaint-card"
+              >
+                <view class="petpal-complaint-card__header">
+                  <view class="petpal-complaint-card__headline">
+                    <text class="petpal-complaint-card__title">{{ getComplaintTypeLabel(complaint.complaintType) }}</text>
+                    <text class="petpal-complaint-card__meta">
+                      {{ formatDateTime(complaint.createdAt) }} · 投诉对象：{{ getComplaintTargetRoleLabel(complaint.targetRole) }}
+                    </text>
+                  </view>
+                  <view class="petpal-timeline-dot" :class="`is-${getComplaintStatusClass(complaint.status)}`" />
+                </view>
+
+                <view class="petpal-note-card">
+                  <text>{{ complaint.description }}</text>
+                </view>
+
+                <view v-if="complaint.assignedAdminNickname" class="petpal-detail-line">
+                  <text>当前负责人：{{ complaint.assignedAdminNickname }}</text>
+                </view>
+
+                <view v-if="complaint.evidenceUrls.length > 0" class="petpal-service-log-media">
+                  <view
+                    v-for="(url, index) in complaint.evidenceUrls"
+                    :key="`${complaint.id}-${url}`"
+                    class="petpal-service-log-media-item"
+                    @tap="openComplaintEvidence(complaint.evidenceUrls, url)"
+                  >
+                    <image
+                      v-if="isPreviewableImage(url)"
+                      :src="url"
+                      mode="aspectFill"
+                      class="petpal-service-log-media-image"
+                    />
+                    <view v-else class="petpal-service-log-media-file">
+                      <text>{{ getMediaLinkLabel(url, index) }}</text>
+                    </view>
+                    <text class="petpal-service-log-media-meta">
+                      {{ isPreviewableImage(url) ? '点击预览证据' : '点击打开或复制链接' }}
+                    </text>
+                  </view>
+                </view>
+
+                <view v-if="complaint.processLogs.length > 0" class="petpal-complaint-progress">
+                  <view
+                    v-for="log in complaint.processLogs"
+                    :key="log.id"
+                    class="petpal-complaint-progress__item"
+                  >
+                    <text class="petpal-complaint-progress__title">{{ getComplaintActionLabel(log.actionType) }}</text>
+                    <text class="petpal-complaint-progress__meta">
+                      {{ formatDateTime(log.createdAt) }} · {{ log.operatorNickname || '系统' }}
+                    </text>
+                    <text v-if="log.note" class="petpal-complaint-progress__note">{{ log.note }}</text>
+                  </view>
+                </view>
+                <view v-else class="petpal-detail-line">
+                  <text>平台尚未追加处理进度</text>
+                </view>
+
+                <view v-if="complaint.resultSummary" class="petpal-note-card">
+                  <text>处理结论：{{ complaint.resultSummary }}</text>
+                </view>
+
+                <view class="petpal-detail-line">
+                  <text>当前状态：{{ getComplaintStatusLabel(complaint.status) }}</text>
+                </view>
+              </view>
+            </view>
+          </template>
+          <view v-else class="petpal-empty">
+            <text>当前暂无投诉记录</text>
           </view>
         </AppSection>
 
@@ -785,6 +936,75 @@ onLoad((options: Record<string, any>) => {
   font-size: 12px;
 }
 
+.petpal-complaint-list {
+  display: grid;
+  gap: 12px;
+}
+
+.petpal-complaint-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e5ebf3;
+  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+}
+
+.petpal-complaint-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.petpal-complaint-card__headline {
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-complaint-card__title {
+  color: #1f2937;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.petpal-complaint-card__meta {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.petpal-complaint-progress {
+  display: grid;
+  gap: 8px;
+}
+
+.petpal-complaint-progress__item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-left: 3px solid #dbeafe;
+  border-radius: 0 10px 10px 0;
+  background: #f9fbff;
+}
+
+.petpal-complaint-progress__title {
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.petpal-complaint-progress__meta {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.petpal-complaint-progress__note {
+  color: #4b5563;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .petpal-timeline {
   position: relative;
   padding: 8px 0;
@@ -844,6 +1064,18 @@ onLoad((options: Record<string, any>) => {
 
   &.is-approved {
     background: #faad14;
+  }
+
+  &.is-warning {
+    background: #f59e0b;
+  }
+
+  &.is-primary {
+    background: #3b82f6;
+  }
+
+  &.is-error {
+    background: #ef4444;
   }
 
   &.is-closed {
