@@ -1476,6 +1476,37 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 93. PetPal 根级后台路由入口脱离 console 目录（P1-M3 Slice 66）
+
+**内容**：继续弱化旧模板目录语义，本轮把 `/petpal-admin/*` 路由入口从 `router` 层面切到根级后台命名空间，不再直接由路由表引用 `pages/console/petpal/*` 文件。
+
+变更摘要：
+
+- 新增根级后台路由入口文件：
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalComplaintAdminRouteView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalCaregiverAuditRouteView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalCallbackAuditRouteView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalCallbackAlertOutboxRouteView.vue`
+- `apps/web-frontend/src/router/index.ts`
+  - `/petpal-admin/complaints`
+  - `/petpal-admin/caregiver-audits`
+  - `/petpal-admin/callback-audits`
+  - `/petpal-admin/callback-alert-outbox`
+  - 路由改为引用新的 `pages/petpal-admin/*RouteView.vue` 入口，而不再直接依赖 `pages/console/petpal/*`。
+- 本轮不改动后台治理页内部实现，仅完成根级后台入口语义抽离，便于后续继续把页面和组件逐步迁出旧目录。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认本轮只是路由入口层的命名空间抽离，不影响投诉、审核、回调审计和告警队列页面的实际逻辑。
+- 已确认新的根级路由入口仍复用原有页面实现，未引入重复状态或并行页面分叉。
+- 已确认后续如果继续迁移后台治理页实现，可以在 `petpal-admin` 命名空间内逐步替换，不必再次修改路由表。
+
+Git commit：待本切片提交。
+
 ## 87. App 端资料页去掉权限中心式表达（P1-M3 Slice 60）
 
 **内容**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

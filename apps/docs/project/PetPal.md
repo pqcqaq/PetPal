@@ -4057,6 +4057,46 @@ gantt
 2. 继续把旧 `console/petpal` 页面语义抽到 `petpal-admin` 命名空间，进一步弱化模板残留。
 3. 继续补更贴近值班场景的快捷入口，例如“仅未指派工单”“仅 ERROR 回调”“仅卡住处理中的告警”。
 
+### 14.83 2026-04-01（P1-M3 Slice 66）
+
+**概述**：继续弱化旧 `console/petpal` 模板目录语义，本轮把根级 `/petpal-admin/*` 路由入口切到 `pages/petpal-admin` 命名空间，为后续后台治理页彻底迁出旧目录做准备。
+
+已完成：
+
+- 新增根级后台路由入口文件：
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalComplaintAdminRouteView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalCaregiverAuditRouteView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalCallbackAuditRouteView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalCallbackAlertOutboxRouteView.vue`
+- `apps/web-frontend/src/router/index.ts`
+  - 以下根级后台路由已改为引用新的 `petpal-admin` 入口文件：
+    - `/petpal-admin/complaints`
+    - `/petpal-admin/caregiver-audits`
+    - `/petpal-admin/callback-audits`
+    - `/petpal-admin/callback-alert-outbox`
+- 新入口当前继续复用原有治理页实现，不改变业务逻辑，只做根级后台命名空间抽离。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认本轮只改路由入口引用关系，不影响治理页内部状态、接口调用和鉴权。
+- 已确认后续若继续把投诉、审核、回调治理页及其组件迁入 `petpal-admin` 目录，可以在新入口文件基础上逐步替换，不需要再次调整根级路由定义。
+- 已确认当前根级后台路径已经在“公开入口、布局层、路由层”三处完成与旧控制台路径的语义切割。
+
+风险与缓解：
+
+- 风险：当前治理页内部实现仍复用旧目录文件，目录语义上的迁移尚未彻底完成。
+- 缓解：本轮先完成最外层路由命名空间切割；后续可逐页把实现和组件平移到 `petpal-admin` 目录，降低一次性迁移风险。
+
+下一步（1-3）：
+
+1. 继续把投诉工单、照料者审核、回调审计、告警队列页面的实现逐步迁到 `petpal-admin` 命名空间。
+2. 继续前移根级后台高频值班动作，减少进入二级页面后的重复点击。
+3. 继续排查 Web 端剩余的 `console` 语义暴露点，确保 PetPal 后台作为独立产品呈现。
+
 ### 14.77 2026-04-01（P1-M3 Slice 60）
 
 **概述**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

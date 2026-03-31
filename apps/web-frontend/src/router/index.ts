@@ -78,7 +78,7 @@ const routes = [
       {
         path: 'complaints',
         name: 'petpal-admin-complaints',
-        component: () => import('@/pages/console/petpal/ComplaintAdminView.vue'),
+        component: () => import('@/pages/petpal-admin/PetPalComplaintAdminRouteView.vue'),
         meta: {
           requiresAuth: true,
           permission: 'petpal.complaint.manage',
@@ -89,7 +89,7 @@ const routes = [
       {
         path: 'caregiver-audits',
         name: 'petpal-admin-caregiver-audits',
-        component: () => import('@/pages/console/petpal/CaregiverAuditView.vue'),
+        component: () => import('@/pages/petpal-admin/PetPalCaregiverAuditRouteView.vue'),
         meta: {
           requiresAuth: true,
           permission: 'petpal.caregiver.audit',
@@ -100,7 +100,7 @@ const routes = [
       {
         path: 'callback-audits',
         name: 'petpal-admin-callback-audits',
-        component: () => import('@/pages/console/petpal/CallbackAuditView.vue'),
+        component: () => import('@/pages/petpal-admin/PetPalCallbackAuditRouteView.vue'),
         meta: {
           requiresAuth: true,
           permission: 'petpal.callback-audit.read',
@@ -111,7 +111,7 @@ const routes = [
       {
         path: 'callback-alert-outbox',
         name: 'petpal-admin-callback-alert-outbox',
-        component: () => import('@/pages/console/petpal/CallbackAlertOutboxView.vue'),
+        component: () => import('@/pages/petpal-admin/PetPalCallbackAlertOutboxRouteView.vue'),
         meta: {
           requiresAuth: true,
           permission: 'petpal.callback-alert.read',
