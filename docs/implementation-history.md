@@ -1302,6 +1302,40 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 69. PetPal 投诉 SLA 阈值配置化（P1-M3 Slice 42）
+
+**内容**：继续推进 P1-M3 投诉工单时效治理，本轮将后台投诉 SLA 从代码常量收敛为后端环境配置项，便于不同部署环境按运营节奏调整“处理时限”和“预警窗口”，同时补一条独立集成测试验证配置边界确实生效。
+
+变更摘要：
+
+- `apps/backend/src/config/env.ts`
+  - 新增：
+    - `PETPAL_COMPLAINT_SLA_LIMIT_HOURS`
+    - `PETPAL_COMPLAINT_SLA_WARNING_HOURS`
+  - 增加配置约束：预警窗口必须小于处理时限，避免无效 SLA 组合进入运行时。
+- `apps/backend/.env.example`
+  - 补充投诉 SLA 相关示例环境变量。
+- `apps/backend/src/services/petpal-service.ts`
+  - 投诉管理列表的 SLA 截止时间计算、`NORMAL / DUE_SOON / OVERDUE` 识别和筛选边界改为读取环境配置，不再依赖硬编码常量。
+- `apps/backend/test/integration/petpal-complaint-sla-config.test.ts`
+  - 新增独立集成测试文件，通过自定义 `30h` 处理时限和 `10h` 预警窗口验证：
+    - `19h` 工单仍属于 `NORMAL`
+    - `27h` 工单属于 `DUE_SOON`
+    - 截止时间按 `30h` 回传而非默认 `24h`
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-complaint-sla-config.test.ts` 通过（1/1）。
+
+代码审计结论：
+
+- 已确认投诉 SLA 配置只影响后台列表时效识别与截止时间展示，不改变投诉状态机、处理动作权限或结案语义。
+- 已确认新增环境变量在配置层做了“预警窗口 < 处理时限”的约束，避免部署时写出自相矛盾的阈值。
+- 已确认配置化测试使用单独测试文件和独立应用启动时机，不会污染既有默认 SLA 集成测试。
+
+Git commit：待本切片提交。
+
 ## 68. PetPal 投诉批量分配后端接口化（P1-M3 Slice 41）
 
 **内容**：继续推进 P1-M3 投诉工单批处理效率，本轮将前端“循环调用单条指派接口”的批量分配方式收敛为真正的后端批量分配接口，降低前端请求数并统一后端校验语义。

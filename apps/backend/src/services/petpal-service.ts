@@ -4,6 +4,7 @@ import type {
   PetProfile,
   ServiceRequest,
 } from '../lib/prisma-generated';
+import { env } from '../config/env';
 import { badRequest, forbidden, notFound } from '../utils/errors';
 import { withSnowflakeId } from '../utils/persistence';
 import { getRequestActorId } from '../utils/request-context';
@@ -172,8 +173,10 @@ type ComplaintAdminFilters = {
 const OWNER_TRANSACTION_EXPORT_DEFAULT_DAYS = 365;
 const OWNER_TRANSACTION_EXPORT_MAX_DAYS = 366;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-const COMPLAINT_SLA_LIMIT_HOURS = 24;
-const COMPLAINT_SLA_WARNING_HOURS = 6;
+const HOUR_IN_MS = 60 * 60 * 1000;
+const COMPLAINT_SLA_LIMIT_MS = env.PETPAL_COMPLAINT_SLA_LIMIT_HOURS * HOUR_IN_MS;
+const COMPLAINT_SLA_WARNING_MS = env.PETPAL_COMPLAINT_SLA_WARNING_HOURS * HOUR_IN_MS;
+const COMPLAINT_SLA_DUE_SOON_AGE_MS = COMPLAINT_SLA_LIMIT_MS - COMPLAINT_SLA_WARNING_MS;
 const ACTIVE_COMPLAINT_STATUSES = ['OPEN', 'PROCESSING'] as const;
 
 const normalizeOwnerTransactionExportRange = (
@@ -572,14 +575,13 @@ const getComplaintAdminSlaMeta = (complaint: Pick<ComplaintEntity, 'status' | 'c
     };
   }
 
-  const deadline = new Date(complaint.createdAt.getTime() + (COMPLAINT_SLA_LIMIT_HOURS * 60 * 60 * 1000));
+  const deadline = new Date(complaint.createdAt.getTime() + COMPLAINT_SLA_LIMIT_MS);
   const remainingMs = deadline.getTime() - Date.now();
-  const warningMs = COMPLAINT_SLA_WARNING_HOURS * 60 * 60 * 1000;
 
   return {
     slaStatus: remainingMs < 0
       ? 'OVERDUE'
-      : remainingMs <= warningMs
+      : remainingMs <= COMPLAINT_SLA_WARNING_MS
         ? 'DUE_SOON'
         : 'NORMAL',
     slaDeadlineAt: deadline,
@@ -594,8 +596,8 @@ const buildComplaintAdminSlaWhere = (
   }
 
   const now = Date.now();
-  const overdueBoundary = new Date(now - (COMPLAINT_SLA_LIMIT_HOURS * 60 * 60 * 1000));
-  const warningBoundary = new Date(now - ((COMPLAINT_SLA_LIMIT_HOURS - COMPLAINT_SLA_WARNING_HOURS) * 60 * 60 * 1000));
+  const overdueBoundary = new Date(now - COMPLAINT_SLA_LIMIT_MS);
+  const warningBoundary = new Date(now - COMPLAINT_SLA_DUE_SOON_AGE_MS);
 
   if (slaStatus === 'OVERDUE') {
     return {
@@ -727,10 +729,13 @@ const loadComplaintAdminAssignee = async (
   },
 });
 
-const assertComplaintUpdatable = (complaint: {
+function assertComplaintUpdatable(complaint: {
   id: string;
   status: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
-} | null) => {
+} | null): asserts complaint is {
+  id: string;
+  status: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
+} {
   if (!complaint) {
     throw notFound('Complaint not found');
   }
@@ -738,7 +743,7 @@ const assertComplaintUpdatable = (complaint: {
   if (complaint.status === 'RESOLVED' || complaint.status === 'REJECTED') {
     throw badRequest('Closed complaints cannot be updated');
   }
-};
+}
 
 const assignComplaintInTransaction = async (
   tx: Prisma.TransactionClient,

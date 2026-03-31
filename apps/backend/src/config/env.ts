@@ -68,6 +68,16 @@ const envSchema = z.object({
   PETPAL_CALLBACK_ALERT_OUTBOX_INTERVAL_SECONDS: z.coerce.number().int().positive().default(30),
   PETPAL_CALLBACK_ALERT_OUTBOX_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173,http://localhost:9000,http://127.0.0.1:9000,http://localhost:3300,http://127.0.0.1:3300'),
+  PETPAL_COMPLAINT_SLA_LIMIT_HOURS: z.coerce.number().int().positive().default(24),
+  PETPAL_COMPLAINT_SLA_WARNING_HOURS: z.coerce.number().int().positive().default(6),
+}).superRefine((value, ctx) => {
+  if (value.PETPAL_COMPLAINT_SLA_WARNING_HOURS >= value.PETPAL_COMPLAINT_SLA_LIMIT_HOURS) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['PETPAL_COMPLAINT_SLA_WARNING_HOURS'],
+      message: 'PETPAL_COMPLAINT_SLA_WARNING_HOURS must be smaller than PETPAL_COMPLAINT_SLA_LIMIT_HOURS',
+    });
+  }
 });
 
 export const env = envSchema.parse(process.env);
@@ -75,4 +85,3 @@ export const env = envSchema.parse(process.env);
 export const clientOrigins = env.CLIENT_ORIGIN.split(',')
   .map((item) => item.trim())
   .filter(Boolean);
-

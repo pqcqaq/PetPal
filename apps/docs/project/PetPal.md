@@ -3640,3 +3640,45 @@ gantt
 1. 评估是否将投诉 SLA 阈值改为后台配置项，并接入超时提醒或值班看板。
 2. 继续补主人端退款明细列表或售后时间线，完善售后透明度。
 3. 视运营需求，评估是否增加投诉批量催办、批量备注模板或批量关闭能力。
+
+### 14.59 2026-04-01（P1-M3 Slice 42）
+
+**概述**：继续推进 P1-M3 投诉工单时效治理，本轮将后台投诉 SLA 阈值从代码常量改为后端环境配置项，让不同部署环境可以按运营班次灵活调整处理时限与预警窗口，同时用独立集成测试验证配置边界真实生效。
+
+已完成：
+
+- 后端配置：
+  - `apps/backend/src/config/env.ts`
+    - 新增：
+      - `PETPAL_COMPLAINT_SLA_LIMIT_HOURS`
+      - `PETPAL_COMPLAINT_SLA_WARNING_HOURS`
+    - 增加配置约束：预警窗口必须小于处理时限。
+  - `apps/backend/.env.example`
+    - 补充投诉 SLA 示例环境变量，便于本地和部署环境直接配置。
+- 后端投诉管理：
+  - `apps/backend/src/services/petpal-service.ts`
+    - 投诉管理列表中的 SLA 截止时间计算、预警识别和筛选边界改为读取环境配置。
+    - 保持 `NORMAL / DUE_SOON / OVERDUE` 语义不变，只收敛阈值来源。
+- 集成测试：
+  - `apps/backend/test/integration/petpal-complaint-sla-config.test.ts`
+    - 独立启动一套带自定义配置的测试应用。
+    - 验证自定义 `30h` 处理时限、`10h` 预警窗口下：
+      - `19h` 工单仍为 `NORMAL`
+      - `27h` 工单为 `DUE_SOON`
+      - 截止时间按 `30h` 计算并回传
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-complaint-sla-config.test.ts` 通过（1/1）。
+
+风险与缓解：
+
+- 风险：当前 SLA 虽已支持环境级配置，但仍属于部署时静态配置，尚未做到后台页面动态调参，也未接入主动提醒任务。
+- 缓解：本轮先优先解决“不同环境阈值可调”和“配置边界可验证”的问题；后续如运营确有需要，再补后台可视化配置、值班看板和提醒任务。
+
+下一步（1-3）：
+
+1. 继续评估是否为投诉工单接入超时提醒或值班看板，提升主动治理能力。
+2. 继续补主人端退款明细列表或售后时间线，完善售后透明度。
+3. 视运营需求，评估是否增加投诉批量催办、批量备注模板或批量关闭能力。
