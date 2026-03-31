@@ -121,6 +121,7 @@ const ownerTransactionExportQuerySchema = z.object({
 const ownerRefundExportQuerySchema = z.object({
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
+  refundType: z.enum(['FULL', 'PARTIAL']).optional(),
   refundStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'SUCCESS', 'FAILED']).optional(),
   serviceType: z.enum(['BOARDING', 'WALKING', 'FEEDING', 'DOOR_VISIT']).optional(),
   orderNoKeyword: z.string().trim().min(1).max(64).optional(),

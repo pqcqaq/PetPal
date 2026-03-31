@@ -111,6 +111,7 @@ type OwnerTransactionExportFilters = {
 type OwnerRefundExportFilters = {
   startDate?: Date;
   endDate?: Date;
+  refundType?: 'FULL' | 'PARTIAL';
   refundStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
   serviceType?: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
   orderNoKeyword?: string;
@@ -1510,6 +1511,11 @@ export const petpalService = {
           gte: startDate,
           lte: endDate,
         },
+        ...(filters.refundType
+          ? {
+              refundType: filters.refundType,
+            }
+          : {}),
         ...(filters.refundStatus
           ? {
               refundStatus: filters.refundStatus,

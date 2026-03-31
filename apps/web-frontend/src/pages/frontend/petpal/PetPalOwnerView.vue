@@ -117,6 +117,20 @@
                 style="width: min(100%, 320px)"
               />
               <el-select
+                v-model="ownerRefundExportType"
+                clearable
+                placeholder="退款类型"
+                size="small"
+                style="width: 140px"
+              >
+                <el-option
+                  v-for="option in refundTypeOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-select
                 v-model="ownerRefundExportStatus"
                 clearable
                 placeholder="退款状态"
@@ -547,6 +561,7 @@ import type {
   OwnerRefundExportQuery,
   OrderStatus,
   PetProfileRecord,
+  RefundType,
   PetServiceType,
   RefundStatus,
   ServiceRequestRecord,
@@ -698,6 +713,11 @@ const refundStatusOptions: Array<{ label: string; value: RefundStatus }> = [
   { label: '退款失败', value: 'FAILED' },
 ];
 
+const refundTypeOptions: Array<{ label: string; value: RefundType }> = [
+  { label: '全额退款', value: 'FULL' },
+  { label: '部分退款', value: 'PARTIAL' },
+];
+
 const refundExportServiceTypeOptions: Array<{ label: string; value: PetServiceType }> = [
   { label: '寄养', value: 'BOARDING' },
   { label: '遛宠', value: 'WALKING' },
@@ -706,6 +726,7 @@ const refundExportServiceTypeOptions: Array<{ label: string; value: PetServiceTy
 ];
 
 const ownerRefundExportDateRange = ref<[Date, Date] | null>(null);
+const ownerRefundExportType = ref<RefundType | ''>('');
 const ownerRefundExportStatus = ref<RefundStatus | ''>('');
 const ownerRefundExportServiceType = ref<PetServiceType | ''>('');
 const ownerRefundExportOrderNoKeyword = ref('');
@@ -728,6 +749,7 @@ const buildOwnerRefundExportQuery = (): OwnerRefundExportQuery => ({
   endDate: ownerRefundExportDateRange.value?.[1]
     ? toDayBoundaryIsoString(ownerRefundExportDateRange.value[1], 'end')
     : undefined,
+  refundType: ownerRefundExportType.value || undefined,
   refundStatus: ownerRefundExportStatus.value || undefined,
   serviceType: ownerRefundExportServiceType.value || undefined,
   orderNoKeyword: ownerRefundExportOrderNoKeyword.value.trim() || undefined,

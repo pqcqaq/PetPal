@@ -1302,6 +1302,46 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 77. PetPal 主人端退款导出退款类型筛选（P1-M3 Slice 50）
+
+**内容**：继续推进 P1-M3 主人端售后透明度，本轮为退款明细导出补齐“退款类型”筛选，让主人在工作台可以区分整单退款与部分退款的对账结果。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 扩展 `OwnerRefundExportQuery`，新增 `refundType` 共享参数。
+- `apps/backend/src/routes/petpal.ts`
+  - 扩展 `GET /api/petpal/orders/refunds/export` 查询参数校验。
+  - 支持接收 `FULL` / `PARTIAL` 退款类型过滤条件。
+- `apps/backend/src/services/petpal-service.ts`
+  - 扩展 `listOwnerRefundExportRows(filters)`。
+  - 在原有主人范围、时间窗、退款状态和订单维度过滤基础上，追加按退款类型过滤。
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 在退款导出筛选条中新增“退款类型”选择。
+  - 可与既有日期范围、退款状态、服务类型和订单号关键词组合使用。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增退款导出按退款类型过滤的成功用例。
+  - 断言：
+    - 当前主人命中的全额退款被导出
+    - 部分退款被排除
+    - 他人全额退款仍被隔离
+    - 实际导出的退款记录全部属于当前主人且类型均为 `FULL`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（25/25）。
+
+代码审计结论：
+
+- 已确认退款类型筛选只在当前主人退款集合内部生效，不会因为选择“全额退款”而越权导出他人整单退款记录。
+- 已确认新增筛选不改变现有导出列结构和排序规则，只收窄结果集。
+- 已确认前端新增筛选项复用既有导出链路，不引入新的后端状态、配置持久化或异步任务。
+
+Git commit：待本切片提交。
+
 ## 76. PetPal 主人端退款导出订单维度筛选（P1-M3 Slice 49）
 
 **内容**：继续推进 P1-M3 主人端售后透明度，本轮为退款明细导出补齐“订单号关键词 + 服务类型”筛选，让主人在工作台可以直接按订单维度收窄退款对账范围。

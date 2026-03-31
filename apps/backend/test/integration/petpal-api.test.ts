@@ -1370,6 +1370,153 @@ describe('PetPal API integration', () => {
     assert.deepEqual(exportedOrderNos, [matchedOrder.orderNo]);
   });
 
+  it('filters owner refund export by refund type', async () => {
+    const {
+      app,
+      prisma,
+      ownerSession,
+      caregiverProfile,
+    } = await createFulfillmentScenario();
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+    const suffix = Date.now().toString(36);
+
+    const fullRefundOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-type-full-${suffix}`,
+        orderNo: `PP-REFUND-TYPE-FULL-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'BOARDING',
+        appointmentStart: new Date('2026-03-30T08:00:00.000Z'),
+        appointmentEnd: new Date('2026-03-31T08:00:00.000Z'),
+        amountTotal: 128,
+        amountAdjusted: 0,
+        amountPaid: 128,
+        amountRefunded: 128,
+        orderStatus: 'REFUNDED',
+      },
+    });
+
+    const matchedFullRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-type-full-${suffix}`,
+        orderId: fullRefundOrder.id,
+        refundNo: `REF-TYPE-FULL-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'FULL',
+        refundReason: '整单取消，全额退款',
+        refundAmount: 128,
+        refundStatus: 'SUCCESS',
+        reviewedBy: adminSession.user.id,
+        reviewedAt: new Date('2026-03-30T12:00:00.000Z'),
+        createdAt: new Date('2026-03-30T10:00:00.000Z'),
+      },
+    });
+
+    const partialRefundOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-type-partial-${suffix}`,
+        orderNo: `PP-REFUND-TYPE-PARTIAL-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'WALKING',
+        appointmentStart: new Date('2026-03-30T09:00:00.000Z'),
+        appointmentEnd: new Date('2026-03-30T10:00:00.000Z'),
+        amountTotal: 68,
+        amountAdjusted: 0,
+        amountPaid: 68,
+        amountRefunded: 18,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    const mismatchedPartialRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-type-partial-${suffix}`,
+        orderId: partialRefundOrder.id,
+        refundNo: `REF-TYPE-PARTIAL-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '仅退部分服务费用',
+        refundAmount: 18,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-03-30T11:00:00.000Z'),
+      },
+    });
+
+    const foreignOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-type-foreign-${suffix}`,
+        orderNo: `PP-REFUND-TYPE-FOREIGN-${Date.now()}`,
+        ownerId: adminSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'BOARDING',
+        appointmentStart: new Date('2026-03-30T11:00:00.000Z'),
+        appointmentEnd: new Date('2026-03-31T11:00:00.000Z'),
+        amountTotal: 168,
+        amountAdjusted: 0,
+        amountPaid: 168,
+        amountRefunded: 168,
+        orderStatus: 'REFUNDED',
+      },
+    });
+
+    const foreignFullRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-type-foreign-${suffix}`,
+        orderId: foreignOrder.id,
+        refundNo: `REF-TYPE-FOREIGN-${Date.now()}`,
+        applyUserId: adminSession.user.id,
+        refundType: 'FULL',
+        refundReason: 'foreign refund',
+        refundAmount: 168,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-03-30T13:00:00.000Z'),
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/orders/refunds/export')
+      .query({
+        refundType: 'FULL',
+      })
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    const exportedRefundNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(6).value ?? ''),
+    ).filter(Boolean);
+
+    assert.ok(exportedRefundNos.includes(matchedFullRefund.refundNo));
+    assert.ok(!exportedRefundNos.includes(mismatchedPartialRefund.refundNo));
+    assert.ok(!exportedRefundNos.includes(foreignFullRefund.refundNo));
+
+    const exportedRefunds = await prisma.refundRecord.findMany({
+      where: {
+        refundNo: {
+          in: exportedRefundNos,
+        },
+      },
+      select: {
+        refundNo: true,
+        refundType: true,
+        order: {
+          select: {
+            ownerId: true,
+          },
+        },
+      },
+    });
+
+    assert.equal(exportedRefunds.length, exportedRefundNos.length);
+    assert.ok(exportedRefunds.every(item => item.refundType === 'FULL'));
+    assert.ok(exportedRefunds.every(item => item.order.ownerId === ownerSession.user.id));
+  });
+
   it('returns owner refund progress snapshots for pending, approved and successful refunds', async () => {
     const {
       app,
