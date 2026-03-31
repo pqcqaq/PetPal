@@ -3734,3 +3734,53 @@ gantt
 1. 继续评估是否为投诉工单接入超时提醒或值班看板独立页，提升主动治理能力。
 2. 继续补主人端退款明细列表或售后时间线，完善售后透明度。
 3. 视运营需求，评估是否增加投诉批量催办、批量备注模板或批量关闭能力。
+
+### 14.61 2026-04-01（P1-M3 Slice 44）
+
+**概述**：继续推进 P1-M3 管理端纠纷处理效率，本轮为投诉管理补充真正的批量结案能力，支持运营对多条已核实工单统一选择结案结果并填写统一结论，减少逐单关闭的重复操作。
+
+已完成：
+
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增：
+      - `BatchCloseComplaintsPayload`
+      - `BatchCloseComplaintsResult`
+  - `packages/api-common/src/api/factory.ts`
+    - 新增 `api.petpal.admin.batchCloseComplaints(...)`。
+- 后端投诉管理：
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `POST /api/petpal/admin/complaints/batch-close`。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 抽出投诉结案事务逻辑，供单条结案与批量结案共享。
+    - 批量结案在单次事务内完成：
+      - 工单存在性校验
+      - 关闭态阻断
+      - 统一写入结案状态、结论、关闭时间与处理日志
+      - 未指派工单自动记录为当前操作管理员负责
+- Web 管理端：
+  - `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+    - 新增“批量结案”按钮与弹窗。
+    - 支持对勾选工单统一选择“已解决 / 已驳回”并填写统一结案结论。
+- 集成测试：
+  - `apps/backend/test/integration/petpal-complaint-batch-close.test.ts`
+    - 验证投诉批量结案成功路径。
+    - 验证非管理员访问批量结案接口返回 `403`。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-complaint-batch-close.test.ts` 通过（2/2）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+风险与缓解：
+
+- 风险：当前批量结案仍要求同一批工单使用同一个结案结果和统一结论，尚未支持模板库、分组结案或差异化结论。
+- 缓解：本轮先优先解决高频的“统一核实后批量收口”场景；后续如运营需要，再补模板备注、批量催办或更复杂的分组结案能力。
+
+下一步（1-3）：
+
+1. 继续评估是否为投诉工单接入超时提醒或独立值班页，提升主动治理能力。
+2. 继续补主人端退款明细列表或售后时间线，完善售后透明度。
+3. 视运营需求，评估是否增加投诉批量催办、模板结论或更细粒度的批量关闭能力。

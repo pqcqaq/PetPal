@@ -40,6 +40,8 @@ import type {
   ComplaintAdminPage,
   ComplaintAdminQuery,
   ComplaintAdminStats,
+  BatchCloseComplaintsPayload,
+  BatchCloseComplaintsResult,
   ComplaintRecord,
   CaregiverAuditPayload,
   CaregiverAuditPage,
@@ -545,6 +547,12 @@ export const createApiFactory = (options: ClientOptions) => {
         batchAssignComplaints: (payload: BatchAssignComplaintsPayload) =>
           client.request<BatchAssignComplaintsResult>({
             url: '/petpal/admin/complaints/batch-assign',
+            method: 'POST',
+            data: payload,
+          }),
+        batchCloseComplaints: (payload: BatchCloseComplaintsPayload) =>
+          client.request<BatchCloseComplaintsResult>({
+            url: '/petpal/admin/complaints/batch-close',
             method: 'POST',
             data: payload,
           }),

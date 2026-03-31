@@ -11,6 +11,15 @@
         >
           批量分配
         </el-button>
+        <el-button
+          v-permission="'petpal.complaint.manage'"
+          type="danger"
+          plain
+          :disabled="selectedActionableComplaints.length === 0"
+          @click="openBatchCloseDialog"
+        >
+          批量结案
+        </el-button>
         <el-button @click="loadRows">刷新</el-button>
       </el-space>
     </template>
@@ -232,6 +241,44 @@
     </el-dialog>
 
     <el-dialog
+      v-model="batchCloseDialogVisible"
+      title="批量结案投诉工单"
+      width="560px"
+      :close-on-click-modal="!batchCloseSubmitting"
+      :close-on-press-escape="!batchCloseSubmitting"
+      @closed="resetBatchCloseDialog"
+    >
+      <el-form label-position="top">
+        <el-form-item label="已选工单">
+          <div class="complaint-batch-summary">
+            已选择 {{ selectedActionableComplaints.length }} 条可处理工单，将统一按同一结案结果关闭。
+          </div>
+        </el-form-item>
+        <el-form-item label="结案结果">
+          <el-radio-group v-model="batchCloseForm.resultStatus">
+            <el-radio value="RESOLVED">已解决</el-radio>
+            <el-radio value="REJECTED">已驳回</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="结案结论">
+          <el-input
+            v-model="batchCloseForm.resultSummary"
+            type="textarea"
+            :rows="4"
+            maxlength="1000"
+            show-word-limit
+            placeholder="请填写本次批量结案的统一说明"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button :disabled="batchCloseSubmitting" @click="batchCloseDialogVisible = false">取消</el-button>
+        <el-button type="danger" :loading="batchCloseSubmitting" @click="submitBatchClose">提交</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="actionDialogVisible"
       title="处理投诉工单"
       width="560px"
@@ -365,6 +412,8 @@ const loading = ref(false);
 const selectedComplaints = ref<ComplaintAdminRecord[]>([]);
 const batchAssignDialogVisible = ref(false);
 const batchAssignSubmitting = ref(false);
+const batchCloseDialogVisible = ref(false);
+const batchCloseSubmitting = ref(false);
 const actionDialogVisible = ref(false);
 const actionSubmitting = ref(false);
 const quickAssigningId = ref('');
@@ -413,6 +462,10 @@ const actionForm = reactive<ActionForm>(createEmptyActionForm());
 const batchAssignForm = reactive({
   assigneeId: '',
   note: '',
+});
+const batchCloseForm = reactive({
+  resultStatus: 'RESOLVED' as 'RESOLVED' | 'REJECTED',
+  resultSummary: '',
 });
 const currentAdminId = computed(() => auth.user?.id ?? '');
 const currentAdminNickname = computed(() => auth.user?.nickname ?? '当前管理员');
@@ -657,6 +710,11 @@ const resetBatchAssignDialog = () => {
   batchAssignForm.note = '';
 };
 
+const resetBatchCloseDialog = () => {
+  batchCloseForm.resultStatus = 'RESOLVED';
+  batchCloseForm.resultSummary = '';
+};
+
 const resetActionDialog = () => {
   activeComplaint.value = null;
   Object.assign(actionForm, createEmptyActionForm());
@@ -670,6 +728,16 @@ const openBatchAssignDialog = () => {
 
   resetBatchAssignDialog();
   batchAssignDialogVisible.value = true;
+};
+
+const openBatchCloseDialog = () => {
+  if (selectedActionableComplaints.value.length === 0) {
+    ElMessage.warning('请先选择至少一条可处理的投诉工单');
+    return;
+  }
+
+  resetBatchCloseDialog();
+  batchCloseDialogVisible.value = true;
 };
 
 const openActionDialog = (complaint: ComplaintAdminRecord) => {
@@ -732,6 +800,36 @@ const submitBatchAssign = async () => {
     ElMessage.error(getErrorMessage(error, '批量分配投诉工单失败'));
   } finally {
     batchAssignSubmitting.value = false;
+  }
+};
+
+const submitBatchClose = async () => {
+  if (selectedActionableComplaints.value.length === 0) {
+    ElMessage.warning('请先选择至少一条可处理的投诉工单');
+    return;
+  }
+
+  const resultSummary = batchCloseForm.resultSummary.trim();
+  if (!resultSummary) {
+    ElMessage.error('请填写结案结论');
+    return;
+  }
+
+  try {
+    batchCloseSubmitting.value = true;
+    const result = await api.petpal.admin.batchCloseComplaints({
+      complaintIds: selectedActionableComplaints.value.map(item => item.id),
+      resultStatus: batchCloseForm.resultStatus,
+      resultSummary,
+    });
+
+    batchCloseDialogVisible.value = false;
+    ElMessage.success(`已完成 ${result.updatedCount} 条投诉工单结案`);
+    await loadRows();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '批量结案投诉工单失败'));
+  } finally {
+    batchCloseSubmitting.value = false;
   }
 };
 

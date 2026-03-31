@@ -791,6 +791,38 @@ const assignComplaintInTransaction = async (
   });
 };
 
+const closeComplaintInTransaction = async (
+  tx: Prisma.TransactionClient,
+  payload: {
+    complaintId: string;
+    actorId: string;
+    assignedAdminId?: string | null;
+    resultStatus: 'RESOLVED' | 'REJECTED';
+    resultSummary: string;
+  },
+) => {
+  const resultSummary = payload.resultSummary.trim();
+
+  await tx.complaint.update({
+    where: {
+      id: payload.complaintId,
+    },
+    data: {
+      status: payload.resultStatus,
+      resultSummary,
+      closedAt: new Date(),
+      assignedAdminId: payload.assignedAdminId ?? payload.actorId,
+    },
+  });
+
+  await appendComplaintProcessLog(tx, {
+    complaintId: payload.complaintId,
+    actionType: 'CLOSE',
+    operatorId: payload.actorId,
+    note: resultSummary,
+  });
+};
+
 const buildOwnerRefundProgress = (order: {
   amountPaid: Prisma.Decimal | number;
   amountRefunded: Prisma.Decimal | number;
@@ -2166,6 +2198,84 @@ export const petpalService = {
     });
   },
 
+  async batchCloseAdminComplaints(
+    actorId: string,
+    payload: {
+      complaintIds: string[];
+      resultStatus: 'RESOLVED' | 'REJECTED';
+      resultSummary: string;
+    },
+  ) {
+    return runSerializableTransaction(async (tx) => {
+      const complaintIds = [...new Set(
+        payload.complaintIds
+          .map(item => item.trim())
+          .filter(Boolean),
+      )];
+
+      if (complaintIds.length === 0) {
+        throw badRequest('Complaint ids are required');
+      }
+
+      const resultSummary = payload.resultSummary.trim();
+      if (!resultSummary) {
+        throw badRequest('Complaint result summary is required');
+      }
+
+      const complaints = await tx.complaint.findMany({
+        where: {
+          id: {
+            in: complaintIds,
+          },
+          deleteAt: null,
+        },
+        select: {
+          id: true,
+          status: true,
+          assignedAdminId: true,
+        },
+      });
+
+      if (complaints.length !== complaintIds.length) {
+        throw notFound('Complaint not found');
+      }
+
+      complaints.forEach(assertComplaintUpdatable);
+
+      for (const complaintId of complaintIds) {
+        const complaint = complaints.find(item => item.id === complaintId)!;
+        await closeComplaintInTransaction(tx, {
+          complaintId,
+          actorId,
+          assignedAdminId: complaint.assignedAdminId,
+          resultStatus: payload.resultStatus,
+          resultSummary,
+        });
+      }
+
+      const updatedComplaints = await tx.complaint.findMany({
+        where: {
+          id: {
+            in: complaintIds,
+          },
+          deleteAt: null,
+        },
+        include: complaintAdminInclude,
+      });
+
+      const complaintMap = new Map(updatedComplaints.map(item => [item.id, item]));
+
+      return {
+        requestedCount: complaintIds.length,
+        updatedCount: updatedComplaints.length,
+        items: complaintIds
+          .map(id => complaintMap.get(id))
+          .filter((item): item is ComplaintAdminEntity => Boolean(item))
+          .map(toComplaintAdminRecord),
+      };
+    });
+  },
+
   async handleAdminComplaint(
     complaintId: string,
     actorId: string,
@@ -2221,23 +2331,12 @@ export const petpalService = {
           throw badRequest('Complaint result summary is required');
         }
 
-        await tx.complaint.update({
-          where: {
-            id: complaint.id,
-          },
-          data: {
-            status: resultStatus,
-            resultSummary,
-            closedAt: new Date(),
-            assignedAdminId: complaint.assignedAdminId ?? actorId,
-          },
-        });
-
-        await appendComplaintProcessLog(tx, {
+        await closeComplaintInTransaction(tx, {
           complaintId: complaint.id,
-          actionType: 'CLOSE',
-          operatorId: actorId,
-          note: resultSummary,
+          actorId,
+          assignedAdminId: complaint.assignedAdminId,
+          resultStatus,
+          resultSummary,
         });
       } else {
         const note = payload.note?.trim();

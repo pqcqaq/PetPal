@@ -339,6 +339,18 @@ export interface BatchAssignComplaintsResult {
   items: ComplaintAdminRecord[];
 }
 
+export interface BatchCloseComplaintsPayload {
+  complaintIds: string[];
+  resultStatus: Extract<ComplaintStatus, 'RESOLVED' | 'REJECTED'>;
+  resultSummary: string;
+}
+
+export interface BatchCloseComplaintsResult {
+  requestedCount: number;
+  updatedCount: number;
+  items: ComplaintAdminRecord[];
+}
+
 export interface ComplaintAdminStats {
   total: number;
   byStatus: Record<ComplaintStatus, number>;
