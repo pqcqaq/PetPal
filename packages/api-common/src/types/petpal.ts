@@ -381,6 +381,10 @@ export interface OwnerTransactionExportQuery {
   endDate?: string;
 }
 
+export interface OwnerOrderRefundExportQuery {
+  [key: string]: string | number | boolean | undefined;
+}
+
 export interface MatchCaregiverQuery {
   serviceType: PetServiceType;
   petSpecies: PetSpecies;

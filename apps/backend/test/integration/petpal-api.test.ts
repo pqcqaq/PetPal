@@ -811,6 +811,115 @@ describe('PetPal API integration', () => {
     assert.equal(oversizeRangeResponse.body.message, 'Export date range cannot exceed 366 days');
   });
 
+  it('allows owner to export refund detail rows for the current order only', async () => {
+    const {
+      app,
+      prisma,
+      ownerSession,
+      caregiverProfile,
+      order,
+    } = await createFulfillmentScenario();
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+    const suffix = Date.now().toString(36);
+
+    const firstRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-export-a-${suffix}`,
+        orderId: order.id,
+        refundNo: `REF-EXPORT-A-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '服务提前结束，退还部分费用',
+        refundAmount: 18,
+        refundStatus: 'PENDING',
+      },
+    });
+
+    const secondRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-export-b-${suffix}`,
+        orderId: order.id,
+        refundNo: `REF-EXPORT-B-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'FULL',
+        refundReason: '照料者未按约上门，整单退款',
+        refundAmount: 88,
+        refundStatus: 'SUCCESS',
+        reviewedBy: adminSession.user.id,
+        reviewedAt: new Date('2026-04-06T11:00:00.000Z'),
+      },
+    });
+
+    const foreignOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-export-foreign-${suffix}`,
+        orderNo: `PP-REFUND-FOREIGN-${Date.now()}`,
+        ownerId: adminSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'BOARDING',
+        appointmentStart: new Date('2026-04-10T09:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-11T09:00:00.000Z'),
+        amountTotal: 168,
+        amountAdjusted: 0,
+        amountPaid: 168,
+        amountRefunded: 40,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    await prisma.refundRecord.create({
+      data: {
+        id: `refund-export-foreign-${suffix}`,
+        orderId: foreignOrder.id,
+        refundNo: `REF-EXPORT-FOREIGN-${Date.now()}`,
+        applyUserId: adminSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: 'foreign refund',
+        refundAmount: 40,
+        refundStatus: 'SUCCESS',
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get(`/api/petpal/orders/${order.id}/refunds/export`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    assert.match(
+      String(exportResponse.headers['content-type']),
+      /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/i,
+    );
+    assert.match(String(exportResponse.headers['content-disposition']), /attachment;\s*filename=/i);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    assert.equal(worksheet.name, 'PetPal Order Refunds');
+    assert.equal(worksheet.getRow(1).getCell(1).value, '订单号');
+    assert.equal(worksheet.getRow(1).getCell(2).value, '退款单号');
+
+    const exportedRefundNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(2).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(exportedRefundNos, [firstRefund.refundNo, secondRefund.refundNo]);
+
+    const exportedOrderNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.ok(exportedOrderNos.every(item => item === order.orderNo));
+
+    const foreignResponse = await request(app)
+      .get(`/api/petpal/orders/${foreignOrder.id}/refunds/export`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(404);
+
+    assert.equal(foreignResponse.body.message, 'Order not found');
+  });
+
   it('returns owner refund progress snapshots for pending, approved and successful refunds', async () => {
     const {
       app,

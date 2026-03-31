@@ -475,7 +475,16 @@
         <!-- 退款时间线 -->
         <article class="frontend-card petpal-order-detail__refunds">
           <span class="frontend-card__eyebrow">退款记录</span>
-          <h3>{{ order.refunds.length > 0 ? `共 ${order.refunds.length} 条退款记录` : '暂无退款记录' }}</h3>
+          <div class="petpal-section-heading">
+            <h3>{{ order.refunds.length > 0 ? `共 ${order.refunds.length} 条退款记录` : '暂无退款记录' }}</h3>
+            <ListExportButton
+              v-if="isOwnerView && order.refunds.length > 0"
+              :request="buildOrderRefundExportRequest"
+              label="导出退款明细"
+              pending-label="导出中"
+              error-message="导出退款明细失败"
+            />
+          </div>
           <template v-if="order.refunds.length > 0">
             <div class="petpal-timeline">
               <div v-for="refund in order.refunds" :key="refund.id" class="petpal-timeline__item">
@@ -643,6 +652,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
+import ListExportButton from '@/components/download/ListExportButton.vue';
 import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
 import type {
@@ -1358,6 +1368,8 @@ const submitComplaint = async () => {
   }
 };
 
+const buildOrderRefundExportRequest = () => api.petpal.orders.exportRefunds(orderId);
+
 const reload = async () => {
   loading.value = true;
   try {
@@ -1439,6 +1451,18 @@ onMounted(() => {
 .petpal-order-info__value {
   font-size: 1rem;
   color: #333;
+}
+
+.petpal-section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.petpal-section-heading h3 {
+  margin: 0;
 }
 
 .petpal-amount-item {

@@ -3828,3 +3828,53 @@ gantt
 1. 继续评估是否为主人端补退款明细导出、售后消息提醒或催办入口。
 2. 继续补投诉工单的独立值班页或超时提醒，提升后台主动治理能力。
 3. 视售后字段扩展情况，考虑抽离双端共用的时间线聚合逻辑，减少页面内重复映射代码。
+
+### 14.63 2026-04-01（P1-M3 Slice 46）
+
+**概述**：继续推进 P1-M3 主人端售后透明度，本轮补齐“当前订单退款明细导出”能力，让用户在订单详情页即可导出本单退款记录，便于对账、售后沟通和留档。
+
+已完成：
+
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增 `OwnerOrderRefundExportQuery`。
+  - `packages/api-common/src/api/factory.ts`
+    - 新增 `api.petpal.orders.exportRefunds(id)` 下载配置方法。
+- 后端 owner 退款导出：
+  - `apps/backend/src/services/petpal-service.ts`
+    - 新增 `listOwnerOrderRefundExportRows(ownerId, orderId)`，按当前主人和当前订单范围聚合退款明细。
+    - 导出行覆盖：
+      - 退款单号
+      - 退款类型 / 状态
+      - 退款金额 / 原因
+      - 申请人 / 审核人
+      - 申请时间 / 审核时间 / 最后更新时间
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `GET /api/petpal/orders/:id/refunds/export`。
+    - 复用现有 Excel 导出工具生成“PetPal Order Refunds”工作表。
+- Web 主人端订单详情：
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+    - 在“退款记录”区块新增“导出退款明细”按钮。
+    - 仅在主人视角且当前订单存在退款记录时展示。
+- 集成测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 验证当前主人导出本单退款明细成功。
+    - 验证主人导出他人订单退款明细返回 `404`。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（21/21）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+风险与缓解：
+
+- 风险：当前退款明细导出仍聚焦单订单退款记录，尚未覆盖跨订单退款对账、批量时间窗导出或退款相关投诉联动信息。
+- 缓解：本轮先优先解决“当前订单售后凭证可直接导出”的高频场景；后续如财务或客服需要，再补跨订单退款对账导出或退款与投诉联合导出。
+
+下一步（1-3）：
+
+1. 继续评估是否为主人端补售后消息提醒、催办入口或跨订单退款对账导出。
+2. 继续补投诉工单独立值班页或超时提醒，提升后台主动治理能力。
+3. 视双端共用逻辑增长情况，评估抽离订单详情里的售后聚合与导出辅助函数。

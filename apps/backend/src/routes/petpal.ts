@@ -118,6 +118,8 @@ const ownerTransactionExportQuerySchema = z.object({
   endDate: z.coerce.date().optional(),
 });
 
+const ownerOrderRefundExportQuerySchema = z.object({});
+
 const adminComplaintQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().max(100).optional(),
@@ -217,6 +219,11 @@ const refundStatusLabels: Record<string, string> = {
   REJECTED: '已拒绝',
   SUCCESS: '已退款',
   FAILED: '退款失败',
+};
+
+const refundTypeLabels: Record<string, string> = {
+  FULL: '全额退款',
+  PARTIAL: '部分退款',
 };
 
 const petpalRouter = Router();
@@ -359,6 +366,31 @@ petpalRouter.get('/orders/:id', asyncHandler(async (req, res) => {
   const order = await petpalService.getOwnerOrderDetail(auth.id, String(req.params.id));
   return ok(res, order, 'Order detail');
 }));
+
+petpalRouter.get('/orders/:id/refunds/export', (req, res, next) => {
+  const auth = req.auth!;
+  const handler = createExcelExportHandler({
+    fileName: () => createTimestampedExcelFileName('petpal-order-refunds'),
+    sheetName: 'PetPal Order Refunds',
+    parseQuery: query => ownerOrderRefundExportQuerySchema.parse(query ?? {}),
+    queryRows: () => petpalService.listOwnerOrderRefundExportRows(auth.id, String(req.params.id)),
+    columns: [
+      { header: '订单号', width: 24, value: row => row.orderNo },
+      { header: '退款单号', width: 24, value: row => row.refundNo },
+      { header: '退款类型', width: 14, value: row => refundTypeLabels[row.refundType] ?? row.refundType },
+      { header: '退款状态', width: 14, value: row => refundStatusLabels[row.refundStatus] ?? row.refundStatus },
+      { header: '退款金额', width: 14, value: row => row.refundAmount },
+      { header: '退款原因', width: 36, value: row => row.refundReason },
+      { header: '申请人', width: 24, value: row => row.applyUserId },
+      { header: '审核人', width: 24, value: row => row.reviewedBy ?? '' },
+      { header: '申请时间', width: 22, value: row => row.createdAt },
+      { header: '审核时间', width: 22, value: row => row.reviewedAt },
+      { header: '最后更新时间', width: 22, value: row => row.updatedAt },
+    ],
+  });
+
+  return handler(req, res, next);
+});
 
 petpalRouter.get('/orders/:id/refund-progress', asyncHandler(async (req, res) => {
   const auth = req.auth!;

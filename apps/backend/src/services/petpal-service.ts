@@ -130,6 +130,20 @@ type OwnerTransactionExportRow = {
   closedAt: Date | null;
 };
 
+type OwnerOrderRefundExportRow = {
+  orderNo: string;
+  refundNo: string;
+  refundType: 'FULL' | 'PARTIAL';
+  refundStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
+  refundAmount: number;
+  refundReason: string;
+  applyUserId: string;
+  reviewedBy: string | null;
+  reviewedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 type OwnerRefundProgressStage =
   | 'NONE'
   | 'PENDING_REVIEW'
@@ -1454,6 +1468,57 @@ export const petpalService = {
         closedAt: order.closedAt,
       };
     });
+  },
+
+  async listOwnerOrderRefundExportRows(ownerId: string, orderId: string): Promise<OwnerOrderRefundExportRow[]> {
+    const order = await prisma.orderMain.findFirst({
+      where: {
+        id: orderId,
+        ownerId,
+        deleteAt: null,
+      },
+      select: {
+        orderNo: true,
+        refunds: {
+          where: {
+            deleteAt: null,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+          select: {
+            refundNo: true,
+            refundType: true,
+            refundStatus: true,
+            refundAmount: true,
+            refundReason: true,
+            applyUserId: true,
+            reviewedBy: true,
+            reviewedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw notFound('Order not found');
+    }
+
+    return order.refunds.map(refund => ({
+      orderNo: order.orderNo,
+      refundNo: refund.refundNo,
+      refundType: refund.refundType,
+      refundStatus: refund.refundStatus,
+      refundAmount: Number(refund.refundAmount),
+      refundReason: refund.refundReason,
+      applyUserId: refund.applyUserId,
+      reviewedBy: refund.reviewedBy,
+      reviewedAt: refund.reviewedAt,
+      createdAt: refund.createdAt,
+      updatedAt: refund.updatedAt,
+    }));
   },
 
   async getOwnerOrderDetail(ownerId: string, orderId: string): Promise<OrderDetailRecord> {
