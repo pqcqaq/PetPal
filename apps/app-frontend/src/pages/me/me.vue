@@ -41,7 +41,39 @@ const pageDescription = computed(() => {
   return `${displayName.value}，这里集中展示账号资料、宠物资产和需要跟进的订单。`
 })
 
-const roleSummary = computed(() => userInfo.value.roles.map(role => role.name).join('、') || '未分配角色')
+const petpalAdminPermissionPrefixes = ['petpal.complaint.', 'petpal.caregiver.', 'petpal.callback-']
+const canUploadAvatar = computed(() => {
+  const permissions = userInfo.value.permissions || []
+  return permissions.includes('file.upload.avatar') || permissions.includes('file.upload')
+})
+const hasPetPalAdminAccess = computed(() => userInfo.value.permissions.some(permission => (
+  petpalAdminPermissionPrefixes.some(prefix => permission.startsWith(prefix))
+)))
+const petpalTierSummary = computed(() => {
+  if (userInfo.value.roles.some(role => role.code === 'super-admin')) {
+    return '平台全量治理账号'
+  }
+
+  if (userInfo.value.roles.some(role => role.code === 'ops-manager')) {
+    return '运营协同账号'
+  }
+
+  return '主人服务账号'
+})
+const workspaceSummary = computed(() => hasPetPalAdminAccess.value ? '主人服务台 + 治理后台' : '主人服务台')
+const capabilitySummary = computed(() => {
+  const capabilities = ['宠物档案', '需求发布', '订单跟进']
+
+  if (canUploadAvatar.value) {
+    capabilities.push('资料上传')
+  }
+
+  if (hasPetPalAdminAccess.value) {
+    capabilities.push('后台治理')
+  }
+
+  return capabilities.join('、')
+})
 const statusTagType = computed(() => userInfo.value.status === 'ACTIVE' ? 'success' : 'warning')
 const appPreferenceSummary = computed(() => {
   const app = uiStore.preferences
@@ -193,7 +225,7 @@ onShow(() => {
             {{ tokenStore.hasLogin ? (userInfo.status === 'ACTIVE' ? '账号正常' : '账号受限') : '未登录' }}
           </AppTag>
           <AppTag v-if="tokenStore.hasLogin" type="primary">
-            {{ roleSummary }}
+            {{ petpalTierSummary }}
           </AppTag>
         </view>
       </view>
@@ -234,12 +266,13 @@ onShow(() => {
         </view>
       </AppSection>
 
-      <AppSection title="账号状态">
+      <AppSection title="账户能力">
         <AppList>
           <AppListItem title="账号状态" :value="userInfo.status === 'ACTIVE' ? '正常' : '停用'" value-emphasis />
-          <AppListItem title="角色数量" :value="String(userInfo.roles.length)" />
-          <AppListItem title="当前角色" :label="roleSummary" />
-          <AppListItem title="权限数量" :value="String(userInfo.permissions.length)" />
+          <AppListItem title="账号定位" :value="petpalTierSummary" />
+          <AppListItem title="可用工作区" :value="workspaceSummary" />
+          <AppListItem title="资料上传" :value="canUploadAvatar ? '可用' : '受限'" />
+          <AppListItem title="已开通能力" :label="capabilitySummary" />
           <AppListItem title="当前体验设置" :label="appPreferenceSummary" />
         </AppList>
       </AppSection>
