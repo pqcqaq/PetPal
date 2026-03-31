@@ -7,16 +7,52 @@
         这套入口专门给 PetPal 后台使用，不再依赖菜单树组织路径。投诉、资质审核、回调审计和告警队列都可以直接进入。
       </p>
       <div class="petpal-admin-hub__signals">
-        <article>
-          <span>可访问工作区</span>
-          <strong>{{ accessibleItems.length }}</strong>
-        </article>
-        <article>
-          <span>当前账号</span>
-          <strong>{{ auth.user?.nickname ?? auth.user?.username ?? '未知用户' }}</strong>
+        <article v-for="item in signalCards" :key="item.label">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+          <small>{{ item.hint }}</small>
         </article>
       </div>
+      <div class="petpal-admin-hub__hero-actions">
+        <el-button plain :loading="overviewLoading" @click="loadHubOverview">刷新治理摘要</el-button>
+        <p v-if="overviewNotice" class="petpal-admin-hub__notice">
+          {{ overviewNotice }}
+        </p>
+      </div>
     </div>
+
+    <div v-if="metricCards.length" class="petpal-admin-hub__metrics">
+      <RouterLink
+        v-for="card in metricCards"
+        :key="card.label"
+        :to="card.to"
+        class="petpal-admin-metric"
+        :class="`is-${card.tone}`"
+      >
+        <span>{{ card.label }}</span>
+        <strong>{{ card.value }}</strong>
+        <small>{{ card.hint }}</small>
+      </RouterLink>
+    </div>
+
+    <section v-if="priorityItems.length" class="petpal-admin-hub__priority">
+      <header class="petpal-admin-hub__section-header">
+        <p>优先关注</p>
+        <h2>当前治理摘要</h2>
+      </header>
+      <div class="petpal-admin-hub__priority-list">
+        <RouterLink
+          v-for="item in priorityItems"
+          :key="item.title"
+          :to="item.to"
+          class="petpal-admin-priority"
+          :class="`is-${item.tone}`"
+        >
+          <strong>{{ item.title }}</strong>
+          <p>{{ item.detail }}</p>
+        </RouterLink>
+      </div>
+    </section>
 
     <div class="petpal-admin-hub__grid">
       <RouterLink
@@ -44,15 +80,231 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import type { CallbackAlertOutboxStats, CallbackAuditStats, ComplaintAdminStats } from '@rbac/api-common';
+import { ElMessage } from 'element-plus';
+import { computed, ref, watch } from 'vue';
+import { api } from '@/api/client';
 import UnoIcon from '@/components/common/UnoIcon.vue';
 import { useAuthStore } from '@/stores/auth';
+import { getErrorMessage } from '@/utils/errors';
 import { canAccessPetPalAdminNavItem, petpalAdminNavItems } from './navigation';
+
+type HubTone = 'neutral' | 'accent' | 'warning' | 'danger';
 
 const auth = useAuthStore();
 const accessibleItems = computed(() => petpalAdminNavItems.filter((item) => (
   item.to !== '/petpal-admin' && canAccessPetPalAdminNavItem(auth.permissions, item)
 )));
+
+const overviewLoading = ref(false);
+const overviewNotice = ref('');
+const statsUpdatedAt = ref('');
+const complaintStats = ref<ComplaintAdminStats | null>(null);
+const pendingCaregiverCount = ref<number | null>(null);
+const callbackAuditStats = ref<CallbackAuditStats | null>(null);
+const callbackAlertStats = ref<CallbackAlertOutboxStats | null>(null);
+
+const canReadComplaints = computed(() => auth.permissions.includes('petpal.complaint.read'));
+const canAuditCaregivers = computed(() => auth.permissions.includes('petpal.caregiver.audit'));
+const canReadCallbackAudits = computed(() => auth.permissions.includes('petpal.callback-audit.read'));
+const canReadCallbackAlerts = computed(() => auth.permissions.includes('petpal.callback-alert.read'));
+
+const signalCards = computed(() => {
+  const cards = [
+    {
+      label: '可访问工作区',
+      value: String(accessibleItems.value.length),
+      hint: '这里只展示当前账号已开通的治理入口。',
+    },
+    {
+      label: '当前账号',
+      value: auth.user?.nickname ?? auth.user?.username ?? '未知用户',
+      hint: '根级后台会复用当前登录态与访问控制。',
+    },
+  ];
+
+  if (statsUpdatedAt.value) {
+    cards.push({
+      label: '最近刷新',
+      value: statsUpdatedAt.value,
+      hint: '治理摘要只聚合当前账号实际可见的数据。',
+    });
+  }
+
+  return cards;
+});
+
+const metricCards = computed(() => {
+  const cards: Array<{
+    label: string;
+    value: string;
+    hint: string;
+    to: string;
+    tone: HubTone;
+  }> = [];
+
+  if (canReadComplaints.value && complaintStats.value) {
+    cards.push({
+      label: '已超时投诉',
+      value: String(complaintStats.value.overdueCount),
+      hint: `即将超时 ${complaintStats.value.dueSoonCount} · 未分配 ${complaintStats.value.unassignedCount}`,
+      to: '/petpal-admin/complaints',
+      tone: complaintStats.value.overdueCount > 0 ? 'danger' : complaintStats.value.dueSoonCount > 0 ? 'warning' : 'neutral',
+    });
+  }
+
+  if (canAuditCaregivers.value && pendingCaregiverCount.value !== null) {
+    cards.push({
+      label: '待审照料者',
+      value: String(pendingCaregiverCount.value),
+      hint: '优先处理入驻审核，避免订单承接能力积压。',
+      to: '/petpal-admin/caregiver-audits',
+      tone: pendingCaregiverCount.value > 0 ? 'warning' : 'neutral',
+    });
+  }
+
+  if (canReadCallbackAudits.value && callbackAuditStats.value) {
+    const failureCount = callbackAuditStats.value.byStatus.FAILURE + callbackAuditStats.value.byStatus.ERROR;
+    cards.push({
+      label: '回调成功率',
+      value: `${callbackAuditStats.value.successRate}%`,
+      hint: `审计总量 ${callbackAuditStats.value.total} · 异常 ${failureCount}`,
+      to: '/petpal-admin/callback-audits',
+      tone: failureCount > 0 ? 'warning' : 'accent',
+    });
+  }
+
+  if (canReadCallbackAlerts.value && callbackAlertStats.value) {
+    cards.push({
+      label: '死信告警',
+      value: String(callbackAlertStats.value.byStatus.DEAD),
+      hint: `处理中卡住 ${callbackAlertStats.value.stuckProcessingCount} · 最老死信 ${callbackAlertStats.value.oldestDeadAgeMinutes} 分钟`,
+      to: '/petpal-admin/callback-alert-outbox',
+      tone: callbackAlertStats.value.byStatus.DEAD > 0 ? 'danger' : callbackAlertStats.value.stuckProcessingCount > 0 ? 'warning' : 'neutral',
+    });
+  }
+
+  return cards;
+});
+
+const priorityItems = computed(() => {
+  const items: Array<{
+    title: string;
+    detail: string;
+    to: string;
+    tone: Exclude<HubTone, 'neutral'>;
+  }> = [];
+
+  if (canReadComplaints.value && complaintStats.value?.overdueCount) {
+    items.push({
+      title: '投诉工单已超时',
+      detail: `当前有 ${complaintStats.value.overdueCount} 单投诉超过 SLA，建议优先进入投诉工单台处理。`,
+      to: '/petpal-admin/complaints',
+      tone: 'danger',
+    });
+  }
+
+  if (canAuditCaregivers.value && pendingCaregiverCount.value) {
+    items.push({
+      title: '照料者审核待处理',
+      detail: `当前仍有 ${pendingCaregiverCount.value} 份照料者档案待审核，可能影响接单供给。`,
+      to: '/petpal-admin/caregiver-audits',
+      tone: 'warning',
+    });
+  }
+
+  if (canReadCallbackAlerts.value && callbackAlertStats.value && (
+    callbackAlertStats.value.byStatus.DEAD > 0 || callbackAlertStats.value.stuckProcessingCount > 0
+  )) {
+    items.push({
+      title: '回调告警需要排查',
+      detail: `死信 ${callbackAlertStats.value.byStatus.DEAD} 条，卡住 ${callbackAlertStats.value.stuckProcessingCount} 条，请优先检查告警队列。`,
+      to: '/petpal-admin/callback-alert-outbox',
+      tone: callbackAlertStats.value.byStatus.DEAD > 0 ? 'danger' : 'warning',
+    });
+  }
+
+  return items.slice(0, 3);
+});
+
+const formatRefreshTime = (date: Date) => date.toLocaleTimeString('zh-CN', { hour12: false });
+
+const loadHubOverview = async () => {
+  if (!auth.ready || !auth.isAuthenticated) {
+    return;
+  }
+
+  overviewLoading.value = true;
+  overviewNotice.value = '';
+
+  const tasks: Promise<void>[] = [];
+
+  complaintStats.value = null;
+  pendingCaregiverCount.value = null;
+  callbackAuditStats.value = null;
+  callbackAlertStats.value = null;
+
+  if (canReadComplaints.value) {
+    tasks.push(
+      api.petpal.admin.complaintStats().then((response) => {
+        complaintStats.value = response;
+      }),
+    );
+  }
+
+  if (canAuditCaregivers.value) {
+    tasks.push(
+      api.petpal.admin.caregiverAudits({
+        page: 1,
+        pageSize: 1,
+        auditStatus: 'PENDING',
+      }).then((response) => {
+        pendingCaregiverCount.value = response.pagination.total;
+      }),
+    );
+  }
+
+  if (canReadCallbackAudits.value) {
+    tasks.push(
+      api.petpal.admin.callbackAuditStats().then((response) => {
+        callbackAuditStats.value = response;
+      }),
+    );
+  }
+
+  if (canReadCallbackAlerts.value) {
+    tasks.push(
+      api.petpal.admin.callbackAlertOutboxStats().then((response) => {
+        callbackAlertStats.value = response;
+      }),
+    );
+  }
+
+  try {
+    const results = await Promise.allSettled(tasks);
+    const firstRejected = results.find((item) => item.status === 'rejected');
+    if (firstRejected?.status === 'rejected') {
+      overviewNotice.value = '部分治理摘要加载失败，仍可直接进入对应工作区处理。';
+      ElMessage.warning(getErrorMessage(firstRejected.reason, overviewNotice.value));
+    }
+
+    statsUpdatedAt.value = formatRefreshTime(new Date());
+  } finally {
+    overviewLoading.value = false;
+  }
+};
+
+watch(
+  () => `${auth.ready}:${auth.permissions.join('|')}`,
+  () => {
+    if (!auth.ready) {
+      return;
+    }
+
+    void loadHubOverview();
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped lang="scss">
@@ -119,6 +371,134 @@ const accessibleItems = computed(() => petpalAdminNavItems.filter((item) => (
 .petpal-admin-hub__signals strong {
   color: #183e39;
   font-size: 20px;
+}
+
+.petpal-admin-hub__signals small {
+  color: #6c837b;
+  line-height: 1.6;
+}
+
+.petpal-admin-hub__hero-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.petpal-admin-hub__notice {
+  margin: 0;
+  color: #8c5e1a;
+  font-size: 13px;
+}
+
+.petpal-admin-hub__metrics {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.petpal-admin-metric {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(32, 72, 67, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 16px 36px rgba(24, 62, 57, 0.05);
+}
+
+.petpal-admin-metric span {
+  color: #698077;
+  font-size: 12px;
+}
+
+.petpal-admin-metric strong {
+  color: #183e39;
+  font-size: clamp(28px, 3vw, 36px);
+  line-height: 1;
+}
+
+.petpal-admin-metric small {
+  color: #5c726a;
+  line-height: 1.7;
+}
+
+.petpal-admin-metric.is-accent {
+  border-color: rgba(26, 111, 94, 0.18);
+  background: linear-gradient(180deg, rgba(241, 252, 248, 0.94), rgba(255, 255, 255, 0.88));
+}
+
+.petpal-admin-metric.is-warning {
+  border-color: rgba(169, 124, 46, 0.2);
+  background: linear-gradient(180deg, rgba(255, 249, 235, 0.94), rgba(255, 255, 255, 0.9));
+}
+
+.petpal-admin-metric.is-danger {
+  border-color: rgba(169, 67, 50, 0.18);
+  background: linear-gradient(180deg, rgba(255, 244, 242, 0.95), rgba(255, 255, 255, 0.9));
+}
+
+.petpal-admin-hub__priority {
+  display: grid;
+  gap: 14px;
+}
+
+.petpal-admin-hub__section-header {
+  display: grid;
+  gap: 6px;
+}
+
+.petpal-admin-hub__section-header p,
+.petpal-admin-hub__section-header h2 {
+  margin: 0;
+}
+
+.petpal-admin-hub__section-header p {
+  color: #6d847c;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.petpal-admin-hub__section-header h2 {
+  color: #183e39;
+  font-size: 24px;
+}
+
+.petpal-admin-hub__priority-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.petpal-admin-priority {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(32, 72, 67, 0.08);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.petpal-admin-priority strong,
+.petpal-admin-priority p {
+  margin: 0;
+}
+
+.petpal-admin-priority strong {
+  color: #183e39;
+}
+
+.petpal-admin-priority p {
+  color: #5b7269;
+  line-height: 1.7;
+}
+
+.petpal-admin-priority.is-warning {
+  border-color: rgba(169, 124, 46, 0.22);
+}
+
+.petpal-admin-priority.is-danger {
+  border-color: rgba(169, 67, 50, 0.2);
 }
 
 .petpal-admin-hub__grid {
