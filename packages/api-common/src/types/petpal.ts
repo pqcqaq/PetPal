@@ -388,6 +388,7 @@ export interface OwnerRefundExportQuery {
   refundType?: RefundType;
   refundStatus?: RefundStatus;
   complaintStatus?: ComplaintStatus;
+  complaintType?: ComplaintType;
   serviceType?: PetServiceType;
   orderNoKeyword?: string;
 }

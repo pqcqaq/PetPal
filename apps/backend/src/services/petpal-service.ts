@@ -114,6 +114,7 @@ type OwnerRefundExportFilters = {
   refundType?: 'FULL' | 'PARTIAL';
   refundStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
   complaintStatus?: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
+  complaintType?: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
   serviceType?: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
   orderNoKeyword?: string;
 };
@@ -1525,12 +1526,21 @@ export const petpalService = {
         order: {
           ownerId: actorId,
           deleteAt: null,
-          ...(filters.complaintStatus
+          ...(filters.complaintStatus || filters.complaintType
             ? {
                 complaints: {
                   some: {
                     deleteAt: null,
-                    status: filters.complaintStatus,
+                    ...(filters.complaintStatus
+                      ? {
+                          status: filters.complaintStatus,
+                        }
+                      : {}),
+                    ...(filters.complaintType
+                      ? {
+                          complaintType: filters.complaintType,
+                        }
+                      : {}),
                   },
                 },
               }

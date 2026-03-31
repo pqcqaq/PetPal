@@ -3829,6 +3829,58 @@ gantt
 2. 继续补投诉工单的独立值班页或超时提醒，提升后台主动治理能力。
 3. 视售后字段扩展情况，考虑抽离双端共用的时间线聚合逻辑，减少页面内重复映射代码。
 
+### 14.69 2026-04-01（P1-M3 Slice 52）
+
+**概述**：继续推进 P1-M3 主人端售后透明度，本轮为退款明细导出补齐“投诉类型”联动筛选，让主人在工作台可以区分安全、费用、服务、欺诈等不同售后原因对应的退款记录。
+
+已完成：
+
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts`
+    - 扩展 `OwnerRefundExportQuery`，新增 `complaintType` 共享参数。
+- 后端 owner 退款导出投诉类型筛选：
+  - `apps/backend/src/routes/petpal.ts`
+    - 扩展 `GET /api/petpal/orders/refunds/export` 查询参数校验。
+    - 支持接收 `SAFETY` / `FEE` / `SERVICE` / `FRAUD` / `OTHER` 投诉类型过滤条件。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 扩展 `listOwnerRefundExportRows(filters)`。
+    - 将关联投诉过滤从“仅状态”扩展为“状态 + 类型”组合过滤，支持单独按投诉类型筛选，也支持与投诉状态联合收窄结果集。
+- Web 主人端工作台：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+    - 在退款导出筛选条中新增“投诉类型”选择。
+    - 可与既有退款日期、退款状态、投诉状态、退款类型、服务类型和订单号关键词组合使用。
+- 集成测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 验证退款导出可按投诉类型过滤。
+    - 复跑投诉状态过滤用例，确认组合投诉过滤逻辑未回归。
+    - 验证当前主人命中的 `SERVICE` 投诉关联退款会被导出。
+    - 验证费用投诉退款、无投诉退款和他人 `SERVICE` 投诉退款不会进入导出结果。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 --test-name-pattern "filters owner refund export by complaint type" test/integration/petpal-api.test.ts` 通过（1/1）。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 --test-name-pattern "filters owner refund export by complaint status" test/integration/petpal-api.test.ts` 通过（1/1）。
+
+代码审计结论：
+
+- 已确认投诉类型筛选仍严格限定在当前登录主人的订单退款集合内，不会因为命中相同投诉类型而越权导出他人售后记录。
+- 已确认投诉状态与投诉类型采用同一关联投诉 `some` 过滤分支，支持组合过滤且不会放宽既有筛选边界。
+- 已确认新增筛选项复用既有退款导出链路，不改变导出列结构、排序规则或后台执行模式。
+
+风险与缓解：
+
+- 风险：当前退款导出筛选已覆盖时间、退款状态、退款类型、投诉状态、投诉类型、服务类型和订单关键词，但仍未支持常用导出条件模板保存或更复杂的售后聚合视图。
+- 缓解：本轮先优先补齐主人做售后对账时最直接的“售后原因类型”区分能力；后续再按使用频率评估是否补常用导出模板或售后联动视图。
+
+下一步（1-3）：
+
+1. 评估是否为退款导出补常用导出条件保存或一键复用最近一次筛选。
+2. 继续评估是否补售后消息提醒、催办入口或统一售后通知流。
+3. 视导出条件继续增长情况，评估抽离主人端交易/退款导出的共用筛选工具条。
+
 ### 14.68 2026-04-01（P1-M3 Slice 51）
 
 **概述**：继续推进 P1-M3 主人端售后透明度，本轮为退款明细导出补齐“投诉状态”联动筛选，让主人在工作台可以直接区分与待处理、处理中或已结案投诉相关的退款记录。
