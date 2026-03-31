@@ -12,6 +12,8 @@ model PetProfile {
   neutered         Boolean    @default(false)
   temperamentTags  Json?
   feedingNote      String?
+  allergyNote      String?
+  medicalNote      String?
   emergencyContact Json?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
@@ -33,6 +35,9 @@ model CaregiverProfile {
   experienceYears  Int                  @default(0)
   serviceRadiusKm  Int                  @default(5)
   serviceCity      String?
+  specialtyTags    Json?
+  serviceCommitment String?
+  qualificationMaterials Json?
   ratingAvg        Decimal              @default(5.0) @db.Decimal(3, 2)
   ratingCount      Int                  @default(0)
   auditStatus      CaregiverAuditStatus @default(PENDING)

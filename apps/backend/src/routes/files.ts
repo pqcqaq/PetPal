@@ -42,6 +42,14 @@ const isPetpalServiceLogUpload = (input: {
   && input.tag1 === 'petpal-service-log'
   && Boolean(input.tag2?.trim());
 
+const isPetpalCaregiverQualificationUpload = (input: {
+  kind: string;
+  tag1?: string | null;
+  tag2?: string | null;
+}) => input.kind === 'attachment'
+  && input.tag1 === 'petpal-caregiver-qualification'
+  && Boolean(input.tag2?.trim());
+
 const canManagePetpalServiceLogUpload = async (userId: string, orderId: string) => {
   const caregiverProfile = await prisma.caregiverProfile.findFirst({
     where: {
@@ -75,6 +83,21 @@ const canManagePetpalServiceLogUpload = async (userId: string, orderId: string) 
   return Boolean(order);
 };
 
+const canManagePetpalCaregiverQualificationUpload = async (userId: string, caregiverId: string) => {
+  const caregiverProfile = await prisma.caregiverProfile.findFirst({
+    where: {
+      id: caregiverId,
+      userId,
+      deleteAt: null,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return Boolean(caregiverProfile);
+};
+
 const canManageUploadRequest = async (
   actor: { id: string; permissions: string[] },
   input: {
@@ -89,6 +112,10 @@ const canManageUploadRequest = async (
 
   if (isPetpalServiceLogUpload(input)) {
     return canManagePetpalServiceLogUpload(actor.id, String(input.tag2));
+  }
+
+  if (isPetpalCaregiverQualificationUpload(input)) {
+    return canManagePetpalCaregiverQualificationUpload(actor.id, String(input.tag2));
   }
 
   return false;

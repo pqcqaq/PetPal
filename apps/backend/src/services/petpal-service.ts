@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { Prisma, PrismaClient } from '../lib/prisma-generated';
 import type {
+  CaregiverProfile,
   PetProfile,
   ServiceRequest,
 } from '../lib/prisma-generated';
@@ -505,6 +506,125 @@ const toStringArray = (value: Prisma.JsonValue | null | undefined) => Array.isAr
   ? value.filter((item): item is string => typeof item === 'string')
   : [];
 
+const toRecord = (value: Prisma.JsonValue | null | undefined) => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+);
+
+const normalizeTagList = (tags?: string[], limit = 12) => [...new Set(
+  (tags ?? [])
+    .map((item) => item.trim())
+    .filter(Boolean),
+)].slice(0, limit);
+
+const normalizePetEmergencyContact = (
+  contact?: {
+    name: string;
+    phone: string;
+    relation?: string;
+  } | null,
+) => {
+  if (!contact) {
+    return null;
+  }
+
+  const name = contact.name.trim();
+  const phone = contact.phone.trim();
+  if (!name || !phone) {
+    return null;
+  }
+
+  return {
+    name,
+    phone,
+    relation: contact.relation?.trim() || null,
+  };
+};
+
+const toPetEmergencyContact = (value: Prisma.JsonValue | null | undefined) => {
+  const record = toRecord(value);
+  if (!record) {
+    return null;
+  }
+
+  const name = typeof record.name === 'string' ? record.name.trim() : '';
+  const phone = typeof record.phone === 'string' ? record.phone.trim() : '';
+  if (!name || !phone) {
+    return null;
+  }
+
+  return {
+    name,
+    phone,
+    relation: typeof record.relation === 'string' && record.relation.trim()
+      ? record.relation.trim()
+      : null,
+  };
+};
+
+const normalizeQualificationMaterials = (materials?: Array<{
+  fileId: string;
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: Date;
+}>) => (materials ?? [])
+  .map((item) => ({
+    fileId: item.fileId.trim(),
+    url: item.url.trim(),
+    name: item.name.trim(),
+    mimeType: item.mimeType.trim(),
+    size: Math.max(1, Math.trunc(item.size)),
+    uploadedAt: item.uploadedAt.toISOString(),
+  }))
+  .filter((item) => item.fileId && item.url && item.name && item.mimeType);
+
+const toQualificationMaterials = (value: Prisma.JsonValue | null | undefined) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return [];
+    }
+
+    const fileId = typeof item.fileId === 'string' ? item.fileId.trim() : '';
+    const url = typeof item.url === 'string' ? item.url.trim() : '';
+    const name = typeof item.name === 'string' ? item.name.trim() : '';
+    const mimeType = typeof item.mimeType === 'string' ? item.mimeType.trim() : '';
+    const uploadedAt = typeof item.uploadedAt === 'string' ? item.uploadedAt : '';
+    const size = typeof item.size === 'number' ? Math.trunc(item.size) : Number(item.size ?? 0);
+
+    if (!fileId || !url || !name || !mimeType || !uploadedAt || !Number.isFinite(size) || size <= 0) {
+      return [];
+    }
+
+    return [{
+      fileId,
+      url,
+      name,
+      mimeType,
+      size,
+      uploadedAt,
+    }];
+  });
+};
+
+const toPetProfileRecord = (pet: PetProfile) => ({
+  ...pet,
+  temperamentTags: toStringArray(pet.temperamentTags),
+  emergencyContact: toPetEmergencyContact(pet.emergencyContact),
+});
+
+const toCaregiverProfileRecord = (profile: CaregiverProfile) => ({
+  ...profile,
+  specialtyTags: toStringArray(profile.specialtyTags),
+  qualificationMaterials: toQualificationMaterials(profile.qualificationMaterials),
+});
+
 const complaintInclude = {
   assignedAdmin: {
     select: {
@@ -954,15 +1074,18 @@ export const petpalService = {
     });
 
     if (existing) {
-      return existing;
+      return toCaregiverProfileRecord(existing);
     }
 
-    return prisma.caregiverProfile.create({
+    const created = await prisma.caregiverProfile.create({
       data: withSnowflakeId({
         userId,
         auditStatus: 'PENDING',
+        specialtyTags: [],
+        qualificationMaterials: [],
       }),
     });
+    return toCaregiverProfileRecord(created);
   },
 
   async upsertCaregiverProfile(userId: string, payload: {
@@ -970,10 +1093,21 @@ export const petpalService = {
     experienceYears?: number;
     serviceRadiusKm?: number;
     serviceCity?: string;
+    specialtyTags?: string[];
+    serviceCommitment?: string;
+    qualificationMaterials?: Array<{
+      fileId: string;
+      url: string;
+      name: string;
+      mimeType: string;
+      size: number;
+      uploadedAt: Date;
+    }>;
   }) {
     const current = await petpalService.getOrCreateCaregiverProfile(userId);
+    const nextAuditStatus = current.auditStatus === 'REJECTED' ? 'PENDING' : current.auditStatus;
 
-    return prisma.caregiverProfile.update({
+    const updated = await prisma.caregiverProfile.update({
       where: {
         id: current.id,
       },
@@ -982,8 +1116,17 @@ export const petpalService = {
         experienceYears: payload.experienceYears ?? current.experienceYears,
         serviceRadiusKm: payload.serviceRadiusKm ?? current.serviceRadiusKm,
         serviceCity: payload.serviceCity?.trim() || null,
+        specialtyTags: payload.specialtyTags
+          ? normalizeTagList(payload.specialtyTags)
+          : undefined,
+        serviceCommitment: payload.serviceCommitment?.trim() || null,
+        qualificationMaterials: payload.qualificationMaterials
+          ? normalizeQualificationMaterials(payload.qualificationMaterials)
+          : undefined,
+        auditStatus: nextAuditStatus,
       },
     });
+    return toCaregiverProfileRecord(updated);
   },
 
   async listCaregiverServices(userId: string) {
@@ -1087,6 +1230,7 @@ export const petpalService = {
       },
       select: {
         id: true,
+        qualificationMaterials: true,
       },
     });
 
@@ -1094,7 +1238,11 @@ export const petpalService = {
       throw notFound('Caregiver profile not found');
     }
 
-    return prisma.caregiverProfile.update({
+    if (status === 'APPROVED' && toQualificationMaterials(existing.qualificationMaterials).length === 0) {
+      throw badRequest('Caregiver qualification materials are required before approval');
+    }
+
+    const updated = await prisma.caregiverProfile.update({
       where: {
         id: caregiverId,
       },
@@ -1102,6 +1250,7 @@ export const petpalService = {
         auditStatus: status,
       },
     });
+    return toCaregiverProfileRecord(updated);
   },
 
   async queryCaregiverAuditList(payload: {
@@ -1126,6 +1275,11 @@ export const petpalService = {
           },
           {
             intro: {
+              contains: payload.keyword.trim(),
+            },
+          },
+          {
+            serviceCommitment: {
               contains: payload.keyword.trim(),
             },
           },
@@ -1170,8 +1324,12 @@ export const petpalService = {
         experienceYears: item.experienceYears,
         serviceRadiusKm: item.serviceRadiusKm,
         serviceCity: item.serviceCity,
+        specialtyTags: toStringArray(item.specialtyTags),
+        serviceCommitment: item.serviceCommitment,
         auditStatus: item.auditStatus,
         serviceCount: item.services.length,
+        qualificationMaterialCount: toQualificationMaterials(item.qualificationMaterials).length,
+        qualificationMaterials: toQualificationMaterials(item.qualificationMaterials),
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
       })),
@@ -1268,7 +1426,7 @@ export const petpalService = {
   },
 
   async listPets(ownerId: string) {
-    return prisma.petProfile.findMany({
+    const rows = await prisma.petProfile.findMany({
       where: {
         ownerId,
       },
@@ -1276,6 +1434,7 @@ export const petpalService = {
         createdAt: 'desc',
       },
     });
+    return rows.map(toPetProfileRecord);
   },
 
   async createPet(ownerId: string, payload: {
@@ -1283,20 +1442,92 @@ export const petpalService = {
     species: 'DOG' | 'CAT' | 'OTHER';
     breed?: string;
     gender?: 'MALE' | 'FEMALE' | 'UNKNOWN';
+    birthday?: Date;
     weightKg?: number;
     neutered?: boolean;
-  }): Promise<PetProfile> {
-    return prisma.petProfile.create({
+    temperamentTags?: string[];
+    feedingNote?: string;
+    allergyNote?: string;
+    medicalNote?: string;
+    emergencyContact?: {
+      name: string;
+      phone: string;
+      relation?: string;
+    };
+  }) {
+    const pet = await prisma.petProfile.create({
       data: withSnowflakeId({
         ownerId,
-        name: payload.name,
+        name: payload.name.trim(),
         species: payload.species,
-        breed: payload.breed ?? null,
+        breed: payload.breed?.trim() || null,
         gender: payload.gender ?? 'UNKNOWN',
+        birthday: payload.birthday ?? null,
         weightKg: payload.weightKg,
         neutered: payload.neutered ?? false,
+        temperamentTags: normalizeTagList(payload.temperamentTags, 10),
+        feedingNote: payload.feedingNote?.trim() || null,
+        allergyNote: payload.allergyNote?.trim() || null,
+        medicalNote: payload.medicalNote?.trim() || null,
+        emergencyContact: normalizePetEmergencyContact(payload.emergencyContact) ?? Prisma.JsonNull,
       }),
     });
+    return toPetProfileRecord(pet);
+  },
+
+  async updatePet(ownerId: string, petId: string, payload: {
+    name: string;
+    species: 'DOG' | 'CAT' | 'OTHER';
+    breed?: string;
+    gender?: 'MALE' | 'FEMALE' | 'UNKNOWN';
+    birthday?: Date;
+    weightKg?: number;
+    neutered?: boolean;
+    temperamentTags?: string[];
+    feedingNote?: string;
+    allergyNote?: string;
+    medicalNote?: string;
+    emergencyContact?: {
+      name: string;
+      phone: string;
+      relation?: string;
+    };
+  }) {
+    const pet = await prisma.petProfile.findFirst({
+      where: {
+        id: petId,
+        ownerId,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!pet) {
+      throw notFound('Pet not found');
+    }
+
+    const updated = await prisma.petProfile.update({
+      where: {
+        id: pet.id,
+      },
+      data: {
+        name: payload.name.trim(),
+        species: payload.species,
+        breed: payload.breed?.trim() || null,
+        gender: payload.gender ?? 'UNKNOWN',
+        birthday: payload.birthday ?? null,
+        weightKg: payload.weightKg,
+        neutered: payload.neutered ?? false,
+        temperamentTags: normalizeTagList(payload.temperamentTags, 10),
+        feedingNote: payload.feedingNote?.trim() || null,
+        allergyNote: payload.allergyNote?.trim() || null,
+        medicalNote: payload.medicalNote?.trim() || null,
+        emergencyContact: normalizePetEmergencyContact(payload.emergencyContact) ?? Prisma.JsonNull,
+      },
+    });
+    return toPetProfileRecord(updated);
   },
 
   async listOwnerRequests(ownerId: string) {

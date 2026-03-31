@@ -13,7 +13,7 @@
     <section class="frontend-page__section-grid">
       <article class="frontend-card petpal-grid-span-4">
         <span class="frontend-card__eyebrow">宠物档案</span>
-        <h3>新增宠物</h3>
+        <h3>{{ editingPetId ? '编辑宠物' : '新增宠物' }}</h3>
         <el-form :model="petForm" label-position="top" size="small">
           <el-form-item label="宠物名">
             <el-input v-model="petForm.name" placeholder="例如：可乐" />
@@ -28,11 +28,54 @@
           <el-form-item label="品种">
             <el-input v-model="petForm.breed" placeholder="可选" />
           </el-form-item>
+          <el-form-item label="生日">
+            <el-date-picker
+              v-model="petForm.birthday"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="可选"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="性别">
+            <el-select v-model="petForm.gender" style="width: 100%">
+              <el-option label="公" value="MALE" />
+              <el-option label="母" value="FEMALE" />
+              <el-option label="未知" value="UNKNOWN" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="体重(kg)">
             <el-input-number v-model="petForm.weightKg" :min="0.1" :max="120" :precision="1" style="width: 100%" />
           </el-form-item>
+          <el-form-item label="是否绝育">
+            <el-switch v-model="petForm.neutered" />
+          </el-form-item>
+          <el-form-item label="性格标签">
+            <el-input v-model="petTemperamentTagsText" placeholder="例如：亲人，活泼，胆小" />
+          </el-form-item>
+          <el-form-item label="喂养备注">
+            <el-input v-model="petForm.feedingNote" type="textarea" :rows="2" placeholder="例如：早晚各一次，换粮要慢" />
+          </el-form-item>
+          <el-form-item label="过敏提醒">
+            <el-input v-model="petForm.allergyNote" type="textarea" :rows="2" placeholder="例如：对鸡肉冻干过敏" />
+          </el-form-item>
+          <el-form-item label="健康备注">
+            <el-input v-model="petForm.medicalNote" type="textarea" :rows="3" placeholder="例如：近期体检结果、常用药、就诊史" />
+          </el-form-item>
+          <el-form-item label="紧急联系人">
+            <el-space direction="vertical" fill style="width: 100%">
+              <el-input v-model="petForm.emergencyContact.name" placeholder="联系人姓名" />
+              <el-input v-model="petForm.emergencyContact.phone" placeholder="联系电话" />
+              <el-input v-model="petForm.emergencyContact.relation" placeholder="关系，可选" />
+            </el-space>
+          </el-form-item>
           <el-form-item>
-            <el-button type="primary" :loading="petSaving" @click="createPet">保存宠物</el-button>
+            <el-space>
+              <el-button type="primary" :loading="petSaving" @click="createPet">
+                {{ editingPetId ? '更新宠物档案' : '保存宠物' }}
+              </el-button>
+              <el-button v-if="editingPetId" @click="resetPetForm">取消编辑</el-button>
+            </el-space>
           </el-form-item>
         </el-form>
       </article>
@@ -44,14 +87,42 @@
           <el-table-column prop="name" label="名称" min-width="120" />
           <el-table-column prop="species" label="物种" min-width="100" />
           <el-table-column prop="breed" label="品种" min-width="120" />
+          <el-table-column prop="birthday" label="生日" min-width="120">
+            <template #default="scope">
+              {{ scope.row.birthday ? scope.row.birthday.slice(0, 10) : '-' }}
+            </template>
+          </el-table-column>
           <el-table-column prop="weightKg" label="体重" min-width="100">
             <template #default="scope">
               {{ scope.row.weightKg ?? '-' }}
             </template>
           </el-table-column>
+          <el-table-column label="性格标签" min-width="180" show-overflow-tooltip>
+            <template #default="scope">
+              {{ formatPetTagSummary(scope.row.temperamentTags) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="喂养/健康" min-width="260" show-overflow-tooltip>
+            <template #default="scope">
+              {{ [scope.row.feedingNote, scope.row.allergyNote, scope.row.medicalNote].filter(Boolean).join(' ｜ ') || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="紧急联系人" min-width="220" show-overflow-tooltip>
+            <template #default="scope">
+              {{ formatEmergencyContact(scope.row.emergencyContact) }}
+            </template>
+          </el-table-column>
           <el-table-column prop="createdAt" label="创建时间" min-width="170">
             <template #default="scope">
               {{ formatTime(scope.row.createdAt) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" min-width="120" fixed="right">
+            <template #default="scope">
+              <el-space>
+                <el-button link type="primary" size="small" @click="startEditPet(scope.row)">编辑</el-button>
+                <el-button link type="success" size="small" @click="requestForm.petId = scope.row.id">选中</el-button>
+              </el-space>
             </template>
           </el-table-column>
         </el-table>
@@ -382,6 +453,72 @@
           <el-form-item label="服务城市">
             <el-input v-model="caregiverProfileForm.serviceCity" placeholder="例如：杭州" />
           </el-form-item>
+          <el-form-item label="专长标签">
+            <el-input
+              v-model="caregiverProfileForm.specialtyTagsText"
+              placeholder="例如：幼宠看护，猫咪喂养，异宠熟悉"
+            />
+          </el-form-item>
+          <el-form-item label="服务承诺">
+            <el-input
+              v-model="caregiverProfileForm.serviceCommitment"
+              type="textarea"
+              :rows="3"
+              placeholder="例如：支持每日两次图文反馈，紧急情况第一时间联系主人"
+            />
+          </el-form-item>
+          <el-form-item label="资质材料">
+            <div class="petpal-qualification-panel">
+              <div class="petpal-qualification-panel__actions">
+                <input
+                  ref="qualificationUploadInput"
+                  type="file"
+                  multiple
+                  class="petpal-hidden-file-input"
+                  accept="image/*,.pdf"
+                  @change="onQualificationFilesChange"
+                >
+                <el-button
+                  plain
+                  :loading="qualificationUploading"
+                  :disabled="caregiverProfileForm.qualificationMaterials.length >= 12"
+                  @click="openQualificationFilePicker"
+                >
+                  上传资质材料
+                </el-button>
+                <span class="petpal-qualification-panel__hint">
+                  已上传 {{ caregiverProfileForm.qualificationMaterials.length }}/12 份
+                </span>
+              </div>
+
+              <el-progress
+                v-if="qualificationUploadProgress !== null"
+                :percentage="qualificationUploadProgress"
+                :status="qualificationUploadProgress >= 100 ? 'success' : undefined"
+              />
+
+              <div v-if="caregiverProfileForm.qualificationMaterials.length" class="petpal-qualification-list">
+                <div
+                  v-for="item in caregiverProfileForm.qualificationMaterials"
+                  :key="item.fileId"
+                  class="petpal-qualification-item"
+                >
+                  <div class="petpal-qualification-item__copy">
+                    <strong>{{ item.name }}</strong>
+                    <span>{{ item.mimeType }} · {{ Math.round(item.size / 1024) }} KB</span>
+                  </div>
+                  <el-space>
+                    <el-button link type="primary" size="small" @click="openExternalLink(item.url)">
+                      预览
+                    </el-button>
+                    <el-button link type="danger" size="small" @click="removeQualificationMaterial(item.fileId)">
+                      移除
+                    </el-button>
+                  </el-space>
+                </div>
+              </div>
+            </div>
+          </el-form-item>
           <el-form-item>
             <el-space>
               <el-button type="primary" :loading="caregiverProfileSaving" @click="saveCaregiverProfile">保存档案</el-button>
@@ -644,6 +781,7 @@
 
 <script setup lang="ts">
 import type {
+  CaregiverQualificationMaterialRecord,
   CaregiverOrderRecord,
   CaregiverProfileRecord,
   CaregiverServiceRecord,
@@ -657,7 +795,9 @@ import type {
   OrderRecord,
   OwnerRefundExportQuery,
   OrderStatus,
+  PetGender,
   PetProfileRecord,
+  PetSpecies,
   RefundType,
   PetServiceType,
   RefundStatus,
@@ -677,6 +817,35 @@ defineOptions({
   name: 'PetPalOwnerView',
 });
 
+type PetFormState = {
+  name: string;
+  species: PetSpecies;
+  gender: PetGender;
+  breed: string;
+  birthday: string;
+  weightKg: number;
+  neutered: boolean;
+  temperamentTags: string[];
+  feedingNote: string;
+  allergyNote: string;
+  medicalNote: string;
+  emergencyContact: {
+    name: string;
+    phone: string;
+    relation: string;
+  };
+};
+
+type CaregiverProfileFormState = {
+  intro: string;
+  experienceYears: number;
+  serviceRadiusKm: number;
+  serviceCity: string;
+  specialtyTagsText: string;
+  serviceCommitment: string;
+  qualificationMaterials: CaregiverQualificationMaterialRecord[];
+};
+
 const pets = ref<PetProfileRecord[]>([]);
 const requests = ref<ServiceRequestRecord[]>([]);
 const orders = ref<OrderRecord[]>([]);
@@ -684,6 +853,9 @@ const matchItems = ref<MatchedCaregiverRecord[]>([]);
 const caregiverProfile = ref<CaregiverProfileRecord | null>(null);
 const caregiverServices = ref<CaregiverServiceRecord[]>([]);
 const caregiverOrders = ref<CaregiverOrderRecord[]>([]);
+const editingPetId = ref('');
+const qualificationUploadInput = ref<HTMLInputElement | null>(null);
+const petTemperamentTagsText = ref('');
 const auth = useAuthStore();
 const workbench = useWorkbenchStore();
 
@@ -697,13 +869,26 @@ const caregiverProfileSaving = ref(false);
 const caregiverServiceSaving = ref(false);
 const caregiverOrdersLoading = ref(false);
 const caregiverActionLoadingKey = ref('');
+const qualificationUploading = ref(false);
+const qualificationUploadProgress = ref<number | null>(null);
 
-const petForm = reactive<CreatePetPayload>({
+const petForm = reactive<PetFormState>({
   name: '',
   species: 'DOG',
+  gender: 'UNKNOWN',
   breed: '',
+  birthday: '',
   weightKg: 5,
   neutered: false,
+  temperamentTags: [],
+  feedingNote: '',
+  allergyNote: '',
+  medicalNote: '',
+  emergencyContact: {
+    name: '',
+    phone: '',
+    relation: '',
+  },
 });
 
 const requestForm = reactive<{
@@ -730,11 +915,14 @@ const matchQuery = reactive<MatchCaregiverQuery>({
   pageSize: 10,
 });
 
-const caregiverProfileForm = reactive({
+const caregiverProfileForm = reactive<CaregiverProfileFormState>({
   intro: '',
   experienceYears: 0,
   serviceRadiusKm: 5,
   serviceCity: '',
+  specialtyTagsText: '',
+  serviceCommitment: '',
+  qualificationMaterials: [],
 });
 
 const caregiverServiceForm = reactive({
@@ -1312,10 +1500,168 @@ const buildOwnerRefundExportRequest = () => {
   return api.petpal.orders.exportRefundDetails(buildOwnerRefundExportQuery());
 };
 
+const splitTagText = (value: string) => [...new Set(
+  value
+    .split(/[\n,，、]/)
+    .map(item => item.trim())
+    .filter(Boolean),
+)];
+
+const joinTagText = (tags?: string[]) => (tags ?? []).join('，');
+
+const formatPetTagSummary = (tags?: string[]) => {
+  const normalized = tags ?? [];
+  return normalized.length ? normalized.join(' / ') : '-';
+};
+
+const formatEmergencyContact = (contact: PetProfileRecord['emergencyContact']) => {
+  if (!contact) {
+    return '-';
+  }
+
+  return [contact.name, contact.phone, contact.relation].filter(Boolean).join(' · ');
+};
+
+const formatQualificationSummary = (materials?: CaregiverQualificationMaterialRecord[]) => {
+  const normalized = materials ?? [];
+  return normalized.length ? `${normalized.length} 份材料` : '未上传';
+};
+
+const resetPetForm = () => {
+  editingPetId.value = '';
+  petForm.name = '';
+  petForm.species = 'DOG';
+  petForm.gender = 'UNKNOWN';
+  petForm.breed = '';
+  petForm.birthday = '';
+  petForm.weightKg = 5;
+  petForm.neutered = false;
+  petForm.temperamentTags = [];
+  petTemperamentTagsText.value = '';
+  petForm.feedingNote = '';
+  petForm.allergyNote = '';
+  petForm.medicalNote = '';
+  petForm.emergencyContact = {
+    name: '',
+    phone: '',
+    relation: '',
+  };
+};
+
+const startEditPet = (pet: PetProfileRecord) => {
+  editingPetId.value = pet.id;
+  requestForm.petId = pet.id;
+  petForm.name = pet.name;
+  petForm.species = pet.species;
+  petForm.gender = pet.gender;
+  petForm.breed = pet.breed || '';
+  petForm.birthday = pet.birthday ? pet.birthday.slice(0, 10) : '';
+  petForm.weightKg = Number(pet.weightKg ?? 0) || 0;
+  petForm.neutered = pet.neutered;
+  petForm.temperamentTags = [...pet.temperamentTags];
+  petTemperamentTagsText.value = joinTagText(pet.temperamentTags);
+  petForm.feedingNote = pet.feedingNote || '';
+  petForm.allergyNote = pet.allergyNote || '';
+  petForm.medicalNote = pet.medicalNote || '';
+  petForm.emergencyContact = {
+    name: pet.emergencyContact?.name || '',
+    phone: pet.emergencyContact?.phone || '',
+    relation: pet.emergencyContact?.relation || '',
+  };
+};
+
+const removeQualificationMaterial = (fileId: string) => {
+  caregiverProfileForm.qualificationMaterials = caregiverProfileForm.qualificationMaterials
+    .filter(item => item.fileId !== fileId);
+};
+
+const openQualificationFilePicker = () => {
+  qualificationUploadInput.value?.click();
+};
+
+const openExternalLink = (url: string) => {
+  window.open(url, '_blank', 'noopener');
+};
+
+const uploadQualificationFiles = async (files: File[]) => {
+  if (!caregiverProfile.value) {
+    ElMessage.warning('请先加载照料者档案');
+    return;
+  }
+
+  if (!files.length) {
+    return;
+  }
+
+  qualificationUploading.value = true;
+  qualificationUploadProgress.value = 0;
+
+  const uploaded: CaregiverQualificationMaterialRecord[] = [];
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+  let completedSize = 0;
+
+  try {
+    for (const file of files) {
+      const result = await uploadAttachmentFile(
+        file,
+        {
+          tag1: 'petpal-caregiver-qualification',
+          tag2: caregiverProfile.value.id,
+        },
+        (percent) => {
+          const currentBytes = Math.round((file.size * percent) / 100);
+          qualificationUploadProgress.value = Math.min(
+            99,
+            Math.round(((completedSize + currentBytes) / Math.max(totalSize, 1)) * 100),
+          );
+        },
+      );
+
+      uploaded.push({
+        fileId: result.fileId,
+        url: result.url,
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+      });
+      completedSize += file.size;
+      qualificationUploadProgress.value = Math.min(
+        99,
+        Math.round((completedSize / Math.max(totalSize, 1)) * 100),
+      );
+    }
+
+    caregiverProfileForm.qualificationMaterials = [
+      ...caregiverProfileForm.qualificationMaterials,
+      ...uploaded,
+    ].slice(0, 12);
+    qualificationUploadProgress.value = 100;
+    ElMessage.success(`已上传 ${uploaded.length} 份资质材料`);
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '上传资质材料失败'));
+  } finally {
+    qualificationUploading.value = false;
+    setTimeout(() => {
+      qualificationUploadProgress.value = null;
+    }, 600);
+  }
+};
+
+const onQualificationFilesChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = '';
+  await uploadQualificationFiles(files);
+};
+
 const loadPets = async () => {
   try {
     petsLoading.value = true;
     pets.value = await api.petpal.pets.list();
+    if (!requestForm.petId && pets.value.length > 0) {
+      requestForm.petId = pets.value[0].id;
+    }
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '加载宠物失败'));
   } finally {
@@ -1368,6 +1714,9 @@ const loadCaregiverProfile = async () => {
     caregiverProfileForm.experienceYears = profile.experienceYears;
     caregiverProfileForm.serviceRadiusKm = profile.serviceRadiusKm;
     caregiverProfileForm.serviceCity = profile.serviceCity || '';
+    caregiverProfileForm.specialtyTagsText = joinTagText(profile.specialtyTags);
+    caregiverProfileForm.serviceCommitment = profile.serviceCommitment || '';
+    caregiverProfileForm.qualificationMaterials = [...profile.qualificationMaterials];
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '加载照料者档案失败'));
   }
@@ -1568,8 +1917,14 @@ const saveCaregiverProfile = async () => {
       experienceYears: caregiverProfileForm.experienceYears,
       serviceRadiusKm: caregiverProfileForm.serviceRadiusKm,
       serviceCity: caregiverProfileForm.serviceCity.trim() || undefined,
+      specialtyTags: splitTagText(caregiverProfileForm.specialtyTagsText),
+      serviceCommitment: caregiverProfileForm.serviceCommitment.trim() || undefined,
+      qualificationMaterials: caregiverProfileForm.qualificationMaterials,
     });
     caregiverProfile.value = profile;
+    caregiverProfileForm.specialtyTagsText = joinTagText(profile.specialtyTags);
+    caregiverProfileForm.serviceCommitment = profile.serviceCommitment || '';
+    caregiverProfileForm.qualificationMaterials = [...profile.qualificationMaterials];
     ElMessage.success('照料者档案已更新');
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '保存照料者档案失败'));
@@ -1615,16 +1970,38 @@ const createPet = async () => {
 
   try {
     petSaving.value = true;
-    await api.petpal.pets.create({
+    const payload: CreatePetPayload = {
       ...petForm,
       breed: petForm.breed?.trim() || undefined,
-    });
-    petForm.name = '';
-    petForm.breed = '';
-    ElMessage.success('宠物已创建');
+      birthday: typeof petForm.birthday === 'string' && petForm.birthday
+        ? petForm.birthday
+        : undefined,
+      weightKg: Number(petForm.weightKg || 0) > 0 ? Number(petForm.weightKg) : undefined,
+      temperamentTags: splitTagText(petTemperamentTagsText.value),
+      feedingNote: petForm.feedingNote?.trim() || undefined,
+      allergyNote: petForm.allergyNote?.trim() || undefined,
+      medicalNote: petForm.medicalNote?.trim() || undefined,
+      emergencyContact: petForm.emergencyContact?.name?.trim() && petForm.emergencyContact?.phone?.trim()
+        ? {
+            name: petForm.emergencyContact.name.trim(),
+            phone: petForm.emergencyContact.phone.trim(),
+            relation: petForm.emergencyContact.relation?.trim() || undefined,
+          }
+        : undefined,
+    };
+
+    if (editingPetId.value) {
+      await api.petpal.pets.update(editingPetId.value, payload);
+      ElMessage.success('宠物档案已更新');
+    } else {
+      await api.petpal.pets.create(payload);
+      ElMessage.success('宠物已创建');
+    }
+
+    resetPetForm();
     await loadPets();
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '创建宠物失败'));
+    ElMessage.error(getErrorMessage(error, editingPetId.value ? '更新宠物失败' : '创建宠物失败'));
   } finally {
     petSaving.value = false;
   }
@@ -1802,6 +2179,59 @@ onMounted(async () => {
   color: #6b7280;
 }
 
+.petpal-hidden-file-input {
+  display: none;
+}
+
+.petpal-qualification-panel {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.petpal-qualification-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.petpal-qualification-panel__hint {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.petpal-qualification-list {
+  display: grid;
+  gap: 10px;
+}
+
+.petpal-qualification-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e5ebf3;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.petpal-qualification-item__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-qualification-item__copy strong,
+.petpal-qualification-item__copy span {
+  word-break: break-all;
+}
+
+.petpal-qualification-item__copy span {
+  color: #6b7280;
+  font-size: 12px;
+}
+
 @media (max-width: 900px) {
   .petpal-grid-span-4,
   .petpal-grid-span-5,
@@ -1821,6 +2251,10 @@ onMounted(async () => {
   }
 
   .petpal-service-log-dialog__file-item {
+    flex-direction: column;
+  }
+
+  .petpal-qualification-item {
     flex-direction: column;
   }
 }

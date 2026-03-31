@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type {
   CaregiverAuditStatus,
+  CaregiverQualificationMaterialRecord,
   CaregiverOrderRecord,
   CaregiverProfileRecord,
   CaregiverServiceRecord,
@@ -41,9 +42,11 @@ import {
   listPets,
   listServiceRequests,
   matchCaregivers,
+  updatePet,
   updateCaregiverService,
   upsertCaregiverProfile,
 } from '@/api/petpal'
+import { useManagedAttachmentUpload } from '@/composables/useManagedAttachmentUpload'
 import { LOGIN_PAGE } from '@/router/config'
 import { useUserStore } from '@/store'
 import { useTokenStore } from '@/store/token'
@@ -117,8 +120,15 @@ const caregiverProfile = ref<CaregiverProfileRecord | null>(null)
 const caregiverServices = ref<CaregiverServiceRecord[]>([])
 const caregiverOrders = ref<CaregiverOrderRecord[]>([])
 
+const editingPetId = ref('')
 const editingCaregiverServiceId = ref('')
 const activeServiceLogOrderId = ref('')
+const petTemperamentTagsText = ref('')
+
+const { uploading: qualificationUploading, selectAndUploadAttachments } = useManagedAttachmentUpload({
+  maxCount: 3,
+  maxSizeMb: 8,
+})
 
 const userStore = useUserStore()
 const tokenStore = useTokenStore()
@@ -129,8 +139,15 @@ const petForm = reactive({
   species: 'DOG' as PetSpecies,
   gender: 'UNKNOWN' as PetGender,
   breed: '',
+  birthday: '',
   weightKg: '5',
   neutered: 'NO' as YesNoChoice,
+  feedingNote: '',
+  allergyNote: '',
+  medicalNote: '',
+  emergencyName: '',
+  emergencyPhone: '',
+  emergencyRelation: '',
 })
 
 const requestForm = reactive({
@@ -158,6 +175,9 @@ const caregiverProfileForm = reactive({
   experienceYears: '0',
   serviceRadiusKm: '5',
   serviceCity: '',
+  specialtyTagsText: '',
+  serviceCommitment: '',
+  qualificationMaterials: [] as CaregiverQualificationMaterialRecord[],
 })
 
 const caregiverServiceForm = reactive({
@@ -316,6 +336,61 @@ function getOrderTone(status: OrderStatus) {
   return 'neutral'
 }
 
+function splitTagText(value: string) {
+  return [...new Set(
+    value
+      .split(/[\n,，、]/)
+      .map(item => item.trim())
+      .filter(Boolean),
+  )]
+}
+
+function joinTagText(tags?: string[]) {
+  return (tags ?? []).join('，')
+}
+
+function formatPetTagSummary(tags?: string[]) {
+  const normalized = tags ?? []
+  return normalized.length ? normalized.join(' / ') : '暂无'
+}
+
+function resetPetForm() {
+  editingPetId.value = ''
+  petForm.name = ''
+  petForm.species = 'DOG'
+  petForm.gender = 'UNKNOWN'
+  petForm.breed = ''
+  petForm.birthday = ''
+  petForm.weightKg = '5'
+  petForm.neutered = 'NO'
+  petForm.feedingNote = ''
+  petForm.allergyNote = ''
+  petForm.medicalNote = ''
+  petForm.emergencyName = ''
+  petForm.emergencyPhone = ''
+  petForm.emergencyRelation = ''
+  petTemperamentTagsText.value = ''
+}
+
+function startEditPet(pet: PetProfileRecord) {
+  editingPetId.value = pet.id
+  requestForm.petId = pet.id
+  petForm.name = pet.name
+  petForm.species = pet.species
+  petForm.gender = pet.gender
+  petForm.breed = pet.breed || ''
+  petForm.birthday = pet.birthday ? pet.birthday.slice(0, 10) : ''
+  petForm.weightKg = pet.weightKg ? String(pet.weightKg) : ''
+  petForm.neutered = pet.neutered ? 'YES' : 'NO'
+  petForm.feedingNote = pet.feedingNote || ''
+  petForm.allergyNote = pet.allergyNote || ''
+  petForm.medicalNote = pet.medicalNote || ''
+  petForm.emergencyName = pet.emergencyContact?.name || ''
+  petForm.emergencyPhone = pet.emergencyContact?.phone || ''
+  petForm.emergencyRelation = pet.emergencyContact?.relation || ''
+  petTemperamentTagsText.value = joinTagText(pet.temperamentTags)
+}
+
 function ensurePetSelection() {
   if (!requestForm.petId && pets.value.length > 0) {
     requestForm.petId = pets.value[0].id
@@ -347,8 +422,38 @@ function hydrateCaregiverProfile(profile: CaregiverProfileRecord) {
   caregiverProfileForm.experienceYears = String(profile.experienceYears)
   caregiverProfileForm.serviceRadiusKm = String(profile.serviceRadiusKm)
   caregiverProfileForm.serviceCity = profile.serviceCity || ''
+  caregiverProfileForm.specialtyTagsText = joinTagText(profile.specialtyTags)
+  caregiverProfileForm.serviceCommitment = profile.serviceCommitment || ''
+  caregiverProfileForm.qualificationMaterials = [...profile.qualificationMaterials]
   if (!editingCaregiverServiceId.value && !caregiverServiceForm.serviceCity.trim()) {
     caregiverServiceForm.serviceCity = profile.serviceCity || ''
+  }
+}
+
+function removeQualificationMaterial(fileId: string) {
+  caregiverProfileForm.qualificationMaterials = caregiverProfileForm.qualificationMaterials
+    .filter(item => item.fileId !== fileId)
+}
+
+async function uploadQualificationMaterials() {
+  if (!caregiverProfile.value) {
+    uni.showToast({ title: '请先加载照料者档案', icon: 'none' })
+    return
+  }
+
+  try {
+    const uploaded = await selectAndUploadAttachments({
+      tag1: 'petpal-caregiver-qualification',
+      tag2: caregiverProfile.value.id,
+    })
+    caregiverProfileForm.qualificationMaterials = [
+      ...caregiverProfileForm.qualificationMaterials,
+      ...uploaded,
+    ].slice(0, 12)
+    uni.showToast({ title: `已上传 ${uploaded.length} 份材料`, icon: 'none' })
+  }
+  catch (error: unknown) {
+    uni.showToast({ title: getErrorMessage(error, '上传资质材料失败'), icon: 'none' })
   }
 }
 
@@ -480,21 +585,40 @@ async function submitPet() {
 
   creatingPet.value = true
   try {
-    await createPet({
+    const payload = {
       name: petForm.name.trim(),
       species: petForm.species,
       gender: petForm.gender,
       breed: petForm.breed.trim() || undefined,
+      birthday: petForm.birthday || undefined,
       weightKg: Number(petForm.weightKg || 0) || undefined,
       neutered: petForm.neutered === 'YES',
-    })
-    petForm.name = ''
-    petForm.breed = ''
-    uni.showToast({ title: '宠物档案已保存', icon: 'none' })
+      temperamentTags: splitTagText(petTemperamentTagsText.value),
+      feedingNote: petForm.feedingNote.trim() || undefined,
+      allergyNote: petForm.allergyNote.trim() || undefined,
+      medicalNote: petForm.medicalNote.trim() || undefined,
+      emergencyContact: petForm.emergencyName.trim() && petForm.emergencyPhone.trim()
+        ? {
+            name: petForm.emergencyName.trim(),
+            phone: petForm.emergencyPhone.trim(),
+            relation: petForm.emergencyRelation.trim() || undefined,
+          }
+        : undefined,
+    }
+
+    if (editingPetId.value) {
+      await updatePet(editingPetId.value, payload)
+      uni.showToast({ title: '宠物档案已更新', icon: 'none' })
+    } else {
+      await createPet(payload)
+      uni.showToast({ title: '宠物档案已保存', icon: 'none' })
+    }
+
+    resetPetForm()
     await loadOwnerData(false)
   }
   catch (error: unknown) {
-    uni.showToast({ title: getErrorMessage(error, '保存宠物失败'), icon: 'none' })
+    uni.showToast({ title: getErrorMessage(error, editingPetId.value ? '更新宠物失败' : '保存宠物失败'), icon: 'none' })
   }
   finally {
     creatingPet.value = false
@@ -554,6 +678,9 @@ async function saveCaregiverProfile() {
       experienceYears: Number(caregiverProfileForm.experienceYears || 0),
       serviceRadiusKm: Number(caregiverProfileForm.serviceRadiusKm || 0),
       serviceCity: caregiverProfileForm.serviceCity.trim() || undefined,
+      specialtyTags: splitTagText(caregiverProfileForm.specialtyTagsText),
+      serviceCommitment: caregiverProfileForm.serviceCommitment.trim() || undefined,
+      qualificationMaterials: caregiverProfileForm.qualificationMaterials,
     })
     hydrateCaregiverProfile(profile)
     uni.showToast({ title: '照料者档案已保存', icon: 'none' })
@@ -781,6 +908,7 @@ onPullDownRefresh(() => {
           <view class="petpal-form-block">
             <AppInput v-model="petForm.name" label="宠物名" placeholder="例如：可乐" />
             <AppInput v-model="petForm.breed" label="品种" placeholder="例如：柴犬 / 英短" />
+            <AppInput v-model="petForm.birthday" label="生日" placeholder="例如：2024-05-06" />
             <AppInput v-model="petForm.weightKg" label="体重" placeholder="例如：5" type="digit" />
 
             <view class="petpal-form-group">
@@ -798,7 +926,38 @@ onPullDownRefresh(() => {
               <AppChoiceChips v-model="petForm.neutered" :options="yesNoOptions" />
             </view>
 
-            <AppButton :loading="creatingPet" @click="submitPet">保存宠物档案</AppButton>
+            <AppInput v-model="petTemperamentTagsText" label="性格标签" placeholder="例如：亲人，胆小，活泼" />
+            <textarea
+              v-model="petForm.feedingNote"
+              class="petpal-textarea"
+              :maxlength="180"
+              auto-height
+              placeholder="喂养备注，例如饮食禁忌、换粮方式和作息"
+            />
+            <textarea
+              v-model="petForm.allergyNote"
+              class="petpal-textarea"
+              :maxlength="180"
+              auto-height
+              placeholder="过敏提醒，例如食物或环境过敏"
+            />
+            <textarea
+              v-model="petForm.medicalNote"
+              class="petpal-textarea"
+              :maxlength="240"
+              auto-height
+              placeholder="健康备注，例如年度体检、常用药或慢性病观察"
+            />
+            <AppInput v-model="petForm.emergencyName" label="紧急联系人" placeholder="例如：张三" />
+            <AppInput v-model="petForm.emergencyPhone" label="联系电话" placeholder="例如：13800000000" />
+            <AppInput v-model="petForm.emergencyRelation" label="关系" placeholder="例如：家人 / 邻居" />
+
+            <view class="petpal-action-row">
+              <AppButton :loading="creatingPet" @click="submitPet">
+                {{ editingPetId ? '更新宠物档案' : '保存宠物档案' }}
+              </AppButton>
+              <AppButton v-if="editingPetId" size="medium" type="info" @click="resetPetForm">取消编辑</AppButton>
+            </view>
           </view>
 
           <AppList v-if="pets.length">
@@ -806,12 +965,17 @@ onPullDownRefresh(() => {
               v-for="pet in pets"
               :key="pet.id"
               :title="pet.name"
-              :label="`${speciesLabels[pet.species]} · ${genderLabels[pet.gender]}${pet.breed ? ` · ${pet.breed}` : ''}`"
-              :value="`${pet.weightKg || '-'}kg`"
+              :label="`${speciesLabels[pet.species]} · ${genderLabels[pet.gender]}${pet.breed ? ` · ${pet.breed}` : ''}${pet.birthday ? ` · ${pet.birthday.slice(0, 10)}` : ''}`"
+              :value="`${pet.weightKg || '-'}kg · ${formatPetTagSummary(pet.temperamentTags)}`"
               clickable
-              @click="pickPet(pet.id)"
+              @click="startEditPet(pet)"
             />
           </AppList>
+          <view v-if="pets.length" class="petpal-inline-note">
+            <text>
+              点击宠物卡片可编辑健康档案；发布需求前可再点一次对应宠物，将其设为当前下单对象。
+            </text>
+          </view>
           <view v-else class="petpal-inline-note">
             <text>还没有宠物档案，先录入一只宠物再发布照料需求。</text>
           </view>
@@ -970,6 +1134,7 @@ onPullDownRefresh(() => {
             <AppInput v-model="caregiverProfileForm.experienceYears" label="经验" placeholder="例如：3" type="digit" />
             <AppInput v-model="caregiverProfileForm.serviceRadiusKm" label="半径" placeholder="例如：8" type="digit" />
             <AppInput v-model="caregiverProfileForm.serviceCity" label="城市" placeholder="例如：杭州" />
+            <AppInput v-model="caregiverProfileForm.specialtyTagsText" label="专长标签" placeholder="例如：幼宠，猫咪，异宠" />
             <textarea
               v-model="caregiverProfileForm.intro"
               class="petpal-textarea"
@@ -977,6 +1142,46 @@ onPullDownRefresh(() => {
               auto-height
               placeholder="介绍你的照料经验、擅长宠物类型和服务风格"
             />
+            <textarea
+              v-model="caregiverProfileForm.serviceCommitment"
+              class="petpal-textarea"
+              :maxlength="180"
+              auto-height
+              placeholder="说明你的服务承诺，例如图文反馈频率、紧急响应方式"
+            />
+            <view class="petpal-inline-panel">
+              <view class="petpal-inline-panel__header">
+                <text class="petpal-inline-panel__title">资质材料</text>
+                <text class="petpal-inline-panel__meta">
+                  {{ caregiverProfileForm.qualificationMaterials.length }}/12 份
+                </text>
+              </view>
+              <view class="petpal-action-row">
+                <AppButton
+                  size="medium"
+                  type="info"
+                  :loading="qualificationUploading"
+                  :disabled="caregiverProfileForm.qualificationMaterials.length >= 12"
+                  @click="uploadQualificationMaterials"
+                >
+                  上传资质图片
+                </AppButton>
+              </view>
+              <AppList v-if="caregiverProfileForm.qualificationMaterials.length">
+                <AppListItem
+                  v-for="item in caregiverProfileForm.qualificationMaterials"
+                  :key="item.fileId"
+                  :title="item.name"
+                  :label="`${item.mimeType} · ${Math.round(item.size / 1024)}KB`"
+                  value="点按移除"
+                  clickable
+                  @click="removeQualificationMaterial(item.fileId)"
+                />
+              </AppList>
+              <view v-else class="petpal-inline-note">
+                <text>至少上传一份身份证明或培训资质图片，后台审核时会直接查看。</text>
+              </view>
+            </view>
             <AppButton :loading="caregiverProfileSaving" @click="saveCaregiverProfile">保存照料者档案</AppButton>
           </view>
         </AppSection>

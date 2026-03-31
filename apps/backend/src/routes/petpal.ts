@@ -19,13 +19,25 @@ const orderStatusEnum = z.enum([
   'REFUNDED',
 ]);
 
+const petEmergencyContactSchema = z.object({
+  name: z.string().trim().min(1).max(50),
+  phone: z.string().trim().min(5).max(30),
+  relation: z.string().trim().max(30).optional(),
+});
+
 const petSchema = z.object({
   name: z.string().trim().min(1).max(50),
   species: z.enum(['DOG', 'CAT', 'OTHER']),
   breed: z.string().trim().max(50).optional(),
   gender: z.enum(['MALE', 'FEMALE', 'UNKNOWN']).optional(),
+  birthday: z.coerce.date().optional(),
   weightKg: z.number().positive().max(500).optional(),
   neutered: z.boolean().optional(),
+  temperamentTags: z.array(z.string().trim().min(1).max(20)).max(10).optional(),
+  feedingNote: z.string().trim().max(500).optional(),
+  allergyNote: z.string().trim().max(500).optional(),
+  medicalNote: z.string().trim().max(500).optional(),
+  emergencyContact: petEmergencyContactSchema.optional(),
 });
 
 const requestSchema = z.object({
@@ -48,11 +60,23 @@ const matchQuerySchema = z.object({
   lng: z.coerce.number().min(-180).max(180).optional(),
 });
 
+const qualificationMaterialSchema = z.object({
+  fileId: z.string().trim().min(1).max(64),
+  url: z.string().trim().url().max(1000),
+  name: z.string().trim().min(1).max(120),
+  mimeType: z.string().trim().min(1).max(120),
+  size: z.coerce.number().int().positive().max(50 * 1024 * 1024),
+  uploadedAt: z.coerce.date(),
+});
+
 const caregiverProfileSchema = z.object({
   intro: z.string().trim().max(1000).optional(),
   experienceYears: z.coerce.number().int().min(0).max(60).optional(),
   serviceRadiusKm: z.coerce.number().int().min(1).max(100).optional(),
   serviceCity: z.string().trim().max(50).optional(),
+  specialtyTags: z.array(z.string().trim().min(1).max(20)).max(12).optional(),
+  serviceCommitment: z.string().trim().max(500).optional(),
+  qualificationMaterials: z.array(qualificationMaterialSchema).max(12).optional(),
 });
 
 const caregiverServiceSchema = z.object({
@@ -317,6 +341,13 @@ petpalRouter.post('/pets', asyncHandler(async (req, res) => {
   const payload = petSchema.parse(req.body);
   const pet = await petpalService.createPet(auth.id, payload);
   return ok(res, pet, 'Pet created');
+}));
+
+petpalRouter.put('/pets/:id', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = petSchema.parse(req.body);
+  const pet = await petpalService.updatePet(auth.id, String(req.params.id), payload);
+  return ok(res, pet, 'Pet updated');
 }));
 
 petpalRouter.get('/requests', asyncHandler(async (req, res) => {

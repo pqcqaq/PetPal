@@ -46,6 +46,12 @@ export type ComplaintActionType = 'OPEN' | 'ASSIGN' | 'INVESTIGATE' | 'CALL_USER
 
 type AmountValue = number | string;
 
+export interface PetEmergencyContactRecord {
+  name: string;
+  phone: string;
+  relation: string | null;
+}
+
 export interface PetProfileRecord {
   id: string;
   ownerId: string;
@@ -53,8 +59,14 @@ export interface PetProfileRecord {
   species: PetSpecies;
   breed: string | null;
   gender: PetGender;
+  birthday: string | null;
   weightKg: AmountValue | null;
   neutered: boolean;
+  temperamentTags: string[];
+  feedingNote: string | null;
+  allergyNote: string | null;
+  medicalNote: string | null;
+  emergencyContact: PetEmergencyContactRecord | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,9 +76,21 @@ export interface CreatePetPayload {
   species: PetSpecies;
   breed?: string;
   gender?: PetGender;
+  birthday?: string;
   weightKg?: number;
   neutered?: boolean;
+  temperamentTags?: string[];
+  feedingNote?: string;
+  allergyNote?: string;
+  medicalNote?: string;
+  emergencyContact?: {
+    name: string;
+    phone: string;
+    relation?: string;
+  };
 }
+
+export interface UpdatePetPayload extends CreatePetPayload {}
 
 export interface ServiceRequestRecord {
   id: string;
@@ -424,6 +448,15 @@ export interface MatchedCaregiverRecord {
 
 export type MatchedCaregiverPage = PaginatedResult<MatchedCaregiverRecord>;
 
+export interface CaregiverQualificationMaterialRecord {
+  fileId: string;
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+}
+
 export interface CaregiverProfileRecord {
   id: string;
   userId: string;
@@ -431,6 +464,9 @@ export interface CaregiverProfileRecord {
   experienceYears: number;
   serviceRadiusKm: number;
   serviceCity: string | null;
+  specialtyTags: string[];
+  serviceCommitment: string | null;
+  qualificationMaterials: CaregiverQualificationMaterialRecord[];
   ratingAvg: AmountValue;
   ratingCount: number;
   auditStatus: CaregiverAuditStatus;
@@ -443,6 +479,9 @@ export interface UpsertCaregiverProfilePayload {
   experienceYears?: number;
   serviceRadiusKm?: number;
   serviceCity?: string;
+  specialtyTags?: string[];
+  serviceCommitment?: string;
+  qualificationMaterials?: CaregiverQualificationMaterialRecord[];
 }
 
 export interface CaregiverServiceRecord {
@@ -496,8 +535,12 @@ export interface CaregiverAuditListItem {
   experienceYears: number;
   serviceRadiusKm: number;
   serviceCity: string | null;
+  specialtyTags: string[];
+  serviceCommitment: string | null;
   auditStatus: CaregiverAuditStatus;
   serviceCount: number;
+  qualificationMaterialCount: number;
+  qualificationMaterials: CaregiverQualificationMaterialRecord[];
   createdAt: string;
   updatedAt: string;
 }

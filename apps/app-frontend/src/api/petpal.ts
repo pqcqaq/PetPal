@@ -1,4 +1,5 @@
 import type {
+  CaregiverQualificationMaterialRecord,
   CaregiverOrderPage,
   CaregiverOrderQuery,
   CaregiverProfileRecord,
@@ -12,6 +13,7 @@ import type {
   MatchCaregiverQuery,
   OrderRefundProgressRecord,
   OrderDetailRecord,
+  UpdatePetPayload,
   UpsertCaregiverProfilePayload,
   UpsertCaregiverServicePayload,
 } from '@rbac/api-common'
@@ -23,6 +25,10 @@ export function listPets() {
 
 export function createPet(payload: CreatePetPayload) {
   return appApi.petpal.pets.create(payload)
+}
+
+export function updatePet(id: string, payload: UpdatePetPayload) {
+  return appApi.petpal.pets.update(id, payload)
 }
 
 export function listServiceRequests() {
@@ -72,6 +78,8 @@ export function getCaregiverProfile(): Promise<CaregiverProfileRecord> {
 export function upsertCaregiverProfile(payload: UpsertCaregiverProfilePayload): Promise<CaregiverProfileRecord> {
   return appApi.petpal.caregiver.upsertProfile(payload)
 }
+
+export type { CaregiverQualificationMaterialRecord }
 
 export function listCaregiverServices(): Promise<CaregiverServiceRecord[]> {
   return appApi.petpal.caregiver.services()

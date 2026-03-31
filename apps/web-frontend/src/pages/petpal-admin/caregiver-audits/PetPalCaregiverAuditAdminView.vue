@@ -27,6 +27,30 @@
       <el-table-column prop="experienceYears" label="经验(年)" min-width="100" />
       <el-table-column prop="serviceRadiusKm" label="半径(km)" min-width="100" />
       <el-table-column prop="serviceCount" label="服务项" min-width="80" />
+      <el-table-column label="专长标签" min-width="180" show-overflow-tooltip>
+        <template #default="scope">{{ scope.row.specialtyTags.length ? scope.row.specialtyTags.join(' / ') : '-' }}</template>
+      </el-table-column>
+      <el-table-column prop="serviceCommitment" label="服务承诺" min-width="220" show-overflow-tooltip>
+        <template #default="scope">{{ scope.row.serviceCommitment || '-' }}</template>
+      </el-table-column>
+      <el-table-column label="资质材料" min-width="120">
+        <template #default="scope">
+          <el-space>
+            <el-tag :type="scope.row.qualificationMaterialCount > 0 ? 'success' : 'info'">
+              {{ scope.row.qualificationMaterialCount }} 份
+            </el-tag>
+            <el-button
+              v-if="scope.row.qualificationMaterialCount > 0"
+              link
+              type="primary"
+              size="small"
+              @click="previewMaterials(scope.row)"
+            >
+              查看
+            </el-button>
+          </el-space>
+        </template>
+      </el-table-column>
       <el-table-column prop="auditStatus" label="审核状态" min-width="120">
         <template #default="scope">
           <el-tag :type="statusTagType(scope.row.auditStatus)">{{ scope.row.auditStatus }}</el-tag>
@@ -56,6 +80,29 @@
         @current-change="changePage"
       />
     </div>
+
+    <el-dialog v-model="materialsDialogVisible" width="640px" title="照料者资质材料">
+      <div v-if="previewRow" class="material-preview">
+        <p class="material-preview__summary">
+          {{ previewRow.nickname }} · {{ previewRow.serviceCity || '城市待完善' }} · {{ previewRow.qualificationMaterialCount }} 份材料
+        </p>
+
+        <div class="material-preview__list">
+          <article
+            v-for="item in previewRow.qualificationMaterials"
+            :key="item.fileId"
+            class="material-preview__item"
+          >
+            <div>
+              <strong>{{ item.name }}</strong>
+              <p>{{ item.mimeType }} · {{ Math.round(item.size / 1024) }} KB</p>
+            </div>
+            <el-button link type="primary" @click="openMaterial(item.url)">打开</el-button>
+          </article>
+        </div>
+      </div>
+      <el-empty v-else description="暂无可查看的材料" />
+    </el-dialog>
   </PageScaffold>
 </template>
 
@@ -95,6 +142,8 @@ const rows = ref<CaregiverAuditListItem[]>([]);
 const loading = ref(false);
 const total = ref(0);
 const pageSize = 10;
+const materialsDialogVisible = ref(false);
+const previewRow = ref<CaregiverAuditListItem | null>(null);
 const route = useRoute();
 const router = useRouter();
 
@@ -128,6 +177,15 @@ const statusTagType = (status: CaregiverAuditStatus) => {
     return 'danger';
   }
   return 'warning';
+};
+
+const previewMaterials = (row: CaregiverAuditListItem) => {
+  previewRow.value = row;
+  materialsDialogVisible.value = true;
+};
+
+const openMaterial = (url: string) => {
+  window.open(url, '_blank', 'noopener');
 };
 
 const routeFilterKeys = ['page', 'auditStatus', 'city', 'keyword'] as const;
@@ -255,5 +313,41 @@ watch(
   margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+}
+
+.material-preview {
+  display: grid;
+  gap: 14px;
+}
+
+.material-preview__summary {
+  margin: 0;
+  color: #5b6574;
+}
+
+.material-preview__list {
+  display: grid;
+  gap: 12px;
+}
+
+.material-preview__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e6ebf2;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.material-preview__item strong,
+.material-preview__item p {
+  margin: 0;
+}
+
+.material-preview__item p {
+  margin-top: 4px;
+  color: #6b7280;
 }
 </style>

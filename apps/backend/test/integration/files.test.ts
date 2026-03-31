@@ -226,4 +226,99 @@ describe('File upload integration', () => {
     assert.equal(asset.uploadStatus, 'COMPLETED');
     assert.equal(asset.url, uploaded.url);
   });
+
+  it('allows caregivers to upload qualification materials only for their own caregiver profile', async () => {
+    const { app, prismaRaw } = context;
+    const memberSession = await loginAs(app, 'user', 'User123!');
+
+    const profileResponse = await request(app)
+      .get('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .expect(200);
+
+    const caregiverId = profileResponse.body.data.id as string;
+
+    await request(app)
+      .post('/api/files/presign')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({
+        kind: 'attachment',
+        fileName: 'wrong-caregiver.jpg',
+        contentType: 'image/jpeg',
+        size: 256,
+        tag1: 'petpal-caregiver-qualification',
+        tag2: 'caregiver-not-owned',
+      })
+      .expect(403);
+
+    const prepareResponse = await request(app)
+      .post('/api/files/presign')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({
+        kind: 'attachment',
+        fileName: 'qualification.jpg',
+        contentType: 'image/jpeg',
+        size: Buffer.byteLength('petpal-qualification-binary'),
+        tag1: 'petpal-caregiver-qualification',
+        tag2: caregiverId,
+      })
+      .expect(200);
+
+    const uploadPart = prepareResponse.body.data.parts[0] as {
+      url: string;
+      fields: Record<string, string>;
+    };
+    const uploadPath = new URL(uploadPart.url).pathname;
+
+    await request(app)
+      .post(uploadPath)
+      .field(uploadPart.fields)
+      .attach(
+        'file',
+        Buffer.from('petpal-qualification-binary'),
+        {
+          filename: 'qualification.jpg',
+          contentType: 'image/jpeg',
+        },
+      )
+      .expect(204);
+
+    const callbackResponse = await request(app)
+      .post('/api/files/callback')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({
+        fileId: prepareResponse.body.data.fileId,
+      })
+      .expect(200);
+
+    const uploaded = callbackResponse.body.data as {
+      fileId: string;
+      url: string;
+    };
+
+    assert.equal(uploaded.fileId, prepareResponse.body.data.fileId);
+    assert.match(uploaded.url, /attachments\//);
+
+    const asset = await prismaRaw.mediaAsset.findUnique({
+      where: {
+        id: uploaded.fileId,
+      },
+      select: {
+        userId: true,
+        kind: true,
+        tag1: true,
+        tag2: true,
+        uploadStatus: true,
+        url: true,
+      },
+    });
+
+    assert.ok(asset);
+    assert.equal(asset.userId, memberSession.user.id);
+    assert.equal(asset.kind, 'attachment');
+    assert.equal(asset.tag1, 'petpal-caregiver-qualification');
+    assert.equal(asset.tag2, caregiverId);
+    assert.equal(asset.uploadStatus, 'COMPLETED');
+    assert.equal(asset.url, uploaded.url);
+  });
 });

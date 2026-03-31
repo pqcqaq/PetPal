@@ -231,6 +231,8 @@ erDiagram
 | neutered | boolean | default false | 是否绝育 |
 | temperament_tags | jsonb | default [] | 性格标签 |
 | feeding_note | text | nullable | 喂食说明 |
+| allergy_note | text | nullable | 过敏说明 |
+| medical_note | text | nullable | 就诊史 / 用药 / 医疗说明 |
 | emergency_contact | jsonb | nullable | 紧急联系人 |
 | created_at | timestamptz | not null | 创建时间 |
 | updated_at | timestamptz | not null | 更新时间 |
@@ -239,6 +241,11 @@ erDiagram
 
 - idx_pet_owner(owner_id)
 - idx_pet_species_breed(species, breed)
+
+实现备注（2026-04-01 当前代码基线）：
+
+- 当前后端已经把 `allergy_note`、`medical_note`、`emergency_contact` 直接落在 `pet_profile` 上，用于支撑主人端和 App 端的“轻量健康档案”主流程。
+- `pet_health_record` 仍保留为后续可扩展设计，用于承载多条疫苗、处方、体检或附件化健康记录；当前切片尚未拆成独立子表闭环。
 
 #### 表：pet_health_record
 
@@ -265,11 +272,22 @@ erDiagram
 | experience_years | int | default 0 | 从业年限 |
 | service_radius_km | int | default 5 | 服务半径 |
 | service_city | varchar(50) | index | 服务城市 |
+| specialty_tags | jsonb | default [] | 照护专长标签 |
+| service_commitment | text | nullable | 服务承诺 |
+| qualification_materials | jsonb | default [] | 资质材料摘要列表 |
 | rating_avg | numeric(3,2) | default 5.0 | 平均评分 |
 | rating_count | int | default 0 | 评价数 |
 | audit_status | varchar(20) | index | pending/approved/rejected |
 | created_at | timestamptz | not null | 创建时间 |
 | updated_at | timestamptz | not null | 更新时间 |
+
+实现备注（2026-04-01 当前代码基线）：
+
+- 当前代码已经在 `caregiver_profile` 中落地：
+  - `specialty_tags`
+  - `service_commitment`
+  - `qualification_materials`
+- 这样可以先完成 Web/App 双端资质上传、后台审核预览和审核拦截闭环，避免在本轮继续引入新的明细表与联表复杂度。
 
 #### 表：caregiver_qualification
 
@@ -284,6 +302,12 @@ erDiagram
 | valid_to | date | nullable | 到期日 |
 | verify_status | varchar(20) | index | pending/pass/reject |
 | created_at | timestamptz | not null | 创建时间 |
+
+实现备注（2026-04-01 当前代码基线）：
+
+- 本表仍作为后续“结构化资质档案”设计目标保留。
+- 当前真实实现为了尽快形成可用闭环，先把资质材料以 JSON 摘要数组存放在 `caregiver_profile.qualification_materials` 中，并通过上传附件 `tag1=petpal-caregiver-qualification` 与照料者档案关联。
+- 若后续需要补证书编号、有效期、复审记录、到期提醒与多证件类型治理，再把当前 JSON 摘要拆分到独立 `caregiver_qualification` 表。
 
 #### 表：caregiver_service
 
@@ -1397,6 +1421,59 @@ gantt
 1. 消息与在线沟通尚未落地，订单过程仍缺即时会话与未读提醒。
 2. 健康记录、资质材料、收益分析、规则发布、违规处罚、运营看板仍未形成完整闭环。
 3. App 端虽然已经完成主工作流重构，但媒体上传、过程消息、身份中心与更细的用户体验收口还需继续推进。
+
+### 13.16 本轮健康档案与资质材料补完（2026-04-01）
+
+在 13.15 的大迭代基础上，本轮继续补齐两个此前明确缺口：
+
+- 宠物健康档案不再只有基础信息，已经形成“轻量健康档案 + 编辑更新”闭环。
+- 照料者资质材料不再停留在计划层，已经形成“上传材料 -> 提交档案 -> 后台审核预览 -> 无材料禁止审批”的闭环。
+
+本轮完成内容：
+
+- 后端与共享契约
+  - `PetProfile` 已增加：
+    - `allergyNote`
+    - `medicalNote`
+  - `CaregiverProfile` 已增加：
+    - `specialtyTags`
+    - `serviceCommitment`
+    - `qualificationMaterials`
+  - 共享契约与 API 工厂已同步支持：
+    - 主人端宠物档案更新
+    - 照料者资质材料结构
+    - 管理端审核列表查看资质材料数量与明细
+- Web 端
+  - `PetPalOwnerView.vue` 已支持：
+    - 新建 / 编辑宠物健康档案
+    - 过敏说明、医疗说明、紧急联系人维护
+    - 照料者专长标签、服务承诺、资质材料上传
+  - 管理端照料者审核页已支持：
+    - 查看专长标签
+    - 查看服务承诺
+    - 查看资质材料数量与明细预览
+- App 端
+  - `pages/petpal/index.vue` 已支持：
+    - 主人编辑宠物健康信息
+    - 照料者上传资质材料并维护专长/承诺
+  - 已新增 `useManagedAttachmentUpload.ts`，把移动端资质材料上传接到当前附件链路
+- 审核规则与上传授权
+  - 管理端审批照料者时，若没有资质材料，后端会拒绝通过。
+  - 附件上传链路已增加 `petpal-caregiver-qualification` 白名单，只允许上传到当前照料者自己的档案。
+
+更新后的完成度判断：
+
+| 维度 | 上一轮判断 | 本轮判断 | 说明 |
+| --- | --- | --- | --- |
+| Web 端 | 约 82% | 约 85% | 主人端健康档案与管理端资质审核可视化进一步收口 |
+| App 端 | 约 65% | 约 72% | 主工作台新增宠物健康档案编辑与照料者资质材料上传 |
+| 整体项目 | 约 76% | 约 80% | 真实业务闭环继续增强，但消息、收益与平台治理仍是主要缺口 |
+
+本轮后仍未完成的重点：
+
+1. 即时沟通、消息会话、未读提醒仍未落地。
+2. 详细健康记录子表、收益分析、规则发布、违规处罚、运营看板仍未形成完整前后端闭环。
+3. App 端虽然已经具备宠物健康档案和资质材料上传，但视觉一致性、过程消息和更多履约细节还需要继续打磨。
 
 ## 14. 开发进度日志
 

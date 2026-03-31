@@ -170,6 +170,115 @@ describe('PetPal API integration', () => {
     );
   });
 
+  it('supports owner pet health profile creation and update', async () => {
+    const { app, prisma } = context;
+    const memberSession = await loginAs(app, 'user', 'User123!');
+
+    const createPetResponse = await request(app)
+      .post('/api/petpal/pets')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({
+        name: '团子',
+        species: 'DOG',
+        breed: '柯基',
+        gender: 'MALE',
+        birthday: '2022-08-01',
+        weightKg: 12.5,
+        neutered: true,
+        temperamentTags: ['亲人', '胆小'],
+        feedingNote: '每日两次定量喂食',
+        allergyNote: '鸡肉冻干过敏',
+        medicalNote: '去年做过髌骨检查',
+        emergencyContact: {
+          name: '王阿姨',
+          phone: '13800001234',
+          relation: '邻居',
+        },
+      })
+      .expect(200);
+
+    assert.equal(createPetResponse.body.data.name, '团子');
+    assert.equal(createPetResponse.body.data.species, 'DOG');
+    assert.equal(createPetResponse.body.data.breed, '柯基');
+    assert.equal(Number(createPetResponse.body.data.weightKg), 12.5);
+    assert.deepEqual(createPetResponse.body.data.temperamentTags, ['亲人', '胆小']);
+    assert.equal(createPetResponse.body.data.allergyNote, '鸡肉冻干过敏');
+    assert.equal(createPetResponse.body.data.medicalNote, '去年做过髌骨检查');
+    assert.deepEqual(createPetResponse.body.data.emergencyContact, {
+      name: '王阿姨',
+      phone: '13800001234',
+      relation: '邻居',
+    });
+
+    const petId = createPetResponse.body.data.id as string;
+
+    const updatePetResponse = await request(app)
+      .put(`/api/petpal/pets/${petId}`)
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({
+        name: '团子',
+        species: 'DOG',
+        breed: '彭布罗克',
+        gender: 'MALE',
+        birthday: '2022-08-15',
+        weightKg: 13.2,
+        neutered: true,
+        temperamentTags: ['稳定', '会握手'],
+        feedingNote: '早晚各 90g 狗粮',
+        allergyNote: '牛肉过敏',
+        medicalNote: '每月驱虫，近期无异常',
+        emergencyContact: {
+          name: '李叔叔',
+          phone: '13900004567',
+        },
+      })
+      .expect(200);
+
+    assert.equal(updatePetResponse.body.data.breed, '彭布罗克');
+    assert.equal(Number(updatePetResponse.body.data.weightKg), 13.2);
+    assert.deepEqual(updatePetResponse.body.data.temperamentTags, ['稳定', '会握手']);
+    assert.equal(updatePetResponse.body.data.feedingNote, '早晚各 90g 狗粮');
+    assert.equal(updatePetResponse.body.data.allergyNote, '牛肉过敏');
+    assert.equal(updatePetResponse.body.data.medicalNote, '每月驱虫，近期无异常');
+    assert.deepEqual(updatePetResponse.body.data.emergencyContact, {
+      name: '李叔叔',
+      phone: '13900004567',
+      relation: null,
+    });
+
+    const persistedPet = await prisma.petProfile.findUnique({
+      where: {
+        id: petId,
+      },
+      select: {
+        breed: true,
+        birthday: true,
+        weightKg: true,
+        neutered: true,
+        temperamentTags: true,
+        feedingNote: true,
+        allergyNote: true,
+        medicalNote: true,
+        emergencyContact: true,
+      },
+    });
+
+    assert.ok(persistedPet);
+    assert.equal(persistedPet.breed, '彭布罗克');
+    assert.equal(persistedPet.birthday?.toISOString().slice(0, 10), '2022-08-15');
+    assert.equal(Number(persistedPet.weightKg), 13.2);
+    assert.equal(persistedPet.neutered, true);
+    assert.deepEqual(persistedPet.temperamentTags, ['稳定', '会握手']);
+    assert.equal(persistedPet.feedingNote, '早晚各 90g 狗粮');
+    assert.equal(persistedPet.allergyNote, '牛肉过敏');
+    assert.equal(persistedPet.medicalNote, '每月驱虫，近期无异常');
+    assert.deepEqual(persistedPet.emergencyContact, {
+      name: '李叔叔',
+      phone: '13900004567',
+      relation: null,
+    });
+  });
+
   it('supports caregiver matching and owner order detail', async () => {
     const { app, prisma } = context;
     const memberSession = await loginAs(app, 'user', 'User123!');
@@ -288,6 +397,53 @@ describe('PetPal API integration', () => {
       .expect(403);
 
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
+    const blockedAuditResponse = await request(app)
+      .post(`/api/petpal/admin/caregivers/${profileResponse.body.data.id}/audit`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({ status: 'APPROVED' })
+      .expect(400);
+
+    assert.equal(
+      blockedAuditResponse.body.message,
+      'Caregiver qualification materials are required before approval',
+    );
+
+    const qualificationUploadedAt = '2026-03-31T10:00:00.000Z';
+    const enrichedProfileResponse = await request(app)
+      .put('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({
+        intro: '有 5 年犬猫照护经验',
+        experienceYears: 5,
+        serviceRadiusKm: 8,
+        serviceCity: '杭州',
+        specialtyTags: ['幼宠', '猫咪', '上门照护'],
+        serviceCommitment: '2 小时内响应，异常情况 10 分钟内同步给主人',
+        qualificationMaterials: [
+          {
+            fileId: 'file-qualification-1',
+            url: 'https://static.example.test/petpal/caregiver-qualification-1.jpg',
+            name: '宠物急救培训证书.jpg',
+            mimeType: 'image/jpeg',
+            size: 204800,
+            uploadedAt: qualificationUploadedAt,
+          },
+        ],
+      })
+      .expect(200);
+
+    assert.deepEqual(enrichedProfileResponse.body.data.specialtyTags, ['幼宠', '猫咪', '上门照护']);
+    assert.equal(
+      enrichedProfileResponse.body.data.serviceCommitment,
+      '2 小时内响应，异常情况 10 分钟内同步给主人',
+    );
+    assert.equal(enrichedProfileResponse.body.data.qualificationMaterials.length, 1);
+    assert.equal(enrichedProfileResponse.body.data.qualificationMaterials[0].fileId, 'file-qualification-1');
+    assert.equal(
+      enrichedProfileResponse.body.data.qualificationMaterials[0].uploadedAt,
+      qualificationUploadedAt,
+    );
+
     const adminAuditResponse = await request(app)
       .post(`/api/petpal/admin/caregivers/${profileResponse.body.data.id}/audit`)
       .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
@@ -295,6 +451,8 @@ describe('PetPal API integration', () => {
       .expect(200);
 
     assert.equal(adminAuditResponse.body.data.auditStatus, 'APPROVED');
+    assert.deepEqual(adminAuditResponse.body.data.specialtyTags, ['幼宠', '猫咪', '上门照护']);
+    assert.equal(adminAuditResponse.body.data.qualificationMaterials.length, 1);
 
     const adminListResponse = await request(app)
       .get('/api/petpal/admin/caregivers')
@@ -304,11 +462,18 @@ describe('PetPal API integration', () => {
 
     assert.ok(Array.isArray(adminListResponse.body.data.items));
     assert.ok(typeof adminListResponse.body.data.pagination.total === 'number');
-    assert.ok(
-      adminListResponse.body.data.items.some(
-        (item: { id: string }) => item.id === profileResponse.body.data.id,
-      ),
+    const approvedCaregiver = adminListResponse.body.data.items.find(
+      (item: { id: string }) => item.id === profileResponse.body.data.id,
     );
+
+    assert.ok(approvedCaregiver);
+    assert.deepEqual(approvedCaregiver.specialtyTags, ['幼宠', '猫咪', '上门照护']);
+    assert.equal(
+      approvedCaregiver.serviceCommitment,
+      '2 小时内响应，异常情况 10 分钟内同步给主人',
+    );
+    assert.equal(approvedCaregiver.qualificationMaterialCount, 1);
+    assert.equal(approvedCaregiver.qualificationMaterials[0].fileId, 'file-qualification-1');
   });
 
   it('supports caregiver fulfillment actions and owner completion workflow', async () => {
@@ -632,6 +797,25 @@ describe('PetPal API integration', () => {
     const outsiderProfileResponse = await request(app)
       .get('/api/petpal/caregiver/profile')
       .set('Authorization', `Bearer ${outsiderSession.tokens.accessToken}`)
+      .expect(200);
+
+    await request(app)
+      .put('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${outsiderSession.tokens.accessToken}`)
+      .send({
+        intro: '后台管理员自测照料档案',
+        specialtyTags: ['夜间值守'],
+        qualificationMaterials: [
+          {
+            fileId: 'file-outsider-qualification-1',
+            url: 'https://static.example.test/petpal/outsider-qualification-1.jpg',
+            name: '管理员照护资质.jpg',
+            mimeType: 'image/jpeg',
+            size: 102400,
+            uploadedAt: '2026-03-31T12:00:00.000Z',
+          },
+        ],
+      })
       .expect(200);
 
     await request(app)

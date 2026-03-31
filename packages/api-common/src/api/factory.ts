@@ -77,6 +77,7 @@ import type {
   OwnerTransactionExportQuery,
   PetProfileRecord,
   ServiceRequestRecord,
+  UpdatePetPayload,
   UpsertCaregiverProfilePayload,
   UpsertCaregiverServicePayload,
 } from '../types/petpal';
@@ -416,6 +417,12 @@ export const createApiFactory = (options: ClientOptions) => {
           client.request<PetProfileRecord>({
             url: '/petpal/pets',
             method: 'POST',
+            data: payload,
+          }),
+        update: (id: string, payload: UpdatePetPayload) =>
+          client.request<PetProfileRecord>({
+            url: `/petpal/pets/${id}`,
+            method: 'PUT',
             data: payload,
           }),
       },

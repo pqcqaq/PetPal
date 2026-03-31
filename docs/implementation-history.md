@@ -1822,6 +1822,85 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 103. PetPal 健康档案与照料者资质材料闭环（P2-M1 Slice 75）
+
+**内容**：继续把 PetPal 从“基础工作台”推进到真实业务闭环。本轮补齐主人端宠物健康档案、照料者资质材料上传与后台审核可视化，并把“无材料不得审批通过”真正落到后端规则与集成测试里。
+
+变更摘要：
+
+- `apps/backend/prisma/models/petpal.prisma`
+  - `PetProfile` 新增：
+    - `allergyNote`
+    - `medicalNote`
+  - `CaregiverProfile` 新增：
+    - `specialtyTags`
+    - `serviceCommitment`
+    - `qualificationMaterials`
+- `apps/backend/prisma/seed-data.ts`
+  - 补充宠物健康档案样本数据。
+  - 补充照料者专长、服务承诺和资质材料样本。
+- `packages/api-common/src/types/petpal.ts`
+  - 扩展宠物档案、紧急联系人、照料者档案与资质材料共享类型。
+  - 新增 `UpdatePetPayload`。
+- `packages/api-common/src/api/factory.ts`
+  - 新增 `api.petpal.pets.update(id, payload)`。
+- `apps/backend/src/routes/petpal.ts`
+  - 扩展宠物档案与照料者档案参数校验。
+  - 新增 `PUT /api/petpal/pets/:id`。
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增宠物健康字段和紧急联系人规范化处理。
+  - 新增照料者专长、服务承诺、资质材料规范化处理。
+  - 新增 `updatePet(...)`。
+  - 管理端审批照料者时，如无资质材料则拒绝通过。
+  - 管理端审核列表返回资质材料数量与明细。
+- `apps/backend/src/routes/files.ts`
+  - 附件上传白名单新增 `petpal-caregiver-qualification`。
+  - 仅允许上传到当前登录照料者自己的 `caregiverProfile.id`。
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 主人端新增 / 编辑宠物健康档案：
+    - 过敏说明
+    - 医疗说明
+    - 紧急联系人
+  - 照料者档案新增：
+    - 专长标签
+    - 服务承诺
+    - 资质材料上传 / 删除
+  - 修复页面表单类型收敛问题，恢复 `web` 构建通过。
+- `apps/web-frontend/src/pages/petpal-admin/caregiver-audits/PetPalCaregiverAuditAdminView.vue`
+  - 管理端审核列表新增专长、服务承诺和资质材料数量展示。
+  - 新增资质材料预览弹窗。
+- `apps/app-frontend/src/api/petpal.ts`
+  - 新增 `updatePet`。
+- `apps/app-frontend/src/composables/useManagedAttachmentUpload.ts`
+  - 新增移动端受控附件上传封装，复用当前上传基础设施。
+- `apps/app-frontend/src/pages/petpal/index.vue`
+  - 主人端新增宠物健康档案编辑。
+  - 照料者端新增专长、服务承诺和资质材料上传。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增宠物健康档案创建 / 更新断言。
+  - 更新照料者审核测试为“先补材料，再允许审批”。
+  - 新增后台审核列表返回资质材料字段断言。
+- `apps/backend/test/integration/files.test.ts`
+  - 新增照料者资质材料上传授权测试。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/files.test.ts` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认宠物健康档案更新仍严格限定在当前主人范围内，不会越权编辑他人宠物资料。
+- 已确认照料者资质材料上传走受控白名单，只允许当前登录照料者操作自己的档案，不会因为复用附件上传链路而放宽权限。
+- 已确认“审批通过必须先有资质材料”已经落到后端服务层和集成测试，而不只是前端提示。
+- 已确认 Web 管理端审核页已经能直接看到专长、承诺和材料明细，审核动作不再依赖后台盲审。
+
+Git commit：待本切片提交。
+
 ## 87. App 端资料页去掉权限中心式表达（P1-M3 Slice 60）
 
 **内容**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。
