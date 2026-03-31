@@ -54,6 +54,37 @@
       </div>
     </section>
 
+    <section v-if="quickActions.length" class="petpal-admin-hub__quick-actions">
+      <header class="petpal-admin-hub__section-header">
+        <p>值班动作</p>
+        <h2>直接处理</h2>
+      </header>
+      <div class="petpal-admin-hub__quick-action-list">
+        <template v-for="action in quickActions" :key="action.title">
+          <button
+            v-if="action.kind === 'button'"
+            class="petpal-admin-quick-action"
+            :class="`is-${action.tone}`"
+            type="button"
+            :disabled="action.disabled"
+            @click="action.run"
+          >
+            <strong>{{ action.title }}</strong>
+            <p>{{ action.detail }}</p>
+          </button>
+          <RouterLink
+            v-else
+            :to="action.to"
+            class="petpal-admin-quick-action"
+            :class="`is-${action.tone}`"
+          >
+            <strong>{{ action.title }}</strong>
+            <p>{{ action.detail }}</p>
+          </RouterLink>
+        </template>
+      </div>
+    </section>
+
     <div class="petpal-admin-hub__grid">
       <RouterLink
         v-for="item in accessibleItems"
@@ -104,11 +135,13 @@ const complaintStats = ref<ComplaintAdminStats | null>(null);
 const pendingCaregiverCount = ref<number | null>(null);
 const callbackAuditStats = ref<CallbackAuditStats | null>(null);
 const callbackAlertStats = ref<CallbackAlertOutboxStats | null>(null);
+const deadRetrySubmitting = ref(false);
 
 const canReadComplaints = computed(() => auth.permissions.includes('petpal.complaint.read'));
 const canAuditCaregivers = computed(() => auth.permissions.includes('petpal.caregiver.audit'));
 const canReadCallbackAudits = computed(() => auth.permissions.includes('petpal.callback-audit.read'));
 const canReadCallbackAlerts = computed(() => auth.permissions.includes('petpal.callback-alert.read'));
+const canRetryCallbackAlerts = computed(() => auth.permissions.includes('petpal.callback-alert.retry'));
 
 const signalCards = computed(() => {
   const cards = [
@@ -263,6 +296,84 @@ const priorityItems = computed(() => {
   }
 
   return items.slice(0, 3);
+});
+
+const retryDeadAlerts = async () => {
+  try {
+    deadRetrySubmitting.value = true;
+    const result = await api.petpal.admin.retryDeadCallbackAlertOutbox(50);
+    ElMessage.success(`已重试 ${result.requeued} 条死信告警`);
+    await loadHubOverview();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '重试死信告警失败'));
+  } finally {
+    deadRetrySubmitting.value = false;
+  }
+};
+
+const quickActions = computed(() => {
+  const actions: Array<
+    | {
+        kind: 'link';
+        title: string;
+        detail: string;
+        to: RouteLocationRaw;
+        tone: HubTone;
+      }
+    | {
+        kind: 'button';
+        title: string;
+        detail: string;
+        run: () => Promise<void>;
+        disabled: boolean;
+        tone: HubTone;
+      }
+  > = [];
+
+  if (canReadComplaints.value && auth.user?.id) {
+    actions.push({
+      kind: 'link',
+      title: '查看我的工单',
+      detail: '直接进入当前账号负责的投诉工单，减少值班切换成本。',
+      to: {
+        path: '/petpal-admin/complaints',
+        query: {
+          assignedAdminId: auth.user.id,
+        },
+      },
+      tone: 'accent',
+    });
+  }
+
+  if (canAuditCaregivers.value) {
+    actions.push({
+      kind: 'link',
+      title: '处理待审照料者',
+      detail: '直接查看待审核照料者，优先清理接单供给积压。',
+      to: {
+        path: '/petpal-admin/caregiver-audits',
+        query: {
+          auditStatus: 'PENDING',
+        },
+      },
+      tone: 'warning',
+    });
+  }
+
+  if (canRetryCallbackAlerts.value && callbackAlertStats.value) {
+    actions.push({
+      kind: 'button',
+      title: deadRetrySubmitting.value ? '正在重试死信' : '重试死信告警',
+      detail: callbackAlertStats.value.byStatus.DEAD > 0
+        ? `当前有 ${callbackAlertStats.value.byStatus.DEAD} 条死信，可直接从首页触发重试。`
+        : '当前没有死信积压，也可以手动触发一次兜底重试。',
+      run: retryDeadAlerts,
+      disabled: deadRetrySubmitting.value,
+      tone: callbackAlertStats.value.byStatus.DEAD > 0 ? 'danger' : 'neutral',
+    });
+  }
+
+  return actions;
 });
 
 const formatRefreshTime = (date: Date) => date.toLocaleTimeString('zh-CN', { hour12: false });
@@ -537,6 +648,59 @@ watch(
 
 .petpal-admin-priority.is-danger {
   border-color: rgba(169, 67, 50, 0.2);
+}
+
+.petpal-admin-hub__quick-actions {
+  display: grid;
+  gap: 14px;
+}
+
+.petpal-admin-hub__quick-action-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.petpal-admin-quick-action {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 18px 20px;
+  text-align: left;
+  border-radius: 22px;
+  border: 1px solid rgba(32, 72, 67, 0.08);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.petpal-admin-quick-action strong,
+.petpal-admin-quick-action p {
+  margin: 0;
+}
+
+.petpal-admin-quick-action strong {
+  color: #183e39;
+}
+
+.petpal-admin-quick-action p {
+  color: #5b7269;
+  line-height: 1.7;
+}
+
+.petpal-admin-quick-action.is-accent {
+  border-color: rgba(26, 111, 94, 0.18);
+}
+
+.petpal-admin-quick-action.is-warning {
+  border-color: rgba(169, 124, 46, 0.2);
+}
+
+.petpal-admin-quick-action.is-danger {
+  border-color: rgba(169, 67, 50, 0.2);
+}
+
+.petpal-admin-quick-action:disabled {
+  cursor: wait;
+  opacity: 0.72;
 }
 
 .petpal-admin-hub__grid {
