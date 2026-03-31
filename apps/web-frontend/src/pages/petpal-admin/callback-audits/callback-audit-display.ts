@@ -1,5 +1,5 @@
 /**
- * PetPal Callback Audit display helpers and types
+ * PetPal callback audit display helpers and types.
  */
 
 export type CallbackAuditFilters = {
@@ -64,7 +64,9 @@ export const formatAuditTimestamp = (iso: string): string => {
 };
 
 export const formatAuditDuration = (ms: number): string => {
-  if (ms < 1000) return `${ms}ms`;
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
   return `${(ms / 1000).toFixed(2)}s`;
 };
 
@@ -95,7 +97,7 @@ export const getActiveAuditFilterTokens = (filters: CallbackAuditFilters) => {
   if (filters.requestId) {
     tokens.push({
       label: 'RequestId',
-      value: filters.requestId.substring(0, 12) + '...',
+      value: `${filters.requestId.substring(0, 12)}...`,
     });
   }
 
@@ -110,8 +112,8 @@ export const getActiveAuditFilterTokens = (filters: CallbackAuditFilters) => {
 };
 
 export const compareCallbackAuditRecency = (
-  a: any,
-  b: any,
+  a: { createdAt: string },
+  b: { createdAt: string },
 ): number => {
   const aTime = new Date(a.createdAt).getTime();
   const bTime = new Date(b.createdAt).getTime();

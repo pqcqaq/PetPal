@@ -9,12 +9,8 @@
 
     <div v-else class="detail-content">
       <el-collapse accordion>
-        <!-- Basic Info Section -->
         <el-collapse-item title="基本信息" name="basic">
-          <el-descriptions
-            :column="2"
-            border
-          >
+          <el-descriptions :column="2" border>
             <el-descriptions-item label="回调类型">
               {{ resolveCallbackTypeLabel(audit.callbackType) }}
             </el-descriptions-item>
@@ -38,7 +34,6 @@
           </el-descriptions>
         </el-collapse-item>
 
-        <!-- Payment Info Section -->
         <el-collapse-item v-if="audit.payment" title="支付关联信息" name="payment">
           <el-descriptions :column="2" border>
             <el-descriptions-item label="支付订单号">
@@ -56,7 +51,6 @@
           </el-descriptions>
         </el-collapse-item>
 
-        <!-- Refund Info Section -->
         <el-collapse-item v-if="audit.refund" title="退款关联信息" name="refund">
           <el-descriptions :column="2" border>
             <el-descriptions-item label="退款单号">
@@ -74,7 +68,6 @@
           </el-descriptions>
         </el-collapse-item>
 
-        <!-- Verification Result Section -->
         <el-collapse-item title="验证结果详情" name="verification">
           <div class="json-viewer">
             <el-tree
@@ -87,7 +80,6 @@
           </div>
         </el-collapse-item>
 
-        <!-- Raw Payload Section -->
         <el-collapse-item title="原始回调体" name="payload">
           <el-input
             v-model="formattedPayload"
@@ -96,15 +88,11 @@
             readonly
             resize="none"
           />
-          <el-button
-            style="margin-top: 8px"
-            @click="copyPayload"
-          >
+          <el-button style="margin-top: 8px" @click="copyPayload">
             复制原始体
           </el-button>
         </el-collapse-item>
 
-        <!-- Signature Section -->
         <el-collapse-item title="签名验证信息" name="signature">
           <el-descriptions :column="1" border>
             <el-descriptions-item label="签名摘要">
@@ -143,7 +131,9 @@ const visible = computed({
 });
 
 const formattedPayload = computed(() => {
-  if (!props.audit?.rawPayload) return '';
+  if (!props.audit?.rawPayload) {
+    return '';
+  }
   try {
     return JSON.stringify(JSON.parse(props.audit.rawPayload), null, 2);
   } catch {
@@ -152,9 +142,11 @@ const formattedPayload = computed(() => {
 });
 
 const jsonTreeData = computed(() => {
-  if (!props.audit?.verificationResult) return [];
+  if (!props.audit?.verificationResult) {
+    return [];
+  }
 
-  const buildTree = (obj: any, parentId = ''): any[] => {
+  const buildTree = (obj: unknown, parentId = ''): Array<{ id: string; label: string; children: unknown[] }> => {
     if (!obj || typeof obj !== 'object') {
       return [];
     }

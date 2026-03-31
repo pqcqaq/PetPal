@@ -1,7 +1,7 @@
 <template>
-  <CallbackAuditView />
+  <PetPalCallbackAuditAdminView />
 </template>
 
 <script setup lang="ts">
-import CallbackAuditView from '@/pages/console/petpal/CallbackAuditView.vue';
+import PetPalCallbackAuditAdminView from '@/pages/petpal-admin/callback-audits/PetPalCallbackAuditAdminView.vue';
 </script>

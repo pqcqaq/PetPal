@@ -4135,6 +4135,54 @@ gantt
 2. 继续将治理页内部实现逐步从 `console/petpal` 平移到 `petpal-admin` 命名空间。
 3. 继续补更细粒度的值班动作，例如“仅接手超时工单”“仅查看 ERROR 回调”“仅处理死信告警”。
 
+### 14.85 2026-04-01（P1-M3 Slice 68）
+
+**概述**：继续把 PetPal 后台治理页从旧模板目录剥离，本轮将回调审计页的真实实现迁入根级 `petpal-admin` 命名空间，并补上分页尺寸的路由状态同步，使根级后台不再只是包装层。
+
+已完成：
+
+- `apps/web-frontend/src/pages/petpal-admin/callback-audits/PetPalCallbackAuditAdminView.vue`
+  - 新增根级后台回调审计页面主实现。
+  - 支持筛选、导出、详情抽屉、侧边工作台和 URL 状态恢复。
+  - 新增 `pageSize` 路由同步，切换分页尺寸后自动回到第一页并更新查询参数。
+- `apps/web-frontend/src/pages/petpal-admin/callback-audits/callback-audit-display.ts`
+- `apps/web-frontend/src/pages/petpal-admin/callback-audits/components/CallbackAuditToolbar.vue`
+- `apps/web-frontend/src/pages/petpal-admin/callback-audits/components/CallbackAuditTable.vue`
+- `apps/web-frontend/src/pages/petpal-admin/callback-audits/components/CallbackAuditDetailDrawer.vue`
+- `apps/web-frontend/src/pages/petpal-admin/callback-audits/components/CallbackAuditWorkbenchSidebar.vue`
+  - 将回调审计页的展示辅助与 UI 组件整体迁入根级后台目录。
+- `apps/web-frontend/src/pages/petpal-admin/PetPalCallbackAuditRouteView.vue`
+  - 根级 `/petpal-admin/callback-audits` 路由包装层改为直接引用新的根级页面实现。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAuditView.vue`
+  - 旧页面改为兼容壳层，仅负责转发到新的根级后台实现。
+- 已移除旧副本：
+  - `apps/web-frontend/src/pages/console/petpal/callback-audit-display.ts`
+  - `apps/web-frontend/src/pages/console/petpal/components/CallbackAuditDetailDrawer.vue`
+  - `apps/web-frontend/src/pages/console/petpal/components/CallbackAuditTable.vue`
+  - `apps/web-frontend/src/pages/console/petpal/components/CallbackAuditToolbar.vue`
+  - `apps/web-frontend/src/pages/console/petpal/components/CallbackAuditWorkbenchSidebar.vue`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认根级 `/petpal-admin/callback-audits` 不再仅仅依赖旧 `console/petpal` 实现，治理页代码开始在根命名空间落地。
+- 已确认旧页面仍保留兼容入口，迁移期间不会因为内部残留跳转而直接失效。
+- 已确认分页尺寸与页码一并进入 URL 状态，便于后台运营刷新页面、复制链接或从首页直达后保持一致视图。
+
+风险与缓解：
+
+- 风险：投诉、照料者审核和告警队列页面仍有一部分真实实现保留在旧 `console/petpal` 目录，当前根级后台与旧目录仍处于并存迁移期。
+- 缓解：本轮已经建立“根级目录持有页面实现、旧页面仅做兼容壳”的迁移模式，后续页面可按同样路径逐步切换。
+
+下一步（1-3）：
+
+1. 继续把投诉、照料者审核、告警队列等治理页的真实实现迁入 `petpal-admin` 根级命名空间。
+2. 继续排查 Web 端残余的 `console`、模板式目录和术语暴露点。
+3. 继续围绕 PetPal 后台值班效率补齐更贴近运营的首页入口和筛选预设。
+
 ### 14.77 2026-04-01（P1-M3 Slice 60）
 
 **概述**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

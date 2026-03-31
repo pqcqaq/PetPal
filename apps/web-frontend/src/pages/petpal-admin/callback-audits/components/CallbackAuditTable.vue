@@ -52,12 +52,12 @@
     <div class="pagination-container">
       <el-pagination
         v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
+        :page-size="pageSize"
         :page-sizes="[10, 20, 50, 100]"
         :total="total"
         layout="total, sizes, prev, next, jumper"
         @current-change="onPageChange"
-        @size-change="onPageChange"
+        @size-change="onPageSizeChange"
       />
     </div>
   </div>
@@ -85,20 +85,13 @@ const props = defineProps<{
 const emits = defineEmits<{
   detail: [row: CallbackAuditRecord];
   pageChange: [page: number];
+  pageSizeChange: [pageSize: number];
   select: [row: CallbackAuditRecord];
 }>();
 
 const currentPage = computed({
   get: () => props.page,
   set: (value) => emits('pageChange', value),
-});
-
-const pageSize = computed({
-  get: () => props.pageSize,
-  set: (value) => {
-    // Reset to page 1 if page size changes
-    emits('pageChange', 1);
-  },
 });
 
 const getStatusTagType = (status: string): string => {
@@ -121,6 +114,10 @@ const onDetail = (row: CallbackAuditRecord) => {
 
 const onPageChange = () => {
   emits('pageChange', currentPage.value);
+};
+
+const onPageSizeChange = (value: number) => {
+  emits('pageSizeChange', value);
 };
 </script>
 

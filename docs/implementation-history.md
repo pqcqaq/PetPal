@@ -1536,6 +1536,44 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 95. PetPal 根级后台接管回调审计页面实现（P1-M3 Slice 68）
+
+**内容**：继续把 PetPal 后台从旧模板目录语义中抽离，本轮将回调审计页的真实实现迁入 `pages/petpal-admin/callback-audits`，让 `/petpal-admin/callback-audits` 不再只是根级路由壳，同时补齐分页尺寸的 URL 状态同步。
+
+变更摘要：
+
+- `apps/web-frontend/src/pages/petpal-admin/callback-audits/PetPalCallbackAuditAdminView.vue`
+  - 新增根级后台回调审计主页面，实现查询、导出、侧边工作台和详情抽屉。
+  - 路由状态新增 `pageSize` 同步能力，切换分页尺寸后会回到第 1 页并写入查询参数。
+- `apps/web-frontend/src/pages/petpal-admin/callback-audits/callback-audit-display.ts`
+- `apps/web-frontend/src/pages/petpal-admin/callback-audits/components/CallbackAuditToolbar.vue`
+- `apps/web-frontend/src/pages/petpal-admin/callback-audits/components/CallbackAuditTable.vue`
+- `apps/web-frontend/src/pages/petpal-admin/callback-audits/components/CallbackAuditDetailDrawer.vue`
+- `apps/web-frontend/src/pages/petpal-admin/callback-audits/components/CallbackAuditWorkbenchSidebar.vue`
+  - 将回调审计展示辅助、筛选工具栏、表格、详情抽屉和工作台侧栏一起迁入根级后台命名空间。
+- `apps/web-frontend/src/pages/petpal-admin/PetPalCallbackAuditRouteView.vue`
+  - 根级路由包装层改为直接引用新的 `petpal-admin` 页面实现。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAuditView.vue`
+  - 旧页面退化为兼容壳层，仅转发到新的根级后台页面实现。
+- 已删除旧副本：
+  - `apps/web-frontend/src/pages/console/petpal/callback-audit-display.ts`
+  - `apps/web-frontend/src/pages/console/petpal/components/CallbackAuditDetailDrawer.vue`
+  - `apps/web-frontend/src/pages/console/petpal/components/CallbackAuditTable.vue`
+  - `apps/web-frontend/src/pages/console/petpal/components/CallbackAuditToolbar.vue`
+  - `apps/web-frontend/src/pages/console/petpal/components/CallbackAuditWorkbenchSidebar.vue`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认 `/petpal-admin/callback-audits` 路由不再依赖旧 `console/petpal` 页面实现，根级后台已开始真正接管治理页代码。
+- 已确认旧 `console` 页面仍保留兼容壳层，避免内部残余入口在迁移阶段直接失效。
+- 已确认分页尺寸切换会重置到第 1 页并写回 URL，避免页码与分页尺寸不一致导致空表或重复操作。
+
+Git commit：待本切片提交。
+
 ## 87. App 端资料页去掉权限中心式表达（P1-M3 Slice 60）
 
 **内容**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。
