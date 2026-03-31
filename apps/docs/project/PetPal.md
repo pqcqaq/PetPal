@@ -1946,3 +1946,31 @@ gantt
 1. 对管理端回调审计接口补充更细粒度角色策略（在 `petpal.callback-audit.read` 之上细分读/导出）。
 2. 为统计与导出补充接口级自动化测试。
 3. 评估 CallbackAudit 表分区与归档策略。
+
+### 14.26 2026-04-01（P1 Slice 10）
+
+**概述**：补齐 outbox 运维可观测性，新增积压时长指标（最老待处理/最老死信）。
+
+已完成：
+
+- 服务层：
+  - `apps/backend/src/services/petpal-service.ts`
+    - `queryCallbackAlertOutboxStats` 增加 `oldestPendingAgeMinutes` 与 `oldestDeadAgeMinutes`。
+    - 指标按当前筛选条件计算，便于在管理台按状态快速定位积压风险。
+- 共享契约与前端：
+  - `packages/api-common/src/types/petpal.ts` 扩展 `CallbackAlertOutboxStats`。
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue` 新增两张时长统计卡。
+- 测试补强：
+  - `apps/backend/test/integration/petpal-api.test.ts` 增加新指标类型断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- 指标使用分钟级整数，降低展示噪声并便于阈值告警。
+- 保持统计查询幂等与只读，不引入额外写路径。

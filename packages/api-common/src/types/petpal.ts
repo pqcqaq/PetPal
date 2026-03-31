@@ -269,6 +269,8 @@ export interface CallbackAlertOutboxPage {
 export interface CallbackAlertOutboxStats {
   total: number;
   byStatus: Record<CallbackAlertOutboxStatus, number>;
+  oldestPendingAgeMinutes: number;
+  oldestDeadAgeMinutes: number;
 }
 
 export interface CallbackAlertReplayLogRecord {

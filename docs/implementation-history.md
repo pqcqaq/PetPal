@@ -714,3 +714,30 @@ Git commit：`feat(p1): enforce server-side active role validation and scoped pe
 
 Git commit：`feat(p1): add callback alert replay logs for outbox requeue traceability`。
 - 高增长场景下需要规划审计表分区与归档策略。
+
+## 36. PetPal outbox 积压时长指标（P1 Slice 10）
+
+**内容**：在回调告警 outbox 统计中新增积压时长可观测指标，用于快速识别处理延迟。
+
+变更摘要：
+
+- `apps/backend/src/services/petpal-service.ts`
+  - `queryCallbackAlertOutboxStats` 增加：
+    - `oldestPendingAgeMinutes`
+    - `oldestDeadAgeMinutes`
+  - 指标基于当前过滤条件，按最早创建时间计算分钟级时长。
+- `packages/api-common/src/types/petpal.ts`
+  - 扩展 `CallbackAlertOutboxStats` 共享类型。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 控制台统计卡新增“最老待处理(分钟)”与“最老死信(分钟)”。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 增加新统计字段的接口断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+Git commit：待本切片提交。

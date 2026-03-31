@@ -1060,13 +1060,37 @@ export const petpalService = {
 
   async queryCallbackAlertOutboxStats(filters: CallbackAlertOutboxQueryFilters) {
     const where = buildCallbackAlertOutboxWhere(filters);
-    const [total, statusRows] = await Promise.all([
+    const [total, statusRows, oldestPending, oldestDead] = await Promise.all([
       prisma.callbackAlertOutbox.count({ where }),
       prisma.callbackAlertOutbox.groupBy({
         by: ['status'],
         where,
         _count: {
           _all: true,
+        },
+      }),
+      prisma.callbackAlertOutbox.findFirst({
+        where: {
+          ...where,
+          status: 'PENDING',
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+        select: {
+          createdAt: true,
+        },
+      }),
+      prisma.callbackAlertOutbox.findFirst({
+        where: {
+          ...where,
+          status: 'DEAD',
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+        select: {
+          createdAt: true,
         },
       }),
     ]);
@@ -1083,9 +1107,19 @@ export const petpalService = {
       byStatus[row.status as CallbackAlertOutboxStatus] = row._count._all;
     });
 
+    const now = Date.now();
+    const oldestPendingAgeMinutes = oldestPending
+      ? Math.floor((now - oldestPending.createdAt.getTime()) / 60000)
+      : 0;
+    const oldestDeadAgeMinutes = oldestDead
+      ? Math.floor((now - oldestDead.createdAt.getTime()) / 60000)
+      : 0;
+
     return {
       total,
       byStatus,
+      oldestPendingAgeMinutes,
+      oldestDeadAgeMinutes,
     };
   },
 

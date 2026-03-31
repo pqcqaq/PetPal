@@ -165,6 +165,8 @@ const statsData = ref<CallbackAlertOutboxStats>({
     FAILED: 0,
     DEAD: 0,
   },
+  oldestPendingAgeMinutes: 0,
+  oldestDeadAgeMinutes: 0,
 });
 
 const { state: pageState } = usePageState<OutboxPageState>('page:petpal:callback-alert-outbox', {
@@ -185,8 +187,10 @@ const statusOptions: Array<{ label: string; value: CallbackAlertOutboxStatus }> 
 const stats = computed(() => [
   { label: '总量', value: statsData.value.total },
   { label: '待处理', value: statsData.value.byStatus.PENDING },
+  { label: '最老待处理(分钟)', value: statsData.value.oldestPendingAgeMinutes },
   { label: '失败', value: statsData.value.byStatus.FAILED },
   { label: '死信', value: statsData.value.byStatus.DEAD },
+  { label: '最老死信(分钟)', value: statsData.value.oldestDeadAgeMinutes },
   { label: '已发送', value: statsData.value.byStatus.SENT },
 ]);
 
