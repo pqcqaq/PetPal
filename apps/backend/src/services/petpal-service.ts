@@ -163,6 +163,7 @@ type ComplaintAdminFilters = {
   status?: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
   complaintType?: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
   targetRole?: 'CAREGIVER' | 'PLATFORM';
+  slaStatus?: 'NORMAL' | 'DUE_SOON' | 'OVERDUE';
   assignedAdminId?: string;
   unassignedOnly?: boolean;
   keyword?: string;
@@ -171,6 +172,9 @@ type ComplaintAdminFilters = {
 const OWNER_TRANSACTION_EXPORT_DEFAULT_DAYS = 365;
 const OWNER_TRANSACTION_EXPORT_MAX_DAYS = 366;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const COMPLAINT_SLA_LIMIT_HOURS = 24;
+const COMPLAINT_SLA_WARNING_HOURS = 6;
+const ACTIVE_COMPLAINT_STATUSES = ['OPEN', 'PROCESSING'] as const;
 
 const normalizeOwnerTransactionExportRange = (
   filters: OwnerTransactionExportFilters,
@@ -543,6 +547,7 @@ const toComplaintAdminRecord = (complaint: ComplaintAdminEntity) => ({
   ownerNickname: complaint.order.owner.nickname,
   caregiverId: complaint.order.caregiverId,
   caregiverNickname: complaint.order.caregiver.user.nickname,
+  ...getComplaintAdminSlaMeta(complaint),
 });
 
 const loadOrderComplaintsByOrderId = async (
@@ -559,8 +564,75 @@ const loadOrderComplaintsByOrderId = async (
   },
 });
 
+const getComplaintAdminSlaMeta = (complaint: Pick<ComplaintEntity, 'status' | 'createdAt'>) => {
+  if (!ACTIVE_COMPLAINT_STATUSES.includes(complaint.status as typeof ACTIVE_COMPLAINT_STATUSES[number])) {
+    return {
+      slaStatus: null,
+      slaDeadlineAt: null,
+    };
+  }
+
+  const deadline = new Date(complaint.createdAt.getTime() + (COMPLAINT_SLA_LIMIT_HOURS * 60 * 60 * 1000));
+  const remainingMs = deadline.getTime() - Date.now();
+  const warningMs = COMPLAINT_SLA_WARNING_HOURS * 60 * 60 * 1000;
+
+  return {
+    slaStatus: remainingMs < 0
+      ? 'OVERDUE'
+      : remainingMs <= warningMs
+        ? 'DUE_SOON'
+        : 'NORMAL',
+    slaDeadlineAt: deadline,
+  };
+};
+
+const buildComplaintAdminSlaWhere = (
+  slaStatus?: ComplaintAdminFilters['slaStatus'],
+): Prisma.ComplaintWhereInput | undefined => {
+  if (!slaStatus) {
+    return undefined;
+  }
+
+  const now = Date.now();
+  const overdueBoundary = new Date(now - (COMPLAINT_SLA_LIMIT_HOURS * 60 * 60 * 1000));
+  const warningBoundary = new Date(now - ((COMPLAINT_SLA_LIMIT_HOURS - COMPLAINT_SLA_WARNING_HOURS) * 60 * 60 * 1000));
+
+  if (slaStatus === 'OVERDUE') {
+    return {
+      status: {
+        in: [...ACTIVE_COMPLAINT_STATUSES],
+      },
+      createdAt: {
+        lt: overdueBoundary,
+      },
+    };
+  }
+
+  if (slaStatus === 'DUE_SOON') {
+    return {
+      status: {
+        in: [...ACTIVE_COMPLAINT_STATUSES],
+      },
+      createdAt: {
+        gte: overdueBoundary,
+        lte: warningBoundary,
+      },
+    };
+  }
+
+  return {
+    status: {
+      in: [...ACTIVE_COMPLAINT_STATUSES],
+    },
+    createdAt: {
+      gt: warningBoundary,
+    },
+  };
+};
+
 const buildComplaintAdminWhere = (filters: ComplaintAdminFilters): Prisma.ComplaintWhereInput => {
   const keyword = filters.keyword?.trim();
+  const slaWhere = buildComplaintAdminSlaWhere(filters.slaStatus);
 
   return {
     deleteAt: null,
@@ -568,6 +640,7 @@ const buildComplaintAdminWhere = (filters: ComplaintAdminFilters): Prisma.Compla
     complaintType: filters.complaintType,
     targetRole: filters.targetRole,
     assignedAdminId: filters.unassignedOnly ? null : filters.assignedAdminId,
+    AND: slaWhere ? [slaWhere] : undefined,
     OR: keyword
       ? [
         {

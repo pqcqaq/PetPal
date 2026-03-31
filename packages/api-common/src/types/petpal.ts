@@ -224,6 +224,8 @@ export interface ComplaintRecord {
   processLogs: ComplaintProcessLogRecord[];
 }
 
+export type ComplaintAdminSlaStatus = 'NORMAL' | 'DUE_SOON' | 'OVERDUE';
+
 export interface ComplaintAdminRecord extends ComplaintRecord {
   orderNo: string;
   orderStatus: OrderStatus;
@@ -231,6 +233,8 @@ export interface ComplaintAdminRecord extends ComplaintRecord {
   ownerNickname: string;
   caregiverId: string;
   caregiverNickname: string;
+  slaStatus: ComplaintAdminSlaStatus | null;
+  slaDeadlineAt: string | null;
 }
 
 export interface OrderRecord {
@@ -309,6 +313,7 @@ export interface ComplaintAdminQuery {
   status?: ComplaintStatus;
   complaintType?: ComplaintType;
   targetRole?: ComplaintTargetRole;
+  slaStatus?: ComplaintAdminSlaStatus;
   assignedAdminId?: string;
   unassignedOnly?: boolean;
   keyword?: string;

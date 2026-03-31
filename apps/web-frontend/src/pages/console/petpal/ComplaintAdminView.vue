@@ -25,6 +25,11 @@
           <el-option label="照料者" value="CAREGIVER" />
           <el-option label="平台" value="PLATFORM" />
         </el-select>
+        <el-select v-model="pageState.filters.slaStatus" clearable placeholder="SLA状态" style="width: 150px">
+          <el-option label="正常" value="NORMAL" />
+          <el-option label="即将超时" value="DUE_SOON" />
+          <el-option label="已超时" value="OVERDUE" />
+        </el-select>
         <el-select
           v-model="pageState.filters.assignedAdminId"
           clearable
@@ -108,6 +113,15 @@
       </el-table-column>
       <el-table-column prop="createdAt" label="发起时间" min-width="180">
         <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
+      </el-table-column>
+      <el-table-column label="SLA" min-width="170">
+        <template #default="scope">
+          <div class="complaint-sla" v-if="scope.row.slaStatus && scope.row.slaDeadlineAt">
+            <el-tag :type="getSlaTagType(scope.row.slaStatus)">{{ getSlaStatusLabel(scope.row.slaStatus) }}</el-tag>
+            <span>{{ getSlaDeadlineHint(scope.row.slaDeadlineAt, scope.row.slaStatus) }}</span>
+          </div>
+          <span v-else class="complaint-sla__closed">已结案</span>
+        </template>
       </el-table-column>
       <el-table-column label="摘要" min-width="260" show-overflow-tooltip>
         <template #default="scope">{{ scope.row.description }}</template>
@@ -221,6 +235,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import type {
   ComplaintAdminQuery,
   ComplaintAdminRecord,
+  ComplaintAdminSlaStatus,
   ComplaintStatus,
   ComplaintTargetRole,
   ComplaintType,
@@ -244,6 +259,7 @@ type Filters = {
   status?: ComplaintStatus;
   complaintType?: ComplaintType;
   targetRole?: ComplaintTargetRole;
+  slaStatus?: ComplaintAdminSlaStatus;
   assignedAdminId?: string;
   unassignedOnly: boolean;
   keyword?: string;
@@ -277,6 +293,7 @@ const { state: pageState } = usePageState<State>('page:petpal:complaint-admin', 
     status: undefined,
     complaintType: undefined,
     targetRole: undefined,
+    slaStatus: undefined,
     assignedAdminId: undefined,
     unassignedOnly: false,
     keyword: undefined,
@@ -298,12 +315,16 @@ const stats = computed(() => {
   const processingCount = rows.value.filter(item => item.status === 'PROCESSING').length;
   const closedCount = rows.value.filter(item => item.status === 'RESOLVED' || item.status === 'REJECTED').length;
   const unassignedCount = rows.value.filter(item => !item.assignedAdminId).length;
+  const dueSoonCount = rows.value.filter(item => item.slaStatus === 'DUE_SOON').length;
+  const overdueCount = rows.value.filter(item => item.slaStatus === 'OVERDUE').length;
 
   return [
     { label: '当前页工单', value: rows.value.length },
     { label: '待处理', value: openCount },
     { label: '处理中', value: processingCount },
     { label: '已结案', value: closedCount },
+    { label: '即将超时', value: dueSoonCount },
+    { label: '已超时', value: overdueCount },
     { label: '未指派', value: unassignedCount },
   ];
 });
@@ -359,6 +380,24 @@ const getActionLabel = (actionType: ComplaintAdminRecord['processLogs'][number][
   return labels[actionType] ?? actionType;
 };
 
+const getSlaStatusLabel = (status: ComplaintAdminSlaStatus) => {
+  const labels: Record<ComplaintAdminSlaStatus, string> = {
+    NORMAL: '正常',
+    DUE_SOON: '即将超时',
+    OVERDUE: '已超时',
+  };
+  return labels[status] ?? status;
+};
+
+const getSlaTagType = (status: ComplaintAdminSlaStatus): 'success' | 'warning' | 'danger' => {
+  const types: Record<ComplaintAdminSlaStatus, 'success' | 'warning' | 'danger'> = {
+    NORMAL: 'success',
+    DUE_SOON: 'warning',
+    OVERDUE: 'danger',
+  };
+  return types[status] ?? 'success';
+};
+
 const formatDateTime = (value?: string | null) => {
   if (!value) {
     return '-';
@@ -368,12 +407,30 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
+const getSlaDeadlineHint = (deadlineAt: string, status: ComplaintAdminSlaStatus) => {
+  const deadline = new Date(deadlineAt);
+  const diffMs = deadline.getTime() - Date.now();
+  const diffHours = Math.max(1, Math.ceil(Math.abs(diffMs) / (60 * 60 * 1000)));
+  const deadlineText = formatDateTime(deadlineAt);
+
+  if (status === 'OVERDUE') {
+    return `已超时 ${diffHours} 小时 · 截止 ${deadlineText}`;
+  }
+
+  if (status === 'DUE_SOON') {
+    return `剩余 ${diffHours} 小时 · 截止 ${deadlineText}`;
+  }
+
+  return `截止 ${deadlineText}`;
+};
+
 const buildQuery = (): ComplaintAdminQuery => ({
   page: pageState.page,
   pageSize,
   status: pageState.filters.status,
   complaintType: pageState.filters.complaintType,
   targetRole: pageState.filters.targetRole,
+  slaStatus: pageState.filters.slaStatus,
   assignedAdminId: pageState.filters.unassignedOnly ? undefined : pageState.filters.assignedAdminId || undefined,
   unassignedOnly: pageState.filters.unassignedOnly || undefined,
   keyword: pageState.filters.keyword?.trim() || undefined,
@@ -416,6 +473,7 @@ const resetFilters = async () => {
   pageState.filters.status = undefined;
   pageState.filters.complaintType = undefined;
   pageState.filters.targetRole = undefined;
+  pageState.filters.slaStatus = undefined;
   pageState.filters.assignedAdminId = undefined;
   pageState.filters.unassignedOnly = false;
   pageState.filters.keyword = undefined;
@@ -578,5 +636,17 @@ onMounted(async () => {
 .complaint-dialog__summary p {
   margin: 6px 0 0;
   color: #667085;
+}
+
+.complaint-sla {
+  display: grid;
+  gap: 6px;
+}
+
+.complaint-sla span,
+.complaint-sla__closed {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.6;
 }
 </style>

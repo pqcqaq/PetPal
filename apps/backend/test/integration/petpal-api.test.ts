@@ -1008,6 +1008,97 @@ describe('PetPal API integration', () => {
     assert.equal(closedUpdateResponse.body.message, 'Closed complaints cannot be updated');
   });
 
+  it('supports SLA filters for complaint admin list', async () => {
+    const {
+      app,
+      prisma,
+      ownerSession,
+      caregiverSession,
+      order,
+    } = await createFulfillmentScenario();
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+
+    await request(app)
+      .post(`/api/petpal/caregiver/orders/${order.id}/accept`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    await request(app)
+      .post(`/api/petpal/caregiver/orders/${order.id}/check-in`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .send({})
+      .expect(200);
+
+    const complaintResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/complaints`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .send({
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: '需要验证投诉工单的 SLA 预警筛选与截止时间回传。',
+      })
+      .expect(200);
+
+    const complaintId = complaintResponse.body.data.id as string;
+    const dueSoonCreatedAt = new Date(Date.now() - (21 * 60 * 60 * 1000));
+    await prisma.complaint.update({
+      where: { id: complaintId },
+      data: {
+        createdAt: dueSoonCreatedAt,
+      },
+    });
+
+    const dueSoonResponse = await request(app)
+      .get('/api/petpal/admin/complaints')
+      .query({
+        slaStatus: 'DUE_SOON',
+        keyword: order.orderNo,
+      })
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(dueSoonResponse.body.data.items.length, 1);
+    assert.equal(dueSoonResponse.body.data.items[0].slaStatus, 'DUE_SOON');
+    assert.ok(dueSoonResponse.body.data.items[0].slaDeadlineAt);
+    assert.ok(
+      Math.abs(
+        new Date(dueSoonResponse.body.data.items[0].slaDeadlineAt).getTime()
+          - (dueSoonCreatedAt.getTime() + (24 * 60 * 60 * 1000)),
+      ) < 1_000,
+    );
+
+    const overdueCreatedAt = new Date(Date.now() - (26 * 60 * 60 * 1000));
+    await prisma.complaint.update({
+      where: { id: complaintId },
+      data: {
+        createdAt: overdueCreatedAt,
+      },
+    });
+
+    const overdueResponse = await request(app)
+      .get('/api/petpal/admin/complaints')
+      .query({
+        slaStatus: 'OVERDUE',
+        keyword: order.orderNo,
+      })
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(overdueResponse.body.data.items.length, 1);
+    assert.equal(overdueResponse.body.data.items[0].slaStatus, 'OVERDUE');
+
+    const normalResponse = await request(app)
+      .get('/api/petpal/admin/complaints')
+      .query({
+        slaStatus: 'NORMAL',
+        keyword: order.orderNo,
+      })
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(normalResponse.body.data.items.length, 0);
+  });
+
   it('forbids non-admin users from accessing complaint admin endpoints', async () => {
     const {
       app,

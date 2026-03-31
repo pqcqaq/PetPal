@@ -1302,6 +1302,48 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 65. PetPal 投诉工单 SLA 预警与筛选（P1-M3 Slice 38）
+
+**内容**：继续推进 P1-M3 管理端纠纷处理效率，本轮为投诉工单补充 SLA 预警能力，在后台列表中支持“正常 / 即将超时 / 已超时”识别与筛选，减少分页列表下人工排查超时工单的成本。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 新增 `ComplaintAdminSlaStatus`。
+  - 为 `ComplaintAdminQuery` 增加 `slaStatus` 条件。
+  - 为 `ComplaintAdminRecord` 增加 `slaStatus`、`slaDeadlineAt`。
+- `apps/backend/src/routes/petpal.ts`
+  - 管理端投诉列表查询新增 `slaStatus` 参数校验与透传。
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增投诉工单 SLA 计算逻辑：
+    - 总时限 24 小时
+    - 预警窗口 6 小时
+  - 后台投诉列表支持按 `NORMAL / DUE_SOON / OVERDUE` 做真实后端筛选，而不是只在当前页做前端过滤。
+  - 投诉管理记录返回 `slaStatus` 与 `slaDeadlineAt`，供前端渲染预警标签和截止时间。
+- `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+  - 新增“SLA 状态”筛选项。
+  - 新增当前页“即将超时 / 已超时”统计卡片。
+  - 表格新增 SLA 列，展示状态标签与截止/超时提示。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增投诉工单 SLA 集成测试，覆盖：
+    - 即将超时筛选
+    - 已超时筛选
+    - 截止时间回传
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（19/19）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认 SLA 条件在后端查询层生效，避免前端只对当前页数据筛选导致分页结果失真。
+- 已确认已结案投诉不会被标记为活跃 SLA 预警，避免运营误把已关闭工单当作待处理积压。
+- 已确认 SLA 仅作为展示与筛选辅助，不修改投诉状态机、权限边界或处理动作校验。
+
+Git commit：待本切片提交。
+
 ## 64. PetPal Uni 端投诉进度同步（P1-M3 Slice 37）
 
 **内容**：继续推进 P1-M3 双端售后体验一致性，本轮将主人端“投诉记录与处理进度”同步到 Uni 端订单详情页，让移动端也能查看投诉状态、负责人、证据附件与处理日志。

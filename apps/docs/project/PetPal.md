@@ -3487,3 +3487,49 @@ gantt
 1. 评估是否补主人端退款明细列表或售后时间线，继续完善移动端售后透明度。
 2. 继续补管理员投诉工单 SLA、批量分配与超时提醒，提升纠纷处理效率。
 3. 视移动端实际使用情况，决定是否补投诉催办、补充证据或售后消息提醒。
+
+### 14.55 2026-04-01（P1-M3 Slice 38）
+
+**概述**：继续推进 P1-M3 管理端纠纷处理效率，本轮为投诉管理页补充 SLA 预警与筛选能力，让运营能直接定位“即将超时”和“已超时”的工单，而不需要靠翻页和手工计算处理时效。
+
+已完成：
+
+- 共享类型：
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增 `ComplaintAdminSlaStatus`。
+    - 为投诉管理查询增加 `slaStatus` 条件。
+    - 为投诉管理记录增加 `slaStatus`、`slaDeadlineAt` 返回字段。
+- 后端投诉管理：
+  - `apps/backend/src/routes/petpal.ts`
+    - 管理端投诉列表新增 `slaStatus` 参数校验与透传。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 引入投诉工单 SLA 计算规则：
+      - 24 小时处理时限
+      - 6 小时预警窗口
+    - 支持在后台列表中按 `NORMAL / DUE_SOON / OVERDUE` 进行后端真实筛选。
+    - 投诉管理记录会回传 SLA 状态与截止时间，供前端直接展示。
+- Web 管理端：
+  - `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+    - 新增“SLA 状态”筛选项。
+    - 新增当前页“即将超时 / 已超时”统计卡片。
+    - 表格新增 SLA 列，展示标签与“截止 / 剩余 / 已超时”提示。
+- 集成测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增投诉工单 SLA 预警测试，覆盖即将超时、已超时和截止时间回传。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（19/19）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+风险与缓解：
+
+- 风险：当前 SLA 阈值仍是代码内常量，尚未做成后台可配置项，也未接入主动消息提醒。
+- 缓解：本轮先优先解决“能识别、能筛选、能聚焦”的运营视图问题；后续如需更精细的值班策略，再补阈值配置、提醒任务和批量分派。
+
+下一步（1-3）：
+
+1. 继续补投诉工单批量分配与负责人快捷操作，减少高峰期人工逐单处理成本。
+2. 评估是否将 SLA 阈值改为后台配置项，并接入超时提醒或值班看板。
+3. 继续补主人端退款明细列表或售后时间线，完善售后透明度。
