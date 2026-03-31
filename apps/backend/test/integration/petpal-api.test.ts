@@ -150,6 +150,76 @@ describe('PetPal API integration', () => {
     assert.ok(amountPaid >= amountTotal + amountAdjusted - amountRefunded);
   });
 
+  it('supports caregiver onboarding profile, service setup and admin audit', async () => {
+    const { app } = context;
+    const memberSession = await loginAs(app, 'user', 'User123!');
+
+    const profileResponse = await request(app)
+      .get('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(typeof profileResponse.body.data.id === 'string');
+    assert.equal(profileResponse.body.data.userId, memberSession.user.id);
+
+    const updatedProfileResponse = await request(app)
+      .put('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({
+        intro: '有 5 年犬猫照护经验',
+        experienceYears: 5,
+        serviceRadiusKm: 8,
+        serviceCity: '杭州',
+      })
+      .expect(200);
+
+    assert.equal(updatedProfileResponse.body.data.experienceYears, 5);
+    assert.equal(updatedProfileResponse.body.data.serviceCity, '杭州');
+
+    const createServiceResponse = await request(app)
+      .post('/api/petpal/caregiver/services')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({
+        serviceType: 'WALKING',
+        petSpecies: 'DOG',
+        pricePerUnit: 49,
+        unitType: 'HOUR',
+        minNoticeHours: 4,
+        availableSlots: [{ day: 'SAT', windows: ['09:00-12:00'] }],
+        serviceCity: '杭州',
+        serviceLat: 30.25,
+        serviceLng: 120.18,
+        isActive: true,
+      })
+      .expect(200);
+
+    assert.equal(createServiceResponse.body.data.serviceType, 'WALKING');
+    assert.equal(createServiceResponse.body.data.petSpecies, 'DOG');
+
+    const listServicesResponse = await request(app)
+      .get('/api/petpal/caregiver/services')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(Array.isArray(listServicesResponse.body.data));
+    assert.ok(listServicesResponse.body.data.length >= 1);
+
+    await request(app)
+      .post(`/api/petpal/admin/caregivers/${profileResponse.body.data.id}/audit`)
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({ status: 'APPROVED' })
+      .expect(403);
+
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+    const adminAuditResponse = await request(app)
+      .post(`/api/petpal/admin/caregivers/${profileResponse.body.data.id}/audit`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({ status: 'APPROVED' })
+      .expect(200);
+
+    assert.equal(adminAuditResponse.body.data.auditStatus, 'APPROVED');
+  });
+
   it('handles payment and refund callbacks with idempotency', async () => {
     const { app, prisma } = context;
 
@@ -963,6 +1033,12 @@ describe('PetPal API integration', () => {
       .post('/api/petpal/admin/callback-alert-outbox/retry-dead')
       .set(authHeader)
       .send({ limit: 20 })
+      .expect(403);
+
+    await request(app)
+      .post('/api/petpal/admin/caregivers/unknown/audit')
+      .set(authHeader)
+      .send({ status: 'APPROVED' })
       .expect(403);
   });
 

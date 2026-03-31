@@ -16,6 +16,7 @@ export type PaymentBizType = 'DEPOSIT' | 'TAIL' | 'ADJUSTMENT';
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'CLOSED';
 export type RefundType = 'OWNER_CANCEL' | 'SERVICE_EXCEPTION' | 'DISPUTE';
 export type RefundStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
+export type CaregiverAuditStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 type AmountValue = number | string;
 
@@ -161,6 +162,61 @@ export interface MatchedCaregiverRecord {
 }
 
 export type MatchedCaregiverPage = PaginatedResult<MatchedCaregiverRecord>;
+
+export interface CaregiverProfileRecord {
+  id: string;
+  userId: string;
+  intro: string | null;
+  experienceYears: number;
+  serviceRadiusKm: number;
+  serviceCity: string | null;
+  ratingAvg: AmountValue;
+  ratingCount: number;
+  auditStatus: CaregiverAuditStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertCaregiverProfilePayload {
+  intro?: string;
+  experienceYears?: number;
+  serviceRadiusKm?: number;
+  serviceCity?: string;
+}
+
+export interface CaregiverServiceRecord {
+  id: string;
+  caregiverId: string;
+  serviceType: PetServiceType;
+  petSpecies: PetSpecies;
+  pricePerUnit: AmountValue;
+  unitType: string;
+  minNoticeHours: number;
+  availableSlots: unknown;
+  serviceCity: string | null;
+  serviceLat: AmountValue | null;
+  serviceLng: AmountValue | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertCaregiverServicePayload {
+  serviceType: PetServiceType;
+  petSpecies: PetSpecies;
+  pricePerUnit: number;
+  unitType: string;
+  minNoticeHours?: number;
+  availableSlots?: unknown;
+  serviceCity?: string;
+  serviceLat?: number;
+  serviceLng?: number;
+  isActive?: boolean;
+}
+
+export interface CaregiverAuditPayload {
+  status: CaregiverAuditStatus;
+}
 
 export type CallbackType = 'PAYMENT_CALLBACK' | 'REFUND_CALLBACK';
 export type CallbackStatus = 'PENDING' | 'SUCCESS' | 'FAILURE' | 'ERROR';

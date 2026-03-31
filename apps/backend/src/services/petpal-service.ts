@@ -196,6 +196,164 @@ const writeCallbackAlertReplayLog = async (input: {
 };
 
 export const petpalService = {
+  async getOrCreateCaregiverProfile(userId: string) {
+    const existing = await prisma.caregiverProfile.findUnique({
+      where: {
+        userId,
+      },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    return prisma.caregiverProfile.create({
+      data: withSnowflakeId({
+        userId,
+        auditStatus: 'PENDING',
+      }),
+    });
+  },
+
+  async upsertCaregiverProfile(userId: string, payload: {
+    intro?: string;
+    experienceYears?: number;
+    serviceRadiusKm?: number;
+    serviceCity?: string;
+  }) {
+    const current = await petpalService.getOrCreateCaregiverProfile(userId);
+
+    return prisma.caregiverProfile.update({
+      where: {
+        id: current.id,
+      },
+      data: {
+        intro: payload.intro?.trim() || null,
+        experienceYears: payload.experienceYears ?? current.experienceYears,
+        serviceRadiusKm: payload.serviceRadiusKm ?? current.serviceRadiusKm,
+        serviceCity: payload.serviceCity?.trim() || null,
+      },
+    });
+  },
+
+  async listCaregiverServices(userId: string) {
+    const profile = await petpalService.getOrCreateCaregiverProfile(userId);
+
+    return prisma.caregiverService.findMany({
+      where: {
+        caregiverId: profile.id,
+        deleteAt: null,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  },
+
+  async createCaregiverService(userId: string, payload: {
+    serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+    petSpecies: 'DOG' | 'CAT' | 'OTHER';
+    pricePerUnit: number;
+    unitType: string;
+    minNoticeHours?: number;
+    availableSlots?: unknown;
+    serviceCity?: string;
+    serviceLat?: number;
+    serviceLng?: number;
+    isActive?: boolean;
+  }) {
+    const profile = await petpalService.getOrCreateCaregiverProfile(userId);
+
+    return prisma.caregiverService.create({
+      data: withSnowflakeId({
+        caregiverId: profile.id,
+        serviceType: payload.serviceType,
+        petSpecies: payload.petSpecies,
+        pricePerUnit: payload.pricePerUnit,
+        unitType: payload.unitType.trim(),
+        minNoticeHours: payload.minNoticeHours ?? 2,
+        availableSlots: (payload.availableSlots ?? []) as Prisma.InputJsonValue,
+        serviceCity: payload.serviceCity?.trim() || null,
+        serviceLat: payload.serviceLat,
+        serviceLng: payload.serviceLng,
+        isActive: payload.isActive ?? true,
+      }),
+    });
+  },
+
+  async updateCaregiverService(userId: string, serviceId: string, payload: {
+    serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+    petSpecies: 'DOG' | 'CAT' | 'OTHER';
+    pricePerUnit: number;
+    unitType: string;
+    minNoticeHours?: number;
+    availableSlots?: unknown;
+    serviceCity?: string;
+    serviceLat?: number;
+    serviceLng?: number;
+    isActive?: boolean;
+  }) {
+    const profile = await petpalService.getOrCreateCaregiverProfile(userId);
+
+    const existing = await prisma.caregiverService.findFirst({
+      where: {
+        id: serviceId,
+        caregiverId: profile.id,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!existing) {
+      throw notFound('Caregiver service not found');
+    }
+
+    return prisma.caregiverService.update({
+      where: {
+        id: serviceId,
+      },
+      data: {
+        serviceType: payload.serviceType,
+        petSpecies: payload.petSpecies,
+        pricePerUnit: payload.pricePerUnit,
+        unitType: payload.unitType.trim(),
+        minNoticeHours: payload.minNoticeHours ?? 2,
+        availableSlots: (payload.availableSlots ?? []) as Prisma.InputJsonValue,
+        serviceCity: payload.serviceCity?.trim() || null,
+        serviceLat: payload.serviceLat,
+        serviceLng: payload.serviceLng,
+        isActive: payload.isActive ?? true,
+      },
+    });
+  },
+
+  async auditCaregiverProfile(caregiverId: string, status: 'PENDING' | 'APPROVED' | 'REJECTED') {
+    const existing = await prisma.caregiverProfile.findFirst({
+      where: {
+        id: caregiverId,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!existing) {
+      throw notFound('Caregiver profile not found');
+    }
+
+    return prisma.caregiverProfile.update({
+      where: {
+        id: caregiverId,
+      },
+      data: {
+        auditStatus: status,
+      },
+    });
+  },
+
   async listPets(ownerId: string) {
     return prisma.petProfile.findMany({
       where: {

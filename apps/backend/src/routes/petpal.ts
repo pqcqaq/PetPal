@@ -37,6 +37,30 @@ const matchQuerySchema = z.object({
   lng: z.coerce.number().min(-180).max(180).optional(),
 });
 
+const caregiverProfileSchema = z.object({
+  intro: z.string().trim().max(1000).optional(),
+  experienceYears: z.coerce.number().int().min(0).max(60).optional(),
+  serviceRadiusKm: z.coerce.number().int().min(1).max(100).optional(),
+  serviceCity: z.string().trim().max(50).optional(),
+});
+
+const caregiverServiceSchema = z.object({
+  serviceType: z.enum(['BOARDING', 'WALKING', 'FEEDING', 'DOOR_VISIT']),
+  petSpecies: z.enum(['DOG', 'CAT', 'OTHER']),
+  pricePerUnit: z.coerce.number().positive().max(10000),
+  unitType: z.string().trim().min(1).max(30),
+  minNoticeHours: z.coerce.number().int().min(0).max(168).optional(),
+  availableSlots: z.unknown().optional(),
+  serviceCity: z.string().trim().max(50).optional(),
+  serviceLat: z.coerce.number().min(-90).max(90).optional(),
+  serviceLng: z.coerce.number().min(-180).max(180).optional(),
+  isActive: z.boolean().optional(),
+});
+
+const caregiverAuditSchema = z.object({
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED']),
+});
+
 const paymentCallbackSchema = z.object({
   payNo: z.string().trim().min(1),
   channelTxnId: z.string().trim().min(1),
@@ -190,6 +214,45 @@ petpalRouter.get('/match/caregivers', asyncHandler(async (req, res) => {
     pageSize,
   });
   return ok(res, result, 'Matched caregivers');
+}));
+
+petpalRouter.get('/caregiver/profile', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const profile = await petpalService.getOrCreateCaregiverProfile(auth.id);
+  return ok(res, profile, 'Caregiver profile');
+}));
+
+petpalRouter.put('/caregiver/profile', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = caregiverProfileSchema.parse(req.body ?? {});
+  const profile = await petpalService.upsertCaregiverProfile(auth.id, payload);
+  return ok(res, profile, 'Caregiver profile updated');
+}));
+
+petpalRouter.get('/caregiver/services', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const services = await petpalService.listCaregiverServices(auth.id);
+  return ok(res, services, 'Caregiver services');
+}));
+
+petpalRouter.post('/caregiver/services', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = caregiverServiceSchema.parse(req.body ?? {});
+  const service = await petpalService.createCaregiverService(auth.id, payload);
+  return ok(res, service, 'Caregiver service created');
+}));
+
+petpalRouter.put('/caregiver/services/:id', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = caregiverServiceSchema.parse(req.body ?? {});
+  const service = await petpalService.updateCaregiverService(auth.id, String(req.params.id), payload);
+  return ok(res, service, 'Caregiver service updated');
+}));
+
+petpalRouter.post('/admin/caregivers/:id/audit', requirePermission('petpal.caregiver.audit'), asyncHandler(async (req, res) => {
+  const payload = caregiverAuditSchema.parse(req.body ?? {});
+  const profile = await petpalService.auditCaregiverProfile(String(req.params.id), payload.status);
+  return ok(res, profile, 'Caregiver audited');
 }));
 
 // Admin endpoints (require authentication)

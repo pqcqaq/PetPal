@@ -771,6 +771,55 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 48. PetPal 开发计划重排（审计后）
+
+**内容**：基于当前实现审计结果，开发重心从“回调治理增强”切换为“三端核心功能补齐”，并明确 2026-04-01 至 2026-05-06 的里程碑排期。
+
+计划摘要：
+
+- 2026-04-01 至 2026-04-05：P1-M1 照料者入驻与资质。
+- 2026-04-06 至 2026-04-10：P1-M2 接单履约链路。
+- 2026-04-11 至 2026-04-15：P1-M3 用户反馈与售后。
+- 2026-04-16 至 2026-04-20：P1-M4 管理治理闭环。
+- 2026-04-21 至 2026-05-06：P2 联调测试与论文素材沉淀。
+
+完成标准统一要求：
+
+- 每个切片同步更新进度文档（完成项/进行中/风险/下一步）。
+- 每个切片通过门禁（api-common build、backend lint、web-frontend lint、PetPal 定向集成测试）。
+- 每个切片独立 commit 并可追踪到文档记录。
+
+## 49. PetPal 照料者入驻与服务设置（P1-M1 Slice 22）
+
+**内容**：实现照料者档案维护、服务项配置与管理员审核接口，补齐服务端第一段核心能力。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 新增照料者档案/服务设置/审核相关类型。
+- `packages/api-common/src/api/factory.ts`
+  - 新增 caregiver 端 profile/services 方法与 admin 审核方法。
+- `apps/backend/src/constants/system-permissions.ts`
+  - 新增权限 `petpal.caregiver.audit`。
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增照料者档案懒创建、更新、服务创建/更新/查询、管理员审核逻辑。
+- `apps/backend/src/routes/petpal.ts`
+  - 新增 6 个接口：
+    - `GET/PUT /api/petpal/caregiver/profile`
+    - `GET/POST/PUT /api/petpal/caregiver/services` 及 `:id`
+    - `POST /api/petpal/admin/caregivers/:id/audit`
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增照料者入驻与管理员审核集成用例；member 审核权限拒绝断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（11/11）。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。

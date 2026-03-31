@@ -2362,3 +2362,111 @@ gantt
 
 - 静默风险只在存在最近重放记录时生效，避免空样本误报。
 - 阈值纳入 stats 回传，确保前端展示与后端判定口径一致。
+
+### 14.38 2026-04-01（审计后开发计划重排）
+
+**背景**：根据当前实现审计结果，回调治理能力已形成较高完成度，但“服务端业务闭环、用户反馈闭环、管理治理闭环”仍是主要缺口。
+
+**计划目标**：在不回退既有回调治理成果的前提下，将开发重心切换到三端核心功能补齐，确保与开题设计要求一致。
+
+已完成基线（保留）：
+
+- P0-P1（已完成）：PetPal 主人端最小闭环、回调鉴权与审计、outbox/replay 治理能力。
+
+重排后的后续计划：
+
+1. 2026-04-01 至 2026-04-05（P1-M1：照料者入驻与资质）
+   - 范围：照料者注册、实名认证状态、资质上传与审核状态流。
+   - 完成标准：
+     - 后端具备 caregiver 入驻与资质 API（创建、查询、审核）。
+     - Web/Uni 至少一端具备入驻表单与状态查看。
+     - 集成测试覆盖申请成功、审核通过/拒绝、权限边界。
+
+2. 2026-04-06 至 2026-04-10（P1-M2：接单履约链路）
+   - 范围：接单、签到、服务过程记录（图文/时间戳），订单状态推进。
+   - 完成标准：
+     - 后端具备接单与履约记录 API。
+     - 订单状态机覆盖待接单/服务中/待确认/完成关键路径。
+     - 集成测试覆盖主路径与异常路径（超时/重复提交）。
+
+3. 2026-04-11 至 2026-04-15（P1-M3：用户反馈与售后）
+   - 范围：评价、投诉、售后工单与处理进度查询，业主侧交易记录导出。
+   - 完成标准：
+     - 数据模型新增 review/complaint 及处理日志。
+     - 用户端可提交与查询，管理端可处理与流转。
+     - 导出能力具备权限拆分与审计留痕。
+
+4. 2026-04-16 至 2026-04-20（P1-M4：管理治理闭环）
+   - 范围：资质审核台、纠纷处理台、违规处理与服务标准发布。
+   - 完成标准：
+     - 管理端形成“审核-处置-追踪”闭环页面。
+     - 指标看板补齐供需比、完单率、退款率、投诉率。
+     - 关键操作具备 RBAC 权限边界与导出边界。
+
+5. 2026-04-21 至 2026-05-06（P2：联调测试与论文素材沉淀）
+   - 范围：全链路联调、回归测试、性能压测样例、论文图表与验收材料。
+   - 完成标准：
+     - 核心用例清单通过率达到发布门槛。
+     - 文档覆盖 API、流程图、风险与回滚策略。
+     - 形成可直接用于论文的功能对照与测试证据。
+
+执行约束：
+
+- 每个切片必须同步更新进度文档（完成项/进行中/风险/下一步）。
+- 每个切片必须完成门禁：`api-common build`、`backend lint`、`web-frontend lint`、PetPal 定向集成测试。
+- 每个切片完成后独立 commit，提交信息包含 milestone 与 slice 范围。
+
+### 14.39 2026-04-01（P1-M1 Slice 22）
+
+**概述**：照料者入驻与服务设置后端能力首批落地，打通“档案维护-服务配置-管理员审核”最小链路。
+
+已完成：
+
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增照料者域类型：
+      - `CaregiverProfileRecord`
+      - `CaregiverServiceRecord`
+      - `UpsertCaregiverProfilePayload`
+      - `UpsertCaregiverServicePayload`
+      - `CaregiverAuditPayload`
+  - `packages/api-common/src/api/factory.ts`
+    - 新增照料者接口调用：
+      - `petpal.caregiver.profile/upsertProfile/services/createService/updateService`
+      - `petpal.admin.auditCaregiver`
+- 权限：
+  - `apps/backend/src/constants/system-permissions.ts`
+    - 新增 `petpal.caregiver.audit`。
+- 服务层：
+  - `apps/backend/src/services/petpal-service.ts`
+    - 新增照料者能力：
+      - `getOrCreateCaregiverProfile`
+      - `upsertCaregiverProfile`
+      - `listCaregiverServices`
+      - `createCaregiverService`
+      - `updateCaregiverService`
+      - `auditCaregiverProfile`
+- 路由层：
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增接口：
+      - `GET /api/petpal/caregiver/profile`
+      - `PUT /api/petpal/caregiver/profile`
+      - `GET /api/petpal/caregiver/services`
+      - `POST /api/petpal/caregiver/services`
+      - `PUT /api/petpal/caregiver/services/:id`
+      - `POST /api/petpal/admin/caregivers/:id/audit`（权限：`petpal.caregiver.audit`）
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增用例覆盖：照料者档案创建/更新、服务创建/查询、member 审核拒绝、admin 审核通过。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（11/11）。
+
+关键设计决策：
+
+- 入驻档案采用“按用户懒创建”模式，降低首次接入门槛。
+- 审核能力独立权限控制，避免普通成员提升审核面权限。

@@ -36,6 +36,9 @@ import type {
   UploadPrepareResult,
 } from '../types/files';
 import type {
+  CaregiverAuditPayload,
+  CaregiverProfileRecord,
+  CaregiverServiceRecord,
   CallbackAlertReplayLogPage,
   CallbackAlertReplayLogQuery,
   CallbackAlertReplayLogStats,
@@ -53,6 +56,8 @@ import type {
   OrderRecord,
   PetProfileRecord,
   ServiceRequestRecord,
+  UpsertCaregiverProfilePayload,
+  UpsertCaregiverServicePayload,
 } from '../types/petpal';
 import type {
   AuthClientFormPayload,
@@ -413,7 +418,35 @@ export const createApiFactory = (options: ClientOptions) => {
             params: query as unknown as QueryParams,
           }),
       },
+      caregiver: {
+        profile: () => client.request<CaregiverProfileRecord>({ url: '/petpal/caregiver/profile' }),
+        upsertProfile: (payload: UpsertCaregiverProfilePayload) =>
+          client.request<CaregiverProfileRecord>({
+            url: '/petpal/caregiver/profile',
+            method: 'PUT',
+            data: payload,
+          }),
+        services: () => client.request<CaregiverServiceRecord[]>({ url: '/petpal/caregiver/services' }),
+        createService: (payload: UpsertCaregiverServicePayload) =>
+          client.request<CaregiverServiceRecord>({
+            url: '/petpal/caregiver/services',
+            method: 'POST',
+            data: payload,
+          }),
+        updateService: (id: string, payload: UpsertCaregiverServicePayload) =>
+          client.request<CaregiverServiceRecord>({
+            url: `/petpal/caregiver/services/${id}`,
+            method: 'PUT',
+            data: payload,
+          }),
+      },
       admin: {
+        auditCaregiver: (caregiverId: string, payload: CaregiverAuditPayload) =>
+          client.request<CaregiverProfileRecord>({
+            url: `/petpal/admin/caregivers/${caregiverId}/audit`,
+            method: 'POST',
+            data: payload,
+          }),
         callbackAudits: (query?: CallbackAuditQuery) =>
           client.request<CallbackAuditPage>({
             url: '/petpal/admin/callback-audits',
