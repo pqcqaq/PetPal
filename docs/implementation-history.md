@@ -1302,6 +1302,39 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 83. PetPal 主人端退款导出模板接入账户级同步（P1-M3 Slice 56）
+
+**内容**：继续推进 P1-M3 主人端售后透明度，本轮把退款导出“最近一次筛选 + 常用模板”从页面私有 `localStorage` 升级到 workbench 账户偏好，支持跟随登录账号同步，不再局限于单浏览器局部存储。
+
+变更摘要：
+
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 新增 `page:petpal:owner-refund-export-filters` workbench page state 键，作为主人端退款导出模板的主存储位置。
+  - 退款导出模板与最近一次筛选不再直接写入页面私有 `localStorage`，而是通过 `useWorkbenchStore().setPageState()` 进入 workbench 偏好同步链路。
+  - 读取逻辑改为：
+    - 优先读取 workbench `pageStateMap`
+    - 若不存在，再兼容读取旧版本地 `v2 / v1` 存储
+    - 一旦命中旧版本地存储，立即迁移到 workbench page state，并清理旧 key，避免双写和陈旧数据残留
+  - 现有模板能力保持不变：
+    - 恢复上次筛选
+    - 清空筛选
+    - 保存模板
+    - 应用模板
+    - 删除模板
+  - 页面现有交互、模板数量限制和同名覆盖策略保持不变，本轮只替换底层存储与迁移逻辑。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认退款导出模板的新主存储与现有 workbench 用户偏好链路一致，可复用既有本地持久化与远端偏好同步，不新增接口和数据库结构。
+- 已确认旧版 `v2 / v1` 本地存储只在首次读取时做一次性迁移，迁移后会清理旧 key，避免 workbench page state 与 `localStorage` 双源竞争。
+- 已确认模板仍按 `ownerUserId` 隔离，切换账号时不会串用其他主人的退款导出模板与最近一次筛选快照。
+
+Git commit：待本切片提交。
+
 ## 82. PetPal 主人端退款导出常用模板（P1-M3 Slice 55）
 
 **内容**：继续推进 P1-M3 主人端售后透明度，本轮在“最近一次筛选复用”基础上继续补齐“常用导出模板”，让主人可以把高频退款导出条件保存为命名模板并重复套用。

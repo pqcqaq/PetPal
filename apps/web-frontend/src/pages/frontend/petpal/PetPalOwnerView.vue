@@ -669,6 +669,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '@/api/client';
 import ListExportButton from '@/components/download/ListExportButton.vue';
 import { useAuthStore } from '@/stores/auth';
+import { useWorkbenchStore } from '@/stores/workbench';
 import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
 
@@ -684,6 +685,7 @@ const caregiverProfile = ref<CaregiverProfileRecord | null>(null);
 const caregiverServices = ref<CaregiverServiceRecord[]>([]);
 const caregiverOrders = ref<CaregiverOrderRecord[]>([]);
 const auth = useAuthStore();
+const workbench = useWorkbenchStore();
 
 const petsLoading = ref(false);
 const requestsLoading = ref(false);
@@ -842,6 +844,7 @@ const refundExportServiceTypeOptions: Array<{ label: string; value: PetServiceTy
   { label: '上门陪伴', value: 'DOOR_VISIT' },
 ];
 
+const OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY = 'page:petpal:owner-refund-export-filters';
 const OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY = 'petpal-owner-refund-export-filters-v2';
 const OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY = 'petpal-owner-refund-export-filters-v1';
 const OWNER_REFUND_EXPORT_TEMPLATE_LIMIT = 5;
@@ -917,6 +920,37 @@ const createEmptyOwnerRefundExportFilterStorage = (): OwnerRefundExportFilterSto
   version: 2,
   users: {},
 });
+
+const normalizeOwnerRefundExportFilterStorage = (value: unknown): OwnerRefundExportFilterStorage => {
+  if (!value || typeof value !== 'object' || !('users' in value) || typeof value.users !== 'object' || !value.users) {
+    return createEmptyOwnerRefundExportFilterStorage();
+  }
+
+  const parsedUsers = value.users as Record<string, Partial<OwnerRefundExportFilterStorageEntry>>;
+  const users = Object.fromEntries(
+    Object.entries(parsedUsers).map(([ownerUserId, entry]) => {
+      const lastUsed = normalizeOwnerRefundExportFilterSnapshot(entry.lastUsed ?? {});
+      const templates = Array.isArray(entry.templates)
+        ? entry.templates
+          .map(item => normalizeOwnerRefundExportFilterTemplate(item as Partial<OwnerRefundExportFilterTemplate>))
+          .filter((item): item is OwnerRefundExportFilterTemplate => Boolean(item))
+        : [];
+
+      return [
+        ownerUserId,
+        {
+          lastUsed,
+          templates,
+        } satisfies OwnerRefundExportFilterStorageEntry,
+      ];
+    }),
+  );
+
+  return {
+    version: 2,
+    users,
+  };
+};
 
 const buildOwnerRefundExportFilterSnapshot = (): OwnerRefundExportFilterSnapshot | null => {
   const ownerUserId = auth.user?.id;
@@ -1014,46 +1048,32 @@ const normalizeOwnerRefundExportFilterTemplate = (
   };
 };
 
+const clearLegacyOwnerRefundExportFilterStorage = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.removeItem(OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY);
+  window.localStorage.removeItem(OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY);
+};
+
 const readStoredOwnerRefundExportFilterStorage = (): OwnerRefundExportFilterStorage => {
+  const storedPageState = workbench.getPageState<OwnerRefundExportFilterStorage>(OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY);
+  if (storedPageState) {
+    return normalizeOwnerRefundExportFilterStorage(storedPageState);
+  }
+
   if (typeof window === 'undefined') {
     return createEmptyOwnerRefundExportFilterStorage();
   }
 
-  const normalizeStorage = (value: unknown): OwnerRefundExportFilterStorage => {
-    if (!value || typeof value !== 'object' || !('users' in value) || typeof value.users !== 'object' || !value.users) {
-      return createEmptyOwnerRefundExportFilterStorage();
-    }
-
-    const parsedUsers = value.users as Record<string, Partial<OwnerRefundExportFilterStorageEntry>>;
-    const users = Object.fromEntries(
-      Object.entries(parsedUsers).map(([ownerUserId, entry]) => {
-        const lastUsed = normalizeOwnerRefundExportFilterSnapshot(entry.lastUsed ?? {});
-        const templates = Array.isArray(entry.templates)
-          ? entry.templates
-            .map(item => normalizeOwnerRefundExportFilterTemplate(item as Partial<OwnerRefundExportFilterTemplate>))
-            .filter((item): item is OwnerRefundExportFilterTemplate => Boolean(item))
-          : [];
-
-        return [
-          ownerUserId,
-          {
-            lastUsed,
-            templates,
-          } satisfies OwnerRefundExportFilterStorageEntry,
-        ];
-      }),
-    );
-
-    return {
-      version: 2,
-      users,
-    };
-  };
-
   try {
     const raw = window.localStorage.getItem(OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY);
     if (raw) {
-      return normalizeStorage(JSON.parse(raw));
+      const storage = normalizeOwnerRefundExportFilterStorage(JSON.parse(raw));
+      workbench.setPageState(OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY, storage);
+      clearLegacyOwnerRefundExportFilterStorage();
+      return storage;
     }
 
     const legacyRaw = window.localStorage.getItem(OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY);
@@ -1068,7 +1088,7 @@ const readStoredOwnerRefundExportFilterStorage = (): OwnerRefundExportFilterStor
       return createEmptyOwnerRefundExportFilterStorage();
     }
 
-    return {
+    const storage: OwnerRefundExportFilterStorage = {
       version: 2,
       users: {
         [legacySnapshot.ownerUserId]: {
@@ -1077,18 +1097,17 @@ const readStoredOwnerRefundExportFilterStorage = (): OwnerRefundExportFilterStor
         },
       },
     };
+    workbench.setPageState(OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY, storage);
+    clearLegacyOwnerRefundExportFilterStorage();
+    return storage;
   } catch {
     return createEmptyOwnerRefundExportFilterStorage();
   }
 };
 
 const writeStoredOwnerRefundExportFilterStorage = (storage: OwnerRefundExportFilterStorage) => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.localStorage.setItem(OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY, JSON.stringify(storage));
-  window.localStorage.removeItem(OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY);
+  workbench.setPageState(OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY, storage);
+  clearLegacyOwnerRefundExportFilterStorage();
 };
 
 const applyOwnerRefundExportFilterSnapshot = (snapshot: OwnerRefundExportFilterSnapshot) => {
