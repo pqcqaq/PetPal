@@ -218,6 +218,39 @@ export interface CaregiverAuditPayload {
   status: CaregiverAuditStatus;
 }
 
+export interface CaregiverAuditQuery {
+  [key: string]: string | number | boolean | undefined;
+  page?: number;
+  pageSize?: number;
+  auditStatus?: CaregiverAuditStatus;
+  city?: string;
+  keyword?: string;
+}
+
+export interface CaregiverAuditListItem {
+  id: string;
+  userId: string;
+  nickname: string;
+  intro: string | null;
+  experienceYears: number;
+  serviceRadiusKm: number;
+  serviceCity: string | null;
+  auditStatus: CaregiverAuditStatus;
+  serviceCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CaregiverAuditPage {
+  items: CaregiverAuditListItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 export type CallbackType = 'PAYMENT_CALLBACK' | 'REFUND_CALLBACK';
 export type CallbackStatus = 'PENDING' | 'SUCCESS' | 'FAILURE' | 'ERROR';
 export type CallbackSourceMode = 'TOKEN' | 'WECHATPAY_HMAC' | 'WECHATPAY_SDK';

@@ -218,6 +218,20 @@ describe('PetPal API integration', () => {
       .expect(200);
 
     assert.equal(adminAuditResponse.body.data.auditStatus, 'APPROVED');
+
+    const adminListResponse = await request(app)
+      .get('/api/petpal/admin/caregivers')
+      .query({ auditStatus: 'APPROVED' })
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(Array.isArray(adminListResponse.body.data.items));
+    assert.ok(typeof adminListResponse.body.data.pagination.total === 'number');
+    assert.ok(
+      adminListResponse.body.data.items.some(
+        (item: { id: string }) => item.id === profileResponse.body.data.id,
+      ),
+    );
   });
 
   it('handles payment and refund callbacks with idempotency', async () => {
@@ -1039,6 +1053,11 @@ describe('PetPal API integration', () => {
       .post('/api/petpal/admin/caregivers/unknown/audit')
       .set(authHeader)
       .send({ status: 'APPROVED' })
+      .expect(403);
+
+    await request(app)
+      .get('/api/petpal/admin/caregivers')
+      .set(authHeader)
       .expect(403);
   });
 

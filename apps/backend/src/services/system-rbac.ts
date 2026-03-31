@@ -244,6 +244,18 @@ const defaultMenuTree: SystemMenuSeedNode[] = [
         sortOrder: 45,
         permissionCode: 'petpal.callback-alert.read',
       },
+      {
+        code: 'petpal-caregiver-audit',
+        type: 'PAGE',
+        title: '宠托帮照料者审核',
+        caption: 'PetPal Caregiver Audit',
+        description: '审核照料者入驻档案并调整审核状态。',
+        icon: 'i-carbon-user-certification',
+        path: '/petpal/caregiver-audits',
+        viewKey: 'caregiver-audit',
+        sortOrder: 50,
+        permissionCode: 'petpal.caregiver.audit',
+      },
     ],
   },
   {

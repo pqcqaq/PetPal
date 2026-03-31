@@ -840,6 +840,38 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 51. PetPal 管理端照料者审核台（P1-M1 Slice 24）
+
+**内容**：新增管理员照料者审核列表查询能力与控制台审核页面，形成管理端审核闭环入口。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 新增 `CaregiverAuditQuery`、`CaregiverAuditListItem`、`CaregiverAuditPage`。
+- `packages/api-common/src/api/factory.ts`
+  - 新增 `petpal.admin.caregiverAudits(query)`。
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增 `queryCaregiverAuditList`，支持分页、审核状态、城市、关键字筛选。
+- `apps/backend/src/routes/petpal.ts`
+  - 新增 `GET /api/petpal/admin/caregivers`（权限：`petpal.caregiver.audit`）。
+  - 列表查询参数 schema 与分页参数兜底处理。
+- `apps/backend/src/services/system-rbac.ts`
+  - 新增控制台菜单：`/petpal/caregiver-audits`（`viewKey: caregiver-audit`）。
+- `apps/web-frontend/src/pages/console/petpal/CaregiverAuditView.vue`
+  - 新增审核台页面：筛选、列表、分页、审核动作（通过/拒绝/重置）。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增管理员审核列表查询断言。
+  - 新增 member 访问管理员审核列表 403 断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（11/11）。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。

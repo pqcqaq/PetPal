@@ -2497,3 +2497,53 @@ gantt
 
 - 采用“业主工作台同页扩展”的方式快速交付照料者端最小操作能力，减少新增导航与权限接线复杂度。
 - 审核状态仅展示，不在前台暴露审核动作，避免权限误用。
+
+### 14.41 2026-04-01（P1-M1 Slice 24）
+
+**概述**：交付管理端照料者审核台，打通“审核列表查询 + 审核动作操作 + 权限边界验证”闭环。
+
+已完成：
+
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增审核列表分页查询类型：
+      - `CaregiverAuditQuery`
+      - `CaregiverAuditListItem`
+      - `CaregiverAuditPage`
+  - `packages/api-common/src/api/factory.ts`
+    - 新增 `petpal.admin.caregiverAudits` 查询接口。
+- 后端：
+  - `apps/backend/src/services/petpal-service.ts`
+    - 新增 `queryCaregiverAuditList`，支持分页、审核状态、城市与关键字筛选。
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `GET /api/petpal/admin/caregivers`。
+    - 新增列表查询参数 schema 与分页参数兜底处理。
+  - `apps/backend/src/services/system-rbac.ts`
+    - 新增控制台菜单项：`/petpal/caregiver-audits`（`viewKey: caregiver-audit`）。
+- Web 控制台：
+  - `apps/web-frontend/src/pages/console/petpal/CaregiverAuditView.vue`
+    - 新增筛选区（状态/城市/关键字）。
+    - 新增审核列表与分页。
+    - 新增审核动作（通过/拒绝/重置）。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增管理员查询审核列表成功断言。
+    - 新增 member 访问管理员审核列表 403 断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（11/11）。
+
+风险与缓解：
+
+- 风险：当前审核列表未提供时间范围筛选，审核台在数据量较大时排查效率受限。
+- 缓解：在 P1-M4 管理治理阶段补充 createdAt 区间过滤与导出能力。
+
+下一步（1-3）：
+
+1. 进入 P1-M2，补齐照料者接单与履约打卡链路 API。
+2. 在 Web 前台新增履约过程上报与订单状态推进操作。
+3. 为履约主路径补充失败分支集成测试（重复打卡、越权更新、状态逆行）。

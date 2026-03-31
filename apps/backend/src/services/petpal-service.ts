@@ -354,6 +354,86 @@ export const petpalService = {
     });
   },
 
+  async queryCaregiverAuditList(payload: {
+    page: number;
+    pageSize: number;
+    auditStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+    city?: string;
+    keyword?: string;
+  }) {
+    const where: Prisma.CaregiverProfileWhereInput = {
+      deleteAt: null,
+      auditStatus: payload.auditStatus,
+      serviceCity: payload.city?.trim() || undefined,
+      OR: payload.keyword?.trim()
+        ? [
+          {
+            user: {
+              nickname: {
+                contains: payload.keyword.trim(),
+              },
+            },
+          },
+          {
+            intro: {
+              contains: payload.keyword.trim(),
+            },
+          },
+        ]
+        : undefined,
+    };
+
+    const [total, rows] = await Promise.all([
+      prisma.caregiverProfile.count({ where }),
+      prisma.caregiverProfile.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              nickname: true,
+            },
+          },
+          services: {
+            where: {
+              deleteAt: null,
+            },
+            select: {
+              id: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip: (payload.page - 1) * payload.pageSize,
+        take: payload.pageSize,
+      }),
+    ]);
+
+    return {
+      items: rows.map(item => ({
+        id: item.id,
+        userId: item.userId,
+        nickname: item.user.nickname,
+        intro: item.intro,
+        experienceYears: item.experienceYears,
+        serviceRadiusKm: item.serviceRadiusKm,
+        serviceCity: item.serviceCity,
+        auditStatus: item.auditStatus,
+        serviceCount: item.services.length,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      })),
+      pagination: {
+        page: payload.page,
+        pageSize: payload.pageSize,
+        total,
+        totalPages: Math.ceil(total / payload.pageSize),
+      },
+    };
+  },
+
   async listPets(ownerId: string) {
     return prisma.petProfile.findMany({
       where: {

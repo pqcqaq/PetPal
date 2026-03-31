@@ -61,6 +61,14 @@ const caregiverAuditSchema = z.object({
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED']),
 });
 
+const caregiverAuditListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(100).optional(),
+  auditStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),
+  city: z.string().trim().max(50).optional(),
+  keyword: z.string().trim().max(50).optional(),
+});
+
 const paymentCallbackSchema = z.object({
   payNo: z.string().trim().min(1),
   channelTxnId: z.string().trim().min(1),
@@ -253,6 +261,25 @@ petpalRouter.post('/admin/caregivers/:id/audit', requirePermission('petpal.careg
   const payload = caregiverAuditSchema.parse(req.body ?? {});
   const profile = await petpalService.auditCaregiverProfile(String(req.params.id), payload.status);
   return ok(res, profile, 'Caregiver audited');
+}));
+
+petpalRouter.get('/admin/caregivers', requirePermission('petpal.caregiver.audit'), asyncHandler(async (req, res) => {
+  const { page, pageSize } = parsePagination(req.query);
+  const query = caregiverAuditListQuerySchema.parse({
+    ...req.query,
+    page,
+    pageSize,
+  });
+
+  const result = await petpalService.queryCaregiverAuditList({
+    page: query.page ?? page,
+    pageSize: query.pageSize ?? pageSize,
+    auditStatus: query.auditStatus,
+    city: query.city,
+    keyword: query.keyword,
+  });
+
+  return ok(res, result, 'Caregiver audit list');
 }));
 
 // Admin endpoints (require authentication)

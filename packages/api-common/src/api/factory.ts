@@ -37,6 +37,8 @@ import type {
 } from '../types/files';
 import type {
   CaregiverAuditPayload,
+  CaregiverAuditPage,
+  CaregiverAuditQuery,
   CaregiverProfileRecord,
   CaregiverServiceRecord,
   CallbackAlertReplayLogPage,
@@ -441,6 +443,11 @@ export const createApiFactory = (options: ClientOptions) => {
           }),
       },
       admin: {
+        caregiverAudits: (query?: CaregiverAuditQuery) =>
+          client.request<CaregiverAuditPage>({
+            url: '/petpal/admin/caregivers',
+            params: query as unknown as QueryParams,
+          }),
         auditCaregiver: (caregiverId: string, payload: CaregiverAuditPayload) =>
           client.request<CaregiverProfileRecord>({
             url: `/petpal/admin/caregivers/${caregiverId}/audit`,
