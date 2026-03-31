@@ -321,6 +321,40 @@ const buildCallbackAlertOutboxWhere = (
   return where;
 };
 
+const orderConversationSummarySelect = {
+  id: true,
+  orderId: true,
+  ownerUnreadCount: true,
+  caregiverUnreadCount: true,
+  lastMessageAt: true,
+  lastMessagePreview: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.OrderConversationSelect;
+
+const orderMessageSelect = {
+  id: true,
+  conversationId: true,
+  senderRole: true,
+  senderUserId: true,
+  content: true,
+  mediaUrls: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.OrderMessageSelect;
+
+const orderConversationDetailInclude = {
+  messages: {
+    where: {
+      deleteAt: null,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+    select: orderMessageSelect,
+  },
+} satisfies Prisma.OrderConversationInclude;
+
 const orderDetailInclude = {
   payments: {
     where: {
@@ -368,6 +402,9 @@ const orderDetailInclude = {
       updatedAt: true,
     },
   },
+  conversation: {
+    select: orderConversationSummarySelect,
+  },
 } satisfies Prisma.OrderMainInclude;
 
 type OrderDetailEntity = Prisma.OrderMainGetPayload<{
@@ -378,10 +415,63 @@ type OrderDetailRecord = Omit<OrderDetailEntity, 'timelines'> & {
   timeline: OrderDetailEntity['timelines'];
 };
 
+type OrderConversationSummaryShape = {
+  id: string;
+  orderId: string;
+  ownerUnreadCount: number;
+  caregiverUnreadCount: number;
+  lastMessageAt: Date | null;
+  lastMessagePreview: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type OrderMessageEntity = Prisma.OrderMessageGetPayload<{
+  select: typeof orderMessageSelect;
+}>;
+
+type OrderConversationDetailEntity = Prisma.OrderConversationGetPayload<{
+  include: typeof orderConversationDetailInclude;
+}>;
+
+const toOrderConversationRecord = (conversation: OrderConversationSummaryShape | null) => {
+  if (!conversation) {
+    return null;
+  }
+
+  return {
+    id: conversation.id,
+    orderId: conversation.orderId,
+    ownerUnreadCount: conversation.ownerUnreadCount,
+    caregiverUnreadCount: conversation.caregiverUnreadCount,
+    lastMessageAt: conversation.lastMessageAt,
+    lastMessagePreview: conversation.lastMessagePreview,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
+  };
+};
+
+const toOrderMessageRecord = (message: OrderMessageEntity) => ({
+  id: message.id,
+  conversationId: message.conversationId,
+  senderRole: message.senderRole,
+  senderUserId: message.senderUserId,
+  content: message.content,
+  mediaUrls: toStringArray(message.mediaUrls),
+  createdAt: message.createdAt,
+  updatedAt: message.updatedAt,
+});
+
+const toOrderConversationDetailRecord = (conversation: OrderConversationDetailEntity) => ({
+  ...toOrderConversationRecord(conversation)!,
+  messages: conversation.messages.map(toOrderMessageRecord),
+});
+
 const toOrderDetailRecord = (order: OrderDetailEntity): OrderDetailRecord => {
   const { timelines, ...rest } = order;
   return {
     ...rest,
+    conversation: toOrderConversationRecord(order.conversation),
     timeline: timelines,
   };
 };
@@ -404,6 +494,37 @@ const loadOrderDetailById = async (
   assertOrderAmountInvariant(order);
   return toOrderDetailRecord(order);
 };
+
+const orderListInclude = {
+  payments: {
+    where: {
+      deleteAt: null,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  },
+  refunds: {
+    where: {
+      deleteAt: null,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  },
+  conversation: {
+    select: orderConversationSummarySelect,
+  },
+} satisfies Prisma.OrderMainInclude;
+
+type OrderListEntity = Prisma.OrderMainGetPayload<{
+  include: typeof orderListInclude;
+}>;
+
+const toOrderRecord = (order: OrderListEntity) => ({
+  ...order,
+  conversation: toOrderConversationRecord(order.conversation),
+});
 
 const getApprovedCaregiverProfile = async (
   client: Prisma.TransactionClient | PrismaClient,
@@ -429,6 +550,116 @@ const getApprovedCaregiverProfile = async (
   }
 
   return profile;
+};
+
+const normalizeMessageContent = (content?: string | null) => {
+  const normalized = content?.trim() ?? '';
+  return normalized ? normalized.slice(0, 1000) : null;
+};
+
+const normalizeMessageMediaUrls = (mediaUrls?: string[]) => [...new Set(
+  (mediaUrls ?? [])
+    .map(url => url.trim())
+    .filter(Boolean),
+)].slice(0, 10);
+
+const buildMessagePreview = (content: string | null, mediaUrls: string[]) => {
+  if (content) {
+    return content.length > 80 ? `${content.slice(0, 77)}...` : content;
+  }
+
+  if (mediaUrls.length > 0) {
+    return mediaUrls.length === 1 ? '[附件消息]' : `[附件消息 ${mediaUrls.length}]`;
+  }
+
+  return null;
+};
+
+type OrderConversationParticipant = {
+  orderId: string;
+  ownerId: string;
+  caregiverId: string;
+  caregiverUserId: string;
+  actorRole: 'OWNER' | 'CAREGIVER';
+};
+
+const loadOrderConversationParticipant = async (
+  client: Prisma.TransactionClient | PrismaClient,
+  userId: string,
+  orderId: string,
+): Promise<OrderConversationParticipant> => {
+  const order = await client.orderMain.findFirst({
+    where: {
+      id: orderId,
+      deleteAt: null,
+      OR: [
+        {
+          ownerId: userId,
+        },
+        {
+          caregiver: {
+            userId,
+            deleteAt: null,
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      ownerId: true,
+      caregiverId: true,
+      caregiver: {
+        select: {
+          userId: true,
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    throw notFound('Order not found');
+  }
+
+  return {
+    orderId: order.id,
+    ownerId: order.ownerId,
+    caregiverId: order.caregiverId,
+    caregiverUserId: order.caregiver.userId,
+    actorRole: order.ownerId === userId ? 'OWNER' : 'CAREGIVER',
+  };
+};
+
+const ensureOrderConversation = async (
+  client: Prisma.TransactionClient | PrismaClient,
+  orderId: string,
+) => client.orderConversation.upsert({
+  where: {
+    orderId,
+  },
+  create: withSnowflakeId({
+    orderId,
+    ownerUnreadCount: 0,
+    caregiverUnreadCount: 0,
+  }),
+  update: {},
+});
+
+const loadOrderConversationDetail = async (
+  client: Prisma.TransactionClient | PrismaClient,
+  orderId: string,
+) => {
+  const conversation = await client.orderConversation.findUnique({
+    where: {
+      orderId,
+    },
+    include: orderConversationDetailInclude,
+  });
+
+  if (!conversation) {
+    throw notFound('Order conversation not found');
+  }
+
+  return toOrderConversationDetailRecord(conversation);
 };
 
 const appendOrderTimeline = async (
@@ -1391,6 +1622,9 @@ export const petpalService = {
               createdAt: 'asc',
             },
           },
+          conversation: {
+            select: orderConversationSummarySelect,
+          },
         },
         orderBy: [
           {
@@ -1411,7 +1645,7 @@ export const petpalService = {
 
     return {
       items: rows.map((order) => ({
-        ...order,
+        ...toOrderRecord(order),
         ownerNickname: order.owner.nickname,
         petName: order.serviceRequest?.pet?.name ?? null,
         locationText: order.serviceRequest?.locationText ?? null,
@@ -1605,25 +1839,9 @@ export const petpalService = {
     const orders = await prisma.orderMain.findMany({
       where: {
         ownerId,
+        deleteAt: null,
       },
-      include: {
-        payments: {
-          where: {
-            deleteAt: null,
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
-        refunds: {
-          where: {
-            deleteAt: null,
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
-      },
+      include: orderListInclude,
       orderBy: {
         createdAt: 'desc',
       },
@@ -1633,7 +1851,7 @@ export const petpalService = {
       assertOrderAmountInvariant(order);
     });
 
-    return orders;
+    return orders.map(toOrderRecord);
   },
 
   async listOwnerTransactionExportRows(filters: OwnerTransactionExportFilters = {}): Promise<OwnerTransactionExportRow[]> {
@@ -1933,6 +2151,102 @@ export const petpalService = {
 
     assertOrderAmountInvariant(order);
     return toOrderDetailRecord(order);
+  },
+
+  async listOrderMessages(userId: string, orderId: string) {
+    await loadOrderConversationParticipant(prisma, userId, orderId);
+    await ensureOrderConversation(prisma, orderId);
+    return loadOrderConversationDetail(prisma, orderId);
+  },
+
+  async createOrderMessage(userId: string, orderId: string, payload: {
+    content?: string;
+    mediaUrls?: string[];
+  }) {
+    return runSerializableTransaction(async (tx) => {
+      const participant = await loadOrderConversationParticipant(tx, userId, orderId);
+      const content = normalizeMessageContent(payload.content);
+      const mediaUrls = normalizeMessageMediaUrls(payload.mediaUrls);
+
+      if (!content && mediaUrls.length === 0) {
+        throw badRequest('Message content or media is required');
+      }
+
+      const conversation = await ensureOrderConversation(tx, orderId);
+      const now = new Date();
+
+      await tx.orderMessage.create({
+        data: withSnowflakeId({
+          conversationId: conversation.id,
+          senderRole: participant.actorRole,
+          senderUserId: userId,
+          content,
+          mediaUrls: mediaUrls as Prisma.InputJsonValue,
+        }),
+      });
+
+      await tx.orderConversation.update({
+        where: {
+          id: conversation.id,
+        },
+        data: participant.actorRole === 'OWNER'
+          ? {
+              updateId: userId,
+              ownerUnreadCount: 0,
+              caregiverUnreadCount: {
+                increment: 1,
+              },
+              lastMessageAt: now,
+              lastMessagePreview: buildMessagePreview(content, mediaUrls),
+            }
+          : {
+              updateId: userId,
+              ownerUnreadCount: {
+                increment: 1,
+              },
+              caregiverUnreadCount: 0,
+              lastMessageAt: now,
+              lastMessagePreview: buildMessagePreview(content, mediaUrls),
+            },
+      });
+
+      return loadOrderConversationDetail(tx, orderId);
+    });
+  },
+
+  async markOrderMessagesRead(userId: string, orderId: string) {
+    return runSerializableTransaction(async (tx) => {
+      const participant = await loadOrderConversationParticipant(tx, userId, orderId);
+      const conversation = await ensureOrderConversation(tx, orderId);
+
+      await tx.orderConversation.update({
+        where: {
+          id: conversation.id,
+        },
+        data: participant.actorRole === 'OWNER'
+          ? {
+              updateId: userId,
+              ownerUnreadCount: 0,
+            }
+          : {
+              updateId: userId,
+              caregiverUnreadCount: 0,
+            },
+      });
+
+      const updated = await tx.orderConversation.findUnique({
+        where: {
+          id: conversation.id,
+        },
+        select: orderConversationSummarySelect,
+      });
+
+      if (!updated) {
+        throw notFound('Order conversation not found');
+      }
+
+      return toOrderConversationRecord(updated)!;
+    });
   },
 
   async getOwnerOrderRefundProgress(ownerId: string, orderId: string): Promise<OwnerRefundProgressRecord> {

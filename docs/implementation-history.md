@@ -1718,6 +1718,57 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 104. PetPal 订单消息闭环（P2-M1 Slice 76）
+
+**内容**：补齐订单内即时沟通主链路，让主人与照料者可以在订单详情中发送文字与附件消息，并在 Web/App 工作台直接看到最近消息与未读计数。
+
+变更摘要：
+
+- `apps/backend/prisma/models/petpal.prisma`
+  - 新增 `OrderConversation` 与 `OrderMessage` 模型，并与 `OrderMain` 建立会话关系。
+- `packages/api-common/src/types/petpal.ts`
+  - 新增订单会话、消息、发送消息载荷共享类型。
+- `packages/api-common/src/api/factory.ts`
+  - 新增订单消息查询、发送、已读接口工厂方法。
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增订单消息查询、发送、标记已读能力。
+  - 主人订单列表、照料者订单列表和订单详情补齐最近消息摘要与未读数返回。
+- `apps/backend/src/routes/petpal.ts`
+  - 新增订单消息接口：
+    - `GET /api/petpal/orders/:id/messages`
+    - `POST /api/petpal/orders/:id/messages`
+    - `POST /api/petpal/orders/:id/messages/read`
+- `apps/backend/src/routes/files.ts`
+  - 上传白名单新增 `petpal-order-message`。
+  - 特殊业务附件改为优先按订单参与者校验，不允许被通用 `file.upload` 权限绕过。
+- `apps/backend/test/support/backend-testkit.ts`
+  - 上传测试 helper 改为复用应用内本地上传路由，避免依赖外部对象存储可达性。
+- `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+  - 新增订单消息区、附件上传、发送与标记已读。
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 主人订单表与照料者履约表新增最近消息摘要与未读标记。
+- `apps/app-frontend/src/api/petpal.ts`
+  - 新增订单消息 API 封装。
+- `apps/app-frontend/src/pages/order-detail/index.vue`
+  - 新增移动端订单消息区、附件上传、媒体查看与已读动作。
+- `apps/app-frontend/src/pages/petpal/index.vue`
+  - 主人/照料者订单卡片新增消息摘要与未读提示，并为照料者补齐详情入口。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 --test-name-pattern "supports order messaging loop" test/integration/petpal-api.test.ts` 通过（1/1）。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/files.test.ts` 通过（4/4）。
+
+代码审计结论：
+
+- 已确认订单消息会话严格限定在订单主人与当前照料者之间，不会向无关用户泄露内容。
+- 已确认 `petpal-order-message` 附件上传权限不会被通用上传权限绕过，管理员等高权限账号也不能代替订单参与者上传会话附件。
+- 已确认 Web/App 工作台都已暴露最近消息与未读摘要，消息能力不再只存在于隐藏详情页。
+
+Git commit：待本切片提交。
+
 ## 101. PetPal 当前实现进度复盘与后续安排（2026-04-01）
 
 **内容**：本节不是新的功能切片，而是一次基于当前代码树的阶段复盘，用来同步“真实已完成能力、仍未完成缺口、下一阶段优先级”，避免实现历史只记录局部切片而缺少整体判断。

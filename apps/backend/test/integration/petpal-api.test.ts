@@ -761,6 +761,118 @@ describe('PetPal API integration', () => {
     assert.equal(persistedOrder.serviceRequest?.status, 'CLOSED');
   });
 
+  it('supports order messaging loop for owner and caregiver participants', async () => {
+    const {
+      app,
+      ownerSession,
+      caregiverSession,
+      order,
+    } = await createFulfillmentScenario();
+
+    const ownerSendResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/messages`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .send({
+        content: '今天需要在 9 点前确认上门，狗粮放在玄关柜第二层。',
+        mediaUrls: ['https://static.example.test/petpal/order-message-1.jpg'],
+      })
+      .expect(200);
+
+    assert.equal(ownerSendResponse.body.data.messages.length, 1);
+    assert.equal(ownerSendResponse.body.data.ownerUnreadCount, 0);
+    assert.equal(ownerSendResponse.body.data.caregiverUnreadCount, 1);
+    assert.equal(
+      ownerSendResponse.body.data.lastMessagePreview,
+      '今天需要在 9 点前确认上门，狗粮放在玄关柜第二层。',
+    );
+
+    const caregiverOrdersResponse = await request(app)
+      .get('/api/petpal/caregiver/orders')
+      .query({ status: 'PENDING_ACCEPT' })
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    const caregiverOrder = caregiverOrdersResponse.body.data.items.find(
+      (item: { id: string }) => item.id === order.id,
+    );
+
+    assert.ok(caregiverOrder);
+    assert.equal(caregiverOrder.conversation.caregiverUnreadCount, 1);
+
+    const caregiverMessagesResponse = await request(app)
+      .get(`/api/petpal/orders/${order.id}/messages`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(caregiverMessagesResponse.body.data.messages.length, 1);
+    assert.equal(caregiverMessagesResponse.body.data.messages[0].senderRole, 'OWNER');
+    assert.deepEqual(
+      caregiverMessagesResponse.body.data.messages[0].mediaUrls,
+      ['https://static.example.test/petpal/order-message-1.jpg'],
+    );
+    assert.equal(caregiverMessagesResponse.body.data.caregiverUnreadCount, 1);
+
+    const caregiverReadResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/messages/read`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(caregiverReadResponse.body.data.caregiverUnreadCount, 0);
+
+    const caregiverReplyResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/messages`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .send({
+        content: '收到，我会提前 10 分钟到达并先给主人同步签到照片。',
+      })
+      .expect(200);
+
+    assert.equal(caregiverReplyResponse.body.data.messages.length, 2);
+    assert.equal(caregiverReplyResponse.body.data.ownerUnreadCount, 1);
+    assert.equal(caregiverReplyResponse.body.data.caregiverUnreadCount, 0);
+    assert.equal(
+      caregiverReplyResponse.body.data.lastMessagePreview,
+      '收到，我会提前 10 分钟到达并先给主人同步签到照片。',
+    );
+
+    const ownerOrdersResponse = await request(app)
+      .get('/api/petpal/orders')
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(200);
+
+    const ownerOrder = ownerOrdersResponse.body.data.find(
+      (item: { id: string }) => item.id === order.id,
+    );
+
+    assert.ok(ownerOrder);
+    assert.equal(ownerOrder.conversation.ownerUnreadCount, 1);
+    assert.equal(
+      ownerOrder.conversation.lastMessagePreview,
+      '收到，我会提前 10 分钟到达并先给主人同步签到照片。',
+    );
+
+    const ownerDetailResponse = await request(app)
+      .get(`/api/petpal/orders/${order.id}`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(ownerDetailResponse.body.data.conversation);
+    assert.equal(ownerDetailResponse.body.data.conversation.ownerUnreadCount, 1);
+
+    const ownerReadResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/messages/read`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(ownerReadResponse.body.data.ownerUnreadCount, 0);
+
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+    await request(app)
+      .get(`/api/petpal/orders/${order.id}/messages`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(404);
+  });
+
   it('rejects unapproved caregivers and unrelated caregivers from fulfillment access', async () => {
     const {
       app,

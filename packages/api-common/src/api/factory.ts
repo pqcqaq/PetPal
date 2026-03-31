@@ -60,6 +60,7 @@ import type {
   CallbackAuditQuery,
   CallbackAuditStats,
   CreateComplaintPayload,
+  CreateOrderMessagePayload,
   CreateOrderReviewPayload,
   CreatePetPayload,
   CreateServiceLogPayload,
@@ -70,6 +71,8 @@ import type {
   BatchAssignComplaintsResult,
   MatchedCaregiverPage,
   OrderDetailRecord,
+  OrderConversationDetailRecord,
+  OrderConversationRecord,
   OrderRecord,
   OrderRefundProgressRecord,
   OwnerOrderRefundExportQuery,
@@ -438,6 +441,21 @@ export const createApiFactory = (options: ClientOptions) => {
       orders: {
         list: () => client.request<OrderRecord[]>({ url: '/petpal/orders' }),
         detail: (id: string) => client.request<OrderDetailRecord>({ url: `/petpal/orders/${id}` }),
+        messages: (id: string) =>
+          client.request<OrderConversationDetailRecord>({
+            url: `/petpal/orders/${id}/messages`,
+          }),
+        sendMessage: (id: string, payload: CreateOrderMessagePayload) =>
+          client.request<OrderConversationDetailRecord>({
+            url: `/petpal/orders/${id}/messages`,
+            method: 'POST',
+            data: payload,
+          }),
+        markMessagesRead: (id: string) =>
+          client.request<OrderConversationRecord>({
+            url: `/petpal/orders/${id}/messages/read`,
+            method: 'POST',
+          }),
         refundProgress: (id: string) =>
           client.request<OrderRefundProgressRecord>({
             url: `/petpal/orders/${id}/refund-progress`,

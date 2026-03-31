@@ -7,6 +7,7 @@ import {
   loginAs,
   reseedBackendTestContext,
   teardownBackendTestContext,
+  uploadManagedFileForTest,
 } from '../support/backend-testkit';
 
 let context: BackendTestContext;
@@ -320,5 +321,135 @@ describe('File upload integration', () => {
     assert.equal(asset.tag2, caregiverId);
     assert.equal(asset.uploadStatus, 'COMPLETED');
     assert.equal(asset.url, uploaded.url);
+  });
+
+  it('allows order participants to upload petpal message attachments without generic attachment permission', async () => {
+    const { app, prisma, prismaRaw } = context;
+    const ownerSession = await loginAs(app, 'user', 'User123!');
+    const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+
+    const pet = await prisma.petProfile.findFirst({
+      where: {
+        ownerId: ownerSession.user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const caregiverProfile = await prisma.caregiverProfile.findFirst({
+      where: {
+        userId: caregiverSession.user.id,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    assert.ok(pet);
+    assert.ok(caregiverProfile);
+
+    const suffix = Date.now().toString(36);
+    const requestRecord = await prisma.serviceRequest.create({
+      data: {
+        id: `req-message-upload-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: pet.id,
+        serviceType: 'WALKING',
+        startTime: new Date('2026-04-05T09:00:00.000Z'),
+        endTime: new Date('2026-04-05T10:00:00.000Z'),
+        locationText: '杭州市上城区',
+        budgetAmount: 68,
+        demandTags: ['message-upload'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfile.id,
+      },
+    });
+
+    const order = await prisma.orderMain.create({
+      data: {
+        id: `order-message-upload-${suffix}`,
+        orderNo: `PP-MSG-UPLOAD-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceRequestId: requestRecord.id,
+        serviceType: 'WALKING',
+        appointmentStart: new Date('2026-04-05T09:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-05T10:00:00.000Z'),
+        amountTotal: 68,
+        amountPaid: 68,
+        orderStatus: 'ACCEPTED',
+      },
+    });
+
+    const ownerUploaded = await uploadManagedFileForTest(app, {
+      accessToken: ownerSession.tokens.accessToken,
+      fileName: 'owner-message.jpg',
+      contentType: 'image/jpeg',
+      content: 'owner-message-binary',
+      tag1: 'petpal-order-message',
+      tag2: order.id,
+    });
+
+    const caregiverUploaded = await uploadManagedFileForTest(app, {
+      accessToken: caregiverSession.tokens.accessToken,
+      fileName: 'caregiver-message.jpg',
+      contentType: 'image/jpeg',
+      content: 'caregiver-message-binary',
+      tag1: 'petpal-order-message',
+      tag2: order.id,
+    });
+
+    const [ownerAsset, caregiverAsset] = await Promise.all([
+      prismaRaw.mediaAsset.findUnique({
+        where: {
+          id: ownerUploaded.fileId,
+        },
+        select: {
+          userId: true,
+          tag1: true,
+          tag2: true,
+          uploadStatus: true,
+        },
+      }),
+      prismaRaw.mediaAsset.findUnique({
+        where: {
+          id: caregiverUploaded.fileId,
+        },
+        select: {
+          userId: true,
+          tag1: true,
+          tag2: true,
+          uploadStatus: true,
+        },
+      }),
+    ]);
+
+    assert.ok(ownerAsset);
+    assert.equal(ownerAsset.userId, ownerSession.user.id);
+    assert.equal(ownerAsset.tag1, 'petpal-order-message');
+    assert.equal(ownerAsset.tag2, order.id);
+    assert.equal(ownerAsset.uploadStatus, 'COMPLETED');
+
+    assert.ok(caregiverAsset);
+    assert.equal(caregiverAsset.userId, caregiverSession.user.id);
+    assert.equal(caregiverAsset.tag1, 'petpal-order-message');
+    assert.equal(caregiverAsset.tag2, order.id);
+    assert.equal(caregiverAsset.uploadStatus, 'COMPLETED');
+
+    await request(app)
+      .post('/api/files/presign')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        kind: 'attachment',
+        fileName: 'blocked-message.jpg',
+        contentType: 'image/jpeg',
+        size: 128,
+        tag1: 'petpal-order-message',
+        tag2: order.id,
+      })
+      .expect(403);
   });
 });

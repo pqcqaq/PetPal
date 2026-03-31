@@ -7,10 +7,13 @@ import type {
   ComplaintRecord,
   CreatePetPayload,
   CreateComplaintPayload,
+  CreateOrderMessagePayload,
   CreateOrderReviewPayload,
   CreateServiceLogPayload,
   CreateServiceRequestPayload,
   MatchCaregiverQuery,
+  OrderConversationDetailRecord,
+  OrderConversationRecord,
   OrderRefundProgressRecord,
   OrderDetailRecord,
   UpdatePetPayload,
@@ -45,6 +48,18 @@ export function listOrders() {
 
 export function getOrderDetail(id: string) {
   return appApi.petpal.orders.detail(id)
+}
+
+export function getOrderMessages(id: string): Promise<OrderConversationDetailRecord> {
+  return appApi.petpal.orders.messages(id)
+}
+
+export function sendOrderMessage(id: string, payload: CreateOrderMessagePayload): Promise<OrderConversationDetailRecord> {
+  return appApi.petpal.orders.sendMessage(id, payload)
+}
+
+export function markOrderMessagesRead(id: string): Promise<OrderConversationRecord> {
+  return appApi.petpal.orders.markMessagesRead(id)
 }
 
 export function getOrderRefundProgress(id: string): Promise<OrderRefundProgressRecord> {

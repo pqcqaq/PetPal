@@ -1,13 +1,17 @@
 <script lang="ts" setup>
 import type {
+  CaregiverQualificationMaterialRecord,
   ComplaintActionType,
   ComplaintRecord,
   ComplaintStatus,
   ComplaintTargetRole,
   ComplaintType,
   CreateComplaintPayload,
+  CreateOrderMessagePayload,
   CreateOrderReviewPayload,
   OrderDetailRecord,
+  OrderConversationDetailRecord,
+  OrderMessageRecord,
   OrderOperatorRole,
   OrderRefundProgressRecord,
   OrderStatus,
@@ -17,6 +21,7 @@ import type {
   ServiceLogType,
 } from '@rbac/api-common'
 import dayjs from 'dayjs'
+import { storeToRefs } from 'pinia'
 import { computed, reactive, ref, watch } from 'vue'
 import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
 import AppInput from '@/components/app-input/app-input.vue'
@@ -29,9 +34,14 @@ import {
   createOrderComplaint,
   getOrderComplaints,
   getOrderDetail,
+  getOrderMessages,
   getOrderRefundProgress,
+  markOrderMessagesRead,
   reviewOrder,
+  sendOrderMessage,
 } from '@/api/petpal'
+import { useManagedAttachmentUpload } from '@/composables/useManagedAttachmentUpload'
+import { useUserStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
 
 defineOptions({
@@ -49,8 +59,11 @@ const orderId = ref('')
 const order = ref<OrderDetailRecord | null>(null)
 const refundProgress = ref<OrderRefundProgressRecord | null>(null)
 const complaints = ref<ComplaintRecord[]>([])
+const messageConversation = ref<OrderConversationDetailRecord | null>(null)
 const loading = ref(false)
 const error = ref('')
+const userStore = useUserStore()
+const { userInfo } = storeToRefs(userStore)
 
 const labels = {
   orderStatus: {
@@ -175,6 +188,15 @@ const complaintSubmitting = ref(false)
 const confirmingCompletion = ref(false)
 const reviewExpanded = ref(false)
 const complaintExpanded = ref(false)
+const messageSubmitting = ref(false)
+
+const {
+  uploading: messageAttachmentUploading,
+  selectAndUploadAttachments: selectAndUploadMessageAttachments,
+} = useManagedAttachmentUpload({
+  maxCount: 4,
+  maxSizeMb: 10,
+})
 
 const reviewRatingOptions = [
   { label: '1 分', value: '1', description: '明显不满意' },
@@ -215,20 +237,39 @@ const complaintForm = reactive({
   description: '',
   evidenceUrlsText: '',
 })
+const messageForm = reactive({
+  content: '',
+  attachments: [] as CaregiverQualificationMaterialRecord[],
+})
 
 const activeComplaint = computed(() => complaints.value.find(item => (
   item.status === 'OPEN' || item.status === 'PROCESSING'
 )) ?? null)
-const canConfirmComplete = computed(() => order.value?.orderStatus === 'SERVING')
+const isOwnerView = computed(() => Boolean(userInfo.value.id && order.value?.ownerId === userInfo.value.id))
+const canConfirmComplete = computed(() => Boolean(isOwnerView.value && order.value?.orderStatus === 'SERVING'))
 const canCreateReview = computed(() => (
-  Boolean(order.value?.orderStatus === 'COMPLETED' && !order.value?.review)
+  Boolean(isOwnerView.value && order.value?.orderStatus === 'COMPLETED' && !order.value?.review)
 ))
 const canCreateComplaint = computed(() => Boolean(
-  order.value
+  isOwnerView.value
+  && order.value
   && ['SERVING', 'COMPLETED', 'PARTIAL_REFUNDED', 'REFUNDED', 'DISPUTED'].includes(order.value.orderStatus)
   && !activeComplaint.value,
 ))
+const currentConversationUnreadCount = computed(() => {
+  if (!messageConversation.value) {
+    return 0
+  }
+
+  return isOwnerView.value
+    ? messageConversation.value.ownerUnreadCount
+    : messageConversation.value.caregiverUnreadCount
+})
+const canSendMessage = computed(() => Boolean(order.value))
 const ownerActionSummary = computed(() => {
+  if (!isOwnerView.value) {
+    return '当前页面展示订单履约、沟通和售后状态，主人侧专属操作已自动隐藏。'
+  }
   if (canConfirmComplete.value) {
     return '照料服务已在进行中。确认完成前，请先核对服务记录和签到签退时间。'
   }
@@ -570,6 +611,144 @@ const getMediaLinkLabel = (url: string, index: number) => {
   }
 }
 
+const buildConversationSummary = (
+  conversation: Pick<
+    OrderConversationDetailRecord,
+    'id' | 'orderId' | 'ownerUnreadCount' | 'caregiverUnreadCount' | 'lastMessageAt' | 'lastMessagePreview' | 'createdAt' | 'updatedAt'
+  >,
+) => ({
+  id: conversation.id,
+  orderId: conversation.orderId,
+  ownerUnreadCount: conversation.ownerUnreadCount,
+  caregiverUnreadCount: conversation.caregiverUnreadCount,
+  lastMessageAt: conversation.lastMessageAt,
+  lastMessagePreview: conversation.lastMessagePreview,
+  createdAt: conversation.createdAt,
+  updatedAt: conversation.updatedAt,
+})
+
+const applyConversationSummary = (summary: OrderDetailRecord['conversation']) => {
+  if (order.value) {
+    order.value.conversation = summary ? { ...summary } : null
+  }
+
+  if (messageConversation.value && summary) {
+    messageConversation.value.ownerUnreadCount = summary.ownerUnreadCount
+    messageConversation.value.caregiverUnreadCount = summary.caregiverUnreadCount
+    messageConversation.value.lastMessageAt = summary.lastMessageAt
+    messageConversation.value.lastMessagePreview = summary.lastMessagePreview
+    messageConversation.value.updatedAt = summary.updatedAt
+  }
+}
+
+const applyConversationDetail = (conversation: OrderConversationDetailRecord | null) => {
+  messageConversation.value = conversation
+    ? {
+        ...conversation,
+        messages: [...conversation.messages],
+      }
+    : null
+  applyConversationSummary(conversation ? buildConversationSummary(conversation) : null)
+}
+
+const getConversationSenderLabel = (message: OrderMessageRecord) => (
+  message.senderRole === 'OWNER' ? '宠物主人' : '照料者'
+)
+
+const isOwnMessage = (message: OrderMessageRecord) => Boolean(userInfo.value.id && message.senderUserId === userInfo.value.id)
+
+const resetMessageComposer = () => {
+  messageForm.content = ''
+  messageForm.attachments = []
+}
+
+const uploadMessageAttachments = async () => {
+  if (!order.value) {
+    return
+  }
+
+  try {
+    const uploaded = await selectAndUploadMessageAttachments({
+      tag1: 'petpal-order-message',
+      tag2: order.value.id,
+    })
+    messageForm.attachments = [
+      ...messageForm.attachments,
+      ...uploaded,
+    ].slice(0, 8)
+    uni.showToast({
+      title: `已上传 ${uploaded.length} 个附件`,
+      icon: 'none',
+    })
+  }
+  catch (error: unknown) {
+    uni.showToast({
+      title: getErrorMessage(error, '上传附件失败'),
+      icon: 'none',
+    })
+  }
+}
+
+const removeMessageAttachment = (fileId: string) => {
+  messageForm.attachments = messageForm.attachments.filter(item => item.fileId !== fileId)
+}
+
+const markConversationAsRead = async () => {
+  if (!order.value || !messageConversation.value || currentConversationUnreadCount.value === 0) {
+    return
+  }
+
+  try {
+    const summary = await markOrderMessagesRead(order.value.id)
+    applyConversationSummary(summary)
+  }
+  catch (error: unknown) {
+    uni.showToast({
+      title: getErrorMessage(error, '同步已读失败'),
+      icon: 'none',
+    })
+  }
+}
+
+const submitMessage = async () => {
+  if (!order.value) {
+    return
+  }
+
+  const content = messageForm.content.trim()
+  if (!content && messageForm.attachments.length === 0) {
+    uni.showToast({
+      title: '请填写消息或上传附件',
+      icon: 'none',
+    })
+    return
+  }
+
+  try {
+    messageSubmitting.value = true
+    const payload: CreateOrderMessagePayload = {
+      content: content || undefined,
+      mediaUrls: messageForm.attachments.map(item => item.url),
+    }
+    const conversation = await sendOrderMessage(order.value.id, payload)
+    applyConversationDetail(conversation)
+    resetMessageComposer()
+    uni.showToast({
+      title: '消息已发送',
+      icon: 'none',
+    })
+  }
+  catch (error: unknown) {
+    uni.showToast({
+      title: getErrorMessage(error, '发送消息失败'),
+      icon: 'none',
+    })
+  }
+  finally {
+    messageSubmitting.value = false
+  }
+}
+
 const previewMediaImage = (mediaUrls: string[], currentUrl: string) => {
   const imageUrls = mediaUrls.filter((item) => isPreviewableImage(item))
   if (imageUrls.length === 0) {
@@ -745,10 +924,11 @@ async function loadOrderDetail() {
   loading.value = true
   error.value = ''
   try {
-    const [detailResult, refundProgressResult, complaintsResult] = await Promise.allSettled([
+    const [detailResult, refundProgressResult, complaintsResult, messagesResult] = await Promise.allSettled([
       getOrderDetail(orderId.value),
       getOrderRefundProgress(orderId.value),
       getOrderComplaints(orderId.value),
+      getOrderMessages(orderId.value),
     ])
 
     if (detailResult.status !== 'fulfilled') {
@@ -757,6 +937,7 @@ async function loadOrderDetail() {
 
     const detail = detailResult.value
     order.value = detail
+    applyConversationSummary(detail.conversation)
 
     refundProgress.value = refundProgressResult.status === 'fulfilled'
       ? refundProgressResult.value
@@ -765,15 +946,18 @@ async function loadOrderDetail() {
     complaints.value = complaintsResult.status === 'fulfilled'
       ? complaintsResult.value
       : []
+    applyConversationDetail(messagesResult.status === 'fulfilled' ? messagesResult.value : null)
     if (detail.review) {
       reviewExpanded.value = false
     }
     if (complaints.value.some(item => item.status === 'OPEN' || item.status === 'PROCESSING')) {
       complaintExpanded.value = false
     }
+    await markConversationAsRead()
   } catch (err) {
     refundProgress.value = null
     complaints.value = []
+    applyConversationDetail(null)
     error.value = getErrorMessage(err, '加载订单详情失败')
   } finally {
     loading.value = false
@@ -1125,6 +1309,126 @@ onLoad((options: Record<string, string | undefined>) => {
           </template>
           <view v-else class="petpal-empty">
             <text>当前暂无投诉记录</text>
+          </view>
+        </AppSection>
+
+        <AppSection :title="messageConversation?.messages.length ? `订单沟通 (${messageConversation.messages.length})` : '订单沟通'">
+          <view class="petpal-message-panel">
+            <view class="petpal-message-panel__header">
+              <view class="petpal-message-panel__headline">
+                <text class="petpal-message-panel__title">
+                  {{
+                    order.conversation?.lastMessageAt
+                      ? `最近更新：${formatDateTime(order.conversation.lastMessageAt)}`
+                      : '当前还没有订单沟通记录'
+                  }}
+                </text>
+                <text class="petpal-message-panel__hint">
+                  {{
+                    currentConversationUnreadCount > 0
+                      ? `你有 ${currentConversationUnreadCount} 条未读消息`
+                      : '订单内的交接说明、异常同步和附件回传都会保留在这里。'
+                  }}
+                </text>
+              </view>
+              <view v-if="currentConversationUnreadCount > 0" class="petpal-message-panel__badge">
+                <text>待读 {{ currentConversationUnreadCount }}</text>
+              </view>
+            </view>
+
+            <view v-if="messageConversation?.messages.length" class="petpal-message-list">
+              <view
+                v-for="message in messageConversation.messages"
+                :key="message.id"
+                :class="['petpal-message-card', { 'is-self': isOwnMessage(message) }]"
+              >
+                <view class="petpal-message-card__header">
+                  <view class="petpal-message-card__headline">
+                    <text class="petpal-message-card__title">{{ getConversationSenderLabel(message) }}</text>
+                    <text class="petpal-message-card__meta">{{ formatDateTime(message.createdAt) }}</text>
+                  </view>
+                  <text class="petpal-message-card__tag">{{ isOwnMessage(message) ? '我发送的' : '对方发送' }}</text>
+                </view>
+                <view v-if="message.content" class="petpal-note-card">
+                  <text>{{ message.content }}</text>
+                </view>
+                <view v-if="message.mediaUrls.length > 0" class="petpal-service-log-media">
+                  <view
+                    v-for="(url, index) in message.mediaUrls"
+                    :key="`${message.id}-${url}`"
+                    class="petpal-service-log-media-item"
+                    @tap="openMediaUrl(message.mediaUrls, url)"
+                  >
+                    <image
+                      v-if="isPreviewableImage(url)"
+                      :src="url"
+                      mode="aspectFill"
+                      class="petpal-service-log-media-image"
+                    />
+                    <view v-else class="petpal-service-log-media-file">
+                      <text>{{ getMediaLinkLabel(url, index) }}</text>
+                    </view>
+                    <text class="petpal-service-log-media-meta">
+                      {{ isPreviewableImage(url) ? '点击预览附件' : '点击打开或复制链接' }}
+                    </text>
+                  </view>
+                </view>
+              </view>
+            </view>
+            <view v-else class="petpal-empty">
+              <text>发送第一条消息后，这里会形成完整沟通记录。</text>
+            </view>
+
+            <view v-if="canSendMessage" class="petpal-message-composer">
+              <textarea
+                v-model="messageForm.content"
+                class="petpal-textarea"
+                :maxlength="300"
+                auto-height
+                placeholder="补充照料安排、交接说明或售后沟通内容"
+              />
+              <view class="petpal-action-row">
+                <AppButton
+                  size="medium"
+                  type="info"
+                  :loading="messageAttachmentUploading"
+                  @click="uploadMessageAttachments"
+                >
+                  上传附件
+                </AppButton>
+                <AppButton
+                  v-if="currentConversationUnreadCount > 0"
+                  size="medium"
+                  type="info"
+                  @click="markConversationAsRead"
+                >
+                  标记已读
+                </AppButton>
+                <AppButton size="medium" :loading="messageSubmitting" @click="submitMessage">
+                  发送消息
+                </AppButton>
+              </view>
+              <view v-if="messageForm.attachments.length > 0" class="petpal-message-attachment-list">
+                <view
+                  v-for="item in messageForm.attachments"
+                  :key="item.fileId"
+                  class="petpal-message-attachment-item"
+                >
+                  <view class="petpal-message-attachment-item__copy">
+                    <text>{{ item.name }}</text>
+                    <text>{{ Math.max(1, Math.round(item.size / 1024)) }} KB</text>
+                  </view>
+                  <view class="petpal-action-row">
+                    <AppButton size="medium" type="info" @click="openMediaUrl(messageForm.attachments.map(file => file.url), item.url)">
+                      打开
+                    </AppButton>
+                    <AppButton size="medium" type="danger" @click="removeMessageAttachment(item.fileId)">
+                      移除
+                    </AppButton>
+                  </view>
+                </view>
+              </view>
+            </view>
           </view>
         </AppSection>
 
@@ -1606,6 +1910,123 @@ onLoad((options: Record<string, string | undefined>) => {
   color: #4b5563;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.petpal-message-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.petpal-message-panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.petpal-message-panel__headline {
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-message-panel__title {
+  color: #1f2937;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.petpal-message-panel__hint {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.petpal-message-panel__badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+.petpal-message-list {
+  display: grid;
+  gap: 10px;
+}
+
+.petpal-message-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e5ebf3;
+  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+}
+
+.petpal-message-card.is-self {
+  border-color: #bfd7ff;
+  background: linear-gradient(180deg, #f4f8ff 0%, #eef5ff 100%);
+}
+
+.petpal-message-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.petpal-message-card__headline {
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-message-card__title {
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.petpal-message-card__meta {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.petpal-message-card__tag {
+  color: #475467;
+  font-size: 12px;
+}
+
+.petpal-message-composer {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #dbe7ff;
+  background: linear-gradient(180deg, #fff 0%, #f7fbff 100%);
+}
+
+.petpal-message-attachment-list {
+  display: grid;
+  gap: 10px;
+}
+
+.petpal-message-attachment-item {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #e5ebf3;
+  background: #fff;
+}
+
+.petpal-message-attachment-item__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-message-attachment-item__copy text:last-child {
+  color: #6b7280;
+  font-size: 12px;
 }
 
 .petpal-timeline {

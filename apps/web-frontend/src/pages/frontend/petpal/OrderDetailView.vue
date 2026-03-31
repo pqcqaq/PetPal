@@ -174,6 +174,131 @@
           </div>
         </article>
 
+        <article class="frontend-card petpal-order-detail__messages">
+          <span class="frontend-card__eyebrow">订单沟通</span>
+          <div class="petpal-message-panel__header">
+            <div class="petpal-message-panel__headline">
+              <h3>
+                {{
+                  messageConversation?.messages.length
+                    ? `共 ${messageConversation.messages.length} 条沟通消息`
+                    : '暂无订单消息'
+                }}
+              </h3>
+              <p>
+                {{
+                  order.conversation?.lastMessageAt
+                    ? `最近更新于 ${formatDateTime(order.conversation.lastMessageAt)}`
+                    : '订单内的服务沟通和附件回传都会保留在这里。'
+                }}
+              </p>
+            </div>
+            <el-tag v-if="currentConversationUnreadCount > 0" type="danger">
+              待读 {{ currentConversationUnreadCount }}
+            </el-tag>
+          </div>
+
+          <template v-if="messageConversation?.messages.length">
+            <div class="petpal-message-list">
+              <article
+                v-for="message in messageConversation.messages"
+                :key="message.id"
+                :class="['petpal-message-card', { 'is-self': isOwnMessage(message) }]"
+              >
+                <div class="petpal-message-card__header">
+                  <div>
+                    <strong>{{ getConversationSenderLabel(message) }}</strong>
+                    <span>{{ formatDateTime(message.createdAt) }}</span>
+                  </div>
+                  <el-tag size="small" effect="plain">
+                    {{ isOwnMessage(message) ? '我发送的' : '对方发送' }}
+                  </el-tag>
+                </div>
+                <p v-if="message.content" class="petpal-message-card__content">{{ message.content }}</p>
+                <div v-if="message.mediaUrls.length > 0" class="petpal-service-log-media">
+                  <a
+                    v-for="(url, index) in message.mediaUrls"
+                    :key="`${message.id}-${url}`"
+                    class="petpal-service-log-media__item"
+                    :href="url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <img
+                      v-if="isPreviewableImage(url)"
+                      :src="url"
+                      :alt="`消息附件 ${index + 1}`"
+                      loading="lazy"
+                    />
+                    <div v-else class="petpal-service-log-media__file">
+                      {{ getMediaLinkLabel(url, index) }}
+                    </div>
+                    <span class="petpal-service-log-media__meta">
+                      {{ isPreviewableImage(url) ? '查看附件' : '打开文件' }}
+                    </span>
+                  </a>
+                </div>
+              </article>
+            </div>
+          </template>
+          <div v-else class="petpal-empty">
+            <p>当前还没有订单沟通记录，发送第一条消息即可建立会话。</p>
+          </div>
+
+          <div class="petpal-message-composer">
+            <el-input
+              v-model="messageForm.content"
+              type="textarea"
+              :rows="3"
+              maxlength="1000"
+              show-word-limit
+              placeholder="补充照料安排、交接说明或售后沟通内容"
+            />
+            <input
+              ref="messageFileInput"
+              class="petpal-hidden-file-input"
+              type="file"
+              multiple
+              accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+              @change="onMessageFilesChange"
+            />
+            <div class="petpal-message-composer__actions">
+              <el-space wrap>
+                <el-button plain @click="openMessageFilePicker">选择附件</el-button>
+                <el-button
+                  v-if="currentConversationUnreadCount > 0"
+                  plain
+                  type="success"
+                  @click="markConversationAsRead"
+                >
+                  标记已读
+                </el-button>
+              </el-space>
+              <el-button type="primary" :loading="messageSubmitting" @click="submitMessage">
+                发送消息
+              </el-button>
+            </div>
+            <ul v-if="messageForm.files.length > 0" class="petpal-message-file-list">
+              <li
+                v-for="(file, index) in messageForm.files"
+                :key="`${file.name}-${file.size}-${index}`"
+                class="petpal-message-file-item"
+              >
+                <div>
+                  <strong>{{ file.name }}</strong>
+                  <span>{{ Math.max(1, Math.round(file.size / 1024)) }} KB</span>
+                </div>
+                <el-button link type="danger" @click="removeMessageFile(index)">移除</el-button>
+              </li>
+            </ul>
+            <el-progress
+              v-if="messageUploadProgress !== null"
+              :percentage="messageUploadProgress"
+              :stroke-width="10"
+            />
+          </div>
+        </article>
+
         <article class="frontend-card petpal-order-detail__review">
           <span class="frontend-card__eyebrow">服务评价</span>
           <div class="petpal-review-card__header">
@@ -655,6 +780,7 @@ import { api } from '@/api/client';
 import ListExportButton from '@/components/download/ListExportButton.vue';
 import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
+import { uploadAttachmentFile } from '@/utils/direct-upload';
 import type {
   ComplaintActionType,
   ComplaintRecord,
@@ -662,8 +788,11 @@ import type {
   ComplaintTargetRole,
   ComplaintType,
   CreateComplaintPayload,
+  CreateOrderMessagePayload,
   CreateOrderReviewPayload,
   OrderDetailRecord,
+  OrderConversationDetailRecord,
+  OrderMessageRecord,
   OrderOperatorRole,
   OrderRefundProgressRecord,
   OrderStatus,
@@ -686,11 +815,15 @@ const order = ref<OrderDetailRecord | null>(null);
 const orderNo = ref('');
 const complaints = ref<ComplaintRecord[]>([]);
 const refundProgress = ref<OrderRefundProgressRecord | null>(null);
+const messageConversation = ref<OrderConversationDetailRecord | null>(null);
 const loading = ref(false);
 const reviewDialogVisible = ref(false);
 const reviewSubmitting = ref(false);
 const complaintDialogVisible = ref(false);
 const complaintSubmitting = ref(false);
+const messageSubmitting = ref(false);
+const messageUploadProgress = ref<number | null>(null);
+const messageFileInput = ref<HTMLInputElement | null>(null);
 
 const reviewPresetTags = ['准时签到', '沟通顺畅', '反馈及时', '服务细致', '宠物状态稳定', '环境整洁'];
 const complaintEvidenceHint = '可粘贴已上传附件 URL，后续会补充直接上传证据能力';
@@ -711,6 +844,10 @@ const createEmptyComplaintForm = () => ({
 
 const reviewForm = reactive(createEmptyReviewForm());
 const complaintForm = reactive(createEmptyComplaintForm());
+const messageForm = reactive({
+  content: '',
+  files: [] as File[],
+});
 
 type AftersalesTimelineDotClass = 'pending' | 'success' | 'warning' | 'error';
 
@@ -742,6 +879,15 @@ const canCreateComplaint = computed(() =>
     && !activeComplaint.value,
   ),
 );
+const currentConversationUnreadCount = computed(() => {
+  if (!messageConversation.value) {
+    return 0;
+  }
+
+  return isOwnerView.value
+    ? messageConversation.value.ownerUnreadCount
+    : messageConversation.value.caregiverUnreadCount;
+});
 
 const formatAmount = (value: unknown) => {
   if (!value) return '0.00';
@@ -1288,6 +1434,164 @@ const getMediaLinkLabel = (url: string, index: number) => {
   }
 };
 
+const buildConversationSummary = (
+  conversation: Pick<
+    OrderConversationDetailRecord,
+    'id' | 'orderId' | 'ownerUnreadCount' | 'caregiverUnreadCount' | 'lastMessageAt' | 'lastMessagePreview' | 'createdAt' | 'updatedAt'
+  >,
+) => ({
+  id: conversation.id,
+  orderId: conversation.orderId,
+  ownerUnreadCount: conversation.ownerUnreadCount,
+  caregiverUnreadCount: conversation.caregiverUnreadCount,
+  lastMessageAt: conversation.lastMessageAt,
+  lastMessagePreview: conversation.lastMessagePreview,
+  createdAt: conversation.createdAt,
+  updatedAt: conversation.updatedAt,
+});
+
+const applyConversationSummary = (summary: OrderDetailRecord['conversation']) => {
+  if (order.value) {
+    order.value.conversation = summary ? { ...summary } : null;
+  }
+
+  if (messageConversation.value && summary) {
+    messageConversation.value.ownerUnreadCount = summary.ownerUnreadCount;
+    messageConversation.value.caregiverUnreadCount = summary.caregiverUnreadCount;
+    messageConversation.value.lastMessageAt = summary.lastMessageAt;
+    messageConversation.value.lastMessagePreview = summary.lastMessagePreview;
+    messageConversation.value.updatedAt = summary.updatedAt;
+  }
+};
+
+const applyConversationDetail = (conversation: OrderConversationDetailRecord | null) => {
+  messageConversation.value = conversation
+    ? {
+        ...conversation,
+        messages: [...conversation.messages],
+      }
+    : null;
+  applyConversationSummary(conversation ? buildConversationSummary(conversation) : null);
+};
+
+const getCurrentConversationUnreadCount = (conversation: OrderConversationDetailRecord | null) => {
+  if (!conversation) {
+    return 0;
+  }
+
+  return isOwnerView.value ? conversation.ownerUnreadCount : conversation.caregiverUnreadCount;
+};
+
+const getConversationSenderLabel = (message: OrderMessageRecord) =>
+  message.senderRole === 'OWNER' ? '宠物主人' : '照料者';
+
+const isOwnMessage = (message: OrderMessageRecord) => Boolean(auth.user?.id && message.senderUserId === auth.user.id);
+
+const resetMessageComposer = () => {
+  messageForm.content = '';
+  messageForm.files = [];
+  messageUploadProgress.value = null;
+  if (messageFileInput.value) {
+    messageFileInput.value.value = '';
+  }
+};
+
+const openMessageFilePicker = () => {
+  messageFileInput.value?.click();
+};
+
+const onMessageFilesChange = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  messageForm.files = Array.from(input.files ?? []);
+};
+
+const removeMessageFile = (index: number) => {
+  messageForm.files.splice(index, 1);
+  if (messageFileInput.value) {
+    messageFileInput.value.value = '';
+  }
+};
+
+const uploadMessageFiles = async (currentOrderId: string) => {
+  if (messageForm.files.length === 0) {
+    messageUploadProgress.value = null;
+    return [];
+  }
+
+  const totalBytes = messageForm.files.reduce((sum, file) => sum + file.size, 0);
+  const uploadedUrls: string[] = [];
+  let completedBytes = 0;
+
+  for (const file of messageForm.files) {
+    const uploaded = await uploadAttachmentFile(
+      file,
+      {
+        tag1: 'petpal-order-message',
+        tag2: currentOrderId,
+      },
+      (progress) => {
+        const currentBytes = Math.round((file.size * progress) / 100);
+        messageUploadProgress.value = Math.min(
+          99,
+          Math.round(((completedBytes + currentBytes) / Math.max(totalBytes, 1)) * 100),
+        );
+      },
+    );
+    uploadedUrls.push(uploaded.url);
+    completedBytes += file.size;
+    messageUploadProgress.value = Math.min(
+      99,
+      Math.round((completedBytes / Math.max(totalBytes, 1)) * 100),
+    );
+  }
+
+  messageUploadProgress.value = 100;
+  return uploadedUrls;
+};
+
+const markConversationAsRead = async () => {
+  if (!order.value || !messageConversation.value || getCurrentConversationUnreadCount(messageConversation.value) === 0) {
+    return;
+  }
+
+  try {
+    const summary = await api.petpal.orders.markMessagesRead(order.value.id);
+    applyConversationSummary(summary);
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '更新消息已读状态失败'));
+  }
+};
+
+const submitMessage = async () => {
+  if (!order.value) {
+    return;
+  }
+
+  const content = messageForm.content.trim();
+  if (!content && messageForm.files.length === 0) {
+    ElMessage.error('请先填写消息内容或选择附件');
+    return;
+  }
+
+  messageSubmitting.value = true;
+  try {
+    const mediaUrls = await uploadMessageFiles(order.value.id);
+    const payload: CreateOrderMessagePayload = {
+      content: content || undefined,
+      mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
+    };
+    const conversation = await api.petpal.orders.sendMessage(order.value.id, payload);
+    applyConversationDetail(conversation);
+    resetMessageComposer();
+    ElMessage.success('消息已发送');
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '发送消息失败'));
+  } finally {
+    messageSubmitting.value = false;
+    messageUploadProgress.value = null;
+  }
+};
+
 const resetReviewDialog = () => {
   Object.assign(reviewForm, createEmptyReviewForm());
 };
@@ -1376,6 +1680,18 @@ const reload = async () => {
     const detail = await api.petpal.orders.detail(orderId);
     order.value = detail;
     orderNo.value = detail.orderNo;
+    applyConversationSummary(detail.conversation);
+
+    const messagesResult = await Promise.allSettled([
+      api.petpal.orders.messages(orderId),
+    ]);
+
+    if (messagesResult[0].status === 'fulfilled') {
+      applyConversationDetail(messagesResult[0].value);
+    } else {
+      applyConversationDetail(null);
+      ElMessage.error(getErrorMessage(messagesResult[0].reason, '加载订单消息失败'));
+    }
 
     if (auth.user?.id && detail.ownerId === auth.user.id) {
       const [complaintsResult, refundProgressResult] = await Promise.allSettled([
@@ -1400,6 +1716,8 @@ const reload = async () => {
       complaints.value = [];
       refundProgress.value = null;
     }
+
+    await markConversationAsRead();
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '加载订单详情失败'));
   } finally {
@@ -1634,6 +1952,125 @@ onMounted(() => {
 .petpal-service-log-media__meta {
   font-size: 0.75rem;
   color: #6b7280;
+}
+
+.petpal-hidden-file-input {
+  display: none;
+}
+
+.petpal-message-panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.petpal-message-panel__headline h3 {
+  margin: 0;
+  color: #333;
+}
+
+.petpal-message-panel__headline p {
+  margin: 0.5rem 0 0;
+  color: #666;
+  line-height: 1.6;
+}
+
+.petpal-message-list {
+  display: grid;
+  gap: 0.875rem;
+  margin-top: 1rem;
+}
+
+.petpal-message-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid #e5ebf3;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.petpal-message-card.is-self {
+  border-color: #bfd7ff;
+  background: linear-gradient(180deg, #f4f8ff 0%, #eef5ff 100%);
+}
+
+.petpal-message-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.petpal-message-card__header strong {
+  display: block;
+  color: #1f2937;
+}
+
+.petpal-message-card__header span {
+  display: block;
+  margin-top: 0.25rem;
+  color: #6b7280;
+  font-size: 0.8125rem;
+}
+
+.petpal-message-card__content {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.8);
+  color: #334155;
+  line-height: 1.7;
+}
+
+.petpal-message-composer {
+  display: grid;
+  gap: 0.875rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid #dbe7ff;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+}
+
+.petpal-message-composer__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.petpal-message-file-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.petpal-message-file-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 0.875rem 1rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e5ebf3;
+}
+
+.petpal-message-file-item div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.petpal-message-file-item span {
+  color: #6b7280;
+  font-size: 0.8125rem;
 }
 
 .petpal-review-card__header {

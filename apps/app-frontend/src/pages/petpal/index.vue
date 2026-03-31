@@ -336,6 +336,39 @@ function getOrderTone(status: OrderStatus) {
   return 'neutral'
 }
 
+function getConversationUnreadCount(
+  conversation: OrderRecord['conversation'] | null | undefined,
+  role: WorkspaceMode,
+) {
+  if (!conversation) {
+    return 0
+  }
+  return role === 'owner' ? conversation.ownerUnreadCount : conversation.caregiverUnreadCount
+}
+
+function getConversationPreview(conversation: OrderRecord['conversation'] | null | undefined) {
+  const preview = conversation?.lastMessagePreview?.trim()
+  if (preview) {
+    return preview
+  }
+  if (conversation?.lastMessageAt) {
+    return '最近更新了一条附件或简短消息'
+  }
+  return '暂未开始订单沟通，可进入详情发送消息'
+}
+
+function getConversationHint(
+  conversation: OrderRecord['conversation'] | null | undefined,
+  role: WorkspaceMode,
+) {
+  const unreadCount = getConversationUnreadCount(conversation, role)
+  const unreadText = unreadCount > 0 ? `${unreadCount} 条未读` : '已读完'
+  if (conversation?.lastMessageAt) {
+    return `${formatDateTime(conversation.lastMessageAt)} · ${unreadText}`
+  }
+  return unreadCount > 0 ? unreadText : '暂无沟通记录'
+}
+
 function splitTagText(value: string) {
   return [...new Set(
     value
@@ -1059,6 +1092,19 @@ onPullDownRefresh(() => {
               <text class="petpal-order-card__meta">
                 实付 ¥{{ formatAmount(order.amountPaid) }} / 已退 ¥{{ formatAmount(order.amountRefunded) }}
               </text>
+              <view class="petpal-order-card__conversation">
+                <view class="petpal-order-card__conversation-copy">
+                  <text class="petpal-order-card__conversation-title">订单沟通</text>
+                  <text class="petpal-order-card__conversation-preview">{{ getConversationPreview(order.conversation) }}</text>
+                  <text class="petpal-order-card__conversation-meta">{{ getConversationHint(order.conversation, 'owner') }}</text>
+                </view>
+                <text
+                  v-if="getConversationUnreadCount(order.conversation, 'owner') > 0"
+                  class="petpal-order-card__badge"
+                >
+                  待读 {{ getConversationUnreadCount(order.conversation, 'owner') }}
+                </text>
+              </view>
               <view class="petpal-action-row">
                 <AppButton size="medium" type="info" @click="goToOrderDetail(order.id)">查看详情</AppButton>
               </view>
@@ -1279,8 +1325,22 @@ onPullDownRefresh(() => {
               <text class="petpal-order-card__meta">
                 {{ formatRange(order.appointmentStart, order.appointmentEnd) }} · 实收 ¥{{ formatAmount(order.amountPaid) }}
               </text>
+              <view class="petpal-order-card__conversation">
+                <view class="petpal-order-card__conversation-copy">
+                  <text class="petpal-order-card__conversation-title">订单沟通</text>
+                  <text class="petpal-order-card__conversation-preview">{{ getConversationPreview(order.conversation) }}</text>
+                  <text class="petpal-order-card__conversation-meta">{{ getConversationHint(order.conversation, 'caregiver') }}</text>
+                </view>
+                <text
+                  v-if="getConversationUnreadCount(order.conversation, 'caregiver') > 0"
+                  class="petpal-order-card__badge"
+                >
+                  待读 {{ getConversationUnreadCount(order.conversation, 'caregiver') }}
+                </text>
+              </view>
 
               <view class="petpal-action-row">
+                <AppButton size="medium" type="info" @click="goToOrderDetail(order.id)">详情</AppButton>
                 <AppButton
                   v-if="order.orderStatus === 'PENDING_ACCEPT'"
                   size="medium"
@@ -1508,6 +1568,53 @@ onPullDownRefresh(() => {
   color: var(--app-text-secondary);
   font-size: 22rpx;
   line-height: 1.7;
+}
+
+.petpal-order-card__conversation {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 20rpx;
+  background: #eefaf7;
+}
+
+.petpal-order-card__conversation-copy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 6rpx;
+}
+
+.petpal-order-card__conversation-title {
+  color: #0f766e;
+  font-size: 20rpx;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.petpal-order-card__conversation-preview {
+  color: var(--app-text);
+  font-size: 24rpx;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.petpal-order-card__conversation-meta {
+  color: var(--app-text-secondary);
+  font-size: 20rpx;
+  line-height: 1.5;
+}
+
+.petpal-order-card__badge {
+  flex-shrink: 0;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: #feeceb;
+  color: #c2410c;
+  font-size: 20rpx;
+  line-height: 1.2;
 }
 
 .petpal-order-card__status {

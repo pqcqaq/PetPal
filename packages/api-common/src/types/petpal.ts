@@ -38,6 +38,7 @@ export type OrderTimelineEventType =
   | 'REFUND_APPLIED'
   | 'REFUND_DONE';
 export type OrderOperatorRole = 'OWNER' | 'CAREGIVER' | 'ADMIN' | 'SYSTEM';
+export type OrderMessageSenderRole = Extract<OrderOperatorRole, 'OWNER' | 'CAREGIVER'>;
 export type ServiceLogType = 'CHECK_IN' | 'FEED' | 'WALK' | 'PLAY' | 'HEALTH' | 'CHECK_OUT' | 'NOTE';
 export type ComplaintTargetRole = 'CAREGIVER' | 'PLATFORM';
 export type ComplaintType = 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
@@ -248,6 +249,32 @@ export interface ComplaintRecord {
   processLogs: ComplaintProcessLogRecord[];
 }
 
+export interface OrderConversationRecord {
+  id: string;
+  orderId: string;
+  ownerUnreadCount: number;
+  caregiverUnreadCount: number;
+  lastMessageAt: string | null;
+  lastMessagePreview: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderMessageRecord {
+  id: string;
+  conversationId: string;
+  senderRole: OrderMessageSenderRole;
+  senderUserId: string;
+  content: string | null;
+  mediaUrls: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderConversationDetailRecord extends OrderConversationRecord {
+  messages: OrderMessageRecord[];
+}
+
 export type ComplaintAdminSlaStatus = 'NORMAL' | 'DUE_SOON' | 'OVERDUE';
 
 export interface ComplaintAdminRecord extends ComplaintRecord {
@@ -277,6 +304,7 @@ export interface OrderRecord {
   orderStatus: OrderStatus;
   createdAt: string;
   updatedAt: string;
+  conversation: OrderConversationRecord | null;
   payments: PaymentRecordBrief[];
   refunds: RefundRecordBrief[];
 }
@@ -331,6 +359,11 @@ export interface CreateComplaintPayload {
   complaintType: ComplaintType;
   description: string;
   evidenceUrls?: string[];
+}
+
+export interface CreateOrderMessagePayload {
+  content?: string;
+  mediaUrls?: string[];
 }
 
 export interface ComplaintAdminQuery {

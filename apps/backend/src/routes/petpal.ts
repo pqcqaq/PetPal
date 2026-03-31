@@ -137,6 +137,11 @@ const orderComplaintSchema = z.object({
   evidenceUrls: z.array(z.string().trim().url().max(500)).max(10).optional(),
 });
 
+const orderMessageSchema = z.object({
+  content: z.string().trim().max(1000).optional(),
+  mediaUrls: z.array(z.string().trim().url().max(500)).max(10).optional(),
+});
+
 const ownerTransactionExportQuerySchema = z.object({
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
@@ -435,6 +440,25 @@ petpalRouter.get('/orders/:id', asyncHandler(async (req, res) => {
   const auth = req.auth!;
   const order = await petpalService.getOwnerOrderDetail(auth.id, String(req.params.id));
   return ok(res, order, 'Order detail');
+}));
+
+petpalRouter.get('/orders/:id/messages', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const conversation = await petpalService.listOrderMessages(auth.id, String(req.params.id));
+  return ok(res, conversation, 'Order messages');
+}));
+
+petpalRouter.post('/orders/:id/messages', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = orderMessageSchema.parse(req.body ?? {});
+  const conversation = await petpalService.createOrderMessage(auth.id, String(req.params.id), payload);
+  return ok(res, conversation, 'Order message created');
+}));
+
+petpalRouter.post('/orders/:id/messages/read', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const conversation = await petpalService.markOrderMessagesRead(auth.id, String(req.params.id));
+  return ok(res, conversation, 'Order messages marked as read');
 }));
 
 petpalRouter.get('/orders/:id/refunds/export', (req, res, next) => {

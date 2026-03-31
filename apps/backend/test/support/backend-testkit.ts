@@ -368,23 +368,21 @@ export const uploadManagedFileForTest = async (
     url: string;
     fields: Record<string, string>;
   };
-  const formData = new FormData();
-  Object.entries(uploadPart.fields).forEach(([key, value]) => {
-    formData.append(key, value);
-  });
-  formData.append(
-    'file',
-    new Blob([Buffer.from(input.content)], {
-      type: input.contentType,
-    }),
-    input.fileName,
-  );
+  const uploadPath = new URL(uploadPart.url).pathname;
+  const uploadRequest = request(app)
+    .post(uploadPath)
+    .field(uploadPart.fields);
 
-  const uploadResponse = await fetch(uploadPart.url, {
-    method: 'POST',
-    body: formData,
-  });
-  assert.equal(uploadResponse.status, 204);
+  await uploadRequest
+    .attach(
+      'file',
+      Buffer.from(input.content),
+      {
+        filename: input.fileName,
+        contentType: input.contentType,
+      },
+    )
+    .expect(204);
 
   const callbackResponse = await request(app)
     .post('/api/files/callback')

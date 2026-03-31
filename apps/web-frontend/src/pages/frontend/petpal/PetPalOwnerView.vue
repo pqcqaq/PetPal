@@ -371,6 +371,27 @@
             <el-table-column prop="amountTotal" label="总额" min-width="100" />
             <el-table-column prop="amountPaid" label="已付" min-width="100" />
             <el-table-column prop="amountRefunded" label="已退" min-width="100" />
+            <el-table-column label="订单沟通" min-width="280">
+              <template #default="scope">
+                <div class="petpal-conversation-cell">
+                  <div class="petpal-conversation-cell__copy">
+                    <p class="petpal-conversation-cell__preview">
+                      {{ formatConversationPreview(scope.row.conversation) }}
+                    </p>
+                    <p class="petpal-conversation-cell__meta">
+                      {{ formatConversationMeta(scope.row.conversation, 'owner') }}
+                    </p>
+                  </div>
+                  <el-tag
+                    v-if="getConversationUnreadCount(scope.row.conversation, 'owner') > 0"
+                    type="danger"
+                    size="small"
+                  >
+                    待读 {{ getConversationUnreadCount(scope.row.conversation, 'owner') }}
+                  </el-tag>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column label="操作" min-width="180" fixed="right">
               <template #default="scope">
                 <el-space>
@@ -622,6 +643,27 @@
         <el-table-column prop="orderStatus" label="状态" min-width="120">
           <template #default="scope">
             {{ getOrderStatusLabel(scope.row.orderStatus) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="订单沟通" min-width="280">
+          <template #default="scope">
+            <div class="petpal-conversation-cell">
+              <div class="petpal-conversation-cell__copy">
+                <p class="petpal-conversation-cell__preview">
+                  {{ formatConversationPreview(scope.row.conversation) }}
+                </p>
+                <p class="petpal-conversation-cell__meta">
+                  {{ formatConversationMeta(scope.row.conversation, 'caregiver') }}
+                </p>
+              </div>
+              <el-tag
+                v-if="getConversationUnreadCount(scope.row.conversation, 'caregiver') > 0"
+                type="danger"
+                size="small"
+              >
+                待读 {{ getConversationUnreadCount(scope.row.conversation, 'caregiver') }}
+              </el-tag>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="动作" min-width="320" fixed="right">
@@ -991,6 +1033,39 @@ const getOrderStatusLabel = (status: OrderStatus) => ({
   PARTIAL_REFUNDED: '部分退款',
   REFUNDED: '已退款',
 }[status] ?? status);
+
+const getConversationUnreadCount = (
+  conversation: OrderRecord['conversation'] | null | undefined,
+  role: 'owner' | 'caregiver',
+) => {
+  if (!conversation) {
+    return 0;
+  }
+  return role === 'owner' ? conversation.ownerUnreadCount : conversation.caregiverUnreadCount;
+};
+
+const formatConversationPreview = (conversation: OrderRecord['conversation'] | null | undefined) => {
+  const preview = conversation?.lastMessagePreview?.trim();
+  if (preview) {
+    return preview;
+  }
+  if (conversation?.lastMessageAt) {
+    return '最近更新了一条附件或简短消息';
+  }
+  return '暂未开始订单沟通，可进入详情页发送消息。';
+};
+
+const formatConversationMeta = (
+  conversation: OrderRecord['conversation'] | null | undefined,
+  role: 'owner' | 'caregiver',
+) => {
+  const unreadCount = getConversationUnreadCount(conversation, role);
+  const unreadText = unreadCount > 0 ? `${unreadCount} 条未读` : '已读完';
+  if (conversation?.lastMessageAt) {
+    return `${formatTime(conversation.lastMessageAt)} · ${unreadText}`;
+  }
+  return unreadCount > 0 ? unreadText : '暂无沟通记录';
+};
 
 const refundStatusOptions: Array<{ label: string; value: RefundStatus }> = [
   { label: '待审核', value: 'PENDING' },
@@ -2117,6 +2192,38 @@ onMounted(async () => {
   display: grid;
   gap: 10px;
   justify-items: end;
+}
+
+.petpal-conversation-cell {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.petpal-conversation-cell__copy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-conversation-cell__preview,
+.petpal-conversation-cell__meta {
+  margin: 0;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.petpal-conversation-cell__preview {
+  color: #111827;
+  line-height: 1.5;
+}
+
+.petpal-conversation-cell__meta {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .petpal-service-log-dialog__upload {
