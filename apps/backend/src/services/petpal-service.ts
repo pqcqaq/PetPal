@@ -112,6 +112,8 @@ type OwnerRefundExportFilters = {
   startDate?: Date;
   endDate?: Date;
   refundStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
+  serviceType?: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+  orderNoKeyword?: string;
 };
 
 type OwnerTransactionExportRow = {
@@ -1516,6 +1518,19 @@ export const petpalService = {
         order: {
           ownerId: actorId,
           deleteAt: null,
+          ...(filters.serviceType
+            ? {
+                serviceType: filters.serviceType,
+              }
+            : {}),
+          ...(filters.orderNoKeyword
+            ? {
+                orderNo: {
+                  contains: filters.orderNoKeyword,
+                  mode: 'insensitive' as const,
+                },
+              }
+            : {}),
         },
       },
       orderBy: {

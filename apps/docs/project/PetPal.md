@@ -3829,6 +3829,54 @@ gantt
 2. 继续补投诉工单的独立值班页或超时提醒，提升后台主动治理能力。
 3. 视售后字段扩展情况，考虑抽离双端共用的时间线聚合逻辑，减少页面内重复映射代码。
 
+### 14.66 2026-04-01（P1-M3 Slice 49）
+
+**概述**：继续推进 P1-M3 主人端售后透明度，本轮为退款明细导出补齐“订单号关键词 + 服务类型”筛选，让主人在工作台可以直接按订单维度收窄退款对账范围。
+
+已完成：
+
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts`
+    - 扩展 `OwnerRefundExportQuery`，新增：
+      - `serviceType`
+      - `orderNoKeyword`
+- 后端 owner 退款导出订单维度筛选：
+  - `apps/backend/src/routes/petpal.ts`
+    - 扩展 `GET /api/petpal/orders/refunds/export` 查询参数校验。
+    - 支持接收服务类型和订单号关键词过滤条件。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 扩展 `listOwnerRefundExportRows(filters)`。
+    - 在原有主人范围、时间窗和退款状态过滤基础上，追加：
+      - 按 `order.serviceType` 过滤
+      - 按 `order.orderNo` 模糊匹配过滤
+- Web 主人端工作台：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+    - 在退款导出筛选条中新增服务类型选择。
+    - 新增订单号关键词输入。
+    - 与既有日期范围、退款状态筛选组合后统一生成导出请求参数。
+- 集成测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 验证退款导出可按服务类型和订单号关键词联合筛选。
+    - 验证服务类型不匹配、订单号关键词不匹配和他人订单退款均不会被导出。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（24/24）。
+
+风险与缓解：
+
+- 风险：当前退款导出筛选已覆盖时间、状态、服务类型和订单关键词，但尚未支持退款类型、投诉状态或更复杂的多条件模板保存。
+- 缓解：本轮先优先解决主人做退款对账时最直接的订单维度定位需求；后续如需要，再补退款类型、投诉联动筛选或常用导出条件保存。
+
+下一步（1-3）：
+
+1. 评估是否为退款导出补退款类型筛选或退款与投诉联合筛选。
+2. 继续评估是否补售后消息提醒、催办入口或统一售后通知流。
+3. 视导出条件继续增长情况，评估抽离主人端交易/退款导出的共用筛选工具条。
+
 ### 14.65 2026-04-01（P1-M3 Slice 48）
 
 **概述**：继续推进 P1-M3 主人端售后透明度，本轮为跨订单退款明细导出补齐“日期范围 + 退款状态”筛选，让主人在工作台导出退款流水时可以直接收窄对账范围。

@@ -1206,6 +1206,170 @@ describe('PetPal API integration', () => {
     assert.deepEqual(exportedOrderNos, [secondOrder.orderNo]);
   });
 
+  it('filters owner refund export by service type and order keyword', async () => {
+    const {
+      app,
+      prisma,
+      ownerSession,
+      caregiverProfile,
+    } = await createFulfillmentScenario();
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+    const suffix = Date.now().toString(36);
+
+    const matchedOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-focus-hit-${suffix}`,
+        orderNo: `PP-REFUND-FOCUS-WALK-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'WALKING',
+        appointmentStart: new Date('2026-04-21T08:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-21T09:00:00.000Z'),
+        amountTotal: 78,
+        amountAdjusted: 0,
+        amountPaid: 78,
+        amountRefunded: 18,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    const matchedRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-focus-hit-${suffix}`,
+        orderId: matchedOrder.id,
+        refundNo: `REF-FOCUS-HIT-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '命中服务类型和订单号关键词',
+        refundAmount: 18,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-03-30T10:00:00.000Z'),
+      },
+    });
+
+    const mismatchedServiceOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-focus-board-${suffix}`,
+        orderNo: `PP-REFUND-FOCUS-BOARD-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'BOARDING',
+        appointmentStart: new Date('2026-04-21T10:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-22T10:00:00.000Z'),
+        amountTotal: 188,
+        amountAdjusted: 0,
+        amountPaid: 188,
+        amountRefunded: 28,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    const mismatchedServiceRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-focus-board-${suffix}`,
+        orderId: mismatchedServiceOrder.id,
+        refundNo: `REF-FOCUS-BOARD-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '订单号命中但服务类型不符',
+        refundAmount: 28,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-03-30T11:00:00.000Z'),
+      },
+    });
+
+    const mismatchedKeywordOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-other-walk-${suffix}`,
+        orderNo: `PP-OTHER-WALK-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'WALKING',
+        appointmentStart: new Date('2026-04-21T12:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-21T13:00:00.000Z'),
+        amountTotal: 66,
+        amountAdjusted: 0,
+        amountPaid: 66,
+        amountRefunded: 12,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    const mismatchedKeywordRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-other-walk-${suffix}`,
+        orderId: mismatchedKeywordOrder.id,
+        refundNo: `REF-OTHER-WALK-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '服务类型命中但订单号关键词不符',
+        refundAmount: 12,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-03-30T12:30:00.000Z'),
+      },
+    });
+
+    const foreignOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-focus-foreign-${suffix}`,
+        orderNo: `PP-REFUND-FOCUS-FOREIGN-${Date.now()}`,
+        ownerId: adminSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'WALKING',
+        appointmentStart: new Date('2026-04-21T14:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-21T15:00:00.000Z'),
+        amountTotal: 80,
+        amountAdjusted: 0,
+        amountPaid: 80,
+        amountRefunded: 20,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    const foreignRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-focus-foreign-${suffix}`,
+        orderId: foreignOrder.id,
+        refundNo: `REF-FOCUS-FOREIGN-${Date.now()}`,
+        applyUserId: adminSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: 'foreign refund',
+        refundAmount: 20,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-03-30T14:30:00.000Z'),
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/orders/refunds/export')
+      .query({
+        serviceType: 'WALKING',
+        orderNoKeyword: 'REFUND-FOCUS',
+      })
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    const exportedRefundNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(6).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(exportedRefundNos, [matchedRefund.refundNo]);
+    assert.ok(!exportedRefundNos.includes(mismatchedServiceRefund.refundNo));
+    assert.ok(!exportedRefundNos.includes(mismatchedKeywordRefund.refundNo));
+    assert.ok(!exportedRefundNos.includes(foreignRefund.refundNo));
+
+    const exportedOrderNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(exportedOrderNos, [matchedOrder.orderNo]);
+  });
+
   it('returns owner refund progress snapshots for pending, approved and successful refunds', async () => {
     const {
       app,

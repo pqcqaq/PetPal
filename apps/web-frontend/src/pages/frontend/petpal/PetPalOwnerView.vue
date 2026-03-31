@@ -130,6 +130,28 @@
                   :value="option.value"
                 />
               </el-select>
+              <el-select
+                v-model="ownerRefundExportServiceType"
+                clearable
+                placeholder="服务类型"
+                size="small"
+                style="width: 140px"
+              >
+                <el-option
+                  v-for="option in refundExportServiceTypeOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-input
+                v-model="ownerRefundExportOrderNoKeyword"
+                clearable
+                maxlength="64"
+                placeholder="订单号关键词"
+                size="small"
+                style="width: min(100%, 180px)"
+              />
             </el-space>
             <el-space wrap>
               <ListExportButton
@@ -525,6 +547,7 @@ import type {
   OwnerRefundExportQuery,
   OrderStatus,
   PetProfileRecord,
+  PetServiceType,
   RefundStatus,
   ServiceRequestRecord,
   ServiceLogType,
@@ -675,8 +698,17 @@ const refundStatusOptions: Array<{ label: string; value: RefundStatus }> = [
   { label: '退款失败', value: 'FAILED' },
 ];
 
+const refundExportServiceTypeOptions: Array<{ label: string; value: PetServiceType }> = [
+  { label: '寄养', value: 'BOARDING' },
+  { label: '遛宠', value: 'WALKING' },
+  { label: '喂养', value: 'FEEDING' },
+  { label: '上门陪伴', value: 'DOOR_VISIT' },
+];
+
 const ownerRefundExportDateRange = ref<[Date, Date] | null>(null);
 const ownerRefundExportStatus = ref<RefundStatus | ''>('');
+const ownerRefundExportServiceType = ref<PetServiceType | ''>('');
+const ownerRefundExportOrderNoKeyword = ref('');
 
 const toDayBoundaryIsoString = (value: Date, boundary: 'start' | 'end') => {
   const next = new Date(value);
@@ -697,6 +729,8 @@ const buildOwnerRefundExportQuery = (): OwnerRefundExportQuery => ({
     ? toDayBoundaryIsoString(ownerRefundExportDateRange.value[1], 'end')
     : undefined,
   refundStatus: ownerRefundExportStatus.value || undefined,
+  serviceType: ownerRefundExportServiceType.value || undefined,
+  orderNoKeyword: ownerRefundExportOrderNoKeyword.value.trim() || undefined,
 });
 const buildOwnerRefundExportRequest = () => api.petpal.orders.exportRefundDetails(buildOwnerRefundExportQuery());
 
