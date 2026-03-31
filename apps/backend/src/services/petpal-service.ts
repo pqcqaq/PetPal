@@ -173,6 +173,27 @@ const buildCallbackAlertOutboxWhere = (
   return where;
 };
 
+const writeCallbackAlertReplayLog = async (input: {
+  outboxIds: string[];
+  actorId?: string | null;
+  actionType: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
+  note?: string;
+}) => {
+  const outboxIds = [...new Set(input.outboxIds.filter(Boolean))];
+  if (!outboxIds.length) {
+    return;
+  }
+
+  await prisma.callbackAlertReplayLog.createMany({
+    data: outboxIds.map((outboxId) => withSnowflakeId({
+      callbackOutboxId: outboxId,
+      actionType: input.actionType,
+      actorId: input.actorId ?? null,
+      note: input.note ?? null,
+    })),
+  });
+};
+
 export const petpalService = {
   async listPets(ownerId: string) {
     return prisma.petProfile.findMany({
@@ -1068,7 +1089,7 @@ export const petpalService = {
     };
   },
 
-  async retryCallbackAlertOutbox(id: string) {
+  async retryCallbackAlertOutbox(id: string, options?: { actorId?: string | null }) {
     const existing = await prisma.callbackAlertOutbox.findUnique({
       where: {
         id,
@@ -1084,7 +1105,7 @@ export const petpalService = {
       throw notFound('Callback alert outbox record not found');
     }
 
-    return prisma.callbackAlertOutbox.update({
+    const updated = await prisma.callbackAlertOutbox.update({
       where: {
         id,
       },
@@ -1095,9 +1116,18 @@ export const petpalService = {
         maxRetries: Math.max(existing.maxRetries, existing.retryCount + 1),
       },
     });
+
+    await writeCallbackAlertReplayLog({
+      outboxIds: [id],
+      actorId: options?.actorId,
+      actionType: 'REQUEUE',
+      note: 'manual single requeue',
+    });
+
+    return updated;
   },
 
-  async retryDeadCallbackAlertOutboxes(limit = 50) {
+  async retryDeadCallbackAlertOutboxes(limit = 50, options?: { actorId?: string | null }) {
     const take = Math.min(200, Math.max(1, limit));
 
     const deadRows = await prisma.callbackAlertOutbox.findMany({
@@ -1134,10 +1164,38 @@ export const petpalService = {
       },
     });
 
+    await writeCallbackAlertReplayLog({
+      outboxIds: ids,
+      actorId: options?.actorId,
+      actionType: 'REQUEUE_DEAD_BATCH',
+      note: `batch dead requeue limit=${take}`,
+    });
+
     return {
       requested: take,
       requeued: result.count,
     };
+  },
+
+  async listCallbackAlertReplayLogs(callbackOutboxId: string, limit = 50) {
+    const take = Math.min(200, Math.max(1, limit));
+
+    return prisma.callbackAlertReplayLog.findMany({
+      where: {
+        callbackOutboxId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take,
+      select: {
+        id: true,
+        actionType: true,
+        actorId: true,
+        note: true,
+        createdAt: true,
+      },
+    });
   },
 };
 

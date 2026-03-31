@@ -1891,6 +1891,43 @@ gantt
 - activeRole 信任边界下沉到后端，不接受仅前端声明的角色上下文。
 - 在不破坏历史行为前提下，保留“未传 activeRoleId 时按全量角色计算权限”的兼容路径。
 
+### 14.25 2026-04-01（P1 Slice 9）
+
+**概述**：补齐死信重放审计轨迹，支持对单条/批量重放行为追踪“谁、何时、如何重放”。
+
+已完成：
+
+- 数据模型与迁移：
+  - `apps/backend/prisma/models/petpal.prisma` 新增 `CallbackAlertReplayLog`。
+  - `apps/backend/prisma/migrations/20260401103000_add_callback_alert_replay_log/migration.sql` 新增重放日志表与索引。
+  - `apps/backend/prisma/seed-data.ts` 同步清空 replay log 表，保持 seed 幂等。
+- 服务层：
+  - `apps/backend/src/services/petpal-service.ts`
+    - 单条重放、批量死信重放时写入 replay log。
+    - 新增 `listCallbackAlertReplayLogs(outboxId, limit)` 查询能力。
+- 路由层：
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `GET /api/petpal/admin/callback-alert-outbox/:id/replay-logs`。
+    - 重放接口透传 `actorId`（从 `req.auth.id`）用于审计归因。
+- 共享契约与前端：
+  - `packages/api-common/src/types/petpal.ts` 新增 `CallbackAlertReplayLogRecord`。
+  - `packages/api-common/src/api/factory.ts` 新增 `callbackAlertOutboxReplayLogs(id, limit)`。
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue` 新增“记录”按钮与重放记录抽屉。
+- 测试补强：
+  - `apps/backend/test/integration/petpal-api.test.ts` 新增 replay log 生成与查询断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- 重放日志优先记录“操作轨迹”而非业务快照，减少写放大并保持审计可读性。
+- 单条与批量重放统一写日志，确保运维动作可追溯且可回放排查。
+
 - 回调审计持久化：完成。
 - 管理端审计查询 API：完成。
 - 管理端审计 UI：完成。

@@ -679,4 +679,38 @@ Git commit：`feat(p1): harden petpal callback transactions with serializable is
 - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
 
 Git commit：`feat(p1): enforce server-side active role validation and scoped permissions`。
+
+## 35. PetPal 重放审计轨迹（P1 Slice 9）
+
+**内容**：新增回调告警 outbox 重放日志能力，覆盖单条重放与批量死信重放的可追溯记录。
+
+变更摘要：
+
+- 数据层：
+  - `apps/backend/prisma/models/petpal.prisma` 新增 `CallbackAlertReplayLog`。
+  - 新增迁移 `apps/backend/prisma/migrations/20260401103000_add_callback_alert_replay_log/migration.sql`。
+  - `apps/backend/prisma/seed-data.ts` 新增 replay log 表清理。
+- 服务层：
+  - `apps/backend/src/services/petpal-service.ts`
+    - 单条/批量重放写入 replay log。
+    - 新增 `listCallbackAlertReplayLogs` 查询。
+- 路由层：
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `GET /api/petpal/admin/callback-alert-outbox/:id/replay-logs`。
+    - 重放接口带入 `actorId` 进行审计归因。
+- 共享契约与前端：
+  - `packages/api-common/src/types/petpal.ts` 新增 replay log 类型。
+  - `packages/api-common/src/api/factory.ts` 新增 replay log 查询方法。
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue` 新增重放记录抽屉。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts` 增加 replay log 断言与权限边界回归。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+Git commit：`feat(p1): add callback alert replay logs for outbox requeue traceability`。
 - 高增长场景下需要规划审计表分区与归档策略。

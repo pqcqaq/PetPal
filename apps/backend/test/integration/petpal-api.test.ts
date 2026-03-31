@@ -793,6 +793,15 @@ describe('PetPal API integration', () => {
     assert.equal(retryResponse.body.data.id, outboxId);
     assert.equal(retryResponse.body.data.status, 'PENDING');
 
+    const replayLogsAfterSingleRetry = await request(app)
+      .get(`/api/petpal/admin/callback-alert-outbox/${outboxId}/replay-logs`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(Array.isArray(replayLogsAfterSingleRetry.body.data));
+    assert.equal(replayLogsAfterSingleRetry.body.data[0].actionType, 'REQUEUE');
+    assert.ok(typeof replayLogsAfterSingleRetry.body.data[0].actorId === 'string');
+
     await prisma.callbackAlertOutbox.update({
       where: { id: outboxId },
       data: {
@@ -808,6 +817,15 @@ describe('PetPal API integration', () => {
 
     assert.ok(retryDeadResponse.body.data.requeued >= 1);
     assert.equal(retryDeadResponse.body.data.requested, 20);
+
+    const replayLogsAfterBatchRetry = await request(app)
+      .get(`/api/petpal/admin/callback-alert-outbox/${outboxId}/replay-logs`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(
+      replayLogsAfterBatchRetry.body.data.some((item: any) => item.actionType === 'REQUEUE_DEAD_BATCH'),
+    );
   });
 
   it('rejects tampered active role context and allows valid scoped role context', async () => {
@@ -878,6 +896,11 @@ describe('PetPal API integration', () => {
       .expect(403);
 
     await request(app)
+      .get('/api/petpal/admin/callback-alert-outbox/unknown/replay-logs')
+      .set(authHeader)
+      .expect(403);
+
+    await request(app)
       .post('/api/petpal/admin/callback-alert-outbox/retry-dead')
       .set(authHeader)
       .send({ limit: 20 })
@@ -919,6 +942,11 @@ describe('PetPal API integration', () => {
       .post('/api/petpal/admin/callback-alert-outbox/unknown/retry')
       .set(authHeader)
       .expect(403);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-alert-outbox/unknown/replay-logs')
+      .set(authHeader)
+      .expect(200);
 
     await request(app)
       .post('/api/petpal/admin/callback-alert-outbox/retry-dead')

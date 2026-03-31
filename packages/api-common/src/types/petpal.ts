@@ -270,3 +270,11 @@ export interface CallbackAlertOutboxStats {
   total: number;
   byStatus: Record<CallbackAlertOutboxStatus, number>;
 }
+
+export interface CallbackAlertReplayLogRecord {
+  id: string;
+  actionType: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
+  actorId: string | null;
+  note: string | null;
+  createdAt: string;
+}

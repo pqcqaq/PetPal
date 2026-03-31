@@ -56,6 +56,10 @@ const callbackAlertOutboxRetryDeadSchema = z.object({
   limit: z.number().int().positive().max(200).optional(),
 });
 
+const callbackAlertOutboxReplayLogQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(200).optional(),
+});
+
 const petpalRouter = Router();
 
 const parseCallbackAuditQuery = (query: Record<string, unknown>) => ({
@@ -230,14 +234,24 @@ petpalRouter.get('/admin/callback-alert-outbox/stats', requirePermission('petpal
   return ok(res, result, 'Callback alert outbox stats');
 }));
 
+petpalRouter.get('/admin/callback-alert-outbox/:id/replay-logs', requirePermission('petpal.callback-alert.read'), asyncHandler(async (req, res) => {
+  const query = callbackAlertOutboxReplayLogQuerySchema.parse(req.query ?? {});
+  const result = await petpalService.listCallbackAlertReplayLogs(String(req.params.id), query.limit ?? 50);
+  return ok(res, result, 'Callback alert outbox replay logs');
+}));
+
 petpalRouter.post('/admin/callback-alert-outbox/:id/retry', requirePermission('petpal.callback-alert.retry'), asyncHandler(async (req, res) => {
-  const result = await petpalService.retryCallbackAlertOutbox(String(req.params.id));
+  const result = await petpalService.retryCallbackAlertOutbox(String(req.params.id), {
+    actorId: req.auth?.id ?? null,
+  });
   return ok(res, result, 'Callback alert outbox requeued');
 }));
 
 petpalRouter.post('/admin/callback-alert-outbox/retry-dead', requirePermission('petpal.callback-alert.retry'), asyncHandler(async (req, res) => {
   const payload = callbackAlertOutboxRetryDeadSchema.parse(req.body ?? {});
-  const result = await petpalService.retryDeadCallbackAlertOutboxes(payload.limit ?? 50);
+  const result = await petpalService.retryDeadCallbackAlertOutboxes(payload.limit ?? 50, {
+    actorId: req.auth?.id ?? null,
+  });
   return ok(res, result, 'Callback alert outbox dead records requeued');
 }));
 

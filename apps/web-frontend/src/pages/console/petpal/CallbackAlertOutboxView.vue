@@ -69,6 +69,13 @@
       <el-table-column label="操作" width="120" fixed="right">
         <template #default="{ row }">
           <el-button
+            link
+            type="info"
+            @click="openReplayLogs(row)"
+          >
+            记录
+          </el-button>
+          <el-button
             v-permission="'petpal.callback-alert.retry'"
             link
             type="primary"
@@ -91,6 +98,23 @@
         @current-change="changePage"
       />
     </div>
+
+    <el-drawer
+      v-model="replayDrawerVisible"
+      title="重放记录"
+      size="520px"
+    >
+      <el-table :data="replayLogs" v-loading="replayLoading" border>
+        <el-table-column prop="createdAt" label="时间" min-width="170" />
+        <el-table-column prop="actionType" label="动作" min-width="150" />
+        <el-table-column prop="actorId" label="操作人" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.actorId || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="note" label="说明" min-width="220" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.note || '-' }}</template>
+        </el-table-column>
+      </el-table>
+    </el-drawer>
   </PageScaffold>
 </template>
 
@@ -98,6 +122,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import type {
+  CallbackAlertReplayLogRecord,
   CallbackAlertOutboxPage,
   CallbackAlertOutboxRecord,
   CallbackAlertOutboxStatus,
@@ -128,6 +153,9 @@ const rows = ref<CallbackAlertOutboxRecord[]>([]);
 const total = ref(0);
 const pageSize = 10;
 const loading = ref(false);
+const replayLoading = ref(false);
+const replayDrawerVisible = ref(false);
+const replayLogs = ref<CallbackAlertReplayLogRecord[]>([]);
 const statsData = ref<CallbackAlertOutboxStats>({
   total: 0,
   byStatus: {
@@ -217,6 +245,18 @@ const retryRow = async (id: string) => {
     await loadOutbox();
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '重试失败'));
+  }
+};
+
+const openReplayLogs = async (row: CallbackAlertOutboxRecord) => {
+  replayDrawerVisible.value = true;
+  replayLoading.value = true;
+  try {
+    replayLogs.value = await api.petpal.admin.callbackAlertOutboxReplayLogs(row.id, 50);
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '加载重放记录失败'));
+  } finally {
+    replayLoading.value = false;
   }
 };
 

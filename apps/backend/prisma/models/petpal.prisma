@@ -240,8 +240,24 @@ model CallbackAlertOutbox {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   callbackAudit   CallbackAudit @relation(fields: [callbackAuditId], references: [id], onDelete: Cascade)
+  replayLogs      CallbackAlertReplayLog[]
 
   @@index([callbackAuditId])
   @@index([status, nextRetryAt])
   @@index([createdAt])
+}
+
+model CallbackAlertReplayLog {
+  id              String @id
+  createId        String?
+  updateId        String?
+  callbackOutboxId String
+  actionType      String @default("REQUEUE") // REQUEUE | REQUEUE_DEAD_BATCH
+  actorId         String?
+  note            String?
+  createdAt       DateTime @default(now())
+  outbox          CallbackAlertOutbox @relation(fields: [callbackOutboxId], references: [id], onDelete: Cascade)
+
+  @@index([callbackOutboxId, createdAt])
+  @@index([actorId])
 }

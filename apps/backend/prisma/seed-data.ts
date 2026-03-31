@@ -10,6 +10,7 @@ import { syncUserRoles } from '../src/services/rbac-write';
 export async function seedDatabase(prisma: PrismaClient) {
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      "CallbackAlertReplayLog",
       "CallbackAlertOutbox",
       "RefundRecord",
       "PaymentRecord",
