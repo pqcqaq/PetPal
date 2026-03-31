@@ -4218,6 +4218,41 @@ gantt
 2. 继续围绕 PetPal 后台首页和值班流转补更多直接入口，减少二级页面切换。
 3. 继续清理 Web 端残余的模板语义和旧目录暴露点。
 
+### 14.87 2026-04-01（P1-M3 Slice 70）
+
+**概述**：继续把 PetPal 后台治理页的真实实现迁入根级命名空间，本轮将照料者审核页迁入 `petpal-admin/caregiver-audits`，使 `/petpal-admin/caregiver-audits` 不再依赖旧模板目录中的页面实现。
+
+已完成：
+
+- `apps/web-frontend/src/pages/petpal-admin/caregiver-audits/PetPalCaregiverAuditAdminView.vue`
+  - 新增根级后台照料者审核页面主实现。
+  - 保留现有筛选、分页、查询参数恢复与审核状态流转能力。
+- `apps/web-frontend/src/pages/petpal-admin/PetPalCaregiverAuditRouteView.vue`
+  - 根级后台路由包装层改为直接引用新的根级页面实现。
+- `apps/web-frontend/src/pages/console/petpal/CaregiverAuditView.vue`
+  - 旧页面改为兼容壳层，仅转发到新的根级后台实现。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认根级 `/petpal-admin/caregiver-audits` 已开始直接持有页面实现，而不是继续借用旧 `console/petpal` 页面文件。
+- 已确认本轮未修改照料者审核接口契约、查询参数和审核状态流转，仅做前端实现平移。
+- 已确认旧入口仍然可兼容访问，迁移期间不会打断已有页面跳转。
+
+风险与缓解：
+
+- 风险：投诉工单页仍然是最后一个留在旧 `console/petpal` 中的主要治理页，根级后台与旧目录仍有最后一段并存期。
+- 缓解：本轮继续复用统一迁移模式，下一步可集中处理投诉工单页，完成主要治理页的根级收口。
+
+下一步（1-3）：
+
+1. 继续将投诉工单页真实实现迁入 `petpal-admin` 根级命名空间。
+2. 继续围绕 PetPal 后台首页补更贴近值班的投诉入口和批量动作。
+3. 继续排查 Web 端残余模板术语与旧目录暴露点，收尾根级后台改造。
+
 ### 14.77 2026-04-01（P1-M3 Slice 60）
 
 **概述**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

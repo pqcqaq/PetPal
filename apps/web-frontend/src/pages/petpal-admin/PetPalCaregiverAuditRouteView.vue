@@ -1,7 +1,7 @@
 <template>
-  <CaregiverAuditView />
+  <PetPalCaregiverAuditAdminView />
 </template>
 
 <script setup lang="ts">
-import CaregiverAuditView from '@/pages/console/petpal/CaregiverAuditView.vue';
+import PetPalCaregiverAuditAdminView from '@/pages/petpal-admin/caregiver-audits/PetPalCaregiverAuditAdminView.vue';
 </script>
