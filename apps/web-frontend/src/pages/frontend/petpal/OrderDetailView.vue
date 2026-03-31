@@ -3,7 +3,7 @@
     <section class="frontend-page__hero">
       <p class="frontend-page__eyebrow">订单详情</p>
       <h1>订单 {{ orderNo }}</h1>
-      <p>查看订单状态、支付记录和退款进度</p>
+      <p>查看订单状态、履约时间线、服务记录以及支付退款进度</p>
       <div class="frontend-page__hero-actions">
         <el-button @click="goBack">返回列表</el-button>
         <el-button v-if="order" type="primary" :loading="loading" @click="reload">刷新</el-button>
@@ -65,6 +65,89 @@
               <span class="petpal-amount-item__label">已退款</span>
               <span class="petpal-amount-item__value">¥{{ formatAmount(order.amountRefunded) }}</span>
             </div>
+          </div>
+        </article>
+
+        <article class="frontend-card petpal-order-detail__fulfillment">
+          <span class="frontend-card__eyebrow">履约时间线</span>
+          <h3>{{ order.timeline.length > 0 ? `共 ${order.timeline.length} 条履约事件` : '暂无履约事件' }}</h3>
+          <template v-if="order.timeline.length > 0">
+            <div class="petpal-timeline">
+              <div v-for="event in order.timeline" :key="event.id" class="petpal-timeline__item">
+                <div class="petpal-timeline__dot" :class="`is-${getTimelineEventClass(event.eventType)}`" />
+                <div class="petpal-timeline__content">
+                  <div class="petpal-timeline__header">
+                    <h4>{{ getTimelineEventLabel(event.eventType) }}</h4>
+                    <span class="petpal-timeline__label">
+                      <el-space wrap size="small">
+                        <el-tag size="small" effect="plain">
+                          {{ getOperatorRoleLabel(event.operatorRole) }}
+                        </el-tag>
+                      </el-space>
+                    </span>
+                  </div>
+                  <div class="petpal-timeline__meta">
+                    <span class="petpal-timeline__meta-item">
+                      <strong>记录时间：</strong>{{ formatDateTime(event.createdAt) }}
+                    </span>
+                    <span v-if="event.operatorId" class="petpal-timeline__meta-item">
+                      <strong>操作人：</strong>{{ event.operatorId }}
+                    </span>
+                  </div>
+                  <div
+                    v-for="detail in getTimelineDetails(event)"
+                    :key="`${event.id}-${detail}`"
+                    class="petpal-timeline__detail"
+                  >
+                    {{ detail }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+          <div v-else class="petpal-empty">
+            <p>订单尚未产生履约事件</p>
+          </div>
+        </article>
+
+        <article class="frontend-card petpal-order-detail__service-logs">
+          <span class="frontend-card__eyebrow">服务记录</span>
+          <h3>{{ order.serviceLogs.length > 0 ? `共 ${order.serviceLogs.length} 条服务记录` : '暂无服务记录' }}</h3>
+          <template v-if="order.serviceLogs.length > 0">
+            <div class="petpal-timeline">
+              <div v-for="log in order.serviceLogs" :key="log.id" class="petpal-timeline__item">
+                <div class="petpal-timeline__dot" :class="`is-${getServiceLogClass(log.logType)}`" />
+                <div class="petpal-timeline__content">
+                  <div class="petpal-timeline__header">
+                    <h4>{{ getServiceLogTypeLabel(log.logType) }}</h4>
+                    <span class="petpal-timeline__label">
+                      <el-tag size="small" :type="getServiceLogTagType(log.logType)">
+                        {{ getServiceLogTypeLabel(log.logType) }}
+                      </el-tag>
+                    </span>
+                  </div>
+                  <div class="petpal-timeline__meta">
+                    <span class="petpal-timeline__meta-item">
+                      <strong>服务时间：</strong>{{ formatDateTime(log.happenedAt) }}
+                    </span>
+                    <span class="petpal-timeline__meta-item">
+                      <strong>媒体数量：</strong>{{ log.mediaUrls.length }}
+                    </span>
+                  </div>
+                  <p v-if="log.textNote" class="petpal-timeline__note">{{ log.textNote }}</p>
+                  <div
+                    v-for="detail in getServiceLogDetails(log)"
+                    :key="`${log.id}-${detail}`"
+                    class="petpal-timeline__detail"
+                  >
+                    {{ detail }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+          <div v-else class="petpal-empty">
+            <p>照料者尚未上传服务记录</p>
           </div>
         </article>
 
@@ -168,7 +251,20 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
-import type { OrderDetailRecord, OrderStatus, PetServiceType, PaymentStatus, RefundStatus, RefundType, PaymentBizType } from '@rbac/api-common';
+import type {
+  OrderDetailRecord,
+  OrderOperatorRole,
+  OrderStatus,
+  OrderTimelineEventType,
+  OrderTimelineRecord,
+  PaymentBizType,
+  PaymentStatus,
+  PetServiceType,
+  RefundStatus,
+  RefundType,
+  ServiceLogRecord,
+  ServiceLogType,
+} from '@rbac/api-common';
 
 const router = useRouter();
 const orderId = router.currentRoute.value.params.id as string;
@@ -188,6 +284,30 @@ const formatDate = (dateStr: string) => {
 
 const formatDateTime = (dateStr: string) => {
   return new Date(dateStr).toLocaleString('zh-CN');
+};
+
+const getRecordString = (record: Record<string, unknown> | null | undefined, key: string) => {
+  const value = record?.[key];
+  return typeof value === 'string' && value.trim() ? value : null;
+};
+
+const getRecordNumber = (record: Record<string, unknown> | null | undefined, key: string) => {
+  const value = record?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+};
+
+const formatGeoValue = (value: unknown) => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const lat = (value as { lat?: unknown }).lat;
+  const lng = (value as { lng?: unknown }).lng;
+  if (typeof lat === 'number' && typeof lng === 'number') {
+    return `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+  }
+
+  return null;
 };
 
 const getOrderStatusLabel = (status: OrderStatus): string => {
@@ -226,6 +346,85 @@ const getServiceTypeLabel = (type: PetServiceType): string => {
     DOOR_VISIT: '上门陪伴',
   };
   return labels[type] || type;
+};
+
+const getTimelineEventLabel = (eventType: OrderTimelineEventType): string => {
+  const labels: Record<OrderTimelineEventType, string> = {
+    CREATED: '订单创建',
+    ACCEPTED: '照料者接单',
+    CHECKED_IN: '照料者签到',
+    SERVICE_LOGGED: '上传服务记录',
+    CHECKED_OUT: '照料者签退',
+    COMPLETED: '业主确认完成',
+    CANCELLED: '订单取消',
+    REFUND_APPLIED: '发起退款',
+    REFUND_DONE: '退款完成',
+  };
+  return labels[eventType] || eventType;
+};
+
+const getTimelineEventClass = (eventType: OrderTimelineEventType): string => {
+  const classes: Record<OrderTimelineEventType, string> = {
+    CREATED: 'pending',
+    ACCEPTED: 'success',
+    CHECKED_IN: 'warning',
+    SERVICE_LOGGED: 'primary',
+    CHECKED_OUT: 'success',
+    COMPLETED: 'success',
+    CANCELLED: 'error',
+    REFUND_APPLIED: 'warning',
+    REFUND_DONE: 'info',
+  };
+  return classes[eventType] || 'info';
+};
+
+const getOperatorRoleLabel = (role: OrderOperatorRole): string => {
+  const labels: Record<OrderOperatorRole, string> = {
+    OWNER: '宠物主人',
+    CAREGIVER: '照料者',
+    ADMIN: '管理员',
+    SYSTEM: '系统',
+  };
+  return labels[role] || role;
+};
+
+const getServiceLogTypeLabel = (type: ServiceLogType): string => {
+  const labels: Record<ServiceLogType, string> = {
+    CHECK_IN: '签到记录',
+    FEED: '喂养记录',
+    WALK: '遛宠记录',
+    PLAY: '陪玩记录',
+    HEALTH: '健康观察',
+    CHECK_OUT: '签退记录',
+    NOTE: '服务备注',
+  };
+  return labels[type] || type;
+};
+
+const getServiceLogClass = (type: ServiceLogType): string => {
+  const classes: Record<ServiceLogType, string> = {
+    CHECK_IN: 'warning',
+    FEED: 'primary',
+    WALK: 'success',
+    PLAY: 'primary',
+    HEALTH: 'error',
+    CHECK_OUT: 'info',
+    NOTE: 'pending',
+  };
+  return classes[type] || 'info';
+};
+
+const getServiceLogTagType = (type: ServiceLogType): 'primary' | 'success' | 'warning' | 'info' | 'danger' => {
+  const types: Record<ServiceLogType, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
+    CHECK_IN: 'warning',
+    FEED: 'primary',
+    WALK: 'success',
+    PLAY: 'primary',
+    HEALTH: 'danger',
+    CHECK_OUT: 'info',
+    NOTE: 'info',
+  };
+  return types[type] || 'info';
 };
 
 const getPaymentStatusLabel = (status: PaymentStatus): string => {
@@ -306,6 +505,46 @@ const getRefundTypeLabel = (type: RefundType): string => {
     PARTIAL: '部分退款',
   };
   return labels[type] || type;
+};
+
+const getTimelineDetails = (event: OrderTimelineRecord) => {
+  const details: string[] = [];
+  const previousStatus = getRecordString(event.eventPayload, 'previousStatus');
+  const nextStatus = getRecordString(event.eventPayload, 'nextStatus');
+  const note = getRecordString(event.eventPayload, 'note');
+  const happenedAt = getRecordString(event.eventPayload, 'happenedAt');
+  const mediaCount = getRecordNumber(event.eventPayload, 'mediaCount');
+  const geoText = formatGeoValue(event.eventPayload?.geo);
+
+  if (previousStatus && nextStatus) {
+    details.push(`状态流转：${getOrderStatusLabel(previousStatus as OrderStatus)} -> ${getOrderStatusLabel(nextStatus as OrderStatus)}`);
+  }
+  if (note) {
+    details.push(`备注：${note}`);
+  }
+  if (happenedAt) {
+    details.push(`业务时间：${formatDateTime(happenedAt)}`);
+  }
+  if (mediaCount !== null) {
+    details.push(`附带媒体：${mediaCount} 个`);
+  }
+  if (geoText) {
+    details.push(`定位坐标：${geoText}`);
+  }
+
+  return details;
+};
+
+const getServiceLogDetails = (log: ServiceLogRecord) => {
+  const details: string[] = [];
+  const geoText = formatGeoValue(log.geo);
+  if (geoText) {
+    details.push(`定位坐标：${geoText}`);
+  }
+  if (log.createdAt !== log.happenedAt) {
+    details.push(`上传时间：${formatDateTime(log.createdAt)}`);
+  }
+  return details;
 };
 
 const reload = async () => {
@@ -467,6 +706,22 @@ onMounted(() => {
 .petpal-timeline__meta-item {
   font-size: 0.875rem;
   color: #666;
+}
+
+.petpal-timeline__detail {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #555;
+  line-height: 1.6;
+}
+
+.petpal-timeline__note {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0.875rem;
+  border-radius: 8px;
+  background: #f6f8fb;
+  color: #333;
+  line-height: 1.6;
 }
 
 .petpal-empty {

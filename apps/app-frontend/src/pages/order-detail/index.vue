@@ -1,5 +1,13 @@
 <script lang="ts" setup>
-import type { OrderDetailRecord } from '@rbac/api-common'
+import type {
+  OrderDetailRecord,
+  OrderOperatorRole,
+  OrderStatus,
+  OrderTimelineEventType,
+  OrderTimelineRecord,
+  ServiceLogRecord,
+  ServiceLogType,
+} from '@rbac/api-common'
 import dayjs from 'dayjs'
 import { ref, watch } from 'vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
@@ -63,6 +71,32 @@ const labels = {
     BALANCE: '尾款',
     ADJUSTMENT: '调整',
   } as Record<string, string>,
+  timelineEvent: {
+    CREATED: '订单创建',
+    ACCEPTED: '照料者接单',
+    CHECKED_IN: '照料者签到',
+    SERVICE_LOGGED: '上传服务记录',
+    CHECKED_OUT: '照料者签退',
+    COMPLETED: '业主确认完成',
+    CANCELLED: '订单取消',
+    REFUND_APPLIED: '发起退款',
+    REFUND_DONE: '退款完成',
+  } as Record<string, string>,
+  operatorRole: {
+    OWNER: '宠物主人',
+    CAREGIVER: '照料者',
+    ADMIN: '管理员',
+    SYSTEM: '系统',
+  } as Record<string, string>,
+  serviceLogType: {
+    CHECK_IN: '签到记录',
+    FEED: '喂养记录',
+    WALK: '遛宠记录',
+    PLAY: '陪玩记录',
+    HEALTH: '健康观察',
+    CHECK_OUT: '签退记录',
+    NOTE: '服务备注',
+  } as Record<string, string>,
 }
 
 const formatAmount = (value: unknown) => {
@@ -76,6 +110,97 @@ const formatDate = (dateStr: string) => {
 
 const formatDateTime = (dateStr: string) => {
   return dayjs(dateStr).format('YYYY-MM-DD HH:mm:ss')
+}
+
+const getRecordString = (record: Record<string, unknown> | null | undefined, key: string) => {
+  const value = record?.[key]
+  return typeof value === 'string' && value.trim() ? value : null
+}
+
+const getRecordNumber = (record: Record<string, unknown> | null | undefined, key: string) => {
+  const value = record?.[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+const formatGeoValue = (value: unknown) => {
+  if (!value || typeof value !== 'object') return null
+  const lat = (value as { lat?: unknown }).lat
+  const lng = (value as { lng?: unknown }).lng
+  if (typeof lat === 'number' && typeof lng === 'number') {
+    return `${lat.toFixed(3)}, ${lng.toFixed(3)}`
+  }
+  return null
+}
+
+const getTimelineClass = (eventType: OrderTimelineEventType) => {
+  const classes: Record<OrderTimelineEventType, string> = {
+    CREATED: 'pending',
+    ACCEPTED: 'success',
+    CHECKED_IN: 'warning',
+    SERVICE_LOGGED: 'primary',
+    CHECKED_OUT: 'success',
+    COMPLETED: 'success',
+    CANCELLED: 'error',
+    REFUND_APPLIED: 'warning',
+    REFUND_DONE: 'closed',
+  }
+  return classes[eventType] || 'pending'
+}
+
+const getServiceLogClass = (logType: ServiceLogType) => {
+  const classes: Record<ServiceLogType, string> = {
+    CHECK_IN: 'warning',
+    FEED: 'primary',
+    WALK: 'success',
+    PLAY: 'primary',
+    HEALTH: 'error',
+    CHECK_OUT: 'closed',
+    NOTE: 'pending',
+  }
+  return classes[logType] || 'pending'
+}
+
+const formatOrderStatusLabel = (status: string) => {
+  return labels.orderStatus[status] || status
+}
+
+const getTimelineDetails = (event: OrderTimelineRecord) => {
+  const details: string[] = []
+  const previousStatus = getRecordString(event.eventPayload, 'previousStatus')
+  const nextStatus = getRecordString(event.eventPayload, 'nextStatus')
+  const note = getRecordString(event.eventPayload, 'note')
+  const happenedAt = getRecordString(event.eventPayload, 'happenedAt')
+  const mediaCount = getRecordNumber(event.eventPayload, 'mediaCount')
+  const geoText = formatGeoValue(event.eventPayload?.geo)
+
+  if (previousStatus && nextStatus) {
+    details.push(`状态流转：${formatOrderStatusLabel(previousStatus)} -> ${formatOrderStatusLabel(nextStatus)}`)
+  }
+  if (note) {
+    details.push(`备注：${note}`)
+  }
+  if (happenedAt) {
+    details.push(`业务时间：${formatDateTime(happenedAt)}`)
+  }
+  if (mediaCount !== null) {
+    details.push(`附带媒体：${mediaCount} 个`)
+  }
+  if (geoText) {
+    details.push(`定位坐标：${geoText}`)
+  }
+  return details
+}
+
+const getServiceLogDetails = (log: ServiceLogRecord) => {
+  const details: string[] = []
+  const geoText = formatGeoValue(log.geo)
+  if (geoText) {
+    details.push(`定位坐标：${geoText}`)
+  }
+  if (log.createdAt !== log.happenedAt) {
+    details.push(`上传时间：${formatDateTime(log.createdAt)}`)
+  }
+  return details
 }
 
 async function loadOrderDetail() {
@@ -169,6 +294,69 @@ onLoad((options: Record<string, any>) => {
               <text class="petpal-amount-label">已退款</text>
               <text class="petpal-amount-value">¥{{ formatAmount(order.amountRefunded) }}</text>
             </view>
+          </view>
+        </AppSection>
+
+        <AppSection :title="order.timeline.length > 0 ? `履约时间线 (${order.timeline.length})` : '履约时间线'">
+          <template v-if="order.timeline.length > 0">
+            <view class="petpal-timeline">
+              <view v-for="event in order.timeline" :key="event.id" class="petpal-timeline-item">
+                <view class="petpal-timeline-dot" :class="`is-${getTimelineClass(event.eventType as OrderTimelineEventType)}`" />
+                <view class="petpal-timeline-content">
+                  <view class="petpal-timeline-header">
+                    <text class="petpal-timeline-title">{{ labels.timelineEvent[event.eventType] || event.eventType }}</text>
+                    <text class="petpal-timeline-label">{{ labels.operatorRole[event.operatorRole] || event.operatorRole }}</text>
+                  </view>
+                  <view class="petpal-timeline-meta">
+                    <text class="petpal-timeline-meta-item">
+                      <text class="petpal-timeline-meta-label">记录</text>
+                      <text class="petpal-timeline-meta-value">{{ formatDateTime(event.createdAt) }}</text>
+                    </text>
+                    <text v-if="event.operatorId" class="petpal-timeline-meta-item">
+                      <text class="petpal-timeline-meta-label">操作人</text>
+                      <text class="petpal-timeline-meta-value">{{ event.operatorId }}</text>
+                    </text>
+                  </view>
+                  <view v-for="detail in getTimelineDetails(event)" :key="`${event.id}-${detail}`" class="petpal-detail-line">
+                    <text>{{ detail }}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </template>
+          <view v-else class="petpal-empty">
+            <text>订单尚未产生履约事件</text>
+          </view>
+        </AppSection>
+
+        <AppSection :title="order.serviceLogs.length > 0 ? `服务记录 (${order.serviceLogs.length})` : '服务记录'">
+          <template v-if="order.serviceLogs.length > 0">
+            <view class="petpal-timeline">
+              <view v-for="log in order.serviceLogs" :key="log.id" class="petpal-timeline-item">
+                <view class="petpal-timeline-dot" :class="`is-${getServiceLogClass(log.logType as ServiceLogType)}`" />
+                <view class="petpal-timeline-content">
+                  <view class="petpal-timeline-header">
+                    <text class="petpal-timeline-title">{{ labels.serviceLogType[log.logType] || log.logType }}</text>
+                    <text class="petpal-timeline-label">{{ formatDateTime(log.happenedAt) }}</text>
+                  </view>
+                  <view class="petpal-timeline-meta">
+                    <text class="petpal-timeline-meta-item">
+                      <text class="petpal-timeline-meta-label">媒体</text>
+                      <text class="petpal-timeline-meta-value">{{ log.mediaUrls.length }} 个</text>
+                    </text>
+                  </view>
+                  <view v-if="log.textNote" class="petpal-note-card">
+                    <text>{{ log.textNote }}</text>
+                  </view>
+                  <view v-for="detail in getServiceLogDetails(log)" :key="`${log.id}-${detail}`" class="petpal-detail-line">
+                    <text>{{ detail }}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </template>
+          <view v-else class="petpal-empty">
+            <text>照料者尚未上传服务记录</text>
           </view>
         </AppSection>
 
@@ -428,6 +616,22 @@ onLoad((options: Record<string, any>) => {
 
 .petpal-timeline-meta-value {
   color: #666;
+}
+
+.petpal-detail-line {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #555;
+  line-height: 1.6;
+}
+
+.petpal-note-card {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f5f7fa;
+  color: #333;
+  line-height: 1.6;
 }
 
 .petpal-empty {

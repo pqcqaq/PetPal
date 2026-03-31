@@ -2835,3 +2835,49 @@ gantt
 1. 在订单详情页补充时间线与服务记录可视化，形成履约过程可追溯界面。
 2. 为履约动作补齐越权、状态逆行、未审核照料者等失败分支测试。
 3. 评估服务记录媒体上传复用现有对象存储链路，避免新增一套上传协议。
+
+### 14.43 2026-04-01（P1-M2 Slice 26）
+
+**概述**：补齐订单详情中的履约可视化，确保主人端与移动端都能直接查看履约时间线和服务记录，并增加定向契约断言防止详情字段回退。
+
+已完成：
+
+- Web 前台：
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+    - 新增“履约时间线”区块，展示：
+      - 事件名称
+      - 操作角色
+      - 记录时间
+      - 状态流转/备注/业务时间/媒体数量/定位坐标
+    - 新增“服务记录”区块，展示：
+      - 记录类型
+      - 服务时间
+      - 备注文本
+      - 媒体数量
+      - 定位坐标
+      - 上传时间
+- 移动端：
+  - `apps/app-frontend/src/pages/order-detail/index.vue`
+    - 同步新增履约时间线和服务记录区块，保证 Uni 端具备相同可追溯能力。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 在履约主路径测试中新增业主侧详情断言，校验：
+      - 可读取 `CHECKED_IN` / `CHECKED_OUT` 时间线事件
+      - 可读取 `NOTE` / `CHECK_OUT` 服务记录
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（12/12）。
+
+风险与缓解：
+
+- 风险：当前服务记录仅展示媒体数量，尚未提供媒体缩略图与回放。
+- 缓解：下一切片接入上传链路后，再将记录页升级为“文字 + 媒体预览”的完整履约详情。
+
+下一步（1-3）：
+
+1. 为履约接口补越权、未审核照料者、状态逆行等失败分支测试。
+2. 将服务记录媒体上传接入既有对象存储链路，并在详情页展示缩略图或链接。
+3. 评估是否为履约时间线增加管理员审计视图，支持后续纠纷处理。

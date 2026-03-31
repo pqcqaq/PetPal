@@ -922,6 +922,28 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 53. PetPal 订单详情履约可视化（P1-M2 Slice 26）
+
+**内容**：将履约时间线与服务记录接入订单详情页面，补齐主人端和移动端的履约过程可视化，并增加一条业主详情契约断言。
+
+变更摘要：
+
+- `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+  - 新增履约时间线区块，展示事件标签、操作角色、记录时间、状态流转、备注、业务时间、媒体数量、定位坐标。
+  - 新增服务记录区块，展示记录类型、服务时间、备注、媒体数量、定位坐标与上传时间。
+- `apps/app-frontend/src/pages/order-detail/index.vue`
+  - Uni 端同步新增履约时间线和服务记录展示，保证双端订单详情结构一致。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 在履约主路径测试中增加业主详情断言，校验详情接口返回完整 `timeline` / `serviceLogs` 痕迹。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（12/12）。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。

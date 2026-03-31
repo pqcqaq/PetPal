@@ -396,6 +396,34 @@ describe('PetPal API integration', () => {
       ),
     );
 
+    const ownerDetailResponse = await request(app)
+      .get(`/api/petpal/orders/${order.id}`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(ownerDetailResponse.body.data.id, order.id);
+    assert.ok(
+      ownerDetailResponse.body.data.timeline.some(
+        (item: { eventType: string }) => item.eventType === 'CHECKED_IN',
+      ),
+    );
+    assert.ok(
+      ownerDetailResponse.body.data.timeline.some(
+        (item: { eventType: string }) => item.eventType === 'CHECKED_OUT',
+      ),
+    );
+    assert.ok(
+      ownerDetailResponse.body.data.serviceLogs.some(
+        (item: { logType: string; textNote: string | null }) => item.logType === 'NOTE'
+          && item.textNote?.includes('30 分钟遛狗'),
+      ),
+    );
+    assert.ok(
+      ownerDetailResponse.body.data.serviceLogs.some(
+        (item: { logType: string }) => item.logType === 'CHECK_OUT',
+      ),
+    );
+
     const persistedOrder = await prisma.orderMain.findUnique({
       where: {
         id: order.id,
