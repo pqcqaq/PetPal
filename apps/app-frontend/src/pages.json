@@ -50,7 +50,7 @@
       "path": "pages/me/profile",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "个人信息"
+        "navigationBarTitleText": "PetPal 资料"
       }
     },
     {

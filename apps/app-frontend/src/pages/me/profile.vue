@@ -17,7 +17,7 @@ import { getErrorMessage } from '@/utils/error'
 
 definePage({
   style: {
-    navigationBarTitleText: '个人信息',
+    navigationBarTitleText: 'PetPal 资料',
   },
 })
 
@@ -35,6 +35,7 @@ const canUploadAvatar = computed(() => {
   const permissions = userInfo.value.permissions || []
   return permissions.includes('file.upload.avatar') || permissions.includes('file.upload')
 })
+const hasPetPalAdminAccess = computed(() => userInfo.value.permissions.some(permission => permission.startsWith('petpal.')))
 
 const profileDirty = computed(() => {
   const nickname = profileForm.nickname.trim()
@@ -45,6 +46,29 @@ const profileDirty = computed(() => {
 
 const statusText = computed(() => userInfo.value.status === 'ACTIVE' ? '正常' : '停用')
 const statusTagType = computed(() => userInfo.value.status === 'ACTIVE' ? 'success' : 'warning')
+const roleSummary = computed(() => userInfo.value.roles.map(role => role.name).join('、') || '主人端账号')
+const profileAbilities = computed(() => [
+  {
+    title: '主人服务台',
+    value: '已开通',
+    label: '宠物档案、需求发布、订单跟进和售后主流程可直接使用。',
+  },
+  {
+    title: '头像上传',
+    value: canUploadAvatar.value ? '可用' : '受限',
+    label: canUploadAvatar.value ? '当前账号可以更新头像。' : '当前账号暂未开通头像上传能力。',
+  },
+  {
+    title: 'PetPal 后台',
+    value: hasPetPalAdminAccess.value ? '可进入' : '未开通',
+    label: hasPetPalAdminAccess.value ? '当前账号具备部分后台治理能力。' : '当前账号以主人端主流程为主。',
+  },
+  {
+    title: '资料同步',
+    value: '已开启',
+    label: '昵称、邮箱和体验设置会跟随账号保持同步。',
+  },
+])
 
 function syncProfileForm() {
   profileForm.nickname = userInfo.value.nickname || ''
@@ -118,7 +142,7 @@ onShow(() => {
 </script>
 
 <template>
-  <AppPageShell title="个人信息" description="编辑昵称、邮箱，并通过分步上传更新头像。">
+  <AppPageShell title="PetPal 资料" description="编辑昵称、邮箱和头像，并查看当前账号在 PetPal 中的可用能力。">
     <AppSection title="头像">
       <view class="profile-card-wrap">
         <AppAvatarUploader
@@ -128,12 +152,12 @@ onShow(() => {
           @updated="handleAvatarUpdated"
         />
         <view v-if="!canUploadAvatar" class="profile-card__hint">
-          当前账号未分配 `file.upload.avatar` 或 `file.upload` 权限，无法上传头像。
+          当前账号暂未开通头像上传能力，如需开放可联系平台管理员处理。
         </view>
       </view>
     </AppSection>
 
-    <AppSection title="基本资料" description="修改后会同步到当前账号。">
+    <AppSection title="基本资料" description="修改后会同步到当前 PetPal 账号。">
       <AppList>
         <AppInput v-model="profileForm.nickname" class="app-auth-input" label="昵称" placeholder="请输入昵称" />
         <AppInput v-model="profileForm.email" class="app-auth-input" label="邮箱" placeholder="请输入邮箱（可留空）" />
@@ -151,12 +175,13 @@ onShow(() => {
       </view>
     </AppSection>
 
-    <AppSection title="账号状态">
+    <AppSection title="PetPal 账户">
       <AppList>
         <AppListItem title="用户名" :value="userInfo.username || '--'" />
         <AppListItem title="账号状态" :value="statusText" value-emphasis />
-        <AppListItem title="角色数量" :value="String(userInfo.roles.length)" />
-        <AppListItem title="权限数量" :value="String(userInfo.permissions.length)" />
+        <AppListItem title="当前身份" :label="roleSummary" />
+        <AppListItem title="邮箱状态" :value="userInfo.email ? '已绑定' : '未绑定'" />
+        <AppListItem title="头像上传" :value="canUploadAvatar ? '可用' : '受限'" />
       </AppList>
       <view class="profile-tag-block">
         <view class="app-tag-row app-tag-row--compact">
@@ -170,17 +195,17 @@ onShow(() => {
       </view>
     </AppSection>
 
-    <AppSection title="权限标识">
-      <view v-if="userInfo.permissions.length" class="profile-tag-block">
-        <view class="app-tag-row app-tag-row--compact">
-          <AppTag v-for="permission in userInfo.permissions" :key="permission" type="default">
-            {{ permission }}
-          </AppTag>
-        </view>
-      </view>
-      <view v-else class="app-status-wrap">
-        <AppStatus text="当前账号暂无权限标识。" />
-      </view>
+    <AppSection title="当前账号能力">
+      <AppList>
+        <AppListItem
+          v-for="item in profileAbilities"
+          :key="item.title"
+          :title="item.title"
+          :label="item.label"
+          :value="item.value"
+          :value-emphasis="item.value !== '未开通'"
+        />
+      </AppList>
     </AppSection>
   </AppPageShell>
 </template>
