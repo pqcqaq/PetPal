@@ -111,6 +111,7 @@ type OwnerTransactionExportFilters = {
 type OwnerRefundExportFilters = {
   startDate?: Date;
   endDate?: Date;
+  refundStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
 };
 
 type OwnerTransactionExportRow = {
@@ -1507,6 +1508,11 @@ export const petpalService = {
           gte: startDate,
           lte: endDate,
         },
+        ...(filters.refundStatus
+          ? {
+              refundStatus: filters.refundStatus,
+            }
+          : {}),
         order: {
           ownerId: actorId,
           deleteAt: null,

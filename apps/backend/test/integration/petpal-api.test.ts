@@ -1070,6 +1070,142 @@ describe('PetPal API integration', () => {
     assert.equal(oversizeRangeResponse.body.message, 'Export date range cannot exceed 366 days');
   });
 
+  it('filters owner refund export by date range and refund status', async () => {
+    const {
+      app,
+      prisma,
+      ownerSession,
+      caregiverProfile,
+      order,
+    } = await createFulfillmentScenario();
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+    const suffix = Date.now().toString(36);
+
+    const outOfRangeRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-filter-range-${suffix}`,
+        orderId: order.id,
+        refundNo: `REF-FILTER-RANGE-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '超出筛选日期范围',
+        refundAmount: 16,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-04-18T09:00:00.000Z'),
+      },
+    });
+
+    const secondOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-filter-${suffix}`,
+        orderNo: `PP-REFUND-FILTER-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'WALKING',
+        appointmentStart: new Date('2026-04-20T08:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-20T09:00:00.000Z'),
+        amountTotal: 88,
+        amountAdjusted: 0,
+        amountPaid: 88,
+        amountRefunded: 24,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    const matchedRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-filter-hit-${suffix}`,
+        orderId: secondOrder.id,
+        refundNo: `REF-FILTER-HIT-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '命中时间与状态筛选',
+        refundAmount: 24,
+        refundStatus: 'SUCCESS',
+        reviewedBy: adminSession.user.id,
+        reviewedAt: new Date('2026-04-20T15:00:00.000Z'),
+        createdAt: new Date('2026-04-20T10:00:00.000Z'),
+      },
+    });
+
+    const mismatchedStatusRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-filter-status-${suffix}`,
+        orderId: order.id,
+        refundNo: `REF-FILTER-STATUS-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '日期命中但状态不符',
+        refundAmount: 10,
+        refundStatus: 'APPROVED',
+        reviewedBy: adminSession.user.id,
+        reviewedAt: new Date('2026-04-20T12:00:00.000Z'),
+        createdAt: new Date('2026-04-20T11:00:00.000Z'),
+      },
+    });
+
+    const foreignOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-filter-foreign-${suffix}`,
+        orderNo: `PP-REFUND-FILTER-FOREIGN-${Date.now()}`,
+        ownerId: adminSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'BOARDING',
+        appointmentStart: new Date('2026-04-20T09:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-21T09:00:00.000Z'),
+        amountTotal: 188,
+        amountAdjusted: 0,
+        amountPaid: 188,
+        amountRefunded: 32,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    const foreignRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-filter-foreign-${suffix}`,
+        orderId: foreignOrder.id,
+        refundNo: `REF-FILTER-FOREIGN-${Date.now()}`,
+        applyUserId: adminSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: 'foreign refund',
+        refundAmount: 32,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-04-20T13:00:00.000Z'),
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/orders/refunds/export')
+      .query({
+        startDate: '2026-04-20T00:00:00.000Z',
+        endDate: '2026-04-20T23:59:59.999Z',
+        refundStatus: 'SUCCESS',
+      })
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    const exportedRefundNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(6).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(exportedRefundNos, [matchedRefund.refundNo]);
+    assert.ok(!exportedRefundNos.includes(outOfRangeRefund.refundNo));
+    assert.ok(!exportedRefundNos.includes(mismatchedStatusRefund.refundNo));
+    assert.ok(!exportedRefundNos.includes(foreignRefund.refundNo));
+
+    const exportedOrderNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(exportedOrderNos, [secondOrder.orderNo]);
+  });
+
   it('returns owner refund progress snapshots for pending, approved and successful refunds', async () => {
     const {
       app,

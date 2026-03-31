@@ -97,21 +97,55 @@
       <article class="frontend-card petpal-grid-span-7">
         <span class="frontend-card__eyebrow">需求与订单</span>
         <div class="petpal-section-heading">
-          <h3>当前业务进展</h3>
-          <el-space v-if="auth.isAuthenticated" wrap>
-            <ListExportButton
-              :request="buildOwnerTransactionExportRequest"
-              label="导出近一年交易"
-              pending-label="导出中"
-              error-message="导出交易记录失败"
-            />
-            <ListExportButton
-              :request="buildOwnerRefundExportRequest"
-              label="导出退款明细"
-              pending-label="导出中"
-              error-message="导出退款明细失败"
-            />
-          </el-space>
+          <div class="petpal-section-heading__meta">
+            <h3>当前业务进展</h3>
+            <p v-if="auth.isAuthenticated" class="petpal-section-heading__hint">
+              退款导出默认覆盖最近一年，可按退款日期和状态收窄范围。
+            </p>
+          </div>
+          <div v-if="auth.isAuthenticated" class="petpal-export-toolbar">
+            <el-space wrap :size="10">
+              <el-date-picker
+                v-model="ownerRefundExportDateRange"
+                type="daterange"
+                unlink-panels
+                clearable
+                range-separator="至"
+                start-placeholder="退款开始日期"
+                end-placeholder="退款结束日期"
+                size="small"
+                style="width: min(100%, 320px)"
+              />
+              <el-select
+                v-model="ownerRefundExportStatus"
+                clearable
+                placeholder="退款状态"
+                size="small"
+                style="width: 140px"
+              >
+                <el-option
+                  v-for="option in refundStatusOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+            </el-space>
+            <el-space wrap>
+              <ListExportButton
+                :request="buildOwnerTransactionExportRequest"
+                label="导出近一年交易"
+                pending-label="导出中"
+                error-message="导出交易记录失败"
+              />
+              <ListExportButton
+                :request="buildOwnerRefundExportRequest"
+                label="导出退款明细"
+                pending-label="导出中"
+                error-message="导出退款明细失败"
+              />
+            </el-space>
+          </div>
         </div>
         <el-space direction="vertical" fill :size="14" style="width: 100%">
           <el-table :data="requests" size="small" v-loading="requestsLoading">
@@ -488,8 +522,10 @@ import type {
   MatchCaregiverQuery,
   MatchedCaregiverRecord,
   OrderRecord,
+  OwnerRefundExportQuery,
   OrderStatus,
   PetProfileRecord,
+  RefundStatus,
   ServiceRequestRecord,
   ServiceLogType,
 } from '@rbac/api-common';
@@ -631,8 +667,38 @@ const getOrderStatusLabel = (status: OrderStatus) => ({
   REFUNDED: '已退款',
 }[status] ?? status);
 
+const refundStatusOptions: Array<{ label: string; value: RefundStatus }> = [
+  { label: '待审核', value: 'PENDING' },
+  { label: '已审核', value: 'APPROVED' },
+  { label: '已驳回', value: 'REJECTED' },
+  { label: '退款成功', value: 'SUCCESS' },
+  { label: '退款失败', value: 'FAILED' },
+];
+
+const ownerRefundExportDateRange = ref<[Date, Date] | null>(null);
+const ownerRefundExportStatus = ref<RefundStatus | ''>('');
+
+const toDayBoundaryIsoString = (value: Date, boundary: 'start' | 'end') => {
+  const next = new Date(value);
+  if (boundary === 'start') {
+    next.setHours(0, 0, 0, 0);
+  } else {
+    next.setHours(23, 59, 59, 999);
+  }
+  return next.toISOString();
+};
+
 const buildOwnerTransactionExportRequest = () => api.petpal.orders.exportTransactions();
-const buildOwnerRefundExportRequest = () => api.petpal.orders.exportRefundDetails();
+const buildOwnerRefundExportQuery = (): OwnerRefundExportQuery => ({
+  startDate: ownerRefundExportDateRange.value?.[0]
+    ? toDayBoundaryIsoString(ownerRefundExportDateRange.value[0], 'start')
+    : undefined,
+  endDate: ownerRefundExportDateRange.value?.[1]
+    ? toDayBoundaryIsoString(ownerRefundExportDateRange.value[1], 'end')
+    : undefined,
+  refundStatus: ownerRefundExportStatus.value || undefined,
+});
+const buildOwnerRefundExportRequest = () => api.petpal.orders.exportRefundDetails(buildOwnerRefundExportQuery());
 
 const loadPets = async () => {
   try {
@@ -1022,14 +1088,32 @@ onMounted(async () => {
 
 .petpal-section-heading {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
 }
 
+.petpal-section-heading__meta {
+  display: grid;
+  gap: 6px;
+}
+
 .petpal-section-heading h3 {
   margin: 0;
+}
+
+.petpal-section-heading__hint {
+  margin: 0;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.petpal-export-toolbar {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
 }
 
 .petpal-service-log-dialog__upload {
@@ -1103,6 +1187,11 @@ onMounted(async () => {
   .petpal-section-heading {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .petpal-export-toolbar {
+    width: 100%;
+    justify-items: start;
   }
 
   .petpal-service-log-dialog__file-item {

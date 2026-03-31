@@ -1302,6 +1302,48 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 75. PetPal 主人端退款导出筛选（P1-M3 Slice 48）
+
+**内容**：继续推进 P1-M3 主人端售后透明度，本轮为跨订单退款明细导出补齐“日期范围 + 退款状态”筛选，让主人在工作台导出退款流水时可以直接收窄对账范围。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 扩展 `OwnerRefundExportQuery`，新增 `refundStatus` 共享参数。
+- `apps/backend/src/routes/petpal.ts`
+  - 扩展 `GET /api/petpal/orders/refunds/export` 查询参数校验。
+  - 支持接收 `refundStatus`，并继续沿用最近一年时间窗约束。
+- `apps/backend/src/services/petpal-service.ts`
+  - 扩展 `listOwnerRefundExportRows(filters)`。
+  - 在原有“当前主人 + 时间窗”范围上追加退款状态过滤条件。
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 在主人工作台退款导出入口旁新增：
+    - 退款日期范围选择
+    - 退款状态选择
+  - 导出请求会把筛选条件转换为查询参数后再发起下载。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增退款导出按日期范围与退款状态联合筛选的成功用例。
+  - 断言：
+    - 命中条件的退款被导出
+    - 超出日期范围的退款被排除
+    - 状态不匹配的退款被排除
+    - 他人退款仍被隔离
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（23/23）。
+
+代码审计结论：
+
+- 已确认主人端退款导出筛选不会突破 `ownerId` 隔离边界，筛选只在“当前主人自己的退款集合”内生效。
+- 已确认前端日期筛选会转换为整日开始/结束时间，避免仅选日期时误漏当日退款记录。
+- 已确认筛选功能复用既有导出链路，不新增新的持久化配置、后台任务或异步状态面。
+
+Git commit：待本切片提交。
+
 ## 74. PetPal 主人端跨订单退款明细导出（P1-M3 Slice 47）
 
 **内容**：继续推进 P1-M3 主人端售后透明度，本轮补齐“跨订单退款明细导出”能力，让用户在主人工作台即可按最近一年时间窗导出退款流水，便于跨订单对账、售后留档和年度汇总。

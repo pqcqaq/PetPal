@@ -121,6 +121,7 @@ const ownerTransactionExportQuerySchema = z.object({
 const ownerRefundExportQuerySchema = z.object({
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
+  refundStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'SUCCESS', 'FAILED']).optional(),
 });
 
 const ownerOrderRefundExportQuerySchema = z.object({});

@@ -385,6 +385,7 @@ export interface OwnerRefundExportQuery {
   [key: string]: string | number | boolean | undefined;
   startDate?: string;
   endDate?: string;
+  refundStatus?: RefundStatus;
 }
 
 export interface OwnerOrderRefundExportQuery {
