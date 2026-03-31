@@ -862,6 +862,8 @@ describe('PetPal API integration', () => {
       replayLogStatsResponse.body.data.minutesSinceLastReplay === null
       || typeof replayLogStatsResponse.body.data.minutesSinceLastReplay === 'number',
     );
+    assert.ok(typeof replayLogStatsResponse.body.data.dominanceThreshold === 'number');
+    assert.ok(typeof replayLogStatsResponse.body.data.dominanceMinSamples === 'number');
 
     const futureReplayLogs = await request(app)
       .get(`/api/petpal/admin/callback-alert-outbox/${outboxId}/replay-logs`)

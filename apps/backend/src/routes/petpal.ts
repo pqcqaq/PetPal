@@ -69,6 +69,11 @@ const callbackAlertOutboxReplayLogExportQuerySchema = callbackAlertOutboxReplayL
   outboxId: z.string().trim().min(1),
 });
 
+const callbackAlertOutboxReplayLogStatsQuerySchema = callbackAlertOutboxReplayLogQuerySchema.extend({
+  dominanceThreshold: z.coerce.number().min(0.1).max(1).optional(),
+  dominanceMinSamples: z.coerce.number().int().min(1).max(100).optional(),
+});
+
 const petpalRouter = Router();
 
 const parseCallbackAuditQuery = (query: Record<string, unknown>) => ({
@@ -263,12 +268,14 @@ petpalRouter.get('/admin/callback-alert-outbox/:id/replay-logs', requirePermissi
 }));
 
 petpalRouter.get('/admin/callback-alert-outbox/:id/replay-logs/stats', requirePermission('petpal.callback-alert.read'), asyncHandler(async (req, res) => {
-  const query = callbackAlertOutboxReplayLogQuerySchema.parse(req.query ?? {});
+  const query = callbackAlertOutboxReplayLogStatsQuerySchema.parse(req.query ?? {});
   const result = await petpalService.queryCallbackAlertReplayLogStats(String(req.params.id), {
     actionType: query.actionType,
     actorId: query.actorId,
     startDate: query.startDate,
     endDate: query.endDate,
+    dominanceThreshold: query.dominanceThreshold,
+    dominanceMinSamples: query.dominanceMinSamples,
   });
   return ok(res, result, 'Callback alert outbox replay log stats');
 }));

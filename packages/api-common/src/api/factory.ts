@@ -463,6 +463,8 @@ export const createApiFactory = (options: ClientOptions) => {
               actorId: query.actorId,
               startDate: query.startDate,
               endDate: query.endDate,
+              dominanceThreshold: query.dominanceThreshold,
+              dominanceMinSamples: query.dominanceMinSamples,
             },
           }),
         exportCallbackAlertOutboxReplayLogs: createDownloadEndpoint<CallbackAlertReplayLogQuery>(

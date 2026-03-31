@@ -742,6 +742,35 @@ Git commit：`feat(p1): add callback alert replay logs for outbox requeue tracea
 
 Git commit：待本切片提交。
 
+## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
+
+**内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。
+
+变更摘要：
+
+- `apps/backend/src/routes/petpal.ts`
+  - replay logs stats 查询支持 `dominanceThreshold` 与 `dominanceMinSamples`。
+- `apps/backend/src/services/petpal-service.ts`
+  - replay 主导判定改为使用可配置阈值（默认 0.7/5）。
+  - stats 响应新增 `dominanceThreshold`、`dominanceMinSamples` 回传。
+- `packages/api-common/src/types/petpal.ts`
+  - replay query/stats 类型扩展阈值字段。
+- `packages/api-common/src/api/factory.ts`
+  - replay stats 客户端透传阈值参数。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 抽屉统计区新增阈值标签，并使用默认阈值请求 stats。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增 replay stats 阈值字段类型断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+Git commit：待本切片提交。
+
 ## 45. PetPal replay log 时效信号（P1 Slice 19）
 
 **内容**：在 replay log 统计中新增“最近重放时间”和“距今分钟数”，提升值班诊断效率。

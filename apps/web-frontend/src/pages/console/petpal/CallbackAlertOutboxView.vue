@@ -142,6 +142,7 @@
         <el-tag type="warning">批量重放 {{ replayStats.byAction.REQUEUE_DEAD_BATCH }}</el-tag>
         <el-tag>操作人数 {{ replayStats.uniqueActorCount }}</el-tag>
         <el-tag>批量占比 {{ Number((replayStats.batchReplayRatio * 100).toFixed(1)) }}%</el-tag>
+        <el-tag>阈值 {{ Number((replayStats.dominanceThreshold * 100).toFixed(0)) }}% / {{ replayStats.dominanceMinSamples }} 条</el-tag>
         <el-tag type="info">最近重放 {{ replayStats.latestReplayAt || '-' }}</el-tag>
         <el-tag>距今 {{ replayStats.minutesSinceLastReplay ?? '-' }} 分钟</el-tag>
         <el-tag v-if="replayStats.isBatchReplayDominant" type="danger">批量重放占比偏高</el-tag>
@@ -215,6 +216,8 @@ const replayLogs = ref<CallbackAlertReplayLogRecord[]>([]);
 const replayPage = ref(1);
 const replayPageSize = 10;
 const replayTotal = ref(0);
+const replayDominanceThreshold = 0.7;
+const replayDominanceMinSamples = 5;
 const replayStats = ref<CallbackAlertReplayLogStats>({
   total: 0,
   byAction: {
@@ -226,6 +229,8 @@ const replayStats = ref<CallbackAlertReplayLogStats>({
   isBatchReplayDominant: false,
   latestReplayAt: null,
   minutesSinceLastReplay: null,
+  dominanceThreshold: replayDominanceThreshold,
+  dominanceMinSamples: replayDominanceMinSamples,
 });
 const currentReplayOutboxId = ref<string>('');
 const replayFilter = ref<{
@@ -381,6 +386,8 @@ const reloadReplayLogs = async () => {
       actorId: replayFilter.value.actorId?.trim() || undefined,
       startDate: replayFilter.value.range?.[0],
       endDate: replayFilter.value.range?.[1],
+      dominanceThreshold: replayDominanceThreshold,
+      dominanceMinSamples: replayDominanceMinSamples,
     };
     const [replayPageData, replayStatsData] = await Promise.all([
       api.petpal.admin.callbackAlertOutboxReplayLogs(currentReplayOutboxId.value, replayQuery),

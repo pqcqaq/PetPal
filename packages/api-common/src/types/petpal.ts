@@ -293,6 +293,8 @@ export interface CallbackAlertReplayLogQuery {
   actorId?: string;
   startDate?: string;
   endDate?: string;
+  dominanceThreshold?: number;
+  dominanceMinSamples?: number;
 }
 
 export interface CallbackAlertReplayLogPage {
@@ -316,4 +318,6 @@ export interface CallbackAlertReplayLogStats {
   isBatchReplayDominant: boolean;
   latestReplayAt: string | null;
   minutesSinceLastReplay: number | null;
+  dominanceThreshold: number;
+  dominanceMinSamples: number;
 }

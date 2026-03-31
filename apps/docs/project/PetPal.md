@@ -2278,3 +2278,45 @@ gantt
 
 - 时效信号返回 null 表示无样本，避免前端将 0 误判为“刚发生”。
 - 通过统一 stats 接口返回，避免前端额外计算导致时区与时钟偏差。
+
+### 14.36 2026-04-01（P1 Slice 20）
+
+**概述**：将 replay log 批量主导告警阈值从固定值升级为可配置参数，提升值班调参能力。
+
+已完成：
+
+- 服务层：
+  - `apps/backend/src/services/petpal-service.ts`
+    - `queryCallbackAlertReplayLogStats` 支持可配置参数：
+      - `dominanceThreshold`（默认 `0.7`）
+      - `dominanceMinSamples`（默认 `5`）
+    - `isBatchReplayDominant` 判定改为基于上述参数。
+    - stats 响应回传生效阈值字段，便于审计与前端展示。
+- 路由层：
+  - `apps/backend/src/routes/petpal.ts`
+    - replay stats 接口支持透传阈值参数。
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts`
+    - `CallbackAlertReplayLogQuery` 新增阈值参数字段。
+    - `CallbackAlertReplayLogStats` 新增阈值回传字段。
+  - `packages/api-common/src/api/factory.ts`
+    - replay stats 客户端调用支持阈值参数。
+- 前端：
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+    - 抽屉统计区新增阈值标签展示（百分比 + 最小样本）。
+    - stats 请求透传默认阈值参数。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增阈值字段类型断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- 通过“可配置阈值 + 回传生效值”实现统计口径透明，便于值班复盘。
+- 默认阈值保持与历史行为一致，确保向后兼容。
