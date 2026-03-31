@@ -1302,6 +1302,45 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 78. PetPal 主人端退款导出投诉状态筛选（P1-M3 Slice 51）
+
+**内容**：继续推进 P1-M3 主人端售后透明度，本轮为退款明细导出补齐“投诉状态”联动筛选，让主人在工作台可以直接区分与待处理、处理中或已结案投诉相关的退款记录。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 扩展 `OwnerRefundExportQuery`，新增 `complaintStatus` 共享参数。
+- `apps/backend/src/routes/petpal.ts`
+  - 扩展 `GET /api/petpal/orders/refunds/export` 查询参数校验。
+  - 支持接收 `OPEN` / `PROCESSING` / `RESOLVED` / `REJECTED` 投诉状态过滤条件。
+- `apps/backend/src/services/petpal-service.ts`
+  - 扩展 `listOwnerRefundExportRows(filters)`。
+  - 在原有主人范围、时间窗、退款状态、退款类型和订单维度过滤基础上，追加按关联投诉状态过滤。
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 在退款导出筛选条中新增“投诉状态”选择。
+  - 可与既有退款日期、退款状态、退款类型、服务类型和订单号关键词组合使用。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增退款导出按投诉状态过滤的成功用例。
+  - 断言：
+    - 当前主人命中的 `OPEN` 投诉关联退款被导出
+    - 已解决投诉退款、无投诉退款和他人 `OPEN` 投诉退款均被排除
+    - 实际导出的退款记录全部属于当前主人且至少关联一条 `OPEN` 投诉
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 --test-name-pattern "filters owner refund export by complaint status" test/integration/petpal-api.test.ts` 通过（1/1）。
+
+代码审计结论：
+
+- 已确认投诉状态筛选仍以当前登录主人的订单退款集合为边界，不会因为投诉状态命中而越权导出他人售后记录。
+- 已确认投诉状态过滤基于订单关联的未删除投诉记录做 `some` 匹配，只收窄结果集，不改变既有导出列结构和排序规则。
+- 已确认前端新增筛选项复用既有退款导出链路，不引入新的后端状态、异步导出任务或配置持久化逻辑。
+
+Git commit：待本切片提交。
+
 ## 77. PetPal 主人端退款导出退款类型筛选（P1-M3 Slice 50）
 
 **内容**：继续推进 P1-M3 主人端售后透明度，本轮为退款明细导出补齐“退款类型”筛选，让主人在工作台可以区分整单退款与部分退款的对账结果。

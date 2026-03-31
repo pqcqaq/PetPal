@@ -387,6 +387,7 @@ export interface OwnerRefundExportQuery {
   endDate?: string;
   refundType?: RefundType;
   refundStatus?: RefundStatus;
+  complaintStatus?: ComplaintStatus;
   serviceType?: PetServiceType;
   orderNoKeyword?: string;
 }

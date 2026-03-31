@@ -1517,6 +1517,229 @@ describe('PetPal API integration', () => {
     assert.ok(exportedRefunds.every(item => item.order.ownerId === ownerSession.user.id));
   });
 
+  it('filters owner refund export by complaint status', async () => {
+    const {
+      app,
+      prisma,
+      ownerSession,
+      caregiverProfile,
+    } = await createFulfillmentScenario();
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+    const suffix = Date.now().toString(36);
+    const keyword = `REFUND-COMPLAINT-${suffix}`.toUpperCase();
+
+    const openComplaintOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-complaint-open-${suffix}`,
+        orderNo: `PP-${keyword}-OPEN-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'BOARDING',
+        appointmentStart: new Date('2026-03-30T08:00:00.000Z'),
+        appointmentEnd: new Date('2026-03-31T08:00:00.000Z'),
+        amountTotal: 158,
+        amountAdjusted: 0,
+        amountPaid: 158,
+        amountRefunded: 48,
+        orderStatus: 'DISPUTED',
+      },
+    });
+
+    const matchedRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-complaint-open-${suffix}`,
+        orderId: openComplaintOrder.id,
+        refundNo: `REF-COMPLAINT-OPEN-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '投诉处理中，先退部分费用',
+        refundAmount: 48,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-03-30T10:00:00.000Z'),
+      },
+    });
+
+    await prisma.complaint.create({
+      data: {
+        id: `complaint-open-${suffix}`,
+        orderId: openComplaintOrder.id,
+        complainantId: ownerSession.user.id,
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: '服务与约定不符',
+        status: 'OPEN',
+      },
+    });
+
+    const resolvedComplaintOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-complaint-resolved-${suffix}`,
+        orderNo: `PP-${keyword}-RESOLVED-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'WALKING',
+        appointmentStart: new Date('2026-03-30T09:00:00.000Z'),
+        appointmentEnd: new Date('2026-03-30T10:00:00.000Z'),
+        amountTotal: 88,
+        amountAdjusted: 0,
+        amountPaid: 88,
+        amountRefunded: 28,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    const mismatchedRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-complaint-resolved-${suffix}`,
+        orderId: resolvedComplaintOrder.id,
+        refundNo: `REF-COMPLAINT-RESOLVED-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '投诉已结案后的退款',
+        refundAmount: 28,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-03-30T11:00:00.000Z'),
+      },
+    });
+
+    await prisma.complaint.create({
+      data: {
+        id: `complaint-resolved-${suffix}`,
+        orderId: resolvedComplaintOrder.id,
+        complainantId: ownerSession.user.id,
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: '已处理完成',
+        status: 'RESOLVED',
+        closedAt: new Date('2026-03-30T12:00:00.000Z'),
+      },
+    });
+
+    const noComplaintOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-complaint-none-${suffix}`,
+        orderNo: `PP-${keyword}-NONE-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'FEEDING',
+        appointmentStart: new Date('2026-03-30T12:00:00.000Z'),
+        appointmentEnd: new Date('2026-03-30T13:00:00.000Z'),
+        amountTotal: 66,
+        amountAdjusted: 0,
+        amountPaid: 66,
+        amountRefunded: 18,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    const noComplaintRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-complaint-none-${suffix}`,
+        orderId: noComplaintOrder.id,
+        refundNo: `REF-COMPLAINT-NONE-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '普通退款，无投诉',
+        refundAmount: 18,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-03-30T12:30:00.000Z'),
+      },
+    });
+
+    const foreignOpenComplaintOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-complaint-foreign-${suffix}`,
+        orderNo: `PP-${keyword}-FOREIGN-${Date.now()}`,
+        ownerId: adminSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'BOARDING',
+        appointmentStart: new Date('2026-03-30T13:00:00.000Z'),
+        appointmentEnd: new Date('2026-03-31T13:00:00.000Z'),
+        amountTotal: 188,
+        amountAdjusted: 0,
+        amountPaid: 188,
+        amountRefunded: 58,
+        orderStatus: 'DISPUTED',
+      },
+    });
+
+    const foreignRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-complaint-foreign-${suffix}`,
+        orderId: foreignOpenComplaintOrder.id,
+        refundNo: `REF-COMPLAINT-FOREIGN-${Date.now()}`,
+        applyUserId: adminSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: 'foreign complaint refund',
+        refundAmount: 58,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-03-30T13:30:00.000Z'),
+      },
+    });
+
+    await prisma.complaint.create({
+      data: {
+        id: `complaint-foreign-${suffix}`,
+        orderId: foreignOpenComplaintOrder.id,
+        complainantId: adminSession.user.id,
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: 'foreign complaint',
+        status: 'OPEN',
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/orders/refunds/export')
+      .query({
+        complaintStatus: 'OPEN',
+        orderNoKeyword: keyword,
+      })
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    const exportedRefundNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(6).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(exportedRefundNos, [matchedRefund.refundNo]);
+    assert.ok(!exportedRefundNos.includes(mismatchedRefund.refundNo));
+    assert.ok(!exportedRefundNos.includes(noComplaintRefund.refundNo));
+    assert.ok(!exportedRefundNos.includes(foreignRefund.refundNo));
+
+    const exportedRefunds = await prisma.refundRecord.findMany({
+      where: {
+        refundNo: {
+          in: exportedRefundNos,
+        },
+      },
+      select: {
+        refundNo: true,
+        order: {
+          select: {
+            ownerId: true,
+            complaints: {
+              where: {
+                deleteAt: null,
+              },
+              select: {
+                status: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    assert.equal(exportedRefunds.length, exportedRefundNos.length);
+    assert.ok(exportedRefunds.every(item => item.order.ownerId === ownerSession.user.id));
+    assert.ok(exportedRefunds.every(item => item.order.complaints.some(complaint => complaint.status === 'OPEN')));
+  });
+
   it('returns owner refund progress snapshots for pending, approved and successful refunds', async () => {
     const {
       app,
