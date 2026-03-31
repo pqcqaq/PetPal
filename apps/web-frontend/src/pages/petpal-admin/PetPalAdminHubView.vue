@@ -83,6 +83,7 @@
 import type { CallbackAlertOutboxStats, CallbackAuditStats, ComplaintAdminStats } from '@rbac/api-common';
 import { ElMessage } from 'element-plus';
 import { computed, ref, watch } from 'vue';
+import type { RouteLocationRaw } from 'vue-router';
 import { api } from '@/api/client';
 import UnoIcon from '@/components/common/UnoIcon.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -139,7 +140,7 @@ const metricCards = computed(() => {
     label: string;
     value: string;
     hint: string;
-    to: string;
+    to: RouteLocationRaw;
     tone: HubTone;
   }> = [];
 
@@ -148,7 +149,12 @@ const metricCards = computed(() => {
       label: '已超时投诉',
       value: String(complaintStats.value.overdueCount),
       hint: `即将超时 ${complaintStats.value.dueSoonCount} · 未分配 ${complaintStats.value.unassignedCount}`,
-      to: '/petpal-admin/complaints',
+      to: {
+        path: '/petpal-admin/complaints',
+        query: {
+          slaStatus: complaintStats.value.overdueCount > 0 ? 'OVERDUE' : complaintStats.value.dueSoonCount > 0 ? 'DUE_SOON' : 'NORMAL',
+        },
+      },
       tone: complaintStats.value.overdueCount > 0 ? 'danger' : complaintStats.value.dueSoonCount > 0 ? 'warning' : 'neutral',
     });
   }
@@ -158,7 +164,12 @@ const metricCards = computed(() => {
       label: '待审照料者',
       value: String(pendingCaregiverCount.value),
       hint: '优先处理入驻审核，避免订单承接能力积压。',
-      to: '/petpal-admin/caregiver-audits',
+      to: {
+        path: '/petpal-admin/caregiver-audits',
+        query: {
+          auditStatus: 'PENDING',
+        },
+      },
       tone: pendingCaregiverCount.value > 0 ? 'warning' : 'neutral',
     });
   }
@@ -169,7 +180,14 @@ const metricCards = computed(() => {
       label: '回调成功率',
       value: `${callbackAuditStats.value.successRate}%`,
       hint: `审计总量 ${callbackAuditStats.value.total} · 异常 ${failureCount}`,
-      to: '/petpal-admin/callback-audits',
+      to: {
+        path: '/petpal-admin/callback-audits',
+        query: failureCount > 0
+          ? {
+              callbackStatus: callbackAuditStats.value.byStatus.ERROR > 0 ? 'ERROR' : 'FAILURE',
+            }
+          : {},
+      },
       tone: failureCount > 0 ? 'warning' : 'accent',
     });
   }
@@ -179,7 +197,12 @@ const metricCards = computed(() => {
       label: '死信告警',
       value: String(callbackAlertStats.value.byStatus.DEAD),
       hint: `处理中卡住 ${callbackAlertStats.value.stuckProcessingCount} · 最老死信 ${callbackAlertStats.value.oldestDeadAgeMinutes} 分钟`,
-      to: '/petpal-admin/callback-alert-outbox',
+      to: {
+        path: '/petpal-admin/callback-alert-outbox',
+        query: {
+          status: callbackAlertStats.value.byStatus.DEAD > 0 ? 'DEAD' : callbackAlertStats.value.stuckProcessingCount > 0 ? 'PROCESSING' : 'PENDING',
+        },
+      },
       tone: callbackAlertStats.value.byStatus.DEAD > 0 ? 'danger' : callbackAlertStats.value.stuckProcessingCount > 0 ? 'warning' : 'neutral',
     });
   }
@@ -191,7 +214,7 @@ const priorityItems = computed(() => {
   const items: Array<{
     title: string;
     detail: string;
-    to: string;
+    to: RouteLocationRaw;
     tone: Exclude<HubTone, 'neutral'>;
   }> = [];
 
@@ -199,7 +222,12 @@ const priorityItems = computed(() => {
     items.push({
       title: '投诉工单已超时',
       detail: `当前有 ${complaintStats.value.overdueCount} 单投诉超过 SLA，建议优先进入投诉工单台处理。`,
-      to: '/petpal-admin/complaints',
+      to: {
+        path: '/petpal-admin/complaints',
+        query: {
+          slaStatus: 'OVERDUE',
+        },
+      },
       tone: 'danger',
     });
   }
@@ -208,7 +236,12 @@ const priorityItems = computed(() => {
     items.push({
       title: '照料者审核待处理',
       detail: `当前仍有 ${pendingCaregiverCount.value} 份照料者档案待审核，可能影响接单供给。`,
-      to: '/petpal-admin/caregiver-audits',
+      to: {
+        path: '/petpal-admin/caregiver-audits',
+        query: {
+          auditStatus: 'PENDING',
+        },
+      },
       tone: 'warning',
     });
   }
@@ -219,7 +252,12 @@ const priorityItems = computed(() => {
     items.push({
       title: '回调告警需要排查',
       detail: `死信 ${callbackAlertStats.value.byStatus.DEAD} 条，卡住 ${callbackAlertStats.value.stuckProcessingCount} 条，请优先检查告警队列。`,
-      to: '/petpal-admin/callback-alert-outbox',
+      to: {
+        path: '/petpal-admin/callback-alert-outbox',
+        query: {
+          status: callbackAlertStats.value.byStatus.DEAD > 0 ? 'DEAD' : 'PROCESSING',
+        },
+      },
       tone: callbackAlertStats.value.byStatus.DEAD > 0 ? 'danger' : 'warning',
     });
   }

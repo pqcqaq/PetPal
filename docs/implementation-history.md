@@ -1406,6 +1406,48 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 91. PetPal 根级后台支持预设过滤直达（P1-M3 Slice 64）
+
+**内容**：继续围绕“根下直达、方便快捷使用 PetPal 后台”的要求，本轮给根级后台摘要卡接入 URL 预设过滤，并让投诉、审核、回调审计、告警队列页面按路由查询参数自动恢复筛选条件。
+
+变更摘要：
+
+- `apps/web-frontend/src/pages/petpal-admin/PetPalAdminHubView.vue`
+  - 治理摘要卡和优先关注卡改为携带查询参数跳转：
+    - 投诉超时 -> `slaStatus`
+    - 待审照料者 -> `auditStatus=PENDING`
+    - 回调成功率异常 -> `callbackStatus=FAILURE/ERROR`
+    - 死信告警 -> `status=DEAD/PROCESSING`
+- `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+  - 新增路由查询参数到页面筛选状态的同步：
+    - `page`
+    - `status`
+    - `complaintType`
+    - `targetRole`
+    - `slaStatus`
+    - `assignedAdminId`
+    - `unassignedOnly`
+    - `keyword`
+  - 页面筛选、重置、翻页、“我的工单”切换改为同步 URL，再由路由驱动列表刷新。
+- `apps/web-frontend/src/pages/console/petpal/CaregiverAuditView.vue`
+  - 新增 `page / auditStatus / city / keyword` 路由筛选同步。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAuditView.vue`
+  - 新增 `page / callbackType / callbackStatus / sourceMode / requestId / startDate / endDate` 路由筛选同步。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 新增 `page / status` 路由筛选同步。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认本轮只增加前端路由层的筛选同步，不改动任何后端接口或统计口径。
+- 已确认根级后台摘要卡现在可以带着预设过滤直接进入具体治理页，减少二次筛选操作。
+- 已确认治理页在无查询参数时仍可沿用原有页面状态；当存在已知查询参数时，会以 URL 为准重建过滤条件，避免旧状态污染快捷入口结果。
+
+Git commit：待本切片提交。
+
 ## 87. App 端资料页去掉权限中心式表达（P1-M3 Slice 60）
 
 **内容**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

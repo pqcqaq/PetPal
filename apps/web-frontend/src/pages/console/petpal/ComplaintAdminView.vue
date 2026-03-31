@@ -355,7 +355,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import type {
   ComplaintAdminQuery,
   ComplaintAdminRecord,
@@ -368,6 +368,7 @@ import type {
   UserRecord,
 } from '@rbac/api-common';
 import { ElMessage, type TableInstance } from 'element-plus';
+import { useRoute, useRouter } from 'vue-router';
 import PageScaffold from '@/components/workbench/PageScaffold.vue';
 import { usePageState } from '@/composables/use-page-state';
 import { api } from '@/api/client';
@@ -419,6 +420,8 @@ const actionSubmitting = ref(false);
 const quickAssigningId = ref('');
 const activeComplaint = ref<ComplaintAdminRecord | null>(null);
 const adminOptions = ref<UserRecord[]>([]);
+const route = useRoute();
+const router = useRouter();
 const statsData = ref<ComplaintAdminStats>({
   total: 0,
   byStatus: {
@@ -607,6 +610,84 @@ const canQuickAssignToMe = (complaint: ComplaintAdminRecord) => {
     && complaint.assignedAdminId !== currentAdminId.value;
 };
 
+const routeFilterKeys = ['page', 'status', 'complaintType', 'targetRole', 'slaStatus', 'assignedAdminId', 'unassignedOnly', 'keyword'] as const;
+
+const getSingleQueryValue = (value: unknown) => {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  return '';
+};
+
+const normalizeRouteQuery = (query: Record<string, unknown>) => Object.entries(query)
+  .reduce<Record<string, string>>((acc, [key, value]) => {
+    if (typeof value === 'string' && value.trim()) {
+      acc[key] = value.trim();
+    }
+    return acc;
+  }, {});
+
+const buildRouteQuery = () => {
+  const query: Record<string, string> = {};
+  if (pageState.page > 1) {
+    query.page = String(pageState.page);
+  }
+  if (pageState.filters.status) {
+    query.status = pageState.filters.status;
+  }
+  if (pageState.filters.complaintType) {
+    query.complaintType = pageState.filters.complaintType;
+  }
+  if (pageState.filters.targetRole) {
+    query.targetRole = pageState.filters.targetRole;
+  }
+  if (pageState.filters.slaStatus) {
+    query.slaStatus = pageState.filters.slaStatus;
+  }
+  if (pageState.filters.assignedAdminId && !pageState.filters.unassignedOnly) {
+    query.assignedAdminId = pageState.filters.assignedAdminId;
+  }
+  if (pageState.filters.unassignedOnly) {
+    query.unassignedOnly = 'true';
+  }
+  if (pageState.filters.keyword?.trim()) {
+    query.keyword = pageState.filters.keyword.trim();
+  }
+  return query;
+};
+
+const hydrateStateFromRoute = () => {
+  const hasKnownQuery = routeFilterKeys.some((key) => typeof route.query[key] === 'string');
+  if (!hasKnownQuery) {
+    return;
+  }
+
+  const page = Number.parseInt(getSingleQueryValue(route.query.page), 10);
+  const status = getSingleQueryValue(route.query.status);
+  const complaintType = getSingleQueryValue(route.query.complaintType);
+  const targetRole = getSingleQueryValue(route.query.targetRole);
+  const slaStatus = getSingleQueryValue(route.query.slaStatus);
+  const assignedAdminId = getSingleQueryValue(route.query.assignedAdminId);
+  const unassignedOnly = getSingleQueryValue(route.query.unassignedOnly);
+
+  pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
+  pageState.filters.status = ['OPEN', 'PROCESSING', 'RESOLVED', 'REJECTED'].includes(status)
+    ? status as ComplaintStatus
+    : undefined;
+  pageState.filters.complaintType = ['SAFETY', 'FEE', 'SERVICE', 'FRAUD', 'OTHER'].includes(complaintType)
+    ? complaintType as ComplaintType
+    : undefined;
+  pageState.filters.targetRole = ['CAREGIVER', 'PLATFORM'].includes(targetRole)
+    ? targetRole as ComplaintTargetRole
+    : undefined;
+  pageState.filters.slaStatus = ['NORMAL', 'DUE_SOON', 'OVERDUE'].includes(slaStatus)
+    ? slaStatus as ComplaintAdminSlaStatus
+    : undefined;
+  pageState.filters.unassignedOnly = unassignedOnly === 'true';
+  pageState.filters.assignedAdminId = pageState.filters.unassignedOnly ? undefined : assignedAdminId || undefined;
+  pageState.filters.keyword = getSingleQueryValue(route.query.keyword) || undefined;
+};
+
 const buildQuery = (): ComplaintAdminQuery => ({
   page: pageState.page,
   pageSize,
@@ -663,13 +744,27 @@ const loadRows = async () => {
   }
 };
 
+const syncRouteAndLoad = async () => {
+  const nextQuery = buildRouteQuery();
+  const currentQuery = normalizeRouteQuery(route.query as Record<string, unknown>);
+  const nextSnapshot = JSON.stringify(Object.entries(nextQuery).sort(([left], [right]) => left.localeCompare(right)));
+  const currentSnapshot = JSON.stringify(Object.entries(currentQuery).sort(([left], [right]) => left.localeCompare(right)));
+
+  if (nextSnapshot === currentSnapshot) {
+    await loadRows();
+    return;
+  }
+
+  await router.replace({ query: nextQuery });
+};
+
 const handleSelectionChange = (selection: ComplaintAdminRecord[]) => {
   selectedComplaints.value = selection;
 };
 
 const applyFilters = async () => {
   pageState.page = 1;
-  await loadRows();
+  await syncRouteAndLoad();
 };
 
 const toggleMineOnly = async () => {
@@ -685,7 +780,7 @@ const toggleMineOnly = async () => {
     pageState.filters.assignedAdminId = currentAdminId.value;
   }
 
-  await loadRows();
+  await syncRouteAndLoad();
 };
 
 const resetFilters = async () => {
@@ -697,12 +792,12 @@ const resetFilters = async () => {
   pageState.filters.unassignedOnly = false;
   pageState.filters.keyword = undefined;
   pageState.page = 1;
-  await loadRows();
+  await syncRouteAndLoad();
 };
 
 const changePage = async (page: number) => {
   pageState.page = page;
-  await loadRows();
+  await syncRouteAndLoad();
 };
 
 const resetBatchAssignDialog = () => {
@@ -880,11 +975,17 @@ const submitAction = async () => {
 };
 
 onMounted(async () => {
-  await Promise.all([
-    loadAdminOptions(),
-    loadRows(),
-  ]);
+  await loadAdminOptions();
 });
+
+watch(
+  () => route.fullPath,
+  () => {
+    hydrateStateFromRoute();
+    void loadRows();
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped lang="scss">

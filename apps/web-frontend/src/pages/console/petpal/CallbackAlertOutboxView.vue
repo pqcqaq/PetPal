@@ -174,7 +174,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import type {
   DownloadRequestConfig,
@@ -186,6 +186,7 @@ import type {
   CallbackAlertOutboxStatus,
   CallbackAlertOutboxStats,
 } from '@rbac/api-common';
+import { useRoute, useRouter } from 'vue-router';
 import ListExportButton from '@/components/download/ListExportButton.vue';
 import PageScaffold from '@/components/workbench/PageScaffold.vue';
 import { usePageState } from '@/composables/use-page-state';
@@ -258,6 +259,8 @@ const statsData = ref<CallbackAlertOutboxStats>({
   stuckProcessingCount: 0,
   processingTimeoutMinutes,
 });
+const route = useRoute();
+const router = useRouter();
 
 const { state: pageState } = usePageState<OutboxPageState>('page:petpal:callback-alert-outbox', {
   page: 1,
@@ -301,6 +304,49 @@ const statusTagType = (status: CallbackAlertOutboxStatus) => {
   return 'info';
 };
 
+const routeFilterKeys = ['page', 'status'] as const;
+
+const getSingleQueryValue = (value: unknown) => {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  return '';
+};
+
+const normalizeRouteQuery = (query: Record<string, unknown>) => Object.entries(query)
+  .reduce<Record<string, string>>((acc, [key, value]) => {
+    if (typeof value === 'string' && value.trim()) {
+      acc[key] = value.trim();
+    }
+    return acc;
+  }, {});
+
+const buildRouteQuery = () => {
+  const query: Record<string, string> = {};
+  if (pageState.page > 1) {
+    query.page = String(pageState.page);
+  }
+  if (pageState.filters.status) {
+    query.status = pageState.filters.status;
+  }
+  return query;
+};
+
+const hydrateStateFromRoute = () => {
+  const hasKnownQuery = routeFilterKeys.some((key) => typeof route.query[key] === 'string');
+  if (!hasKnownQuery) {
+    return;
+  }
+
+  const page = Number.parseInt(getSingleQueryValue(route.query.page), 10);
+  const status = getSingleQueryValue(route.query.status);
+
+  pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
+  pageState.filters.status = ['PENDING', 'PROCESSING', 'SENT', 'FAILED', 'DEAD'].includes(status)
+    ? status as CallbackAlertOutboxStatus
+    : undefined;
+};
+
 const buildQuery = () => ({
   status: pageState.filters.status,
   page: pageState.page,
@@ -329,14 +375,28 @@ const loadOutbox = async () => {
   }
 };
 
+const syncRouteAndLoad = async () => {
+  const nextQuery = buildRouteQuery();
+  const currentQuery = normalizeRouteQuery(route.query as Record<string, unknown>);
+  const nextSnapshot = JSON.stringify(Object.entries(nextQuery).sort(([left], [right]) => left.localeCompare(right)));
+  const currentSnapshot = JSON.stringify(Object.entries(currentQuery).sort(([left], [right]) => left.localeCompare(right)));
+
+  if (nextSnapshot === currentSnapshot) {
+    await loadOutbox();
+    return;
+  }
+
+  await router.replace({ query: nextQuery });
+};
+
 const applyFilters = async () => {
   pageState.page = 1;
-  await loadOutbox();
+  await syncRouteAndLoad();
 };
 
 const changePage = async (value: number) => {
   pageState.page = value;
-  await loadOutbox();
+  await syncRouteAndLoad();
 };
 
 const retryRow = async (id: string) => {
@@ -420,7 +480,14 @@ const retryDeadRows = async () => {
   }
 };
 
-onMounted(loadOutbox);
+watch(
+  () => route.fullPath,
+  () => {
+    hydrateStateFromRoute();
+    void loadOutbox();
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped lang="scss">

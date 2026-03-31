@@ -47,13 +47,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import type {
   CallbackAuditQuery,
   CallbackAuditRecord,
   CallbackAuditStats,
 } from '@rbac/api-common';
+import { useRoute, useRouter } from 'vue-router';
 import ListExportButton from '@/components/download/ListExportButton.vue';
 import PageScaffold from '@/components/workbench/PageScaffold.vue';
 import { usePageState } from '@/composables/use-page-state';
@@ -87,6 +88,8 @@ const drawerVisible = ref(false);
 const loading = ref(false);
 const total = ref(0);
 const pageSize = 10;
+const route = useRoute();
+const router = useRouter();
 const statsData = ref<CallbackAuditStats>({
   total: 0,
   successRate: 0,
@@ -123,6 +126,75 @@ const selectedLog = computed(() =>
   logs.value.find(item => item.id === selectedLogId.value)
   ?? logs.value[0]
   ?? null);
+
+const routeFilterKeys = ['page', 'callbackType', 'callbackStatus', 'sourceMode', 'requestId', 'startDate', 'endDate'] as const;
+
+const getSingleQueryValue = (value: unknown) => {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  return '';
+};
+
+const normalizeRouteQuery = (query: Record<string, unknown>) => Object.entries(query)
+  .reduce<Record<string, string>>((acc, [key, value]) => {
+    if (typeof value === 'string' && value.trim()) {
+      acc[key] = value.trim();
+    }
+    return acc;
+  }, {});
+
+const buildRouteQuery = () => {
+  const query: Record<string, string> = {};
+  if (pageState.page > 1) {
+    query.page = String(pageState.page);
+  }
+  if (pageState.filters.callbackType) {
+    query.callbackType = pageState.filters.callbackType;
+  }
+  if (pageState.filters.callbackStatus) {
+    query.callbackStatus = pageState.filters.callbackStatus;
+  }
+  if (pageState.filters.sourceMode) {
+    query.sourceMode = pageState.filters.sourceMode;
+  }
+  if (pageState.filters.requestId?.trim()) {
+    query.requestId = pageState.filters.requestId.trim();
+  }
+  if (pageState.filters.startDate) {
+    query.startDate = pageState.filters.startDate;
+  }
+  if (pageState.filters.endDate) {
+    query.endDate = pageState.filters.endDate;
+  }
+  return query;
+};
+
+const hydrateStateFromRoute = () => {
+  const hasKnownQuery = routeFilterKeys.some((key) => typeof route.query[key] === 'string');
+  if (!hasKnownQuery) {
+    return;
+  }
+
+  const page = Number.parseInt(getSingleQueryValue(route.query.page), 10);
+  const callbackType = getSingleQueryValue(route.query.callbackType);
+  const callbackStatus = getSingleQueryValue(route.query.callbackStatus);
+  const sourceMode = getSingleQueryValue(route.query.sourceMode);
+
+  pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
+  pageState.filters.callbackType = ['PAYMENT_CALLBACK', 'REFUND_CALLBACK'].includes(callbackType)
+    ? callbackType as CallbackAuditFilters['callbackType']
+    : undefined;
+  pageState.filters.callbackStatus = ['PENDING', 'SUCCESS', 'FAILURE', 'ERROR'].includes(callbackStatus)
+    ? callbackStatus as CallbackAuditFilters['callbackStatus']
+    : undefined;
+  pageState.filters.sourceMode = ['TOKEN', 'WECHATPAY_HMAC', 'WECHATPAY_SDK'].includes(sourceMode)
+    ? sourceMode as CallbackAuditFilters['sourceMode']
+    : undefined;
+  pageState.filters.requestId = getSingleQueryValue(route.query.requestId) || undefined;
+  pageState.filters.startDate = getSingleQueryValue(route.query.startDate) || undefined;
+  pageState.filters.endDate = getSingleQueryValue(route.query.endDate) || undefined;
+};
 
 const failureCount = computed(() => statsData.value.byStatus.FAILURE + statsData.value.byStatus.ERROR);
 const paymentCallbackCount = computed(() => statsData.value.byType.PAYMENT_CALLBACK);
@@ -211,9 +283,23 @@ const loadLogs = async () => {
   }
 };
 
+const syncRouteAndLoad = async () => {
+  const nextQuery = buildRouteQuery();
+  const currentQuery = normalizeRouteQuery(route.query as Record<string, unknown>);
+  const nextSnapshot = JSON.stringify(Object.entries(nextQuery).sort(([left], [right]) => left.localeCompare(right)));
+  const currentSnapshot = JSON.stringify(Object.entries(currentQuery).sort(([left], [right]) => left.localeCompare(right)));
+
+  if (nextSnapshot === currentSnapshot) {
+    await loadLogs();
+    return;
+  }
+
+  await router.replace({ query: nextQuery });
+};
+
 const applyFilters = async () => {
   pageState.page = 1;
-  await loadLogs();
+  await syncRouteAndLoad();
 };
 
 const resetFilters = async () => {
@@ -224,12 +310,12 @@ const resetFilters = async () => {
   pageState.filters.startDate = undefined;
   pageState.filters.endDate = undefined;
   pageState.page = 1;
-  await loadLogs();
+  await syncRouteAndLoad();
 };
 
 const changePage = async (value: number) => {
   pageState.page = value;
-  await loadLogs();
+  await syncRouteAndLoad();
 };
 
 const selectLog = (row: CallbackAuditRecord) => {
@@ -241,7 +327,14 @@ const openDetail = (row: CallbackAuditRecord) => {
   drawerVisible.value = true;
 };
 
-onMounted(loadLogs);
+watch(
+  () => route.fullPath,
+  () => {
+    hydrateStateFromRoute();
+    void loadLogs();
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped lang="scss">

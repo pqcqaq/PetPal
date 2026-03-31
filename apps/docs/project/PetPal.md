@@ -3965,6 +3965,58 @@ gantt
 2. 继续把旧 `console/petpal` 目录语义向根级后台组件层抽离，弱化模板式目录痕迹。
 3. 继续围绕后台首页补更贴近运营值班的 SLA、待办和失败重放摘要。
 
+### 14.81 2026-04-01（P1-M3 Slice 64）
+
+**概述**：继续强化根级后台“直达可用”的目标，本轮把 `/petpal-admin` 首页摘要卡升级为带预设过滤的快捷入口，并让各治理页支持通过 URL 查询参数恢复筛选状态。
+
+已完成：
+
+- `apps/web-frontend/src/pages/petpal-admin/PetPalAdminHubView.vue`
+  - 治理摘要卡和优先关注卡改为带查询参数跳转：
+    - 超时投诉 -> `slaStatus`
+    - 待审照料者 -> `auditStatus=PENDING`
+    - 回调成功率异常 -> `callbackStatus=FAILURE/ERROR`
+    - 死信告警 -> `status=DEAD/PROCESSING`
+- `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+  - 新增 URL 筛选同步，支持通过根级后台快捷入口直接恢复投诉页预设状态。
+  - 覆盖字段：
+    - `page`
+    - `status`
+    - `complaintType`
+    - `targetRole`
+    - `slaStatus`
+    - `assignedAdminId`
+    - `unassignedOnly`
+    - `keyword`
+  - 筛选、重置、翻页和“我的工单”切换改为同步 URL。
+- `apps/web-frontend/src/pages/console/petpal/CaregiverAuditView.vue`
+  - 新增 `page / auditStatus / city / keyword` URL 同步。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAuditView.vue`
+  - 新增 `page / callbackType / callbackStatus / sourceMode / requestId / startDate / endDate` URL 同步。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 新增 `page / status` URL 同步。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认本轮只改前端路由同步行为，不涉及后端接口和鉴权逻辑。
+- 已确认治理页在没有查询参数时仍沿用原有页面状态；只有存在已知查询参数时才会按 URL 重建过滤条件。
+- 已确认根级后台摘要卡现在可以直接落到具体异常视图，减少二次手工筛选。
+
+风险与缓解：
+
+- 风险：治理页目前仍是“URL 驱动筛选 + 页面状态持久化”并存模型，后续如果再增加更多筛选项，需要保持 URL 字段与页面状态同步规则一致。
+- 缓解：本轮已经把查询参数白名单显式写在各页面内，后续新增筛选时可以按同一模式扩展，不会隐式污染现有状态。
+
+下一步（1-3）：
+
+1. 继续把根级后台的高频动作前移，例如死信重试、投诉批量分派等。
+2. 继续把旧 `console/petpal` 页面语义向 `petpal-admin` 根级命名空间抽离。
+3. 继续补针对值班场景的预设入口，例如“我的工单”“仅死信”“仅待审”等更细粒度链接。
+
 ### 14.77 2026-04-01（P1-M3 Slice 60）
 
 **概述**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

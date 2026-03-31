@@ -60,9 +60,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { CaregiverAuditListItem, CaregiverAuditQuery, CaregiverAuditStatus } from '@rbac/api-common';
 import { ElMessage } from 'element-plus';
+import { useRoute, useRouter } from 'vue-router';
 import PageScaffold from '@/components/workbench/PageScaffold.vue';
 import { usePageState } from '@/composables/use-page-state';
 import { api } from '@/api/client';
@@ -90,6 +91,8 @@ const rows = ref<CaregiverAuditListItem[]>([]);
 const loading = ref(false);
 const total = ref(0);
 const pageSize = 10;
+const route = useRoute();
+const router = useRouter();
 
 const { state: pageState } = usePageState<State>('page:petpal:caregiver-audit', {
   page: 1,
@@ -123,6 +126,57 @@ const statusTagType = (status: CaregiverAuditStatus) => {
   return 'warning';
 };
 
+const routeFilterKeys = ['page', 'auditStatus', 'city', 'keyword'] as const;
+
+const getSingleQueryValue = (value: unknown) => {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  return '';
+};
+
+const normalizeRouteQuery = (query: Record<string, unknown>) => Object.entries(query)
+  .reduce<Record<string, string>>((acc, [key, value]) => {
+    if (typeof value === 'string' && value.trim()) {
+      acc[key] = value.trim();
+    }
+    return acc;
+  }, {});
+
+const buildRouteQuery = () => {
+  const query: Record<string, string> = {};
+  if (pageState.page > 1) {
+    query.page = String(pageState.page);
+  }
+  if (pageState.filters.auditStatus) {
+    query.auditStatus = pageState.filters.auditStatus;
+  }
+  if (pageState.filters.city?.trim()) {
+    query.city = pageState.filters.city.trim();
+  }
+  if (pageState.filters.keyword?.trim()) {
+    query.keyword = pageState.filters.keyword.trim();
+  }
+  return query;
+};
+
+const hydrateStateFromRoute = () => {
+  const hasKnownQuery = routeFilterKeys.some((key) => typeof route.query[key] === 'string');
+  if (!hasKnownQuery) {
+    return;
+  }
+
+  const auditStatus = getSingleQueryValue(route.query.auditStatus);
+  const page = Number.parseInt(getSingleQueryValue(route.query.page), 10);
+
+  pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
+  pageState.filters.auditStatus = ['PENDING', 'APPROVED', 'REJECTED'].includes(auditStatus)
+    ? auditStatus as CaregiverAuditStatus
+    : undefined;
+  pageState.filters.city = getSingleQueryValue(route.query.city) || undefined;
+  pageState.filters.keyword = getSingleQueryValue(route.query.keyword) || undefined;
+};
+
 const buildQuery = (): CaregiverAuditQuery => ({
   page: pageState.page,
   pageSize,
@@ -154,17 +208,38 @@ const audit = async (caregiverId: string, status: CaregiverAuditStatus) => {
   }
 };
 
+const syncRouteAndLoad = async () => {
+  const nextQuery = buildRouteQuery();
+  const currentQuery = normalizeRouteQuery(route.query as Record<string, unknown>);
+  const nextSnapshot = JSON.stringify(Object.entries(nextQuery).sort(([left], [right]) => left.localeCompare(right)));
+  const currentSnapshot = JSON.stringify(Object.entries(currentQuery).sort(([left], [right]) => left.localeCompare(right)));
+
+  if (nextSnapshot === currentSnapshot) {
+    await loadRows();
+    return;
+  }
+
+  await router.replace({ query: nextQuery });
+};
+
 const applyFilters = async () => {
   pageState.page = 1;
-  await loadRows();
+  await syncRouteAndLoad();
 };
 
 const changePage = async (page: number) => {
   pageState.page = page;
-  await loadRows();
+  await syncRouteAndLoad();
 };
 
-onMounted(loadRows);
+watch(
+  () => route.fullPath,
+  () => {
+    hydrateStateFromRoute();
+    void loadRows();
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped lang="scss">
