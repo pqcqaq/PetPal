@@ -864,6 +864,8 @@ describe('PetPal API integration', () => {
     );
     assert.ok(typeof replayLogStatsResponse.body.data.dominanceThreshold === 'number');
     assert.ok(typeof replayLogStatsResponse.body.data.dominanceMinSamples === 'number');
+    assert.ok(typeof replayLogStatsResponse.body.data.staleThresholdMinutes === 'number');
+    assert.ok(typeof replayLogStatsResponse.body.data.isReplayStale === 'boolean');
 
     const futureReplayLogs = await request(app)
       .get(`/api/petpal/admin/callback-alert-outbox/${outboxId}/replay-logs`)

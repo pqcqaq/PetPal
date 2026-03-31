@@ -143,9 +143,11 @@
         <el-tag>操作人数 {{ replayStats.uniqueActorCount }}</el-tag>
         <el-tag>批量占比 {{ Number((replayStats.batchReplayRatio * 100).toFixed(1)) }}%</el-tag>
         <el-tag>阈值 {{ Number((replayStats.dominanceThreshold * 100).toFixed(0)) }}% / {{ replayStats.dominanceMinSamples }} 条</el-tag>
+        <el-tag>静默阈值 {{ replayStats.staleThresholdMinutes }} 分钟</el-tag>
         <el-tag type="info">最近重放 {{ replayStats.latestReplayAt || '-' }}</el-tag>
         <el-tag>距今 {{ replayStats.minutesSinceLastReplay ?? '-' }} 分钟</el-tag>
         <el-tag v-if="replayStats.isBatchReplayDominant" type="danger">批量重放占比偏高</el-tag>
+        <el-tag v-if="replayStats.isReplayStale" type="danger">重放活动静默超阈值</el-tag>
       </el-space>
       <el-table :data="replayLogs" v-loading="replayLoading" border>
         <el-table-column prop="createdAt" label="时间" min-width="170" />
@@ -218,6 +220,7 @@ const replayPageSize = 10;
 const replayTotal = ref(0);
 const replayDominanceThreshold = 0.7;
 const replayDominanceMinSamples = 5;
+const replayStaleThresholdMinutes = 30;
 const replayStats = ref<CallbackAlertReplayLogStats>({
   total: 0,
   byAction: {
@@ -231,6 +234,8 @@ const replayStats = ref<CallbackAlertReplayLogStats>({
   minutesSinceLastReplay: null,
   dominanceThreshold: replayDominanceThreshold,
   dominanceMinSamples: replayDominanceMinSamples,
+  staleThresholdMinutes: replayStaleThresholdMinutes,
+  isReplayStale: false,
 });
 const currentReplayOutboxId = ref<string>('');
 const replayFilter = ref<{
@@ -388,6 +393,7 @@ const reloadReplayLogs = async () => {
       endDate: replayFilter.value.range?.[1],
       dominanceThreshold: replayDominanceThreshold,
       dominanceMinSamples: replayDominanceMinSamples,
+      staleThresholdMinutes: replayStaleThresholdMinutes,
     };
     const [replayPageData, replayStatsData] = await Promise.all([
       api.petpal.admin.callbackAlertOutboxReplayLogs(currentReplayOutboxId.value, replayQuery),

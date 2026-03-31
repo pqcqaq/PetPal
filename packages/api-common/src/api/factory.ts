@@ -465,6 +465,7 @@ export const createApiFactory = (options: ClientOptions) => {
               endDate: query.endDate,
               dominanceThreshold: query.dominanceThreshold,
               dominanceMinSamples: query.dominanceMinSamples,
+              staleThresholdMinutes: query.staleThresholdMinutes,
             },
           }),
         exportCallbackAlertOutboxReplayLogs: createDownloadEndpoint<CallbackAlertReplayLogQuery>(

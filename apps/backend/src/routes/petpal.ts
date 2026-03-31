@@ -72,6 +72,7 @@ const callbackAlertOutboxReplayLogExportQuerySchema = callbackAlertOutboxReplayL
 const callbackAlertOutboxReplayLogStatsQuerySchema = callbackAlertOutboxReplayLogQuerySchema.extend({
   dominanceThreshold: z.coerce.number().min(0.1).max(1).optional(),
   dominanceMinSamples: z.coerce.number().int().min(1).max(100).optional(),
+  staleThresholdMinutes: z.coerce.number().int().min(1).max(10080).optional(),
 });
 
 const petpalRouter = Router();
@@ -276,6 +277,7 @@ petpalRouter.get('/admin/callback-alert-outbox/:id/replay-logs/stats', requirePe
     endDate: query.endDate,
     dominanceThreshold: query.dominanceThreshold,
     dominanceMinSamples: query.dominanceMinSamples,
+    staleThresholdMinutes: query.staleThresholdMinutes,
   });
   return ok(res, result, 'Callback alert outbox replay log stats');
 }));

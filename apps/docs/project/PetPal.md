@@ -2320,3 +2320,45 @@ gantt
 
 - 通过“可配置阈值 + 回传生效值”实现统计口径透明，便于值班复盘。
 - 默认阈值保持与历史行为一致，确保向后兼容。
+
+### 14.37 2026-04-01（P1 Slice 21）
+
+**概述**：新增 replay 活动静默风险信号，支持可配置静默阈值，提升值班识别“长时间无重放更新”能力。
+
+已完成：
+
+- 服务层：
+  - `apps/backend/src/services/petpal-service.ts`
+    - `queryCallbackAlertReplayLogStats` 新增参数：`staleThresholdMinutes`（默认 `30`）。
+    - stats 响应新增：
+      - `staleThresholdMinutes`
+      - `isReplayStale`
+    - 判定逻辑：当存在最近重放时间且 `minutesSinceLastReplay >= staleThresholdMinutes` 时标记为静默风险。
+- 路由层：
+  - `apps/backend/src/routes/petpal.ts`
+    - replay stats 查询 schema 新增 `staleThresholdMinutes`（1~10080 分钟）。
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts`
+    - replay query/stats 类型新增静默阈值与静默风险字段。
+  - `packages/api-common/src/api/factory.ts`
+    - replay stats 客户端透传 `staleThresholdMinutes`。
+- 前端：
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+    - 抽屉统计区新增“静默阈值”展示标签。
+    - 当 `isReplayStale=true` 时展示危险告警标签。
+    - stats 请求透传默认静默阈值参数。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增 `staleThresholdMinutes` 与 `isReplayStale` 字段类型断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- 静默风险只在存在最近重放记录时生效，避免空样本误报。
+- 阈值纳入 stats 回传，确保前端展示与后端判定口径一致。

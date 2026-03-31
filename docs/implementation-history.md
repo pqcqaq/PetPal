@@ -742,6 +742,35 @@ Git commit：`feat(p1): add callback alert replay logs for outbox requeue tracea
 
 Git commit：待本切片提交。
 
+## 47. PetPal replay 静默风险信号（P1 Slice 21）
+
+**内容**：新增 replay 活动静默风险信号，支持可配置阈值并回传生效阈值。
+
+变更摘要：
+
+- `apps/backend/src/routes/petpal.ts`
+  - replay logs stats 查询新增 `staleThresholdMinutes` 参数。
+- `apps/backend/src/services/petpal-service.ts`
+  - replay stats 新增 `staleThresholdMinutes` 与 `isReplayStale`。
+  - 判定逻辑基于 `minutesSinceLastReplay` 与阈值比较，默认阈值 30 分钟。
+- `packages/api-common/src/types/petpal.ts`
+  - replay query/stats 类型新增静默阈值与静默风险字段。
+- `packages/api-common/src/api/factory.ts`
+  - replay stats 客户端透传静默阈值参数。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 抽屉统计区展示静默阈值标签，并在静默超阈值时显示告警标签。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增静默字段类型断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。

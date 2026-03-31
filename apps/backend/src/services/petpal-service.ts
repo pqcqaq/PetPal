@@ -1323,6 +1323,7 @@ export const petpalService = {
       endDate?: Date;
       dominanceThreshold?: number;
       dominanceMinSamples?: number;
+      staleThresholdMinutes?: number;
     },
   ) {
     const where: Prisma.CallbackAlertReplayLogWhereInput = {
@@ -1379,10 +1380,12 @@ export const petpalService = {
     const dominanceThreshold = Number((filters?.dominanceThreshold ?? 0.7).toFixed(4));
     const dominanceMinSamples = filters?.dominanceMinSamples ?? 5;
     const isBatchReplayDominant = total >= dominanceMinSamples && batchReplayRatio >= dominanceThreshold;
+    const staleThresholdMinutes = filters?.staleThresholdMinutes ?? 30;
     const latestReplayAt = latestReplay?.createdAt.toISOString() ?? null;
     const minutesSinceLastReplay = latestReplay
       ? Math.floor((Date.now() - latestReplay.createdAt.getTime()) / 60000)
       : null;
+    const isReplayStale = minutesSinceLastReplay !== null && minutesSinceLastReplay >= staleThresholdMinutes;
 
     return {
       total,
@@ -1394,6 +1397,8 @@ export const petpalService = {
       minutesSinceLastReplay,
       dominanceThreshold,
       dominanceMinSamples,
+      staleThresholdMinutes,
+      isReplayStale,
     };
   },
 };

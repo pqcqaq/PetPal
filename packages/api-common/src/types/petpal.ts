@@ -295,6 +295,7 @@ export interface CallbackAlertReplayLogQuery {
   endDate?: string;
   dominanceThreshold?: number;
   dominanceMinSamples?: number;
+  staleThresholdMinutes?: number;
 }
 
 export interface CallbackAlertReplayLogPage {
@@ -320,4 +321,6 @@ export interface CallbackAlertReplayLogStats {
   minutesSinceLastReplay: number | null;
   dominanceThreshold: number;
   dominanceMinSamples: number;
+  staleThresholdMinutes: number;
+  isReplayStale: boolean;
 }
