@@ -2921,3 +2921,46 @@ gantt
 1. 接入服务记录媒体上传链路，补齐图片/视频回传的真实履约能力。
 2. 为履约详情增加媒体预览与下载入口，避免当前仅展示媒体数量。
 3. 视需要补充管理员纠纷排查页对履约时间线与服务记录的复用展示。
+
+### 14.45 2026-04-01（P1-M2 Slice 28）
+
+**概述**：将照料者服务记录接入现有附件直传链路，补齐 Web 端媒体上传与订单详情媒体预览，形成“选择媒体 -> 上传 -> 保存服务记录 -> 详情查看”的完整闭环。
+
+已完成：
+
+- Web 履约工作台：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+    - 将原有 `ElMessageBox.prompt` 文本弹窗替换为服务日志对话框。
+    - 新增服务记录类型选择（备注、喂养、遛宠、陪玩、健康观察）。
+    - 复用 `uploadAttachmentFile(...)` managed upload 链路，上传时自动打上：
+      - `tag1 = petpal-service-log`
+      - `tag2 = orderId`
+    - 支持一次选择多个图片/视频文件，并显示待上传文件列表、大小摘要和总体上传进度。
+    - 前端按现有权限边界守卫媒体上传能力：
+      - 具备 `file.upload` 权限时显示媒体选择器。
+      - 无该权限时仍允许提交纯文本服务记录。
+- Web 订单详情：
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+    - 服务记录区从“仅显示媒体数量”升级为真实媒体展示。
+    - 图片 URL 以内联缩略图形式预览。
+    - 非图片媒体以附件卡片形式展示，并支持新窗口打开。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 在履约成功路径中新增 `mediaUrls` 断言。
+    - 校验照料者提交服务记录后，履约返回与业主订单详情均能拿到持久化后的媒体 URL 列表。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（14/14）。
+
+风险与缓解：
+
+- 风险：当前媒体上传仍复用全局 `file.upload` 权限，未单独拆出 PetPal 照料者专属上传权限。
+- 缓解：本轮先严格遵守既有上传边界，前端在无权限时自动退化为“纯文本服务记录”，后续如需向普通照料者开放媒体上传，可在 RBAC 层单独收敛权限模型。
+
+下一步（1-3）：
+
+1. 为 Uni 端订单详情补齐服务记录媒体预览，保持双端履约体验一致。
+2. 评估为服务日志增加视频首帧/时长等摘要信息，提升详情页可读性。
+3. 如业务确认向普通照料者开放媒体上传，补充更细粒度的 PetPal 文件上传权限与审计规则。

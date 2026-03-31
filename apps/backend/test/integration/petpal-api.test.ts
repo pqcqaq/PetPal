@@ -367,6 +367,10 @@ describe('PetPal API integration', () => {
       .send({
         logType: 'NOTE',
         textNote: '已完成 30 分钟遛狗，精神状态良好',
+        mediaUrls: [
+          'https://static.example.test/petpal/service-log-1.jpg',
+          'https://static.example.test/petpal/service-log-2.mp4',
+        ],
       })
       .expect(200);
 
@@ -377,8 +381,15 @@ describe('PetPal API integration', () => {
     );
     assert.ok(
       addLogResponse.body.data.serviceLogs.some(
-        (item: { logType: string; textNote: string }) => item.logType === 'NOTE'
+        (item: { logType: string; textNote: string; mediaUrls: string[] }) => item.logType === 'NOTE'
           && item.textNote.includes('30 分钟遛狗'),
+      ),
+    );
+    assert.ok(
+      addLogResponse.body.data.serviceLogs.some(
+        (item: { logType: string; mediaUrls: string[] }) => item.logType === 'NOTE'
+          && item.mediaUrls.includes('https://static.example.test/petpal/service-log-1.jpg')
+          && item.mediaUrls.includes('https://static.example.test/petpal/service-log-2.mp4'),
       ),
     );
 
@@ -433,8 +444,15 @@ describe('PetPal API integration', () => {
     );
     assert.ok(
       ownerDetailResponse.body.data.serviceLogs.some(
-        (item: { logType: string; textNote: string | null }) => item.logType === 'NOTE'
+        (item: { logType: string; textNote: string | null; mediaUrls: string[] }) => item.logType === 'NOTE'
           && item.textNote?.includes('30 分钟遛狗'),
+      ),
+    );
+    assert.ok(
+      ownerDetailResponse.body.data.serviceLogs.some(
+        (item: { logType: string; mediaUrls: string[] }) => item.logType === 'NOTE'
+          && item.mediaUrls.includes('https://static.example.test/petpal/service-log-1.jpg')
+          && item.mediaUrls.includes('https://static.example.test/petpal/service-log-2.mp4'),
       ),
     );
     assert.ok(

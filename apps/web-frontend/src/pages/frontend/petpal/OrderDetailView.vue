@@ -142,6 +142,29 @@
                   >
                     {{ detail }}
                   </div>
+                  <div v-if="log.mediaUrls.length > 0" class="petpal-service-log-media">
+                    <a
+                      v-for="(url, index) in log.mediaUrls"
+                      :key="`${log.id}-${url}`"
+                      class="petpal-service-log-media__item"
+                      :href="url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img
+                        v-if="isPreviewableImage(url)"
+                        :src="url"
+                        :alt="`${getServiceLogTypeLabel(log.logType)}媒体 ${index + 1}`"
+                        loading="lazy"
+                      />
+                      <div v-else class="petpal-service-log-media__file">
+                        {{ getMediaLinkLabel(url, index) }}
+                      </div>
+                      <span class="petpal-service-log-media__meta">
+                        {{ isPreviewableImage(url) ? '查看原图' : '打开附件' }}
+                      </span>
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
@@ -547,6 +570,23 @@ const getServiceLogDetails = (log: ServiceLogRecord) => {
   return details;
 };
 
+const isPreviewableImage = (url: string) => /\.(apng|avif|bmp|gif|jpe?g|png|svg|webp)$/i.test(
+  url.split(/[?#]/)[0] ?? '',
+);
+
+const getMediaLinkLabel = (url: string, index: number) => {
+  const pathSegment = url.split(/[?#]/)[0]?.split('/').pop();
+  if (!pathSegment) {
+    return `附件 ${index + 1}`;
+  }
+
+  try {
+    return decodeURIComponent(pathSegment);
+  } catch {
+    return pathSegment;
+  }
+};
+
 const reload = async () => {
   loading.value = true;
   try {
@@ -722,6 +762,59 @@ onMounted(() => {
   background: #f6f8fb;
   color: #333;
   line-height: 1.6;
+}
+
+.petpal-service-log-media {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 0.875rem;
+}
+
+.petpal-service-log-media__item {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e5ebf3;
+  border-radius: 12px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.petpal-service-log-media__item:hover {
+  border-color: #91caff;
+  box-shadow: 0 10px 24px rgba(24, 144, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.petpal-service-log-media__item img,
+.petpal-service-log-media__file {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
+}
+
+.petpal-service-log-media__item img {
+  object-fit: cover;
+  background: #eef4fb;
+}
+
+.petpal-service-log-media__file {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: linear-gradient(135deg, #f6f8fb 0%, #edf4ff 100%);
+  color: #2f4668;
+  font-size: 0.875rem;
+  text-align: center;
+  word-break: break-word;
+}
+
+.petpal-service-log-media__meta {
+  font-size: 0.75rem;
+  color: #6b7280;
 }
 
 .petpal-empty {

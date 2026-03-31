@@ -336,7 +336,7 @@
                 type="primary"
                 size="small"
                 :loading="caregiverActionLoadingKey === `log:${scope.row.id}`"
-                @click="addCaregiverServiceLog(scope.row.id)"
+                @click="openCaregiverServiceLogDialog(scope.row.id)"
               >
                 服务记录
               </el-button>
@@ -358,6 +358,107 @@
         </el-table-column>
       </el-table>
     </section>
+
+    <el-dialog
+      v-model="serviceLogDialogVisible"
+      title="新增服务记录"
+      width="680px"
+      :close-on-click-modal="!serviceLogSubmitting"
+      :close-on-press-escape="!serviceLogSubmitting"
+      @closed="resetServiceLogDialog"
+    >
+      <el-form label-position="top">
+        <el-form-item label="记录类型">
+          <el-select v-model="serviceLogForm.logType" style="width: 100%">
+            <el-option
+              v-for="option in serviceLogTypeOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="文字说明">
+          <el-input
+            v-model="serviceLogForm.textNote"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="例如：已遛狗 30 分钟，饮水正常，情绪稳定"
+          />
+        </el-form-item>
+
+        <el-form-item label="服务媒体">
+          <div class="petpal-service-log-dialog__upload">
+            <template v-if="canUploadServiceLogMedia">
+              <input
+                ref="serviceLogFileInput"
+                type="file"
+                multiple
+                accept="image/*,video/*"
+                class="petpal-service-log-dialog__file-input"
+                @change="onServiceLogFilesChange"
+              />
+              <div class="petpal-service-log-dialog__actions">
+                <el-button :disabled="serviceLogSubmitting" @click="openServiceLogFilePicker">选择图片或视频</el-button>
+                <el-button
+                  v-if="serviceLogForm.files.length > 0"
+                  link
+                  type="danger"
+                  :disabled="serviceLogSubmitting"
+                  @click="clearServiceLogFiles"
+                >
+                  清空媒体
+                </el-button>
+              </div>
+            </template>
+            <p v-else class="petpal-service-log-dialog__hint is-warning">
+              当前账号未分配 `file.upload` 权限，仍可提交纯文字服务记录。
+            </p>
+
+            <ul v-if="serviceLogForm.files.length > 0" class="petpal-service-log-dialog__file-list">
+              <li
+                v-for="(file, index) in serviceLogForm.files"
+                :key="`${file.name}-${file.size}-${index}`"
+                class="petpal-service-log-dialog__file-item"
+              >
+                <div class="petpal-service-log-dialog__file-meta">
+                  <strong>{{ file.name }}</strong>
+                  <span>{{ file.type || 'application/octet-stream' }} · {{ formatFileSize(file.size) }}</span>
+                </div>
+                <el-button
+                  link
+                  type="danger"
+                  :disabled="serviceLogSubmitting"
+                  @click="removeServiceLogFile(index)"
+                >
+                  移除
+                </el-button>
+              </li>
+            </ul>
+            <div v-else-if="canUploadServiceLogMedia" class="petpal-service-log-dialog__empty">
+              可选上传图片或视频，保存后会附加到本次服务记录。
+            </div>
+          </div>
+        </el-form-item>
+
+        <el-form-item v-if="serviceLogUploadProgress !== null" label="上传进度">
+          <el-progress
+            :percentage="serviceLogUploadProgress"
+            :status="serviceLogUploadProgress >= 100 ? 'success' : undefined"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button :disabled="serviceLogSubmitting" @click="serviceLogDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="serviceLogSubmitting" @click="submitCaregiverServiceLog">
+          保存记录
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -374,10 +475,13 @@ import type {
   OrderStatus,
   PetProfileRecord,
   ServiceRequestRecord,
+  ServiceLogType,
 } from '@rbac/api-common';
-import { onMounted, reactive, ref } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
+import { useAuthStore } from '@/stores/auth';
+import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
 
 defineOptions({
@@ -391,6 +495,7 @@ const matchItems = ref<MatchedCaregiverRecord[]>([]);
 const caregiverProfile = ref<CaregiverProfileRecord | null>(null);
 const caregiverServices = ref<CaregiverServiceRecord[]>([]);
 const caregiverOrders = ref<CaregiverOrderRecord[]>([]);
+const auth = useAuthStore();
 
 const petsLoading = ref(false);
 const requestsLoading = ref(false);
@@ -464,7 +569,38 @@ const caregiverOrderQuery = reactive<{
   status: 'PENDING_ACCEPT',
 });
 
+const serviceLogTypeOptions: Array<{ label: string; value: ServiceLogType }> = [
+  { label: '服务备注', value: 'NOTE' },
+  { label: '喂养记录', value: 'FEED' },
+  { label: '遛宠记录', value: 'WALK' },
+  { label: '陪玩记录', value: 'PLAY' },
+  { label: '健康观察', value: 'HEALTH' },
+];
+
+const createEmptyServiceLogForm = () => ({
+  orderId: '',
+  logType: 'NOTE' as ServiceLogType,
+  textNote: '',
+  files: [] as File[],
+});
+
+const serviceLogDialogVisible = ref(false);
+const serviceLogSubmitting = ref(false);
+const serviceLogUploadProgress = ref<number | null>(null);
+const serviceLogFileInput = ref<HTMLInputElement | null>(null);
+const serviceLogForm = reactive(createEmptyServiceLogForm());
+const canUploadServiceLogMedia = computed(() => auth.hasPermission('file.upload'));
+
 const formatTime = (value: string) => new Date(value).toLocaleString();
+const formatFileSize = (size: number) => {
+  if (size < 1024) {
+    return `${size} B`;
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
 const getOrderStatusLabel = (status: OrderStatus) => ({
   PENDING_ACCEPT: '待接单',
   ACCEPTED: '已接单',
@@ -597,22 +733,116 @@ const checkInCaregiverOrder = async (orderId: string) => withCaregiverOrderActio
   },
 );
 
-const addCaregiverServiceLog = async (orderId: string) => withCaregiverOrderAction(
-  `log:${orderId}`,
-  '服务记录已保存',
-  async () => {
-    const { value } = await ElMessageBox.prompt('填写本次服务记录', '新增服务记录', {
-      inputType: 'textarea',
-      inputPlaceholder: '例如：已遛狗 30 分钟，精神状态正常',
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-    });
+const resetServiceLogDialog = () => {
+  Object.assign(serviceLogForm, createEmptyServiceLogForm());
+  serviceLogUploadProgress.value = null;
+  if (serviceLogFileInput.value) {
+    serviceLogFileInput.value.value = '';
+  }
+};
+
+const openCaregiverServiceLogDialog = (orderId: string) => {
+  resetServiceLogDialog();
+  serviceLogForm.orderId = orderId;
+  serviceLogDialogVisible.value = true;
+};
+
+const openServiceLogFilePicker = () => {
+  serviceLogFileInput.value?.click();
+};
+
+const clearServiceLogFiles = () => {
+  serviceLogForm.files = [];
+  if (serviceLogFileInput.value) {
+    serviceLogFileInput.value.value = '';
+  }
+};
+
+const onServiceLogFilesChange = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  serviceLogForm.files = Array.from(input.files ?? []);
+};
+
+const removeServiceLogFile = (index: number) => {
+  serviceLogForm.files.splice(index, 1);
+  if (serviceLogFileInput.value) {
+    serviceLogFileInput.value.value = '';
+  }
+};
+
+const uploadServiceLogMediaFiles = async (orderId: string) => {
+  if (serviceLogForm.files.length === 0) {
+    serviceLogUploadProgress.value = null;
+    return [];
+  }
+
+  const totalBytes = serviceLogForm.files.reduce((sum, file) => sum + file.size, 0);
+  const uploadedUrls: string[] = [];
+  let completedBytes = 0;
+
+  for (const file of serviceLogForm.files) {
+    const uploaded = await uploadAttachmentFile(
+      file,
+      { tag1: 'petpal-service-log', tag2: orderId },
+      (progress) => {
+        const currentBytes = Math.round((file.size * progress) / 100);
+        serviceLogUploadProgress.value = Math.min(
+          99,
+          Math.round(((completedBytes + currentBytes) / totalBytes) * 100),
+        );
+      },
+    );
+    uploadedUrls.push(uploaded.url);
+    completedBytes += file.size;
+    serviceLogUploadProgress.value = Math.min(
+      99,
+      Math.round((completedBytes / totalBytes) * 100),
+    );
+  }
+
+  serviceLogUploadProgress.value = 100;
+  return uploadedUrls;
+};
+
+const submitCaregiverServiceLog = async () => {
+  const orderId = serviceLogForm.orderId;
+  const textNote = serviceLogForm.textNote.trim();
+
+  if (!orderId) {
+    return;
+  }
+
+  if (!textNote && serviceLogForm.files.length === 0) {
+    ElMessage.warning('请填写服务说明或上传至少一个媒体文件');
+    return;
+  }
+
+  if (serviceLogForm.files.length > 0 && !canUploadServiceLogMedia.value) {
+    ElMessage.warning('当前账号没有文件上传权限，请移除媒体后再提交');
+    return;
+  }
+
+  try {
+    serviceLogSubmitting.value = true;
+    caregiverActionLoadingKey.value = `log:${orderId}`;
+    const mediaUrls = await uploadServiceLogMediaFiles(orderId);
     await api.petpal.caregiver.addServiceLog(orderId, {
-      logType: 'NOTE',
-      textNote: value,
+      logType: serviceLogForm.logType,
+      textNote: textNote || undefined,
+      mediaUrls,
     });
-  },
-);
+    serviceLogDialogVisible.value = false;
+    resetServiceLogDialog();
+    ElMessage.success('服务记录已保存');
+    await Promise.all([loadCaregiverOrders(), loadOrders()]);
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '保存服务记录失败'));
+  } finally {
+    serviceLogSubmitting.value = false;
+    serviceLogUploadProgress.value = null;
+    caregiverActionLoadingKey.value = '';
+  }
+};
 
 const checkOutCaregiverOrder = async (orderId: string) => withCaregiverOrderAction(
   `checkout:${orderId}`,
@@ -768,12 +998,76 @@ onMounted(async () => {
   margin-bottom: 10px;
 }
 
+.petpal-service-log-dialog__upload {
+  display: grid;
+  gap: 12px;
+}
+
+.petpal-service-log-dialog__file-input {
+  display: none;
+}
+
+.petpal-service-log-dialog__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.petpal-service-log-dialog__hint,
+.petpal-service-log-dialog__empty {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f6f8fb;
+  color: #5f6b7a;
+  line-height: 1.6;
+}
+
+.petpal-service-log-dialog__hint.is-warning {
+  background: #fff8e6;
+  color: #8a6200;
+}
+
+.petpal-service-log-dialog__file-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.petpal-service-log-dialog__file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e5ebf3;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.petpal-service-log-dialog__file-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-service-log-dialog__file-meta span {
+  font-size: 12px;
+  color: #6b7280;
+}
+
 @media (max-width: 900px) {
   .petpal-grid-span-4,
   .petpal-grid-span-5,
   .petpal-grid-span-7,
   .petpal-grid-span-8 {
     grid-column: span 1;
+  }
+
+  .petpal-service-log-dialog__file-item {
+    flex-direction: column;
   }
 }
 </style>

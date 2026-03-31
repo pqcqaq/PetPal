@@ -965,6 +965,30 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 55. PetPal Web 服务日志媒体上传（P1-M2 Slice 28）
+
+**内容**：复用现有 managed upload 链路，为照料者服务日志补齐 Web 端媒体上传、进度展示和订单详情媒体预览。
+
+变更摘要：
+
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 将服务记录入口从简单文本 prompt 升级为对话框编辑器。
+  - 新增服务记录类型选择、媒体文件列表、移除操作与整体上传进度条。
+  - 复用 `uploadAttachmentFile(file, { tag1: 'petpal-service-log', tag2: orderId })` 上传服务日志媒体。
+  - 按 `file.upload` 权限控制媒体上传入口；无权限时保留纯文本记录能力。
+- `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+  - 服务记录列表新增图片缩略图预览。
+  - 非图片媒体改为附件卡片并支持直接打开。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 履约主路径测试新增 `mediaUrls` 输入与返回断言，确保服务日志媒体在履约返回与业主详情中都可见。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（14/14）。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。
