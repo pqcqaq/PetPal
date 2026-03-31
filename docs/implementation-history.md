@@ -585,4 +585,25 @@ Git commit：`feat(p1): add callback failure alert outbox retry pipeline`。
 - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（9/9）。
 
 Git commit：`feat(p1): add callback alert outbox admin APIs with permission boundaries`。
+
+## 31. PetPal 回调告警 Outbox 控制台页面（P1 Slice 5）
+
+**内容**：新增回调告警 outbox Web 管理页面，并接入菜单权限，完成运维端可视化闭环。
+
+变更摘要：
+
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 新增 outbox 列表页：状态筛选、分页、状态聚合、行级重试。
+  - 重试操作使用 `v-permission='petpal.callback-alert.retry'` 做前端权限控制。
+- `apps/backend/src/services/system-rbac.ts`
+  - 新增菜单节点 `petpal-callback-alert-outbox`，绑定 `petpal.callback-alert.read`。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（9/9）。
+
+Git commit：`feat(p1): add callback alert outbox console page and menu integration`。
 - 高增长场景下需要规划审计表分区与归档策略。

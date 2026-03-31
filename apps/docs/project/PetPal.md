@@ -1769,6 +1769,37 @@ gantt
 - 把“死信重放”能力前置到 API 层，先保障运维可操作，再扩展到可视化页面。
 - 管理权限拆分为 read/retry，避免普通运营角色误触重放操作。
 
+### 14.21 2026-04-01（P1 Slice 5）
+
+**概述**：补齐回调告警 outbox Web 控制台页面，完成“后端管理 API -> 前端运维入口”联动闭环。
+
+已完成：
+
+- 新增页面：
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 能力：
+    - 队列分页查询（支持状态筛选）。
+    - 状态聚合指标展示（PENDING/FAILED/DEAD/SENT）。
+    - 行级手动重试按钮。
+    - 重试按钮按权限显隐：`v-permission="'petpal.callback-alert.retry'"`。
+- 菜单接入：
+  - `apps/backend/src/services/system-rbac.ts` 新增菜单节点：
+    - `path: /petpal/callback-alert-outbox`
+    - `viewKey: callback-alert-outbox`
+    - `permissionCode: petpal.callback-alert.read`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（9/9）。
+
+关键设计决策：
+
+- 前端复用现有 `PageScaffold` 与权限指令，保持控制台交互一致性。
+- 先落地“可操作”能力（筛选/重试），后续再扩展高级能力（批量重放、死信对比、重试历史）。
+
 - 回调审计持久化：完成。
 - 管理端审计查询 API：完成。
 - 管理端审计 UI：完成。

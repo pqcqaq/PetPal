@@ -231,6 +231,18 @@ const defaultMenuTree: SystemMenuSeedNode[] = [
         sortOrder: 40,
         permissionCode: 'petpal.callback-audit.read',
       },
+      {
+        code: 'petpal-callback-alert-outbox',
+        type: 'PAGE',
+        title: '宠托帮回调告警队列',
+        caption: 'PetPal Alert Outbox',
+        description: '查看回调失败告警投递队列，处理重试与死信。',
+        icon: 'i-carbon-warning-alt',
+        path: '/petpal/callback-alert-outbox',
+        viewKey: 'callback-alert-outbox',
+        sortOrder: 45,
+        permissionCode: 'petpal.callback-alert.read',
+      },
     ],
   },
   {
