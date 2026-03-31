@@ -168,11 +168,106 @@
         </el-table-column>
       </el-table>
     </section>
+
+    <section class="frontend-page__section-grid">
+      <article class="frontend-card petpal-grid-span-5">
+        <span class="frontend-card__eyebrow">照料者入驻</span>
+        <h3>照料者档案</h3>
+        <el-form :model="caregiverProfileForm" label-position="top" size="small">
+          <el-form-item label="简介">
+            <el-input v-model="caregiverProfileForm.intro" type="textarea" :rows="3" placeholder="介绍照料经验与服务风格" />
+          </el-form-item>
+          <el-form-item label="经验年限">
+            <el-input-number v-model="caregiverProfileForm.experienceYears" :min="0" :max="60" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="服务半径(km)">
+            <el-input-number v-model="caregiverProfileForm.serviceRadiusKm" :min="1" :max="100" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="服务城市">
+            <el-input v-model="caregiverProfileForm.serviceCity" placeholder="例如：杭州" />
+          </el-form-item>
+          <el-form-item>
+            <el-space>
+              <el-button type="primary" :loading="caregiverProfileSaving" @click="saveCaregiverProfile">保存档案</el-button>
+              <el-tag :type="caregiverProfile?.auditStatus === 'APPROVED' ? 'success' : (caregiverProfile?.auditStatus === 'REJECTED' ? 'danger' : 'warning')">
+                审核状态：{{ caregiverProfile?.auditStatus || 'PENDING' }}
+              </el-tag>
+            </el-space>
+          </el-form-item>
+        </el-form>
+      </article>
+
+      <article class="frontend-card petpal-grid-span-7">
+        <span class="frontend-card__eyebrow">服务设置</span>
+        <h3>新增照料服务</h3>
+        <el-form :model="caregiverServiceForm" label-position="top" size="small">
+          <el-row :gutter="12">
+            <el-col :span="8">
+              <el-form-item label="服务类型">
+                <el-select v-model="caregiverServiceForm.serviceType" style="width: 100%">
+                  <el-option label="寄养" value="BOARDING" />
+                  <el-option label="遛宠" value="WALKING" />
+                  <el-option label="喂养" value="FEEDING" />
+                  <el-option label="上门" value="DOOR_VISIT" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="宠物种类">
+                <el-select v-model="caregiverServiceForm.petSpecies" style="width: 100%">
+                  <el-option label="犬" value="DOG" />
+                  <el-option label="猫" value="CAT" />
+                  <el-option label="其他" value="OTHER" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="价格">
+                <el-input-number v-model="caregiverServiceForm.pricePerUnit" :min="1" :max="10000" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="8">
+              <el-form-item label="计价单位">
+                <el-input v-model="caregiverServiceForm.unitType" placeholder="例如：HOUR" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="最短提前小时">
+                <el-input-number v-model="caregiverServiceForm.minNoticeHours" :min="0" :max="168" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="服务城市">
+                <el-input v-model="caregiverServiceForm.serviceCity" placeholder="例如：杭州" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item>
+            <el-button type="primary" :loading="caregiverServiceSaving" @click="createCaregiverService">新增服务</el-button>
+          </el-form-item>
+        </el-form>
+
+        <el-table :data="caregiverServices" size="small">
+          <el-table-column prop="serviceType" label="服务" min-width="100" />
+          <el-table-column prop="petSpecies" label="宠物" min-width="80" />
+          <el-table-column prop="pricePerUnit" label="价格" min-width="100" />
+          <el-table-column prop="unitType" label="单位" min-width="100" />
+          <el-table-column prop="serviceCity" label="城市" min-width="100" />
+          <el-table-column prop="isActive" label="启用" min-width="80">
+            <template #default="scope">{{ scope.row.isActive ? '是' : '否' }}</template>
+          </el-table-column>
+        </el-table>
+      </article>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import type {
+  CaregiverProfileRecord,
+  CaregiverServiceRecord,
   CreatePetPayload,
   CreateServiceRequestPayload,
   MatchCaregiverQuery,
@@ -194,6 +289,8 @@ const pets = ref<PetProfileRecord[]>([]);
 const requests = ref<ServiceRequestRecord[]>([]);
 const orders = ref<OrderRecord[]>([]);
 const matchItems = ref<MatchedCaregiverRecord[]>([]);
+const caregiverProfile = ref<CaregiverProfileRecord | null>(null);
+const caregiverServices = ref<CaregiverServiceRecord[]>([]);
 
 const petsLoading = ref(false);
 const requestsLoading = ref(false);
@@ -201,6 +298,8 @@ const ordersLoading = ref(false);
 const matchLoading = ref(false);
 const petSaving = ref(false);
 const requestSaving = ref(false);
+const caregiverProfileSaving = ref(false);
+const caregiverServiceSaving = ref(false);
 
 const petForm = reactive<CreatePetPayload>({
   name: '',
@@ -232,6 +331,25 @@ const matchQuery = reactive<MatchCaregiverQuery>({
   city: '',
   page: 1,
   pageSize: 10,
+});
+
+const caregiverProfileForm = reactive({
+  intro: '',
+  experienceYears: 0,
+  serviceRadiusKm: 5,
+  serviceCity: '',
+});
+
+const caregiverServiceForm = reactive({
+  serviceType: 'BOARDING' as CreateServiceRequestPayload['serviceType'],
+  petSpecies: 'DOG' as 'DOG' | 'CAT' | 'OTHER',
+  pricePerUnit: 50,
+  unitType: 'HOUR',
+  minNoticeHours: 2,
+  serviceCity: '',
+  serviceLat: undefined as number | undefined,
+  serviceLng: undefined as number | undefined,
+  isActive: true,
 });
 
 const formatTime = (value: string) => new Date(value).toLocaleString();
@@ -281,6 +399,74 @@ const loadMatches = async () => {
     ElMessage.error(getErrorMessage(error, '匹配照料者失败'));
   } finally {
     matchLoading.value = false;
+  }
+};
+
+const loadCaregiverProfile = async () => {
+  try {
+    const profile = await api.petpal.caregiver.profile();
+    caregiverProfile.value = profile;
+    caregiverProfileForm.intro = profile.intro || '';
+    caregiverProfileForm.experienceYears = profile.experienceYears;
+    caregiverProfileForm.serviceRadiusKm = profile.serviceRadiusKm;
+    caregiverProfileForm.serviceCity = profile.serviceCity || '';
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '加载照料者档案失败'));
+  }
+};
+
+const loadCaregiverServices = async () => {
+  try {
+    caregiverServices.value = await api.petpal.caregiver.services();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '加载照料服务失败'));
+  }
+};
+
+const saveCaregiverProfile = async () => {
+  try {
+    caregiverProfileSaving.value = true;
+    const profile = await api.petpal.caregiver.upsertProfile({
+      intro: caregiverProfileForm.intro.trim() || undefined,
+      experienceYears: caregiverProfileForm.experienceYears,
+      serviceRadiusKm: caregiverProfileForm.serviceRadiusKm,
+      serviceCity: caregiverProfileForm.serviceCity.trim() || undefined,
+    });
+    caregiverProfile.value = profile;
+    ElMessage.success('照料者档案已更新');
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '保存照料者档案失败'));
+  } finally {
+    caregiverProfileSaving.value = false;
+  }
+};
+
+const createCaregiverService = async () => {
+  if (!caregiverServiceForm.unitType.trim()) {
+    ElMessage.warning('请填写计价单位');
+    return;
+  }
+
+  try {
+    caregiverServiceSaving.value = true;
+    await api.petpal.caregiver.createService({
+      serviceType: caregiverServiceForm.serviceType,
+      petSpecies: caregiverServiceForm.petSpecies,
+      pricePerUnit: caregiverServiceForm.pricePerUnit,
+      unitType: caregiverServiceForm.unitType.trim(),
+      minNoticeHours: caregiverServiceForm.minNoticeHours,
+      serviceCity: caregiverServiceForm.serviceCity.trim() || undefined,
+      serviceLat: caregiverServiceForm.serviceLat,
+      serviceLng: caregiverServiceForm.serviceLng,
+      isActive: caregiverServiceForm.isActive,
+      availableSlots: [],
+    });
+    ElMessage.success('照料服务已创建');
+    await loadCaregiverServices();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '创建照料服务失败'));
+  } finally {
+    caregiverServiceSaving.value = false;
   }
 };
 
@@ -338,7 +524,14 @@ const createRequest = async () => {
 };
 
 const reloadAll = async () => {
-  await Promise.all([loadPets(), loadRequests(), loadOrders(), loadMatches()]);
+  await Promise.all([
+    loadPets(),
+    loadRequests(),
+    loadOrders(),
+    loadMatches(),
+    loadCaregiverProfile(),
+    loadCaregiverServices(),
+  ]);
 };
 
 onMounted(async () => {

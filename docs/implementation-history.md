@@ -820,6 +820,26 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 50. PetPal Web 接入照料者入驻（P1-M1 Slice 23）
+
+**内容**：将已落地的照料者档案与服务设置 API 接入 Web 前台，形成可操作页面。
+
+变更摘要：
+
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 新增照料者档案编辑区（intro/experienceYears/serviceRadiusKm/serviceCity）。
+  - 新增照料者审核状态展示。
+  - 新增照料服务创建表单与服务列表展示。
+  - 页面初始化与刷新逻辑接入 caregiver profile/services 并行加载。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。
