@@ -1,11 +1,11 @@
 import { prisma } from '../lib/prisma';
+import { Prisma } from '../lib/prisma-generated';
 import type {
   CallbackAudit,
   CaregiverService,
   OrderMain,
   PetProfile,
   ServiceRequest,
-  Prisma,
 } from '../lib/prisma-generated';
 import { badRequest, notFound } from '../utils/errors';
 import { withSnowflakeId } from '../utils/persistence';
@@ -34,6 +34,38 @@ const calcDistanceKm = (
     + Math.cos(toRad(fromLat)) * Math.cos(toRad(toLat)) * Math.sin(dLng / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Number((radius * c).toFixed(3));
+};
+
+const SERIALIZABLE_TX_OPTIONS = {
+  isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  maxWait: 5_000,
+  timeout: 15_000,
+} as const;
+
+const isSerializationConflictError = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  return (error as { code?: string }).code === 'P2034';
+};
+
+const runSerializableTransaction = async <T>(
+  callback: (tx: Prisma.TransactionClient) => Promise<T>,
+  maxRetries = 2,
+) => {
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      return await prisma.$transaction(callback, SERIALIZABLE_TX_OPTIONS);
+    } catch (error) {
+      if (attempt < maxRetries && isSerializationConflictError(error)) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error('Serializable transaction retry exhausted');
 };
 
 const assertOrderAmountInvariant = (order: {
@@ -446,7 +478,7 @@ export const petpalService = {
       rawPayload?: string;
     };
   }) {
-    return prisma.$transaction(async (tx) => {
+    return runSerializableTransaction(async (tx) => {
       const payment = await tx.paymentRecord.findUnique({
         where: {
           payNo: payload.payNo,
@@ -640,7 +672,7 @@ export const petpalService = {
       rawPayload?: string;
     };
   }) {
-    return prisma.$transaction(async (tx) => {
+    return runSerializableTransaction(async (tx) => {
       const refund = await tx.refundRecord.findUnique({
         where: {
           refundNo: payload.refundNo,

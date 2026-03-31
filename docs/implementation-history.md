@@ -633,4 +633,23 @@ Git commit：`feat(p1): add callback alert outbox console page and menu integrat
 - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（9/9）。
 
 Git commit：`feat(p1): support batch retry for dead callback alert outbox records`。
+
+## 33. PetPal 回调并发事务隔离加固（P1 Slice 7）
+
+**内容**：针对支付/退款回调并发竞态，引入 Serializable 事务与冲突自动重试机制。
+
+变更摘要：
+
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增 `runSerializableTransaction` 事务执行器。
+  - 统一开启 `TransactionIsolationLevel.Serializable`。
+  - 识别 Prisma 冲突错误 `P2034`，最多自动重试 2 次。
+  - `handlePaymentCallback`、`handleRefundCallback` 改为通过该执行器运行。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（9/9）。
+
+Git commit：`feat(p1): harden petpal callback transactions with serializable isolation and retry`。
 - 高增长场景下需要规划审计表分区与归档策略。

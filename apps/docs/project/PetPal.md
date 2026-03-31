@@ -1051,7 +1051,7 @@ flowchart TD
 
 | 编号 | 风险描述 | 优先级 | 负责人角色 | 状态 | 目标版本 |
 | --- | --- | --- | --- | --- | --- |
-| R-001 | 支付并发回调导致金额聚合竞态 | P0 | 后端 | Open | Sprint 1 |
+| R-001 | 支付并发回调导致金额聚合竞态 | P0 | 后端 | Mitigated（Serializable+Retry） | Sprint 1 |
 | R-002 | PostGIS 迁移在不同环境不一致 | P0 | 后端/运维 | Open | Sprint 1 |
 | R-003 | activeRole 被篡改导致越权访问 | P0 | 后端 | Open | Sprint 2 |
 | R-004 | Outbox 重试策略导致消息堆积 | P1 | 后端 | Mitigated（MVP） | Sprint 3 |
@@ -1833,6 +1833,31 @@ gantt
 
 - 批量重放只面向 `DEAD` 记录，避免影响正常重试中的消息。
 - 限制批量上限为 200，防止一次性大规模重放冲击下游。
+
+### 14.23 2026-04-01（P1 Slice 7）
+
+**概述**：支付/退款回调并发竞态加固，启用 Serializable 事务隔离并对冲突自动重试。
+
+已完成：
+
+- `apps/backend/src/services/petpal-service.ts`：
+  - 新增 `runSerializableTransaction` 事务执行器。
+  - 统一事务选项：
+    - `isolationLevel = Serializable`
+    - `maxWait = 5000`
+    - `timeout = 15000`
+  - 对 Prisma 并发冲突（`P2034`）增加自动重试（最多 2 次）。
+  - `handlePaymentCallback` 与 `handleRefundCallback` 切换为 Serializable 事务执行器。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（9/9）。
+
+关键设计决策：
+
+- 在现有幂等逻辑基础上，优先使用数据库隔离级别抑制并发写覆盖。
+- 对冲突错误做有限重试，兼顾一致性与吞吐，避免无限重试放大压力。
 
 - 回调审计持久化：完成。
 - 管理端审计查询 API：完成。
