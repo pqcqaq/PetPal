@@ -157,6 +157,17 @@ type OwnerRefundProgressRecord = {
   refundableBalance: number;
 };
 
+type ComplaintAdminFilters = {
+  page: number;
+  pageSize: number;
+  status?: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
+  complaintType?: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
+  targetRole?: 'CAREGIVER' | 'PLATFORM';
+  assignedAdminId?: string;
+  unassignedOnly?: boolean;
+  keyword?: string;
+};
+
 const OWNER_TRANSACTION_EXPORT_DEFAULT_DAYS = 365;
 const OWNER_TRANSACTION_EXPORT_MAX_DAYS = 366;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -434,7 +445,17 @@ const normalizeEvidenceUrls = (urls?: string[]) => [...new Set(
     .filter(Boolean),
 )].slice(0, 10);
 
+const toStringArray = (value: Prisma.JsonValue | null | undefined) => Array.isArray(value)
+  ? value.filter((item): item is string => typeof item === 'string')
+  : [];
+
 const complaintInclude = {
+  assignedAdmin: {
+    select: {
+      id: true,
+      nickname: true,
+    },
+  },
   processLogs: {
     where: {
       deleteAt: null,
@@ -442,8 +463,87 @@ const complaintInclude = {
     orderBy: {
       createdAt: 'asc',
     },
+    include: {
+      operator: {
+        select: {
+          id: true,
+          nickname: true,
+        },
+      },
+    },
   },
 } satisfies Prisma.ComplaintInclude;
+
+type ComplaintEntity = Prisma.ComplaintGetPayload<{
+  include: typeof complaintInclude;
+}>;
+
+const complaintAdminInclude = {
+  ...complaintInclude,
+  order: {
+    select: {
+      id: true,
+      orderNo: true,
+      orderStatus: true,
+      ownerId: true,
+      caregiverId: true,
+      owner: {
+        select: {
+          nickname: true,
+        },
+      },
+      caregiver: {
+        select: {
+          user: {
+            select: {
+              nickname: true,
+            },
+          },
+        },
+      },
+    },
+  },
+} satisfies Prisma.ComplaintInclude;
+
+type ComplaintAdminEntity = Prisma.ComplaintGetPayload<{
+  include: typeof complaintAdminInclude;
+}>;
+
+const toComplaintRecord = (complaint: ComplaintEntity) => ({
+  id: complaint.id,
+  orderId: complaint.orderId,
+  complainantId: complaint.complainantId,
+  targetRole: complaint.targetRole,
+  complaintType: complaint.complaintType,
+  description: complaint.description,
+  evidenceUrls: toStringArray(complaint.evidenceUrls),
+  status: complaint.status,
+  resultSummary: complaint.resultSummary,
+  assignedAdminId: complaint.assignedAdminId,
+  assignedAdminNickname: complaint.assignedAdmin?.nickname ?? null,
+  closedAt: complaint.closedAt,
+  createdAt: complaint.createdAt,
+  updatedAt: complaint.updatedAt,
+  processLogs: complaint.processLogs.map(log => ({
+    id: log.id,
+    complaintId: log.complaintId,
+    actionType: log.actionType,
+    operatorId: log.operatorId,
+    operatorNickname: log.operator?.nickname ?? null,
+    note: log.note,
+    createdAt: log.createdAt,
+  })),
+});
+
+const toComplaintAdminRecord = (complaint: ComplaintAdminEntity) => ({
+  ...toComplaintRecord(complaint),
+  orderNo: complaint.order.orderNo,
+  orderStatus: complaint.order.orderStatus,
+  ownerId: complaint.order.ownerId,
+  ownerNickname: complaint.order.owner.nickname,
+  caregiverId: complaint.order.caregiverId,
+  caregiverNickname: complaint.order.caregiver.user.nickname,
+});
 
 const loadOrderComplaintsByOrderId = async (
   client: Prisma.TransactionClient | PrismaClient,
@@ -457,6 +557,77 @@ const loadOrderComplaintsByOrderId = async (
   orderBy: {
     createdAt: 'desc',
   },
+});
+
+const buildComplaintAdminWhere = (filters: ComplaintAdminFilters): Prisma.ComplaintWhereInput => {
+  const keyword = filters.keyword?.trim();
+
+  return {
+    deleteAt: null,
+    status: filters.status,
+    complaintType: filters.complaintType,
+    targetRole: filters.targetRole,
+    assignedAdminId: filters.unassignedOnly ? null : filters.assignedAdminId,
+    OR: keyword
+      ? [
+        {
+          description: {
+            contains: keyword,
+          },
+        },
+        {
+          resultSummary: {
+            contains: keyword,
+          },
+        },
+        {
+          order: {
+            orderNo: {
+              contains: keyword,
+            },
+          },
+        },
+        {
+          order: {
+            owner: {
+              nickname: {
+                contains: keyword,
+              },
+            },
+          },
+        },
+        {
+          order: {
+            caregiver: {
+              user: {
+                nickname: {
+                  contains: keyword,
+                },
+              },
+            },
+          },
+        },
+        {
+          assignedAdmin: {
+            nickname: {
+              contains: keyword,
+            },
+          },
+        },
+      ]
+      : undefined,
+  };
+};
+
+const loadAdminComplaintById = async (
+  client: Prisma.TransactionClient | PrismaClient,
+  complaintId: string,
+) => client.complaint.findFirst({
+  where: {
+    id: complaintId,
+    deleteAt: null,
+  },
+  include: complaintAdminInclude,
 });
 
 const buildOwnerRefundProgress = (order: {
@@ -1544,7 +1715,8 @@ export const petpalService = {
       throw notFound('Order not found');
     }
 
-    return loadOrderComplaintsByOrderId(prisma, order.id);
+    const complaints = await loadOrderComplaintsByOrderId(prisma, order.id);
+    return complaints.map(toComplaintRecord);
   },
 
   async createOwnerOrderComplaint(ownerId: string, orderId: string, payload: {
@@ -1646,7 +1818,174 @@ export const petpalService = {
         throw notFound('Complaint not found');
       }
 
-      return created;
+      return toComplaintRecord(created);
+    });
+  },
+
+  async queryAdminComplaints(filters: ComplaintAdminFilters) {
+    const where = buildComplaintAdminWhere(filters);
+    const [total, complaints] = await Promise.all([
+      prisma.complaint.count({ where }),
+      prisma.complaint.findMany({
+        where,
+        include: complaintAdminInclude,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip: (filters.page - 1) * filters.pageSize,
+        take: filters.pageSize,
+      }),
+    ]);
+
+    return {
+      items: complaints.map(toComplaintAdminRecord),
+      pagination: {
+        page: filters.page,
+        pageSize: filters.pageSize,
+        total,
+        totalPages: Math.ceil(total / filters.pageSize),
+      },
+    };
+  },
+
+  async handleAdminComplaint(
+    complaintId: string,
+    actorId: string,
+    payload: {
+      actionType: 'ASSIGN' | 'INVESTIGATE' | 'CALL_USER' | 'PENALTY' | 'CLOSE';
+      assigneeId?: string;
+      note?: string;
+      resultStatus?: 'RESOLVED' | 'REJECTED';
+      resultSummary?: string;
+    },
+  ) {
+    return runSerializableTransaction(async (tx) => {
+      const complaint = await tx.complaint.findFirst({
+        where: {
+          id: complaintId,
+          deleteAt: null,
+        },
+        select: {
+          id: true,
+          status: true,
+          assignedAdminId: true,
+        },
+      });
+
+      if (!complaint) {
+        throw notFound('Complaint not found');
+      }
+
+      if (complaint.status === 'RESOLVED' || complaint.status === 'REJECTED') {
+        throw badRequest('Closed complaints cannot be updated');
+      }
+
+      if (payload.actionType === 'ASSIGN') {
+        if (!payload.assigneeId?.trim()) {
+          throw badRequest('Complaint assignee is required');
+        }
+
+        const assignee = await tx.user.findFirst({
+          where: {
+            id: payload.assigneeId.trim(),
+            deleteAt: null,
+            status: 'ACTIVE',
+            roles: {
+              some: {
+                role: {
+                  code: {
+                    in: ['super-admin', 'ops-manager'],
+                  },
+                },
+              },
+            },
+          },
+          select: {
+            id: true,
+            nickname: true,
+          },
+        });
+
+        if (!assignee) {
+          throw badRequest('Complaint assignee must be an active admin user');
+        }
+
+        await tx.complaint.update({
+          where: {
+            id: complaint.id,
+          },
+          data: {
+            assignedAdminId: assignee.id,
+            status: complaint.status === 'OPEN' ? 'PROCESSING' : complaint.status,
+          },
+        });
+
+        await appendComplaintProcessLog(tx, {
+          complaintId: complaint.id,
+          actionType: 'ASSIGN',
+          operatorId: actorId,
+          note: payload.note?.trim() || `已指派给 ${assignee.nickname}`,
+        });
+      } else if (payload.actionType === 'CLOSE') {
+        const resultStatus = payload.resultStatus;
+        const resultSummary = payload.resultSummary?.trim();
+
+        if (!resultStatus) {
+          throw badRequest('Complaint close result is required');
+        }
+
+        if (!resultSummary) {
+          throw badRequest('Complaint result summary is required');
+        }
+
+        await tx.complaint.update({
+          where: {
+            id: complaint.id,
+          },
+          data: {
+            status: resultStatus,
+            resultSummary,
+            closedAt: new Date(),
+            assignedAdminId: complaint.assignedAdminId ?? actorId,
+          },
+        });
+
+        await appendComplaintProcessLog(tx, {
+          complaintId: complaint.id,
+          actionType: 'CLOSE',
+          operatorId: actorId,
+          note: resultSummary,
+        });
+      } else {
+        const note = payload.note?.trim();
+        if (!note) {
+          throw badRequest('Complaint handling note is required');
+        }
+
+        await tx.complaint.update({
+          where: {
+            id: complaint.id,
+          },
+          data: {
+            status: 'PROCESSING',
+            assignedAdminId: complaint.assignedAdminId ?? actorId,
+          },
+        });
+
+        await appendComplaintProcessLog(tx, {
+          complaintId: complaint.id,
+          actionType: payload.actionType,
+          operatorId: actorId,
+          note,
+        });
+      }
+
+      const updated = await loadAdminComplaintById(tx, complaint.id);
+      if (!updated) {
+        throw notFound('Complaint not found');
+      }
+
+      return toComplaintAdminRecord(updated);
     });
   },
 

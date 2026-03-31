@@ -118,6 +118,25 @@ const ownerTransactionExportQuerySchema = z.object({
   endDate: z.coerce.date().optional(),
 });
 
+const adminComplaintQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(100).optional(),
+  status: z.enum(['OPEN', 'PROCESSING', 'RESOLVED', 'REJECTED']).optional(),
+  complaintType: z.enum(['SAFETY', 'FEE', 'SERVICE', 'FRAUD', 'OTHER']).optional(),
+  targetRole: z.enum(['CAREGIVER', 'PLATFORM']).optional(),
+  assignedAdminId: z.string().trim().min(1).max(64).optional(),
+  unassignedOnly: z.coerce.boolean().optional(),
+  keyword: z.string().trim().max(100).optional(),
+});
+
+const adminComplaintActionSchema = z.object({
+  actionType: z.enum(['ASSIGN', 'INVESTIGATE', 'CALL_USER', 'PENALTY', 'CLOSE']),
+  assigneeId: z.string().trim().min(1).max(64).optional(),
+  note: z.string().trim().max(1000).optional(),
+  resultStatus: z.enum(['RESOLVED', 'REJECTED']).optional(),
+  resultSummary: z.string().trim().max(1000).optional(),
+});
+
 const paymentCallbackSchema = z.object({
   payNo: z.string().trim().min(1),
   channelTxnId: z.string().trim().min(1),
@@ -468,6 +487,35 @@ petpalRouter.get('/admin/caregivers', requirePermission('petpal.caregiver.audit'
   });
 
   return ok(res, result, 'Caregiver audit list');
+}));
+
+petpalRouter.get('/admin/complaints', requirePermission('petpal.complaint.read'), asyncHandler(async (req, res) => {
+  const { page, pageSize } = parsePagination(req.query);
+  const query = adminComplaintQuerySchema.parse({
+    ...req.query,
+    page,
+    pageSize,
+  });
+
+  const result = await petpalService.queryAdminComplaints({
+    page: query.page ?? page,
+    pageSize: query.pageSize ?? pageSize,
+    status: query.status,
+    complaintType: query.complaintType,
+    targetRole: query.targetRole,
+    assignedAdminId: query.assignedAdminId,
+    unassignedOnly: query.unassignedOnly,
+    keyword: query.keyword,
+  });
+
+  return ok(res, result, 'Complaint admin list');
+}));
+
+petpalRouter.post('/admin/complaints/:id/actions', requirePermission('petpal.complaint.manage'), asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = adminComplaintActionSchema.parse(req.body ?? {});
+  const complaint = await petpalService.handleAdminComplaint(String(req.params.id), auth.id, payload);
+  return ok(res, complaint, 'Complaint updated');
 }));
 
 // Admin endpoints (require authentication)

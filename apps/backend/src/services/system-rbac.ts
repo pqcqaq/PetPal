@@ -256,6 +256,18 @@ const defaultMenuTree: SystemMenuSeedNode[] = [
         sortOrder: 50,
         permissionCode: 'petpal.caregiver.audit',
       },
+      {
+        code: 'petpal-complaints',
+        type: 'PAGE',
+        title: '宠托帮投诉工单',
+        caption: 'PetPal Complaints',
+        description: '查看、指派与结案宠托帮投诉工单，沉淀处理进度与负责人。',
+        icon: 'i-carbon-chat',
+        path: '/petpal/complaints',
+        viewKey: 'complaint-admin',
+        sortOrder: 55,
+        permissionCode: 'petpal.complaint.read',
+      },
     ],
   },
   {
@@ -521,5 +533,3 @@ export const bootstrapSystemRbac = async (prisma: PrismaClient) => {
     roleByCode,
   };
 };
-
-

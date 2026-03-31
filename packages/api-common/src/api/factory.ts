@@ -36,6 +36,9 @@ import type {
   UploadPrepareResult,
 } from '../types/files';
 import type {
+  ComplaintAdminRecord,
+  ComplaintAdminPage,
+  ComplaintAdminQuery,
   ComplaintRecord,
   CaregiverAuditPayload,
   CaregiverAuditPage,
@@ -59,6 +62,7 @@ import type {
   CreateServiceLogPayload,
   CreateServiceRequestPayload,
   MatchCaregiverQuery,
+  ManageComplaintPayload,
   MatchedCaregiverPage,
   OrderDetailRecord,
   OrderRecord,
@@ -516,6 +520,17 @@ export const createApiFactory = (options: ClientOptions) => {
         auditCaregiver: (caregiverId: string, payload: CaregiverAuditPayload) =>
           client.request<CaregiverProfileRecord>({
             url: `/petpal/admin/caregivers/${caregiverId}/audit`,
+            method: 'POST',
+            data: payload,
+          }),
+        complaints: (query?: ComplaintAdminQuery) =>
+          client.request<ComplaintAdminPage>({
+            url: '/petpal/admin/complaints',
+            params: query as unknown as QueryParams,
+          }),
+        handleComplaint: (complaintId: string, payload: ManageComplaintPayload) =>
+          client.request<ComplaintAdminRecord>({
+            url: `/petpal/admin/complaints/${complaintId}/actions`,
             method: 'POST',
             data: payload,
           }),

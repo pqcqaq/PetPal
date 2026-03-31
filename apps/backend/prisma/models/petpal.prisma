@@ -218,6 +218,7 @@ model Complaint {
   updateId      String?
   orderId       String
   complainantId String
+  assignedAdminId String?
   targetRole    ComplaintTargetRole
   complaintType ComplaintType
   description   String
@@ -230,10 +231,12 @@ model Complaint {
   deleteAt      DateTime?
   order         OrderMain           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   complainant   User                @relation("PetPalComplaintComplainant", fields: [complainantId], references: [id], onDelete: Cascade)
+  assignedAdmin User?               @relation("PetPalComplaintAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
   processLogs   ComplaintProcessLog[]
 
   @@index([orderId, createdAt])
   @@index([complainantId, status])
+  @@index([assignedAdminId, status])
   @@index([status, createdAt])
   @@index([targetRole, createdAt])
   @@index([complaintType, createdAt])

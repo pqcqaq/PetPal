@@ -201,6 +201,7 @@ export interface ComplaintProcessLogRecord {
   complaintId: string;
   actionType: ComplaintActionType;
   operatorId: string | null;
+  operatorNickname: string | null;
   note: string | null;
   createdAt: string;
 }
@@ -215,10 +216,21 @@ export interface ComplaintRecord {
   evidenceUrls: string[];
   status: ComplaintStatus;
   resultSummary: string | null;
+  assignedAdminId: string | null;
+  assignedAdminNickname: string | null;
   closedAt: string | null;
   createdAt: string;
   updatedAt: string;
   processLogs: ComplaintProcessLogRecord[];
+}
+
+export interface ComplaintAdminRecord extends ComplaintRecord {
+  orderNo: string;
+  orderStatus: OrderStatus;
+  ownerId: string;
+  ownerNickname: string;
+  caregiverId: string;
+  caregiverNickname: string;
 }
 
 export interface OrderRecord {
@@ -289,6 +301,35 @@ export interface CreateComplaintPayload {
   complaintType: ComplaintType;
   description: string;
   evidenceUrls?: string[];
+}
+
+export interface ComplaintAdminQuery {
+  page?: number;
+  pageSize?: number;
+  status?: ComplaintStatus;
+  complaintType?: ComplaintType;
+  targetRole?: ComplaintTargetRole;
+  assignedAdminId?: string;
+  unassignedOnly?: boolean;
+  keyword?: string;
+}
+
+export interface ManageComplaintPayload {
+  actionType: Exclude<ComplaintActionType, 'OPEN'>;
+  assigneeId?: string;
+  note?: string;
+  resultStatus?: Extract<ComplaintStatus, 'RESOLVED' | 'REJECTED'>;
+  resultSummary?: string;
+}
+
+export interface ComplaintAdminPage {
+  items: ComplaintAdminRecord[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface OwnerTransactionExportQuery {

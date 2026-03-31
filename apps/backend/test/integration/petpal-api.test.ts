@@ -898,6 +898,160 @@ describe('PetPal API integration', () => {
       .expect(404);
   });
 
+  it('allows admin to assign, investigate and close complaints', async () => {
+    const {
+      app,
+      ownerSession,
+      caregiverSession,
+      order,
+    } = await createFulfillmentScenario();
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+
+    await request(app)
+      .post(`/api/petpal/caregiver/orders/${order.id}/accept`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    await request(app)
+      .post(`/api/petpal/caregiver/orders/${order.id}/check-in`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .send({})
+      .expect(200);
+
+    const complaintResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/complaints`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .send({
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: '上门签到时间明显晚于约定，希望平台介入核实并处理。',
+        evidenceUrls: ['https://example.com/evidence/late-arrival.png'],
+      })
+      .expect(200);
+
+    const complaintId = complaintResponse.body.data.id as string;
+
+    const listResponse = await request(app)
+      .get('/api/petpal/admin/complaints')
+      .query({
+        status: 'OPEN',
+        keyword: order.orderNo,
+      })
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(listResponse.body.data.items.length, 1);
+    assert.equal(listResponse.body.data.items[0].id, complaintId);
+    assert.equal(listResponse.body.data.items[0].orderNo, order.orderNo);
+    assert.equal(listResponse.body.data.items[0].ownerId, ownerSession.user.id);
+
+    const assignResponse = await request(app)
+      .post(`/api/petpal/admin/complaints/${complaintId}/actions`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        actionType: 'ASSIGN',
+        assigneeId: adminSession.user.id,
+      })
+      .expect(200);
+
+    assert.equal(assignResponse.body.data.status, 'PROCESSING');
+    assert.equal(assignResponse.body.data.assignedAdminId, adminSession.user.id);
+    assert.ok(assignResponse.body.data.assignedAdminNickname);
+    assert.equal(assignResponse.body.data.processLogs.at(-1)?.actionType, 'ASSIGN');
+
+    const investigateResponse = await request(app)
+      .post(`/api/petpal/admin/complaints/${complaintId}/actions`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        actionType: 'INVESTIGATE',
+        note: '已调取签到记录并联系照料者补充说明。',
+      })
+      .expect(200);
+
+    assert.equal(investigateResponse.body.data.status, 'PROCESSING');
+    assert.equal(investigateResponse.body.data.processLogs.at(-1)?.actionType, 'INVESTIGATE');
+    assert.ok(investigateResponse.body.data.processLogs.at(-1)?.operatorNickname);
+
+    const closeResponse = await request(app)
+      .post(`/api/petpal/admin/complaints/${complaintId}/actions`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        actionType: 'CLOSE',
+        resultStatus: 'RESOLVED',
+        resultSummary: '已核实签到超时，平台已协调退款并完成结案。',
+      })
+      .expect(200);
+
+    assert.equal(closeResponse.body.data.status, 'RESOLVED');
+    assert.equal(closeResponse.body.data.resultSummary, '已核实签到超时，平台已协调退款并完成结案。');
+    assert.ok(closeResponse.body.data.closedAt);
+    assert.equal(closeResponse.body.data.processLogs.at(-1)?.actionType, 'CLOSE');
+
+    const ownerComplaintList = await request(app)
+      .get(`/api/petpal/orders/${order.id}/complaints`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(ownerComplaintList.body.data[0].status, 'RESOLVED');
+    assert.ok(ownerComplaintList.body.data[0].assignedAdminNickname);
+    assert.ok(ownerComplaintList.body.data[0].processLogs.at(-1)?.operatorNickname);
+
+    const closedUpdateResponse = await request(app)
+      .post(`/api/petpal/admin/complaints/${complaintId}/actions`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        actionType: 'CALL_USER',
+        note: '结案后再次补充回访。',
+      })
+      .expect(400);
+
+    assert.equal(closedUpdateResponse.body.message, 'Closed complaints cannot be updated');
+  });
+
+  it('forbids non-admin users from accessing complaint admin endpoints', async () => {
+    const {
+      app,
+      ownerSession,
+      caregiverSession,
+      order,
+    } = await createFulfillmentScenario();
+
+    await request(app)
+      .post(`/api/petpal/caregiver/orders/${order.id}/accept`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    await request(app)
+      .post(`/api/petpal/caregiver/orders/${order.id}/check-in`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .send({})
+      .expect(200);
+
+    const complaintResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/complaints`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .send({
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: '普通成员不应访问投诉管理端接口。',
+      })
+      .expect(200);
+
+    await request(app)
+      .get('/api/petpal/admin/complaints')
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(403);
+
+    await request(app)
+      .post(`/api/petpal/admin/complaints/${complaintResponse.body.data.id}/actions`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .send({
+        actionType: 'INVESTIGATE',
+        note: '越权尝试',
+      })
+      .expect(403);
+  });
+
   it('handles payment and refund callbacks with idempotency', async () => {
     const { app, prisma } = context;
 

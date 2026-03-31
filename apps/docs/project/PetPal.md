@@ -3313,3 +3313,93 @@ gantt
 1. 补管理端投诉处理动作、指派与结案能力，完成纠纷处置闭环。
 2. 评估是否为主人端补“退款明细导出”或“售后操作时间线”。
 3. 将退款进度摘要能力复用到 Uni 端订单详情，保持双端售后体验一致。
+
+### 14.52 2026-04-01（P1-M3 Slice 35）
+
+**概述**：继续推进 P1-M3 纠纷处置闭环，本轮补齐“管理端投诉工单处理”能力，让主人发起的投诉可以被后台查询、指派负责人、记录处理动作并完成结案。
+
+已完成：
+
+- 投诉负责人建模：
+  - `apps/backend/prisma/models/auth.prisma`
+  - `apps/backend/prisma/models/petpal.prisma`
+  - `apps/backend/prisma/migrations/20260401223000_add_petpal_complaint_assignee/migration.sql`
+    - `Complaint` 新增 `assignedAdminId` 与 `assignedAdmin` 关系。
+    - `User` 新增 `assignedPetpalComplaints` 反向关系。
+    - 为 `assignedAdminId + status` 增加索引，支持后台工单筛选。
+- 权限与菜单：
+  - `apps/backend/src/constants/system-permissions.ts`
+  - `apps/backend/src/services/system-rbac.ts`
+    - 新增权限：
+      - `petpal.complaint.read`
+      - `petpal.complaint.manage`
+    - 新增控制台页面：
+      - `/console/petpal/complaints`
+      - `viewKey = complaint-admin`
+- API 契约与后端业务：
+  - `packages/api-common/src/types/petpal.ts`
+  - `packages/api-common/src/api/factory.ts`
+  - `apps/backend/src/services/petpal-service.ts`
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增后台工单查询：
+      - `GET /api/petpal/admin/complaints`
+    - 新增后台处理动作：
+      - `POST /api/petpal/admin/complaints/:id/actions`
+    - 支持动作：
+      - `ASSIGN`
+      - `INVESTIGATE`
+      - `CALL_USER`
+      - `PENALTY`
+      - `CLOSE`
+    - 关键规则：
+      - 指派对象必须是有效管理用户
+      - 处理中动作必须附处理备注
+      - 结案必须传 `resultStatus + resultSummary`
+      - 已结案投诉禁止继续更新
+    - owner 侧投诉返回结构同步补齐：
+      - `assignedAdminId`
+      - `assignedAdminNickname`
+      - `operatorNickname`
+- Web 控制台页面：
+  - `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+    - 新增投诉工单工作台。
+    - 支持筛选：
+      - 状态
+      - 投诉类型
+      - 投诉对象
+      - 负责人
+      - 未指派
+      - 关键字
+    - 支持展开查看投诉描述、证据链接、处理时间线与结案结论。
+    - 支持在弹窗中执行指派、跟进记录和结案。
+- 定向测试与代码审计：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增主路径测试，覆盖：
+      - 投诉创建
+      - 管理员指派负责人
+      - 追加调查记录
+      - 结案
+      - 主人端回读处理结果
+      - 已结案工单拒绝再次更新
+    - 新增权限边界测试，覆盖普通成员访问后台投诉接口返回 `403`
+    - 审计重点确认：
+      - 关闭态投诉不会被重复处理
+      - 负责人不会被指派给普通成员
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（18/18）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+风险与缓解：
+
+- 风险：当前投诉管理页仍以列表展开 + 弹窗处理为主，尚未提供独立详情页、批量分派或 SLA 超时提醒。
+- 缓解：本轮先优先打通“可查、可处理、可结案”的最小闭环；后续如运营侧需要值班效率优化，再补独立详情、批量操作和超时告警。
+
+下一步（1-3）：
+
+1. 将退款进度摘要复用到 Uni 端订单详情，保持双端售后体验一致。
+2. 评估是否补“退款明细导出”或“售后时间线”页，完善主人端售后透明度。
+3. 继续补管理员投诉工单的 SLA、批量分配与超时提醒，提升运营处理效率。

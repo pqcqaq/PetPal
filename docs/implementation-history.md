@@ -1218,6 +1218,90 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 62. PetPal 管理端投诉处理闭环（P1-M3 Slice 35）
+
+**内容**：继续推进 P1-M3 纠纷处置闭环，本轮补齐“管理端投诉工单列表、负责人指派、处理记录追加与结案”能力，让主人端投诉不再停留在发起阶段，而是能被后台持续跟进。
+
+变更摘要：
+
+- `apps/backend/prisma/models/auth.prisma`
+  - `User` 新增 `assignedPetpalComplaints` 反向关系。
+- `apps/backend/prisma/models/petpal.prisma`
+  - `Complaint` 新增 `assignedAdminId` 与 `assignedAdmin` 关系。
+  - 新增负责人状态索引 `@@index([assignedAdminId, status])`，支撑后台筛选与工单看板。
+- `apps/backend/prisma/migrations/20260401223000_add_petpal_complaint_assignee/migration.sql`
+  - 新增 `Complaint.assignedAdminId` 字段、索引与外键。
+- `apps/backend/src/constants/system-permissions.ts`
+  - 新增：
+    - `petpal.complaint.read`
+    - `petpal.complaint.manage`
+- `apps/backend/src/services/system-rbac.ts`
+  - 新增后台菜单页 `/console/petpal/complaints`，视图键 `complaint-admin`。
+- `packages/api-common/src/types/petpal.ts`
+  - 扩展投诉记录与处理日志结构：
+    - `assignedAdminId`
+    - `assignedAdminNickname`
+    - `operatorNickname`
+  - 新增：
+    - `ComplaintAdminRecord`
+    - `ComplaintAdminQuery`
+    - `ManageComplaintPayload`
+    - `ComplaintAdminPage`
+- `packages/api-common/src/api/factory.ts`
+  - 新增：
+    - `api.petpal.admin.complaints(query)`
+    - `api.petpal.admin.handleComplaint(id, payload)`
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增投诉记录映射函数，统一 owner/admin 侧投诉返回结构。
+  - 新增后台投诉筛选查询：
+    - 状态
+    - 投诉类型
+    - 投诉对象
+    - 负责人
+    - 未指派
+    - 关键字
+  - 新增后台处理动作：
+    - `ASSIGN`
+    - `INVESTIGATE`
+    - `CALL_USER`
+    - `PENALTY`
+    - `CLOSE`
+  - 约束：
+    - 指派对象必须是有效管理用户
+    - 处理中动作必须附带备注
+    - 结案必须附带结果状态与结论
+    - 已结案投诉不可再次更新
+- `apps/backend/src/routes/petpal.ts`
+  - 新增：
+    - `GET /api/petpal/admin/complaints`
+    - `POST /api/petpal/admin/complaints/:id/actions`
+- `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+  - 新增投诉工单管理台。
+  - 支持筛选、展开查看证据与处理时间线、打开处理弹窗、指派负责人、追加调查记录与结案。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增后台投诉处理主路径测试：
+    - 指派
+    - 调查记录
+    - 结案
+    - 主人端回读处理结果
+    - 已结案禁止再次更新
+  - 新增权限边界测试，覆盖普通成员访问后台投诉接口返回 `403`。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（18/18）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认投诉处理动作对关闭态工单做硬阻断，避免结案后继续追加处理动作造成状态污染。
+- 已确认负责人只能指派给有效管理用户，避免将工单流转给普通成员。
+- 已确认 owner 侧投诉查询会同步看到后台处理昵称与进度日志，但不会额外暴露后台权限信息。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。

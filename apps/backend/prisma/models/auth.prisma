@@ -28,6 +28,7 @@ model User {
   refundReviews   RefundRecord[]       @relation("RefundReviewer")
   petpalReviews   Review[]             @relation("PetPalReviewOwner")
   petpalComplaints Complaint[]         @relation("PetPalComplaintComplainant")
+  assignedPetpalComplaints Complaint[] @relation("PetPalComplaintAssignee")
   petpalComplaintLogs ComplaintProcessLog[] @relation("PetPalComplaintOperator")
 
   @@index([deleteAt])
