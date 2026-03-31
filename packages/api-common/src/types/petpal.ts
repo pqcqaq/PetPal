@@ -381,6 +381,12 @@ export interface OwnerTransactionExportQuery {
   endDate?: string;
 }
 
+export interface OwnerRefundExportQuery {
+  [key: string]: string | number | boolean | undefined;
+  startDate?: string;
+  endDate?: string;
+}
+
 export interface OwnerOrderRefundExportQuery {
   [key: string]: string | number | boolean | undefined;
 }

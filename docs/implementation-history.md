@@ -1302,6 +1302,52 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 74. PetPal 主人端跨订单退款明细导出（P1-M3 Slice 47）
+
+**内容**：继续推进 P1-M3 主人端售后透明度，本轮补齐“跨订单退款明细导出”能力，让用户在主人工作台即可按最近一年时间窗导出退款流水，便于跨订单对账、售后留档和年度汇总。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 新增 `OwnerRefundExportQuery`，作为主人端跨订单退款导出的共享查询参数类型。
+- `packages/api-common/src/api/factory.ts`
+  - 新增 `api.petpal.orders.exportRefundDetails()` 下载配置工厂。
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增 `listOwnerRefundExportRows(filters)`。
+  - 复用现有主人交易导出时间窗校验，限制导出区间最大为 366 天。
+  - 按“当前登录主人 + 最近一年时间窗”范围查询退款明细，返回：
+    - 订单号 / 订单状态 / 服务类型
+    - 预约开始 / 结束时间
+    - 退款单号 / 退款类型 / 退款状态
+    - 退款金额 / 原因
+    - 申请人 / 审核人
+    - 申请时间 / 审核时间 / 最后更新时间
+- `apps/backend/src/routes/petpal.ts`
+  - 新增 `GET /api/petpal/orders/refunds/export`。
+  - 复用现有 Excel 导出工具输出“PetPal Owner Refunds”工作表。
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 在主人工作台导出操作区新增“导出退款明细”按钮。
+  - 与现有“导出交易记录”并列，支持直接下载跨订单退款流水。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增主人跨订单退款明细导出成功用例。
+  - 新增导出结果排除他人退款记录的范围隔离断言。
+  - 新增超出 366 天导出时间窗返回 `400` 的边界断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（22/22）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认跨订单退款导出严格按 `order.ownerId = 当前登录主人` 做范围裁剪，不会导出他人退款流水。
+- 已确认退款导出复用既有交易导出时间窗校验，避免一次性拉取超长时间范围数据。
+- 已确认集成测试同时校验“包含当前主人新增退款 + 排除外部退款 + 导出订单全部归属当前主人”，可以防止种子数据引起的误报。
+
+Git commit：待本切片提交。
+
 ## 73. PetPal 主人端当前订单退款明细导出（P1-M3 Slice 46）
 
 **内容**：继续推进 P1-M3 主人端售后透明度，本轮补齐“当前订单退款明细导出”能力，让用户在订单详情页可以直接导出本单退款记录，便于对账、留档和售后沟通。

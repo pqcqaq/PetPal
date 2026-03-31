@@ -98,13 +98,20 @@
         <span class="frontend-card__eyebrow">需求与订单</span>
         <div class="petpal-section-heading">
           <h3>当前业务进展</h3>
-          <ListExportButton
-            v-if="auth.isAuthenticated"
-            :request="buildOwnerTransactionExportRequest"
-            label="导出近一年交易"
-            pending-label="导出中"
-            error-message="导出交易记录失败"
-          />
+          <el-space v-if="auth.isAuthenticated" wrap>
+            <ListExportButton
+              :request="buildOwnerTransactionExportRequest"
+              label="导出近一年交易"
+              pending-label="导出中"
+              error-message="导出交易记录失败"
+            />
+            <ListExportButton
+              :request="buildOwnerRefundExportRequest"
+              label="导出退款明细"
+              pending-label="导出中"
+              error-message="导出退款明细失败"
+            />
+          </el-space>
         </div>
         <el-space direction="vertical" fill :size="14" style="width: 100%">
           <el-table :data="requests" size="small" v-loading="requestsLoading">
@@ -625,6 +632,7 @@ const getOrderStatusLabel = (status: OrderStatus) => ({
 }[status] ?? status);
 
 const buildOwnerTransactionExportRequest = () => api.petpal.orders.exportTransactions();
+const buildOwnerRefundExportRequest = () => api.petpal.orders.exportRefundDetails();
 
 const loadPets = async () => {
   try {

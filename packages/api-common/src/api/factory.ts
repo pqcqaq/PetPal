@@ -73,6 +73,7 @@ import type {
   OrderRecord,
   OrderRefundProgressRecord,
   OwnerOrderRefundExportQuery,
+  OwnerRefundExportQuery,
   OwnerTransactionExportQuery,
   PetProfileRecord,
   ServiceRequestRecord,
@@ -458,6 +459,10 @@ export const createApiFactory = (options: ClientOptions) => {
         exportTransactions: createDownloadEndpoint<OwnerTransactionExportQuery>(
           '/petpal/orders/transactions/export',
           'petpal-owner-transactions.xlsx',
+        ),
+        exportRefundDetails: createDownloadEndpoint<OwnerRefundExportQuery>(
+          '/petpal/orders/refunds/export',
+          'petpal-owner-refunds.xlsx',
         ),
         exportRefunds: (id: string, params?: OwnerOrderRefundExportQuery): DownloadRequestConfig => ({
           url: `/petpal/orders/${id}/refunds/export`,

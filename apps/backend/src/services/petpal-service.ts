@@ -108,6 +108,11 @@ type OwnerTransactionExportFilters = {
   endDate?: Date;
 };
 
+type OwnerRefundExportFilters = {
+  startDate?: Date;
+  endDate?: Date;
+};
+
 type OwnerTransactionExportRow = {
   orderNo: string;
   orderStatus: 'PENDING_ACCEPT' | 'ACCEPTED' | 'SERVING' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'PARTIAL_REFUNDED' | 'REFUNDED';
@@ -128,6 +133,24 @@ type OwnerTransactionExportRow = {
   reviewRating: number | null;
   createdAt: Date;
   closedAt: Date | null;
+};
+
+type OwnerRefundExportRow = {
+  orderNo: string;
+  orderStatus: 'PENDING_ACCEPT' | 'ACCEPTED' | 'SERVING' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'PARTIAL_REFUNDED' | 'REFUNDED';
+  serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+  appointmentStart: Date;
+  appointmentEnd: Date;
+  refundNo: string;
+  refundType: 'FULL' | 'PARTIAL';
+  refundStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
+  refundAmount: number;
+  refundReason: string;
+  applyUserId: string;
+  reviewedBy: string | null;
+  reviewedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 type OwnerOrderRefundExportRow = {
@@ -1468,6 +1491,84 @@ export const petpalService = {
         closedAt: order.closedAt,
       };
     });
+  },
+
+  async listOwnerRefundExportRows(filters: OwnerRefundExportFilters = {}): Promise<OwnerRefundExportRow[]> {
+    const actorId = getRequestActorId();
+    if (!actorId) {
+      throw forbidden('Authentication required');
+    }
+
+    const { startDate, endDate } = normalizeOwnerTransactionExportRange(filters);
+    const refunds = await prisma.refundRecord.findMany({
+      where: {
+        deleteAt: null,
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+        order: {
+          ownerId: actorId,
+          deleteAt: null,
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        refundNo: true,
+        refundType: true,
+        refundStatus: true,
+        refundAmount: true,
+        refundReason: true,
+        applyUserId: true,
+        reviewedBy: true,
+        reviewedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        order: {
+          select: {
+            orderNo: true,
+            orderStatus: true,
+            serviceType: true,
+            appointmentStart: true,
+            appointmentEnd: true,
+            amountTotal: true,
+            amountAdjusted: true,
+            amountPaid: true,
+            amountRefunded: true,
+          },
+        },
+      },
+      take: 5000,
+    });
+
+    refunds.forEach((refund) => {
+      assertOrderAmountInvariant({
+        amountTotal: refund.order.amountTotal,
+        amountAdjusted: refund.order.amountAdjusted,
+        amountPaid: refund.order.amountPaid,
+        amountRefunded: refund.order.amountRefunded,
+      });
+    });
+
+    return refunds.map(refund => ({
+      orderNo: refund.order.orderNo,
+      orderStatus: refund.order.orderStatus,
+      serviceType: refund.order.serviceType,
+      appointmentStart: refund.order.appointmentStart,
+      appointmentEnd: refund.order.appointmentEnd,
+      refundNo: refund.refundNo,
+      refundType: refund.refundType,
+      refundStatus: refund.refundStatus,
+      refundAmount: Number(refund.refundAmount),
+      refundReason: refund.refundReason,
+      applyUserId: refund.applyUserId,
+      reviewedBy: refund.reviewedBy,
+      reviewedAt: refund.reviewedAt,
+      createdAt: refund.createdAt,
+      updatedAt: refund.updatedAt,
+    }));
   },
 
   async listOwnerOrderRefundExportRows(ownerId: string, orderId: string): Promise<OwnerOrderRefundExportRow[]> {

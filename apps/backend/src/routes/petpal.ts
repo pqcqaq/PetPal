@@ -118,6 +118,11 @@ const ownerTransactionExportQuerySchema = z.object({
   endDate: z.coerce.date().optional(),
 });
 
+const ownerRefundExportQuerySchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+});
+
 const ownerOrderRefundExportQuerySchema = z.object({});
 
 const adminComplaintQuerySchema = z.object({
@@ -357,6 +362,33 @@ petpalRouter.get(
       { header: '评价星级', width: 10, value: row => row.reviewRating ?? '' },
       { header: '下单时间', width: 22, value: row => row.createdAt },
       { header: '关闭时间', width: 22, value: row => row.closedAt },
+    ],
+  }),
+);
+
+petpalRouter.get(
+  '/orders/refunds/export',
+  createExcelExportHandler({
+    fileName: () => createTimestampedExcelFileName('petpal-owner-refunds'),
+    sheetName: 'PetPal Owner Refunds',
+    parseQuery: query => ownerRefundExportQuerySchema.parse(query ?? {}),
+    queryRows: query => petpalService.listOwnerRefundExportRows(query),
+    columns: [
+      { header: '订单号', width: 24, value: row => row.orderNo },
+      { header: '订单状态', width: 14, value: row => orderStatusLabels[row.orderStatus] ?? row.orderStatus },
+      { header: '服务类型', width: 14, value: row => serviceTypeLabels[row.serviceType] ?? row.serviceType },
+      { header: '预约开始', width: 22, value: row => row.appointmentStart },
+      { header: '预约结束', width: 22, value: row => row.appointmentEnd },
+      { header: '退款单号', width: 24, value: row => row.refundNo },
+      { header: '退款类型', width: 14, value: row => refundTypeLabels[row.refundType] ?? row.refundType },
+      { header: '退款状态', width: 14, value: row => refundStatusLabels[row.refundStatus] ?? row.refundStatus },
+      { header: '退款金额', width: 14, value: row => row.refundAmount },
+      { header: '退款原因', width: 36, value: row => row.refundReason },
+      { header: '申请人', width: 24, value: row => row.applyUserId },
+      { header: '审核人', width: 24, value: row => row.reviewedBy ?? '' },
+      { header: '申请时间', width: 22, value: row => row.createdAt },
+      { header: '审核时间', width: 22, value: row => row.reviewedAt },
+      { header: '最后更新时间', width: 22, value: row => row.updatedAt },
     ],
   }),
 );

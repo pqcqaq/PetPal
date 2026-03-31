@@ -920,6 +920,156 @@ describe('PetPal API integration', () => {
     assert.equal(foreignResponse.body.message, 'Order not found');
   });
 
+  it('allows owner to export refund detail rows within the recent year window', async () => {
+    const {
+      app,
+      prisma,
+      ownerSession,
+      caregiverProfile,
+      order,
+    } = await createFulfillmentScenario();
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+    const suffix = Date.now().toString(36);
+
+    const firstRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-ledger-a-${suffix}`,
+        orderId: order.id,
+        refundNo: `REF-LEDGER-A-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '行程缩短，退部分费用',
+        refundAmount: 12,
+        refundStatus: 'APPROVED',
+        reviewedBy: adminSession.user.id,
+        reviewedAt: new Date('2026-04-06T09:00:00.000Z'),
+      },
+    });
+
+    const secondOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-ledger-${suffix}`,
+        orderNo: `PP-REFUND-LEDGER-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'FEEDING',
+        appointmentStart: new Date('2026-04-12T08:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-12T09:00:00.000Z'),
+        amountTotal: 66,
+        amountAdjusted: 0,
+        amountPaid: 66,
+        amountRefunded: 20,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    const secondRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-ledger-b-${suffix}`,
+        orderId: secondOrder.id,
+        refundNo: `REF-LEDGER-B-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '服务取消一半时段',
+        refundAmount: 20,
+        refundStatus: 'SUCCESS',
+      },
+    });
+
+    const foreignOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-refund-ledger-foreign-${suffix}`,
+        orderNo: `PP-REFUND-LEDGER-FOREIGN-${Date.now()}`,
+        ownerId: adminSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'BOARDING',
+        appointmentStart: new Date('2026-04-15T09:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-16T09:00:00.000Z'),
+        amountTotal: 188,
+        amountAdjusted: 0,
+        amountPaid: 188,
+        amountRefunded: 50,
+        orderStatus: 'PARTIAL_REFUNDED',
+      },
+    });
+
+    const foreignRefund = await prisma.refundRecord.create({
+      data: {
+        id: `refund-ledger-foreign-${suffix}`,
+        orderId: foreignOrder.id,
+        refundNo: `REF-LEDGER-FOREIGN-${Date.now()}`,
+        applyUserId: adminSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: 'foreign refund',
+        refundAmount: 50,
+        refundStatus: 'SUCCESS',
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/orders/refunds/export')
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    assert.match(
+      String(exportResponse.headers['content-type']),
+      /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/i,
+    );
+    assert.match(String(exportResponse.headers['content-disposition']), /attachment;\s*filename=/i);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    assert.equal(worksheet.name, 'PetPal Owner Refunds');
+    assert.equal(worksheet.getRow(1).getCell(1).value, '订单号');
+    assert.equal(worksheet.getRow(1).getCell(6).value, '退款单号');
+
+    const exportedRefundNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(6).value ?? ''),
+    ).filter(Boolean);
+
+    assert.ok(exportedRefundNos.length >= 2);
+    assert.ok(exportedRefundNos.includes(firstRefund.refundNo));
+    assert.ok(exportedRefundNos.includes(secondRefund.refundNo));
+    assert.ok(!exportedRefundNos.includes(foreignRefund.refundNo));
+
+    const exportedOrderNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.ok(exportedOrderNos.includes(order.orderNo));
+    assert.ok(exportedOrderNos.includes(secondOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(foreignOrder.orderNo));
+
+    const exportedOrders = await prisma.orderMain.findMany({
+      where: {
+        orderNo: {
+          in: exportedOrderNos,
+        },
+      },
+      select: {
+        orderNo: true,
+        ownerId: true,
+      },
+    });
+
+    assert.equal(exportedOrders.length, exportedOrderNos.length);
+    assert.ok(exportedOrders.every(item => item.ownerId === ownerSession.user.id));
+
+    const oversizeRangeResponse = await request(app)
+      .get('/api/petpal/orders/refunds/export')
+      .query({
+        startDate: '2024-01-01T00:00:00.000Z',
+        endDate: '2026-04-01T00:00:00.000Z',
+      })
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(400);
+
+    assert.equal(oversizeRangeResponse.body.message, 'Export date range cannot exceed 366 days');
+  });
+
   it('returns owner refund progress snapshots for pending, approved and successful refunds', async () => {
     const {
       app,
