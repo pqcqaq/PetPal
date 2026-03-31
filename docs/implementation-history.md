@@ -1507,6 +1507,35 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 94. PetPal 根级后台支持首页接手紧急投诉（P1-M3 Slice 67）
+
+**内容**：继续把根级后台首页做成可直接值班的工作台，本轮新增“接手未指派紧急工单”动作，管理员可在 `/petpal-admin` 首页直接接手未指派的超时或即将超时投诉，并自动跳到自己的工单列表。
+
+变更摘要：
+
+- `apps/web-frontend/src/pages/petpal-admin/PetPalAdminHubView.vue`
+  - 新增首页值班动作“接手未指派紧急工单”。
+  - 实现方式完全复用现有接口：
+    - 先查询 `unassignedOnly=true + slaStatus=OVERDUE` 的投诉列表（最多 20 条）
+    - 若没有超时工单，再回退查询 `slaStatus=DUE_SOON`
+    - 复用 `batchAssignComplaints` 批量接手
+  - 接手成功后：
+    - 刷新根级后台治理摘要
+    - 自动跳转到 `/petpal-admin/complaints?assignedAdminId=<当前管理员>`
+  - 动作入口仅在当前账号同时具备投诉读取与投诉管理权限时显示。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认首页接手动作只复用原有投诉查询与批量分配接口，没有新增绕过投诉工单页的后端捷径。
+- 已确认接手逻辑优先处理 `OVERDUE`，在没有超时工单时才回退到 `DUE_SOON`，符合值班优先级。
+- 已确认接手成功后会自动跳转到“我的工单”视图，避免管理员还要手动重新筛选结果。
+
+Git commit：待本切片提交。
+
 ## 87. App 端资料页去掉权限中心式表达（P1-M3 Slice 60）
 
 **内容**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

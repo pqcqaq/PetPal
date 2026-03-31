@@ -115,6 +115,7 @@ import type { CallbackAlertOutboxStats, CallbackAuditStats, ComplaintAdminStats 
 import { ElMessage } from 'element-plus';
 import { computed, ref, watch } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { api } from '@/api/client';
 import UnoIcon from '@/components/common/UnoIcon.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -124,6 +125,7 @@ import { canAccessPetPalAdminNavItem, petpalAdminNavItems } from './navigation';
 type HubTone = 'neutral' | 'accent' | 'warning' | 'danger';
 
 const auth = useAuthStore();
+const router = useRouter();
 const accessibleItems = computed(() => petpalAdminNavItems.filter((item) => (
   item.to !== '/petpal-admin' && canAccessPetPalAdminNavItem(auth.permissions, item)
 )));
@@ -136,12 +138,15 @@ const pendingCaregiverCount = ref<number | null>(null);
 const callbackAuditStats = ref<CallbackAuditStats | null>(null);
 const callbackAlertStats = ref<CallbackAlertOutboxStats | null>(null);
 const deadRetrySubmitting = ref(false);
+const assignUrgentComplaintsSubmitting = ref(false);
 
 const canReadComplaints = computed(() => auth.permissions.includes('petpal.complaint.read'));
+const canManageComplaints = computed(() => auth.permissions.includes('petpal.complaint.manage'));
 const canAuditCaregivers = computed(() => auth.permissions.includes('petpal.caregiver.audit'));
 const canReadCallbackAudits = computed(() => auth.permissions.includes('petpal.callback-audit.read'));
 const canReadCallbackAlerts = computed(() => auth.permissions.includes('petpal.callback-alert.read'));
 const canRetryCallbackAlerts = computed(() => auth.permissions.includes('petpal.callback-alert.retry'));
+const currentAdminDisplayName = computed(() => auth.user?.nickname ?? auth.user?.username ?? '当前管理员');
 
 const signalCards = computed(() => {
   const cards = [
@@ -311,6 +316,56 @@ const retryDeadAlerts = async () => {
   }
 };
 
+const assignUrgentComplaintsToMe = async () => {
+  if (!auth.user?.id) {
+    return;
+  }
+
+  try {
+    assignUrgentComplaintsSubmitting.value = true;
+
+    const overdue = await api.petpal.admin.complaints({
+      page: 1,
+      pageSize: 20,
+      unassignedOnly: true,
+      slaStatus: 'OVERDUE',
+    });
+
+    const candidates = overdue.items.length > 0
+      ? overdue.items
+      : (await api.petpal.admin.complaints({
+          page: 1,
+          pageSize: 20,
+          unassignedOnly: true,
+          slaStatus: 'DUE_SOON',
+        })).items;
+
+    if (candidates.length === 0) {
+      ElMessage.info('当前没有可直接接手的未指派紧急工单');
+      return;
+    }
+
+    const result = await api.petpal.admin.batchAssignComplaints({
+      complaintIds: candidates.map((item) => item.id),
+      assigneeId: auth.user.id,
+      note: `根级后台快捷接手：${currentAdminDisplayName.value} 接手未指派紧急投诉工单`,
+    });
+
+    ElMessage.success(`已接手 ${result.updatedCount} 条未指派紧急工单`);
+    await loadHubOverview();
+    await router.push({
+      path: '/petpal-admin/complaints',
+      query: {
+        assignedAdminId: auth.user.id,
+      },
+    });
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '接手未指派紧急工单失败'));
+  } finally {
+    assignUrgentComplaintsSubmitting.value = false;
+  }
+};
+
 const quickActions = computed(() => {
   const actions: Array<
     | {
@@ -342,6 +397,19 @@ const quickActions = computed(() => {
         },
       },
       tone: 'accent',
+    });
+  }
+
+  if (canReadComplaints.value && canManageComplaints.value && auth.user?.id && complaintStats.value) {
+    actions.push({
+      kind: 'button',
+      title: assignUrgentComplaintsSubmitting.value ? '正在接手紧急工单' : '接手未指派紧急工单',
+      detail: complaintStats.value.unassignedCount > 0
+        ? `当前有 ${complaintStats.value.unassignedCount} 条未指派投诉，优先接手超时和即将超时工单。`
+        : '当前没有未指派投诉工单，也可以随时查看我的工单。',
+      run: assignUrgentComplaintsToMe,
+      disabled: assignUrgentComplaintsSubmitting.value,
+      tone: complaintStats.value.overdueCount > 0 ? 'danger' : complaintStats.value.unassignedCount > 0 ? 'warning' : 'neutral',
     });
   }
 
