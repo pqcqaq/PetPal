@@ -4183,6 +4183,41 @@ gantt
 2. 继续排查 Web 端残余的 `console`、模板式目录和术语暴露点。
 3. 继续围绕 PetPal 后台值班效率补齐更贴近运营的首页入口和筛选预设。
 
+### 14.86 2026-04-01（P1-M3 Slice 69）
+
+**概述**：继续按“根级后台直接拥有页面实现”的方向推进，本轮将告警队列页的真实实现迁入 `petpal-admin` 根级命名空间，使 `/petpal-admin/callback-alert-outbox` 不再依赖旧 `console/petpal` 页面文件。
+
+已完成：
+
+- `apps/web-frontend/src/pages/petpal-admin/callback-alert-outbox/PetPalCallbackAlertOutboxAdminView.vue`
+  - 新增根级后台告警队列页面主实现。
+  - 保留现有筛选、死信重试、重放记录抽屉、重放记录导出与统计摘要能力。
+- `apps/web-frontend/src/pages/petpal-admin/PetPalCallbackAlertOutboxRouteView.vue`
+  - 根级后台路由包装层改为直接引用新的根级页面实现。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 旧页面改为兼容壳层，仅转发到新的根级后台实现。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认根级 `/petpal-admin/callback-alert-outbox` 已开始直接持有页面实现，而不是继续借用旧模板目录中的页面文件。
+- 已确认旧 `console/petpal` 入口仍可兼容访问，不会因迁移导致内部跳转断裂。
+- 已确认本轮只迁移前端实现位置，没有修改回调告警的权限点、接口调用或交互语义。
+
+风险与缓解：
+
+- 风险：投诉工单页和照料者审核页的真实实现仍在旧 `console/petpal` 目录，当前仍有并存期。
+- 缓解：本轮继续复用“根级持有真实实现、旧页仅保留兼容壳”的迁移模式，后续页面可以按同一路径平移。
+
+下一步（1-3）：
+
+1. 继续将投诉工单页和照料者审核页的真实实现迁入 `petpal-admin` 根级命名空间。
+2. 继续围绕 PetPal 后台首页和值班流转补更多直接入口，减少二级页面切换。
+3. 继续清理 Web 端残余的模板语义和旧目录暴露点。
+
 ### 14.77 2026-04-01（P1-M3 Slice 60）
 
 **概述**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

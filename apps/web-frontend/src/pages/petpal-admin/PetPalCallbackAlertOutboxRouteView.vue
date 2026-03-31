@@ -1,7 +1,7 @@
 <template>
-  <CallbackAlertOutboxView />
+  <PetPalCallbackAlertOutboxAdminView />
 </template>
 
 <script setup lang="ts">
-import CallbackAlertOutboxView from '@/pages/console/petpal/CallbackAlertOutboxView.vue';
+import PetPalCallbackAlertOutboxAdminView from '@/pages/petpal-admin/callback-alert-outbox/PetPalCallbackAlertOutboxAdminView.vue';
 </script>
