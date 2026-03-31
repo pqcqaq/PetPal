@@ -691,30 +691,14 @@ const submitBatchAssign = async () => {
   const note = batchAssignForm.note.trim() || undefined;
   try {
     batchAssignSubmitting.value = true;
-    const results = await Promise.allSettled(
-      selectedActionableComplaints.value.map(item =>
-        api.petpal.admin.handleComplaint(item.id, {
-          actionType: 'ASSIGN',
-          assigneeId,
-          note,
-        }),
-      ),
-    );
-
-    const successCount = results.filter(item => item.status === 'fulfilled').length;
-    const failedCount = results.length - successCount;
-
-    if (successCount === 0) {
-      throw (results.find(item => item.status === 'rejected') as PromiseRejectedResult | undefined)?.reason
-        ?? new Error('批量分配失败');
-    }
+    const result = await api.petpal.admin.batchAssignComplaints({
+      complaintIds: selectedActionableComplaints.value.map(item => item.id),
+      assigneeId,
+      note,
+    });
 
     batchAssignDialogVisible.value = false;
-    if (failedCount === 0) {
-      ElMessage.success(`已完成 ${successCount} 条投诉工单分配`);
-    } else {
-      ElMessage.warning(`已完成 ${successCount} 条投诉工单分配，另有 ${failedCount} 条失败`);
-    }
+    ElMessage.success(`已完成 ${result.updatedCount} 条投诉工单分配`);
     await loadRows();
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '批量分配投诉工单失败'));

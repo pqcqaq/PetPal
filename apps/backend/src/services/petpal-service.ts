@@ -703,6 +703,74 @@ const loadAdminComplaintById = async (
   include: complaintAdminInclude,
 });
 
+const loadComplaintAdminAssignee = async (
+  client: Prisma.TransactionClient | PrismaClient,
+  assigneeId: string,
+) => client.user.findFirst({
+  where: {
+    id: assigneeId.trim(),
+    deleteAt: null,
+    status: 'ACTIVE',
+    roles: {
+      some: {
+        role: {
+          code: {
+            in: ['super-admin', 'ops-manager'],
+          },
+        },
+      },
+    },
+  },
+  select: {
+    id: true,
+    nickname: true,
+  },
+});
+
+const assertComplaintUpdatable = (complaint: {
+  id: string;
+  status: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
+} | null) => {
+  if (!complaint) {
+    throw notFound('Complaint not found');
+  }
+
+  if (complaint.status === 'RESOLVED' || complaint.status === 'REJECTED') {
+    throw badRequest('Closed complaints cannot be updated');
+  }
+};
+
+const assignComplaintInTransaction = async (
+  tx: Prisma.TransactionClient,
+  payload: {
+    complaintId: string;
+    actorId: string;
+    currentStatus: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
+    assignee: {
+      id: string;
+      nickname: string;
+    };
+    note?: string;
+  },
+) => {
+  await tx.complaint.update({
+    where: {
+      id: payload.complaintId,
+    },
+    data: {
+      assignedAdminId: payload.assignee.id,
+      status: payload.currentStatus === 'OPEN' ? 'PROCESSING' : payload.currentStatus,
+    },
+  });
+
+  await appendComplaintProcessLog(tx, {
+    complaintId: payload.complaintId,
+    actionType: 'ASSIGN',
+    operatorId: payload.actorId,
+    note: payload.note?.trim() || `已指派给 ${payload.assignee.nickname}`,
+  });
+};
+
 const buildOwnerRefundProgress = (order: {
   amountPaid: Prisma.Decimal | number;
   amountRefunded: Prisma.Decimal | number;
@@ -1921,6 +1989,83 @@ export const petpalService = {
     };
   },
 
+  async batchAssignAdminComplaints(
+    actorId: string,
+    payload: {
+      complaintIds: string[];
+      assigneeId: string;
+      note?: string;
+    },
+  ) {
+    return runSerializableTransaction(async (tx) => {
+      const complaintIds = [...new Set(
+        payload.complaintIds
+          .map(item => item.trim())
+          .filter(Boolean),
+      )];
+
+      if (complaintIds.length === 0) {
+        throw badRequest('Complaint ids are required');
+      }
+
+      const assignee = await loadComplaintAdminAssignee(tx, payload.assigneeId);
+      if (!assignee) {
+        throw badRequest('Complaint assignee must be an active admin user');
+      }
+
+      const complaints = await tx.complaint.findMany({
+        where: {
+          id: {
+            in: complaintIds,
+          },
+          deleteAt: null,
+        },
+        select: {
+          id: true,
+          status: true,
+        },
+      });
+
+      if (complaints.length !== complaintIds.length) {
+        throw notFound('Complaint not found');
+      }
+
+      complaints.forEach(assertComplaintUpdatable);
+
+      for (const complaintId of complaintIds) {
+        const complaint = complaints.find(item => item.id === complaintId)!;
+        await assignComplaintInTransaction(tx, {
+          complaintId,
+          actorId,
+          currentStatus: complaint.status,
+          assignee,
+          note: payload.note,
+        });
+      }
+
+      const updatedComplaints = await tx.complaint.findMany({
+        where: {
+          id: {
+            in: complaintIds,
+          },
+          deleteAt: null,
+        },
+        include: complaintAdminInclude,
+      });
+
+      const complaintMap = new Map(updatedComplaints.map(item => [item.id, item]));
+
+      return {
+        requestedCount: complaintIds.length,
+        updatedCount: updatedComplaints.length,
+        items: complaintIds
+          .map(id => complaintMap.get(id))
+          .filter((item): item is ComplaintAdminEntity => Boolean(item))
+          .map(toComplaintAdminRecord),
+      };
+    });
+  },
+
   async handleAdminComplaint(
     complaintId: string,
     actorId: string,
@@ -1945,59 +2090,24 @@ export const petpalService = {
         },
       });
 
-      if (!complaint) {
-        throw notFound('Complaint not found');
-      }
-
-      if (complaint.status === 'RESOLVED' || complaint.status === 'REJECTED') {
-        throw badRequest('Closed complaints cannot be updated');
-      }
+      assertComplaintUpdatable(complaint);
 
       if (payload.actionType === 'ASSIGN') {
         if (!payload.assigneeId?.trim()) {
           throw badRequest('Complaint assignee is required');
         }
 
-        const assignee = await tx.user.findFirst({
-          where: {
-            id: payload.assigneeId.trim(),
-            deleteAt: null,
-            status: 'ACTIVE',
-            roles: {
-              some: {
-                role: {
-                  code: {
-                    in: ['super-admin', 'ops-manager'],
-                  },
-                },
-              },
-            },
-          },
-          select: {
-            id: true,
-            nickname: true,
-          },
-        });
-
+        const assignee = await loadComplaintAdminAssignee(tx, payload.assigneeId);
         if (!assignee) {
           throw badRequest('Complaint assignee must be an active admin user');
         }
 
-        await tx.complaint.update({
-          where: {
-            id: complaint.id,
-          },
-          data: {
-            assignedAdminId: assignee.id,
-            status: complaint.status === 'OPEN' ? 'PROCESSING' : complaint.status,
-          },
-        });
-
-        await appendComplaintProcessLog(tx, {
+        await assignComplaintInTransaction(tx, {
           complaintId: complaint.id,
-          actionType: 'ASSIGN',
-          operatorId: actorId,
-          note: payload.note?.trim() || `已指派给 ${assignee.nickname}`,
+          actorId,
+          currentStatus: complaint.status,
+          assignee,
+          note: payload.note,
         });
       } else if (payload.actionType === 'CLOSE') {
         const resultStatus = payload.resultStatus;

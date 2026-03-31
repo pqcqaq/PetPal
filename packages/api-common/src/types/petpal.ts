@@ -327,6 +327,18 @@ export interface ManageComplaintPayload {
   resultSummary?: string;
 }
 
+export interface BatchAssignComplaintsPayload {
+  complaintIds: string[];
+  assigneeId: string;
+  note?: string;
+}
+
+export interface BatchAssignComplaintsResult {
+  requestedCount: number;
+  updatedCount: number;
+  items: ComplaintAdminRecord[];
+}
+
 export interface ComplaintAdminPage {
   items: ComplaintAdminRecord[];
   pagination: {

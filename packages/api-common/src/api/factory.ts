@@ -63,6 +63,8 @@ import type {
   CreateServiceRequestPayload,
   MatchCaregiverQuery,
   ManageComplaintPayload,
+  BatchAssignComplaintsPayload,
+  BatchAssignComplaintsResult,
   MatchedCaregiverPage,
   OrderDetailRecord,
   OrderRecord,
@@ -531,6 +533,12 @@ export const createApiFactory = (options: ClientOptions) => {
         handleComplaint: (complaintId: string, payload: ManageComplaintPayload) =>
           client.request<ComplaintAdminRecord>({
             url: `/petpal/admin/complaints/${complaintId}/actions`,
+            method: 'POST',
+            data: payload,
+          }),
+        batchAssignComplaints: (payload: BatchAssignComplaintsPayload) =>
+          client.request<BatchAssignComplaintsResult>({
+            url: '/petpal/admin/complaints/batch-assign',
             method: 'POST',
             data: payload,
           }),

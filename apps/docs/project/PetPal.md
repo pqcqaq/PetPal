@@ -3593,3 +3593,50 @@ gantt
 1. 评估是否为投诉管理补专用批量分配接口，降低高频批处理时的请求开销。
 2. 评估是否将 SLA 阈值改为后台配置项，并接入超时提醒或值班看板。
 3. 继续补主人端退款明细列表或售后时间线，完善售后透明度。
+
+### 14.58 2026-04-01（P1-M3 Slice 41）
+
+**概述**：继续推进 P1-M3 投诉工单批处理效率，本轮将前端“逐条调用单条指派接口”的批量分配实现收敛为真正的后端批量分配接口，降低请求数并统一后端校验语义。
+
+已完成：
+
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增 `BatchAssignComplaintsPayload`、`BatchAssignComplaintsResult`。
+  - `packages/api-common/src/api/factory.ts`
+    - 新增 `api.petpal.admin.batchAssignComplaints(...)`。
+- 后端投诉管理：
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `POST /api/petpal/admin/complaints/batch-assign`。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 抽出投诉负责人校验和指派逻辑，供单条/批量共享。
+    - 批量分配在单次事务内完成：
+      - 工单存在性校验
+      - 关闭态阻断
+      - 负责人合法性校验
+      - 统一写入指派结果和处理日志
+    - 返回批量分配结果摘要及更新后的工单记录。
+- Web 管理端：
+  - `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+    - 批量分配改为调用新的后端批量接口，不再由前端逐条发送单条指派请求。
+- 集成测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增投诉批量分配成功用例。
+    - 越权测试新增对批量分配接口的 `403` 校验。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（20/20）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+风险与缓解：
+
+- 风险：当前批量分配仍是单一负责人统一接手，尚未支持批量催办、批量备注模板或更复杂的分派规则。
+- 缓解：本轮先优先解决批量分配请求过多和校验逻辑分散的问题；后续如运营需求增加，再补批量催办、模板备注和智能分派。
+
+下一步（1-3）：
+
+1. 评估是否将投诉 SLA 阈值改为后台配置项，并接入超时提醒或值班看板。
+2. 继续补主人端退款明细列表或售后时间线，完善售后透明度。
+3. 视运营需求，评估是否增加投诉批量催办、批量备注模板或批量关闭能力。

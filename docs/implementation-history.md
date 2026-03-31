@@ -1302,6 +1302,49 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 68. PetPal 投诉批量分配后端接口化（P1-M3 Slice 41）
+
+**内容**：继续推进 P1-M3 投诉工单批处理效率，本轮将前端“循环调用单条指派接口”的批量分配方式收敛为真正的后端批量分配接口，降低前端请求数并统一后端校验语义。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 新增：
+    - `BatchAssignComplaintsPayload`
+    - `BatchAssignComplaintsResult`
+- `packages/api-common/src/api/factory.ts`
+  - 新增 `api.petpal.admin.batchAssignComplaints(...)`。
+- `apps/backend/src/routes/petpal.ts`
+  - 新增 `POST /api/petpal/admin/complaints/batch-assign`。
+  - 复用既有 `petpal.complaint.manage` 权限边界。
+- `apps/backend/src/services/petpal-service.ts`
+  - 抽出投诉负责人校验与指派逻辑，避免单条/批量两套校验分叉。
+  - 新增批量分配服务方法，在单次事务中完成：
+    - 工单存在性校验
+    - 关闭态阻断
+    - 负责人合法性校验
+    - 批量写入指派结果与处理日志
+  - 返回批量分配结果摘要与更新后的工单记录。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增投诉批量分配成功用例。
+  - 非管理员越权测试新增对批量分配接口的 `403` 校验。
+- `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+  - 批量分配改为调用新的后端批量接口，不再由前端逐条发请求。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（20/20）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认批量分配仍沿用既有投诉管理权限，不会因为新增接口扩大越权面。
+- 已确认批量分配在后端统一校验工单关闭态和负责人合法性，避免前端批量入口与单条入口出现行为偏差。
+- 已确认批量分配返回更新后的工单记录，前端无需自行拼装状态，降低展示与真实数据脱节的风险。
+
+Git commit：待本切片提交。
+
 ## 67. PetPal 投诉工单批量分配（P1-M3 Slice 40）
 
 **内容**：继续推进 P1-M3 投诉工单处理效率，本轮在后台投诉管理页补充批量分配能力，支持当前页勾选多条未结案工单后统一指派负责人。

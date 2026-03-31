@@ -138,6 +138,12 @@ const adminComplaintActionSchema = z.object({
   resultSummary: z.string().trim().max(1000).optional(),
 });
 
+const adminComplaintBatchAssignSchema = z.object({
+  complaintIds: z.array(z.string().trim().min(1).max(64)).min(1).max(50),
+  assigneeId: z.string().trim().min(1).max(64),
+  note: z.string().trim().max(1000).optional(),
+});
+
 const paymentCallbackSchema = z.object({
   payNo: z.string().trim().min(1),
   channelTxnId: z.string().trim().min(1),
@@ -518,6 +524,13 @@ petpalRouter.post('/admin/complaints/:id/actions', requirePermission('petpal.com
   const payload = adminComplaintActionSchema.parse(req.body ?? {});
   const complaint = await petpalService.handleAdminComplaint(String(req.params.id), auth.id, payload);
   return ok(res, complaint, 'Complaint updated');
+}));
+
+petpalRouter.post('/admin/complaints/batch-assign', requirePermission('petpal.complaint.manage'), asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = adminComplaintBatchAssignSchema.parse(req.body ?? {});
+  const result = await petpalService.batchAssignAdminComplaints(auth.id, payload);
+  return ok(res, result, 'Complaints batch assigned');
 }));
 
 // Admin endpoints (require authentication)

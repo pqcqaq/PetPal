@@ -1099,6 +1099,68 @@ describe('PetPal API integration', () => {
     assert.equal(normalResponse.body.data.items.length, 0);
   });
 
+  it('supports batch assigning complaints for admin workbench', async () => {
+    const firstScenario = await createFulfillmentScenario();
+    const secondScenario = await createFulfillmentScenario();
+    const adminSession = await loginAs(firstScenario.app, 'admin', 'Admin123!');
+
+    for (const scenario of [firstScenario, secondScenario]) {
+      await request(scenario.app)
+        .post(`/api/petpal/caregiver/orders/${scenario.order.id}/accept`)
+        .set('Authorization', `Bearer ${scenario.caregiverSession.tokens.accessToken}`)
+        .expect(200);
+
+      await request(scenario.app)
+        .post(`/api/petpal/caregiver/orders/${scenario.order.id}/check-in`)
+        .set('Authorization', `Bearer ${scenario.caregiverSession.tokens.accessToken}`)
+        .send({})
+        .expect(200);
+    }
+
+    const firstComplaint = await request(firstScenario.app)
+      .post(`/api/petpal/orders/${firstScenario.order.id}/complaints`)
+      .set('Authorization', `Bearer ${firstScenario.ownerSession.tokens.accessToken}`)
+      .send({
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: '第一条投诉工单用于验证后端批量分配。',
+      })
+      .expect(200);
+
+    const secondComplaint = await request(secondScenario.app)
+      .post(`/api/petpal/orders/${secondScenario.order.id}/complaints`)
+      .set('Authorization', `Bearer ${secondScenario.ownerSession.tokens.accessToken}`)
+      .send({
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: '第二条投诉工单用于验证后端批量分配。',
+      })
+      .expect(200);
+
+    const batchAssignResponse = await request(firstScenario.app)
+      .post('/api/petpal/admin/complaints/batch-assign')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        complaintIds: [
+          firstComplaint.body.data.id,
+          secondComplaint.body.data.id,
+        ],
+        assigneeId: adminSession.user.id,
+        note: '夜班值守统一接手处理。',
+      })
+      .expect(200);
+
+    assert.equal(batchAssignResponse.body.data.requestedCount, 2);
+    assert.equal(batchAssignResponse.body.data.updatedCount, 2);
+    assert.equal(batchAssignResponse.body.data.items.length, 2);
+    assert.ok(batchAssignResponse.body.data.items.every((item: { assignedAdminId: string; status: string; processLogs: Array<{ actionType: string; note?: string | null }> }) =>
+      item.assignedAdminId === adminSession.user.id
+      && item.status === 'PROCESSING'
+      && item.processLogs.at(-1)?.actionType === 'ASSIGN'
+      && item.processLogs.at(-1)?.note === '夜班值守统一接手处理。',
+    ));
+  });
+
   it('forbids non-admin users from accessing complaint admin endpoints', async () => {
     const {
       app,
@@ -1139,6 +1201,15 @@ describe('PetPal API integration', () => {
       .send({
         actionType: 'INVESTIGATE',
         note: '越权尝试',
+      })
+      .expect(403);
+
+    await request(app)
+      .post('/api/petpal/admin/complaints/batch-assign')
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .send({
+        complaintIds: [complaintResponse.body.data.id],
+        assigneeId: ownerSession.user.id,
       })
       .expect(403);
   });
