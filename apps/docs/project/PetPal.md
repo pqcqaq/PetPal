@@ -2995,3 +2995,53 @@ gantt
 1. 评估移动端服务日志视频预览方案，避免非图片媒体只能走链接兜底。
 2. 在履约详情中补充媒体类型、文件名或拍摄时间等摘要信息。
 3. 将主人端与照料者端的媒体交互说明收敛到统一帮助文案，减少多端行为差异带来的理解成本。
+
+### 14.47 2026-04-01（P1-M2 Slice 30）
+
+**概述**：补齐服务日志媒体上传的后端权限闭环，避免当前功能只对拥有 `file.upload` 的管理型角色可用，让“已审核通过的普通照料者”也能按订单范围上传履约媒体。
+
+已完成：
+
+- 后端上传鉴权：
+  - `apps/backend/src/routes/files.ts`
+    - 保持原有通用规则不变：
+      - 头像上传仍需 `file.upload.avatar` 或 `file.upload`
+      - 普通业务附件仍需 `file.upload`
+    - 新增 PetPal 特例放行逻辑：
+      - 仅当 `kind=attachment`
+      - 且 `tag1=petpal-service-log`
+      - 且 `tag2=orderId`
+      - 且当前用户存在 `auditStatus=APPROVED` 的照料者档案
+      - 且该订单确实归属于该照料者
+      - 且订单状态处于 `ACCEPTED` / `SERVING` / `COMPLETED`
+      时，允许执行上传预签名和上传完成回调。
+    - 这样不会放开通用附件上传，只对白名单业务标签生效。
+- Web 履约工作台：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+    - 服务日志媒体上传入口判断从“仅看 `file.upload` 权限”调整为：
+      - `file.upload`
+      - 或照料者档案已审核通过
+    - 无资格时提示文案同步更新，保持前后端口径一致。
+- 测试：
+  - `apps/backend/test/integration/files.test.ts`
+    - 新增定向用例，验证：
+      - 普通成员仍然不能上传通用附件
+      - 普通成员对错误订单号的 `petpal-service-log` 上传仍被拒绝
+      - 审核通过且订单归属正确的照料者可成功完成 `petpal-service-log` 媒体上传
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test test/integration/files.test.ts` 通过（2/2）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+风险与缓解：
+
+- 风险：当前上传放行依赖 `tag1/tag2` 业务标签约定，属于“受控白名单”而非独立权限模型。
+- 缓解：本轮先用最小变更修复可用性问题；后续如 PetPal 上传场景继续扩展，可再抽出独立的 PetPal 文件上传权限码和审计规则。
+
+下一步（1-3）：
+
+1. 评估是否为服务日志媒体补充独立权限码，避免长期依赖标签白名单。
+2. 为管理员纠纷排查页复用服务日志媒体与履约时间线展示。
+3. 继续推进 P1-M3 的评价/投诉/售后主链路，避免项目停留在履约阶段。

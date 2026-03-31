@@ -1007,6 +1007,30 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 57. PetPal 服务日志媒体上传权限闭环（P1-M2 Slice 30）
+
+**内容**：修复服务日志媒体上传只对 `file.upload` 角色可用的问题，在不放开通用附件上传的前提下，为审核通过且订单归属正确的照料者开放 `petpal-service-log` 白名单上传。
+
+变更摘要：
+
+- `apps/backend/src/routes/files.ts`
+  - 新增 `petpal-service-log` 上传白名单校验。
+  - 仅在 `tag1=petpal-service-log`、`tag2=orderId`、照料者档案审核通过、订单归属正确且状态允许时，放行附件预签名与回调。
+  - 通用附件上传权限模型保持不变，普通成员依然不能上传任意业务附件。
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 服务日志媒体上传入口判断从“仅 `file.upload`”调整为“`file.upload` 或照料者审核通过”。
+  - 无资格提示文案同步调整。
+- `apps/backend/test/integration/files.test.ts`
+  - 新增定向集成测试，覆盖普通成员通用附件拒绝、错误订单拒绝、正确订单白名单上传成功。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test test/integration/files.test.ts` 通过（2/2）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。

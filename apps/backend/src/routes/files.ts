@@ -34,6 +34,66 @@ const getUploadPermissionError = (kind: string) =>
     ? 'Missing permission: file.upload.avatar'
     : 'Missing permission: file.upload';
 
+const isPetpalServiceLogUpload = (input: {
+  kind: string;
+  tag1?: string | null;
+  tag2?: string | null;
+}) => input.kind === 'attachment'
+  && input.tag1 === 'petpal-service-log'
+  && Boolean(input.tag2?.trim());
+
+const canManagePetpalServiceLogUpload = async (userId: string, orderId: string) => {
+  const caregiverProfile = await prisma.caregiverProfile.findFirst({
+    where: {
+      userId,
+      auditStatus: 'APPROVED',
+      deleteAt: null,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!caregiverProfile) {
+    return false;
+  }
+
+  const order = await prisma.orderMain.findFirst({
+    where: {
+      id: orderId,
+      caregiverId: caregiverProfile.id,
+      deleteAt: null,
+      orderStatus: {
+        in: ['ACCEPTED', 'SERVING', 'COMPLETED'],
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return Boolean(order);
+};
+
+const canManageUploadRequest = async (
+  actor: { id: string; permissions: string[] },
+  input: {
+    kind: string;
+    tag1?: string | null;
+    tag2?: string | null;
+  },
+) => {
+  if (canManageUploadKind(actor.permissions, input.kind)) {
+    return true;
+  }
+
+  if (isPetpalServiceLogUpload(input)) {
+    return canManagePetpalServiceLogUpload(actor.id, String(input.tag2));
+  }
+
+  return false;
+};
+
 filesRouter.post(
   '/local/:fileId/parts/:partNumber',
   localUpload.single('file'),
@@ -98,7 +158,7 @@ filesRouter.post(
       tag2: req.body.tag2 == null ? null : String(req.body.tag2),
     });
 
-    if (!canManageUploadKind(actor.permissions, normalized.kind)) {
+    if (!(await canManageUploadRequest(actor, normalized))) {
       throw forbidden(getUploadPermissionError(normalized.kind));
     }
 
@@ -170,7 +230,7 @@ filesRouter.post(
       throw notFound('Upload file not found');
     }
 
-    if (!canManageUploadKind(actor.permissions, asset.kind)) {
+    if (!(await canManageUploadRequest(actor, asset))) {
       throw forbidden(getUploadPermissionError(asset.kind));
     }
 

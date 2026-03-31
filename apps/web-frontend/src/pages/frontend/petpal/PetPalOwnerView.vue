@@ -415,7 +415,7 @@
               </div>
             </template>
             <p v-else class="petpal-service-log-dialog__hint is-warning">
-              当前账号未分配 `file.upload` 权限，仍可提交纯文字服务记录。
+              当前账号未满足服务记录媒体上传条件，需要照料者档案审核通过或具备 `file.upload` 权限，仍可提交纯文字服务记录。
             </p>
 
             <ul v-if="serviceLogForm.files.length > 0" class="petpal-service-log-dialog__file-list">
@@ -589,7 +589,9 @@ const serviceLogSubmitting = ref(false);
 const serviceLogUploadProgress = ref<number | null>(null);
 const serviceLogFileInput = ref<HTMLInputElement | null>(null);
 const serviceLogForm = reactive(createEmptyServiceLogForm());
-const canUploadServiceLogMedia = computed(() => auth.hasPermission('file.upload'));
+const canUploadServiceLogMedia = computed(() =>
+  auth.hasPermission('file.upload') || caregiverProfile.value?.auditStatus === 'APPROVED',
+);
 
 const formatTime = (value: string) => new Date(value).toLocaleString();
 const formatFileSize = (size: number) => {
