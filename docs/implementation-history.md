@@ -1302,6 +1302,47 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 80. PetPal 主人端退款导出投诉对象筛选（P1-M3 Slice 53）
+
+**内容**：继续推进 P1-M3 主人端售后透明度，本轮为退款明细导出补齐“投诉对象”联动筛选，让主人在工作台可以区分“照料者责任”与“平台责任”相关的退款记录。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 扩展 `OwnerRefundExportQuery`，新增 `complaintTargetRole` 共享参数。
+- `apps/backend/src/routes/petpal.ts`
+  - 扩展 `GET /api/petpal/orders/refunds/export` 查询参数校验。
+  - 支持接收 `CAREGIVER` / `PLATFORM` 投诉对象过滤条件。
+- `apps/backend/src/services/petpal-service.ts`
+  - 扩展 `listOwnerRefundExportRows(filters)`。
+  - 将关联投诉过滤从“状态 + 类型”扩展为“状态 + 类型 + 对象”组合过滤，支持单独按投诉对象筛选，也支持与投诉状态、投诉类型联合收窄结果集。
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 在退款导出筛选条中新增“投诉对象”选择。
+  - 可与既有退款日期、退款状态、退款类型、投诉状态、投诉类型、服务类型和订单号关键词组合使用。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增退款导出按投诉对象过滤的成功用例。
+  - 同步复跑投诉类型过滤用例，确认组合投诉过滤逻辑未回归。
+  - 断言：
+    - 当前主人命中的 `PLATFORM` 投诉关联退款被导出
+    - 照料者责任退款、无投诉退款和他人 `PLATFORM` 投诉退款均被排除
+    - 实际导出的退款记录全部属于当前主人且至少关联一条 `PLATFORM` 投诉
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 --test-name-pattern "filters owner refund export by complaint target role" test/integration/petpal-api.test.ts` 通过（1/1）。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 --test-name-pattern "filters owner refund export by complaint type" test/integration/petpal-api.test.ts` 通过（1/1）。
+
+代码审计结论：
+
+- 已确认投诉对象筛选仍严格限定在当前登录主人的订单退款集合内，不会因为命中相同责任对象而越权导出他人售后记录。
+- 已确认投诉状态、投诉类型与投诉对象共用同一关联投诉 `some` 过滤分支，支持组合过滤且不会放宽既有筛选边界。
+- 已确认新增筛选项复用既有退款导出链路，不改变导出列结构、排序规则或后台执行模式。
+
+Git commit：待本切片提交。
+
 ## 79. PetPal 主人端退款导出投诉类型筛选（P1-M3 Slice 52）
 
 **内容**：继续推进 P1-M3 主人端售后透明度，本轮为退款明细导出补齐“投诉类型”联动筛选，让主人在工作台可以区分安全、费用、服务、欺诈等不同售后原因对应的退款记录。

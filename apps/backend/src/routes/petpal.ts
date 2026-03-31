@@ -125,6 +125,7 @@ const ownerRefundExportQuerySchema = z.object({
   refundStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'SUCCESS', 'FAILED']).optional(),
   complaintStatus: z.enum(['OPEN', 'PROCESSING', 'RESOLVED', 'REJECTED']).optional(),
   complaintType: z.enum(['SAFETY', 'FEE', 'SERVICE', 'FRAUD', 'OTHER']).optional(),
+  complaintTargetRole: z.enum(['CAREGIVER', 'PLATFORM']).optional(),
   serviceType: z.enum(['BOARDING', 'WALKING', 'FEEDING', 'DOOR_VISIT']).optional(),
   orderNoKeyword: z.string().trim().min(1).max(64).optional(),
 });

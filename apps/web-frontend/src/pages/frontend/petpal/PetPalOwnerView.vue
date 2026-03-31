@@ -100,7 +100,7 @@
           <div class="petpal-section-heading__meta">
             <h3>当前业务进展</h3>
             <p v-if="auth.isAuthenticated" class="petpal-section-heading__hint">
-              退款导出默认覆盖最近一年，可按退款日期、退款状态、投诉状态与投诉类型等收窄范围。
+              退款导出默认覆盖最近一年，可按退款日期、退款状态、投诉状态、投诉类型与投诉对象等收窄范围。
             </p>
           </div>
           <div v-if="auth.isAuthenticated" class="petpal-export-toolbar">
@@ -167,6 +167,20 @@
               >
                 <el-option
                   v-for="option in complaintTypeOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-select
+                v-model="ownerRefundExportComplaintTargetRole"
+                clearable
+                placeholder="投诉对象"
+                size="small"
+                style="width: 140px"
+              >
+                <el-option
+                  v-for="option in complaintTargetRoleOptions"
                   :key="option.value"
                   :label="option.label"
                   :value="option.value"
@@ -581,6 +595,7 @@ import type {
   CaregiverOrderRecord,
   CaregiverProfileRecord,
   CaregiverServiceRecord,
+  ComplaintTargetRole,
   ComplaintStatus,
   ComplaintType,
   CreatePetPayload,
@@ -763,6 +778,11 @@ const complaintTypeOptions: Array<{ label: string; value: ComplaintType }> = [
   { label: '其他问题', value: 'OTHER' },
 ];
 
+const complaintTargetRoleOptions: Array<{ label: string; value: ComplaintTargetRole }> = [
+  { label: '照料者', value: 'CAREGIVER' },
+  { label: '平台', value: 'PLATFORM' },
+];
+
 const refundExportServiceTypeOptions: Array<{ label: string; value: PetServiceType }> = [
   { label: '寄养', value: 'BOARDING' },
   { label: '遛宠', value: 'WALKING' },
@@ -775,6 +795,7 @@ const ownerRefundExportType = ref<RefundType | ''>('');
 const ownerRefundExportStatus = ref<RefundStatus | ''>('');
 const ownerRefundExportComplaintStatus = ref<ComplaintStatus | ''>('');
 const ownerRefundExportComplaintType = ref<ComplaintType | ''>('');
+const ownerRefundExportComplaintTargetRole = ref<ComplaintTargetRole | ''>('');
 const ownerRefundExportServiceType = ref<PetServiceType | ''>('');
 const ownerRefundExportOrderNoKeyword = ref('');
 
@@ -800,6 +821,7 @@ const buildOwnerRefundExportQuery = (): OwnerRefundExportQuery => ({
   refundStatus: ownerRefundExportStatus.value || undefined,
   complaintStatus: ownerRefundExportComplaintStatus.value || undefined,
   complaintType: ownerRefundExportComplaintType.value || undefined,
+  complaintTargetRole: ownerRefundExportComplaintTargetRole.value || undefined,
   serviceType: ownerRefundExportServiceType.value || undefined,
   orderNoKeyword: ownerRefundExportOrderNoKeyword.value.trim() || undefined,
 });
