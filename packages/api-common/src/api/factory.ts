@@ -36,6 +36,7 @@ import type {
   UploadPrepareResult,
 } from '../types/files';
 import type {
+  CallbackAlertReplayLogQuery,
   CallbackAlertReplayLogRecord,
   CallbackAlertOutboxPage,
   CallbackAlertOutboxQuery,
@@ -441,10 +442,14 @@ export const createApiFactory = (options: ClientOptions) => {
             url: `/petpal/admin/callback-alert-outbox/${id}/retry`,
             method: 'POST',
           }),
-        callbackAlertOutboxReplayLogs: (id: string, limit = 50) =>
+        callbackAlertOutboxReplayLogs: (id: string, query: CallbackAlertReplayLogQuery = {}) =>
           client.request<CallbackAlertReplayLogRecord[]>({
             url: `/petpal/admin/callback-alert-outbox/${id}/replay-logs`,
-            params: { limit },
+            params: {
+              limit: query.limit ?? 50,
+              actionType: query.actionType,
+              actorId: query.actorId,
+            },
           }),
         retryDeadCallbackAlertOutbox: (limit?: number) =>
           client.request<{ requested: number; requeued: number }>({

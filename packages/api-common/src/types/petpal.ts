@@ -283,3 +283,9 @@ export interface CallbackAlertReplayLogRecord {
   note: string | null;
   createdAt: string;
 }
+
+export interface CallbackAlertReplayLogQuery {
+  limit?: number;
+  actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
+  actorId?: string;
+}

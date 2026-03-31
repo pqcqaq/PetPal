@@ -2006,3 +2006,36 @@ gantt
 
 - 以“分钟阈值 + 处理中状态”定义超时，语义直观且可扩展到告警策略。
 - 阈值通过查询参数传递，保持后端统计接口的通用性。
+
+### 14.28 2026-04-01（P1 Slice 12）
+
+**概述**：增强 replay log 查询维度，支持按动作类型与操作人过滤，提高重放排查效率。
+
+已完成：
+
+- 路由与服务层：
+  - `apps/backend/src/routes/petpal.ts`
+    - replay logs 查询参数新增 `actionType`、`actorId`。
+  - `apps/backend/src/services/petpal-service.ts`
+    - `listCallbackAlertReplayLogs` 支持过滤条件透传。
+- 共享契约与 API 工厂：
+  - `packages/api-common/src/types/petpal.ts` 新增 `CallbackAlertReplayLogQuery`。
+  - `packages/api-common/src/api/factory.ts` replay logs 方法改为 query 对象参数。
+- 前端：
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+    - 重放记录抽屉新增“动作类型 + 操作人 ID”筛选控件。
+    - 支持抽屉内二次筛选刷新。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts` 新增 replay logs 过滤断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- replay logs 过滤维度保持最小必要集（动作、操作人），避免查询复杂度过度增长。
+- API 方法签名改为 query 对象，后续扩展时间范围筛选时不破坏调用方。

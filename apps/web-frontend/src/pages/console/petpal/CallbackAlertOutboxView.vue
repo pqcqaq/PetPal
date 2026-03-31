@@ -104,6 +104,24 @@
       title="重放记录"
       size="520px"
     >
+      <el-space wrap style="margin-bottom: 12px">
+        <el-select
+          v-model="replayFilter.actionType"
+          placeholder="全部动作"
+          clearable
+          style="width: 180px"
+        >
+          <el-option label="单条重放" value="REQUEUE" />
+          <el-option label="批量死信重放" value="REQUEUE_DEAD_BATCH" />
+        </el-select>
+        <el-input
+          v-model="replayFilter.actorId"
+          placeholder="操作人 ID"
+          clearable
+          style="width: 220px"
+        />
+        <el-button @click="reloadReplayLogs">筛选</el-button>
+      </el-space>
       <el-table :data="replayLogs" v-loading="replayLoading" border>
         <el-table-column prop="createdAt" label="时间" min-width="170" />
         <el-table-column prop="actionType" label="动作" min-width="150" />
@@ -156,6 +174,11 @@ const loading = ref(false);
 const replayLoading = ref(false);
 const replayDrawerVisible = ref(false);
 const replayLogs = ref<CallbackAlertReplayLogRecord[]>([]);
+const currentReplayOutboxId = ref<string>('');
+const replayFilter = ref<{
+  actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
+  actorId?: string;
+}>({});
 const processingTimeoutMinutes = 10;
 const statsData = ref<CallbackAlertOutboxStats>({
   total: 0,
@@ -263,10 +286,25 @@ const retryRow = async (id: string) => {
 };
 
 const openReplayLogs = async (row: CallbackAlertOutboxRecord) => {
+  currentReplayOutboxId.value = row.id;
+  replayFilter.value = {};
   replayDrawerVisible.value = true;
+  await reloadReplayLogs();
+};
+
+const reloadReplayLogs = async () => {
+  if (!currentReplayOutboxId.value) {
+    replayLogs.value = [];
+    return;
+  }
+
   replayLoading.value = true;
   try {
-    replayLogs.value = await api.petpal.admin.callbackAlertOutboxReplayLogs(row.id, 50);
+    replayLogs.value = await api.petpal.admin.callbackAlertOutboxReplayLogs(currentReplayOutboxId.value, {
+      limit: 50,
+      actionType: replayFilter.value.actionType,
+      actorId: replayFilter.value.actorId?.trim() || undefined,
+    });
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '加载重放记录失败'));
   } finally {

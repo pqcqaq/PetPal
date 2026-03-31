@@ -742,6 +742,34 @@ Git commit：`feat(p1): add callback alert replay logs for outbox requeue tracea
 
 Git commit：待本切片提交。
 
+## 38. PetPal replay log 过滤查询（P1 Slice 12）
+
+**内容**：为 callback alert outbox replay logs 增加动作类型和操作人过滤能力，提升重放排障效率。
+
+变更摘要：
+
+- `apps/backend/src/routes/petpal.ts`
+  - replay logs 查询参数新增 `actionType`、`actorId`。
+- `apps/backend/src/services/petpal-service.ts`
+  - `listCallbackAlertReplayLogs` 支持过滤条件。
+- `packages/api-common/src/types/petpal.ts`
+  - 新增 `CallbackAlertReplayLogQuery`。
+- `packages/api-common/src/api/factory.ts`
+  - replay logs 客户端调用改为 query 对象签名。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 抽屉新增筛选控件与筛选刷新动作。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 增加 replay logs 过滤断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+Git commit：待本切片提交。
+
 ## 37. PetPal outbox 处理中超时指标（P1 Slice 11）
 
 **内容**：为 callback alert outbox 统计增加“处理中超时数量”，用于发现长时间停留在 PROCESSING 的积压消息。

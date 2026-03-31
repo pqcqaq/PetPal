@@ -58,6 +58,8 @@ const callbackAlertOutboxRetryDeadSchema = z.object({
 
 const callbackAlertOutboxReplayLogQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).optional(),
+  actionType: z.enum(['REQUEUE', 'REQUEUE_DEAD_BATCH']).optional(),
+  actorId: z.string().trim().min(1).max(64).optional(),
 });
 
 const petpalRouter = Router();
@@ -239,7 +241,10 @@ petpalRouter.get('/admin/callback-alert-outbox/stats', requirePermission('petpal
 
 petpalRouter.get('/admin/callback-alert-outbox/:id/replay-logs', requirePermission('petpal.callback-alert.read'), asyncHandler(async (req, res) => {
   const query = callbackAlertOutboxReplayLogQuerySchema.parse(req.query ?? {});
-  const result = await petpalService.listCallbackAlertReplayLogs(String(req.params.id), query.limit ?? 50);
+  const result = await petpalService.listCallbackAlertReplayLogs(String(req.params.id), query.limit ?? 50, {
+    actionType: query.actionType,
+    actorId: query.actorId,
+  });
   return ok(res, result, 'Callback alert outbox replay logs');
 }));
 

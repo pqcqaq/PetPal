@@ -1225,12 +1225,21 @@ export const petpalService = {
     };
   },
 
-  async listCallbackAlertReplayLogs(callbackOutboxId: string, limit = 50) {
+  async listCallbackAlertReplayLogs(
+    callbackOutboxId: string,
+    limit = 50,
+    filters?: {
+      actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
+      actorId?: string;
+    },
+  ) {
     const take = Math.min(200, Math.max(1, limit));
 
     return prisma.callbackAlertReplayLog.findMany({
       where: {
         callbackOutboxId,
+        actionType: filters?.actionType,
+        actorId: filters?.actorId,
       },
       orderBy: {
         createdAt: 'desc',

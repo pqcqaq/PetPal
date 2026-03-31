@@ -830,6 +830,17 @@ describe('PetPal API integration', () => {
     assert.ok(
       replayLogsAfterBatchRetry.body.data.some((item: any) => item.actionType === 'REQUEUE_DEAD_BATCH'),
     );
+
+    const filteredReplayLogs = await request(app)
+      .get(`/api/petpal/admin/callback-alert-outbox/${outboxId}/replay-logs`)
+      .query({ actionType: 'REQUEUE_DEAD_BATCH', actorId: adminSession.user.id })
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(Array.isArray(filteredReplayLogs.body.data));
+    assert.ok(filteredReplayLogs.body.data.length >= 1);
+    assert.ok(filteredReplayLogs.body.data.every((item: any) => item.actionType === 'REQUEUE_DEAD_BATCH'));
+    assert.ok(filteredReplayLogs.body.data.every((item: any) => item.actorId === adminSession.user.id));
   });
 
   it('rejects tampered active role context and allows valid scoped role context', async () => {
