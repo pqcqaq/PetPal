@@ -45,6 +45,14 @@
           />
         </el-select>
         <el-checkbox v-model="pageState.filters.unassignedOnly">仅未指派</el-checkbox>
+        <el-button
+          v-if="currentAdminId"
+          :type="isMineFilterActive ? 'primary' : 'default'"
+          plain
+          @click="toggleMineOnly"
+        >
+          {{ isMineFilterActive ? '查看全部' : '我的工单' }}
+        </el-button>
         <el-input v-model="pageState.filters.keyword" clearable placeholder="订单号/昵称/描述" style="width: 220px" />
         <el-button type="primary" @click="applyFilters">筛选</el-button>
         <el-button @click="resetFilters">重置</el-button>
@@ -126,14 +134,24 @@
       <el-table-column label="摘要" min-width="260" show-overflow-tooltip>
         <template #default="scope">{{ scope.row.description }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="scope">
           <el-space>
+            <el-button
+              v-if="canQuickAssignToMe(scope.row)"
+              v-permission="'petpal.complaint.manage'"
+              link
+              type="warning"
+              :loading="quickAssigningId === scope.row.id"
+              @click="assignComplaintToMe(scope.row)"
+            >
+              {{ getQuickAssignLabel(scope.row) }}
+            </el-button>
             <el-button
               v-permission="'petpal.complaint.manage'"
               link
               type="primary"
-              :disabled="scope.row.status === 'RESOLVED' || scope.row.status === 'REJECTED'"
+              :disabled="isClosedComplaint(scope.row)"
               @click="openActionDialog(scope.row)"
             >
               处理
@@ -246,6 +264,7 @@ import { ElMessage } from 'element-plus';
 import PageScaffold from '@/components/workbench/PageScaffold.vue';
 import { usePageState } from '@/composables/use-page-state';
 import { api } from '@/api/client';
+import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
 
 defineOptions({ name: 'ComplaintAdminView' });
@@ -284,8 +303,10 @@ const total = ref(0);
 const loading = ref(false);
 const actionDialogVisible = ref(false);
 const actionSubmitting = ref(false);
+const quickAssigningId = ref('');
 const activeComplaint = ref<ComplaintAdminRecord | null>(null);
 const adminOptions = ref<UserRecord[]>([]);
+const auth = useAuthStore();
 
 const { state: pageState } = usePageState<State>('page:petpal:complaint-admin', {
   page: 1,
@@ -309,6 +330,13 @@ const createEmptyActionForm = (): ActionForm => ({
 });
 
 const actionForm = reactive<ActionForm>(createEmptyActionForm());
+const currentAdminId = computed(() => auth.user?.id ?? '');
+const currentAdminNickname = computed(() => auth.user?.nickname ?? '当前管理员');
+const isMineFilterActive = computed(() =>
+  Boolean(currentAdminId.value)
+  && !pageState.filters.unassignedOnly
+  && pageState.filters.assignedAdminId === currentAdminId.value,
+);
 
 const stats = computed(() => {
   const openCount = rows.value.filter(item => item.status === 'OPEN').length;
@@ -328,6 +356,10 @@ const stats = computed(() => {
     { label: '未指派', value: unassignedCount },
   ];
 });
+
+const isClosedComplaint = (complaint: Pick<ComplaintAdminRecord, 'status'>) => {
+  return complaint.status === 'RESOLVED' || complaint.status === 'REJECTED';
+};
 
 const getStatusLabel = (status: ComplaintStatus) => {
   const labels: Record<ComplaintStatus, string> = {
@@ -424,6 +456,16 @@ const getSlaDeadlineHint = (deadlineAt: string, status: ComplaintAdminSlaStatus)
   return `截止 ${deadlineText}`;
 };
 
+const getQuickAssignLabel = (complaint: ComplaintAdminRecord) => {
+  return complaint.assignedAdminId ? '转给我' : '指派给我';
+};
+
+const canQuickAssignToMe = (complaint: ComplaintAdminRecord) => {
+  return Boolean(currentAdminId.value)
+    && !isClosedComplaint(complaint)
+    && complaint.assignedAdminId !== currentAdminId.value;
+};
+
 const buildQuery = (): ComplaintAdminQuery => ({
   page: pageState.page,
   pageSize,
@@ -469,6 +511,22 @@ const applyFilters = async () => {
   await loadRows();
 };
 
+const toggleMineOnly = async () => {
+  if (!currentAdminId.value) {
+    return;
+  }
+
+  pageState.page = 1;
+  if (isMineFilterActive.value) {
+    pageState.filters.assignedAdminId = undefined;
+  } else {
+    pageState.filters.unassignedOnly = false;
+    pageState.filters.assignedAdminId = currentAdminId.value;
+  }
+
+  await loadRows();
+};
+
 const resetFilters = async () => {
   pageState.filters.status = undefined;
   pageState.filters.complaintType = undefined;
@@ -498,6 +556,29 @@ const openActionDialog = (complaint: ComplaintAdminRecord) => {
     actionType: complaint.assignedAdminId ? 'INVESTIGATE' : 'ASSIGN',
   });
   actionDialogVisible.value = true;
+};
+
+const assignComplaintToMe = async (complaint: ComplaintAdminRecord) => {
+  if (!currentAdminId.value || !canQuickAssignToMe(complaint)) {
+    return;
+  }
+
+  try {
+    quickAssigningId.value = complaint.id;
+    await api.petpal.admin.handleComplaint(complaint.id, {
+      actionType: 'ASSIGN',
+      assigneeId: currentAdminId.value,
+      note: complaint.assignedAdminId
+        ? `工单已转交给 ${currentAdminNickname.value}`
+        : `工单已指派给 ${currentAdminNickname.value}`,
+    });
+    ElMessage.success(complaint.assignedAdminId ? '投诉工单已转交给你' : '投诉工单已指派给你');
+    await loadRows();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '快捷接手投诉工单失败'));
+  } finally {
+    quickAssigningId.value = '';
+  }
 };
 
 const submitAction = async () => {
