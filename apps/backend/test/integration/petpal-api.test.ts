@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import request from 'supertest';
 import {
+  binaryParser,
   bootstrapBackendTestContext,
   type BackendTestContext,
+  loadWorksheet,
   loginAs,
   reseedBackendTestContext,
   teardownBackendTestContext,
@@ -728,6 +730,85 @@ describe('PetPal API integration', () => {
       .expect(400);
 
     assert.equal(emptyServiceLogResponse.body.message, 'Service log requires text note or media');
+  });
+
+  it('allows owner to export transaction records within the recent year window', async () => {
+    const {
+      app,
+      prisma,
+      ownerSession,
+      caregiverProfile,
+    } = await createFulfillmentScenario();
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+
+    const foreignOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-export-foreign-${Date.now().toString(36)}`,
+        orderNo: `PP-FOREIGN-${Date.now()}`,
+        ownerId: adminSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'BOARDING',
+        appointmentStart: new Date('2026-04-10T09:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-11T09:00:00.000Z'),
+        amountTotal: 168,
+        amountAdjusted: 0,
+        amountPaid: 168,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-11T10:00:00.000Z'),
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/orders/transactions/export')
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    assert.match(
+      String(exportResponse.headers['content-type']),
+      /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/i,
+    );
+    assert.match(String(exportResponse.headers['content-disposition']), /attachment;\s*filename=/i);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    assert.equal(worksheet.name, 'PetPal Owner Transactions');
+    assert.equal(worksheet.getRow(1).getCell(1).value, '订单号');
+
+    const exportedOrderNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.ok(exportedOrderNos.length >= 1);
+    assert.ok(!exportedOrderNos.includes(foreignOrder.orderNo));
+
+    const exportedOrders = await prisma.orderMain.findMany({
+      where: {
+        orderNo: {
+          in: exportedOrderNos,
+        },
+      },
+      select: {
+        orderNo: true,
+        ownerId: true,
+      },
+    });
+
+    assert.equal(exportedOrders.length, exportedOrderNos.length);
+    assert.ok(exportedOrders.every(item => item.ownerId === ownerSession.user.id));
+
+    const oversizeRangeResponse = await request(app)
+      .get('/api/petpal/orders/transactions/export')
+      .query({
+        startDate: '2024-01-01T00:00:00.000Z',
+        endDate: '2026-04-01T00:00:00.000Z',
+      })
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(400);
+
+    assert.equal(oversizeRangeResponse.body.message, 'Export date range cannot exceed 366 days');
   });
 
   it('handles payment and refund callbacks with idempotency', async () => {

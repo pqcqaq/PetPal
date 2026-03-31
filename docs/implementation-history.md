@@ -1133,6 +1133,49 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 60. PetPal 主人近一年交易导出（P1-M3 Slice 33）
+
+**内容**：补齐主人侧交易记录导出能力，允许登录用户导出近一年本人订单的交易概览，并复用现有 Excel 下载链路。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 新增 `OwnerTransactionExportQuery`，用于约定导出时间窗参数。
+- `packages/api-common/src/api/factory.ts`
+  - 新增 `api.petpal.orders.exportTransactions(query)` 下载端点。
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增 `listOwnerTransactionExportRows()`。
+  - 使用 `getRequestActorId()` 从请求上下文读取当前用户并限定 `ownerId`。
+  - 默认导出最近 365 天，限制查询时间范围不超过 366 天。
+  - 导出数据聚合订单、支付、退款、投诉与评价概览字段。
+- `apps/backend/src/routes/petpal.ts`
+  - 新增 `GET /api/petpal/orders/transactions/export`。
+  - 复用 `createExcelExportHandler` 生成 Excel。
+  - 导出列采用中文标题。
+  - 路由注册位置放在 `/orders/:id` 之前，避免动态路由吞掉导出路径。
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - “需求与订单”区块新增“导出近一年交易”按钮。
+  - 复用 `ListExportButton`，移动端窄屏下自动换行。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增主人交易导出集成测试：
+    - 校验响应头与工作表标题
+    - 校验导出结果仅包含当前主人订单
+    - 校验超范围时间窗返回 400
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（15/15）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认导出服务按请求用户作用域裁剪，不会跨用户泄露订单。
+- 已确认导出路由位于动态详情路由之前，避免 `/orders/:id` 误匹配导出路径。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。

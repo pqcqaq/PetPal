@@ -6,6 +6,7 @@ import type {
 } from '../lib/prisma-generated';
 import { badRequest, forbidden, notFound } from '../utils/errors';
 import { withSnowflakeId } from '../utils/persistence';
+import { getRequestActorId } from '../utils/request-context';
 
 const toNumber = (value: Prisma.Decimal | number | null | undefined) => {
   if (value == null) {
@@ -99,6 +100,59 @@ type CallbackAlertOutboxStatus = 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED' | 
 type CallbackAlertOutboxQueryFilters = {
   status?: CallbackAlertOutboxStatus;
   processingTimeoutMinutes?: number;
+};
+
+type OwnerTransactionExportFilters = {
+  startDate?: Date;
+  endDate?: Date;
+};
+
+type OwnerTransactionExportRow = {
+  orderNo: string;
+  orderStatus: 'PENDING_ACCEPT' | 'ACCEPTED' | 'SERVING' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'PARTIAL_REFUNDED' | 'REFUNDED';
+  serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+  appointmentStart: Date;
+  appointmentEnd: Date;
+  amountTotal: number;
+  amountPaid: number;
+  amountRefunded: number;
+  netPaid: number;
+  paymentCount: number;
+  paymentNos: string[];
+  refundCount: number;
+  refundNos: string[];
+  latestRefundStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED' | null;
+  latestRefundReviewedAt: Date | null;
+  complaintCount: number;
+  reviewRating: number | null;
+  createdAt: Date;
+  closedAt: Date | null;
+};
+
+const OWNER_TRANSACTION_EXPORT_DEFAULT_DAYS = 365;
+const OWNER_TRANSACTION_EXPORT_MAX_DAYS = 366;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+const normalizeOwnerTransactionExportRange = (
+  filters: OwnerTransactionExportFilters,
+  now = new Date(),
+) => {
+  const endDate = filters.endDate ?? now;
+  const startDate = filters.startDate ?? new Date(endDate.getTime() - (OWNER_TRANSACTION_EXPORT_DEFAULT_DAYS * DAY_IN_MS));
+
+  if (startDate.getTime() > endDate.getTime()) {
+    throw badRequest('startDate must be earlier than endDate');
+  }
+
+  const rangeDays = (endDate.getTime() - startDate.getTime()) / DAY_IN_MS;
+  if (rangeDays > OWNER_TRANSACTION_EXPORT_MAX_DAYS) {
+    throw badRequest(`Export date range cannot exceed ${OWNER_TRANSACTION_EXPORT_MAX_DAYS} days`);
+  }
+
+  return {
+    startDate,
+    endDate,
+  };
 };
 
 type CallbackFailureAlertPayload = {
@@ -856,6 +910,101 @@ export const petpalService = {
     });
 
     return orders;
+  },
+
+  async listOwnerTransactionExportRows(filters: OwnerTransactionExportFilters = {}): Promise<OwnerTransactionExportRow[]> {
+    const actorId = getRequestActorId();
+    if (!actorId) {
+      throw forbidden('Authentication required');
+    }
+
+    const { startDate, endDate } = normalizeOwnerTransactionExportRange(filters);
+    const orders = await prisma.orderMain.findMany({
+      where: {
+        ownerId: actorId,
+        deleteAt: null,
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        payments: {
+          where: {
+            deleteAt: null,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+          select: {
+            payNo: true,
+            payAmount: true,
+            payStatus: true,
+            paidAt: true,
+          },
+        },
+        refunds: {
+          where: {
+            deleteAt: null,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+          select: {
+            refundNo: true,
+            refundAmount: true,
+            refundStatus: true,
+            reviewedAt: true,
+          },
+        },
+        complaints: {
+          where: {
+            deleteAt: null,
+          },
+          select: {
+            id: true,
+          },
+        },
+        review: {
+          select: {
+            rating: true,
+          },
+        },
+      },
+      take: 5000,
+    });
+
+    return orders.map((order) => {
+      assertOrderAmountInvariant(order);
+      const latestRefund = order.refunds[order.refunds.length - 1] ?? null;
+      const amountPaid = toNumber(order.amountPaid);
+      const amountRefunded = toNumber(order.amountRefunded);
+
+      return {
+        orderNo: order.orderNo,
+        orderStatus: order.orderStatus,
+        serviceType: order.serviceType,
+        appointmentStart: order.appointmentStart,
+        appointmentEnd: order.appointmentEnd,
+        amountTotal: toNumber(order.amountTotal),
+        amountPaid,
+        amountRefunded,
+        netPaid: Number((amountPaid - amountRefunded).toFixed(2)),
+        paymentCount: order.payments.length,
+        paymentNos: order.payments.map(item => item.payNo),
+        refundCount: order.refunds.length,
+        refundNos: order.refunds.map(item => item.refundNo),
+        latestRefundStatus: latestRefund?.refundStatus ?? null,
+        latestRefundReviewedAt: latestRefund?.reviewedAt ?? null,
+        complaintCount: order.complaints.length,
+        reviewRating: order.review?.rating ?? null,
+        createdAt: order.createdAt,
+        closedAt: order.closedAt,
+      };
+    });
   },
 
   async getOwnerOrderDetail(ownerId: string, orderId: string): Promise<OrderDetailRecord> {

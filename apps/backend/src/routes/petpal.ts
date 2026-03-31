@@ -113,6 +113,11 @@ const orderComplaintSchema = z.object({
   evidenceUrls: z.array(z.string().trim().url().max(500)).max(10).optional(),
 });
 
+const ownerTransactionExportQuerySchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+});
+
 const paymentCallbackSchema = z.object({
   payNo: z.string().trim().min(1),
   channelTxnId: z.string().trim().min(1),
@@ -150,6 +155,32 @@ const callbackAlertOutboxReplayLogStatsQuerySchema = callbackAlertOutboxReplayLo
   dominanceMinSamples: z.coerce.number().int().min(1).max(100).optional(),
   staleThresholdMinutes: z.coerce.number().int().min(1).max(10080).optional(),
 });
+
+const orderStatusLabels: Record<string, string> = {
+  PENDING_ACCEPT: '待接单',
+  ACCEPTED: '已接单',
+  SERVING: '服务中',
+  COMPLETED: '已完成',
+  CANCELLED: '已取消',
+  DISPUTED: '纠纷中',
+  PARTIAL_REFUNDED: '部分退款',
+  REFUNDED: '已退款',
+};
+
+const serviceTypeLabels: Record<string, string> = {
+  BOARDING: '寄养',
+  WALKING: '遛宠',
+  FEEDING: '喂养',
+  DOOR_VISIT: '上门',
+};
+
+const refundStatusLabels: Record<string, string> = {
+  PENDING: '待处理',
+  APPROVED: '已批准',
+  REJECTED: '已拒绝',
+  SUCCESS: '已退款',
+  FAILED: '退款失败',
+};
 
 const petpalRouter = Router();
 
@@ -250,6 +281,41 @@ petpalRouter.get('/orders', asyncHandler(async (req, res) => {
   const orders = await petpalService.listOwnerOrders(auth.id);
   return ok(res, orders, 'Order list');
 }));
+
+petpalRouter.get(
+  '/orders/transactions/export',
+  createExcelExportHandler({
+    fileName: () => createTimestampedExcelFileName('petpal-owner-transactions'),
+    sheetName: 'PetPal Owner Transactions',
+    parseQuery: query => ownerTransactionExportQuerySchema.parse(query ?? {}),
+    queryRows: query => petpalService.listOwnerTransactionExportRows(query),
+    columns: [
+      { header: '订单号', width: 24, value: row => row.orderNo },
+      { header: '订单状态', width: 14, value: row => orderStatusLabels[row.orderStatus] ?? row.orderStatus },
+      { header: '服务类型', width: 14, value: row => serviceTypeLabels[row.serviceType] ?? row.serviceType },
+      { header: '预约开始', width: 22, value: row => row.appointmentStart },
+      { header: '预约结束', width: 22, value: row => row.appointmentEnd },
+      { header: '订单总额', width: 14, value: row => row.amountTotal },
+      { header: '已付金额', width: 14, value: row => row.amountPaid },
+      { header: '已退金额', width: 14, value: row => row.amountRefunded },
+      { header: '净实收', width: 14, value: row => row.netPaid },
+      { header: '支付单数', width: 12, value: row => row.paymentCount },
+      { header: '支付单号', width: 36, value: row => row.paymentNos },
+      { header: '退款单数', width: 12, value: row => row.refundCount },
+      { header: '退款单号', width: 36, value: row => row.refundNos },
+      {
+        header: '最近退款状态',
+        width: 16,
+        value: row => (row.latestRefundStatus ? (refundStatusLabels[row.latestRefundStatus] ?? row.latestRefundStatus) : ''),
+      },
+      { header: '最近退款审核时间', width: 22, value: row => row.latestRefundReviewedAt },
+      { header: '投诉数', width: 10, value: row => row.complaintCount },
+      { header: '评价星级', width: 10, value: row => row.reviewRating ?? '' },
+      { header: '下单时间', width: 22, value: row => row.createdAt },
+      { header: '关闭时间', width: 22, value: row => row.closedAt },
+    ],
+  }),
+);
 
 petpalRouter.get('/orders/:id', asyncHandler(async (req, res) => {
   const auth = req.auth!;

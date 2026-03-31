@@ -96,7 +96,16 @@
 
       <article class="frontend-card petpal-grid-span-7">
         <span class="frontend-card__eyebrow">需求与订单</span>
-        <h3>当前业务进展</h3>
+        <div class="petpal-section-heading">
+          <h3>当前业务进展</h3>
+          <ListExportButton
+            v-if="auth.isAuthenticated"
+            :request="buildOwnerTransactionExportRequest"
+            label="导出近一年交易"
+            pending-label="导出中"
+            error-message="导出交易记录失败"
+          />
+        </div>
         <el-space direction="vertical" fill :size="14" style="width: 100%">
           <el-table :data="requests" size="small" v-loading="requestsLoading">
             <el-table-column prop="pet.name" label="宠物" min-width="120" />
@@ -480,6 +489,7 @@ import type {
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
+import ListExportButton from '@/components/download/ListExportButton.vue';
 import { useAuthStore } from '@/stores/auth';
 import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
@@ -613,6 +623,8 @@ const getOrderStatusLabel = (status: OrderStatus) => ({
   PARTIAL_REFUNDED: '部分退款',
   REFUNDED: '已退款',
 }[status] ?? status);
+
+const buildOwnerTransactionExportRequest = () => api.petpal.orders.exportTransactions();
 
 const loadPets = async () => {
   try {
@@ -1000,6 +1012,18 @@ onMounted(async () => {
   margin-bottom: 10px;
 }
 
+.petpal-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.petpal-section-heading h3 {
+  margin: 0;
+}
+
 .petpal-service-log-dialog__upload {
   display: grid;
   gap: 12px;
@@ -1066,6 +1090,11 @@ onMounted(async () => {
   .petpal-grid-span-7,
   .petpal-grid-span-8 {
     grid-column: span 1;
+  }
+
+  .petpal-section-heading {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .petpal-service-log-dialog__file-item {

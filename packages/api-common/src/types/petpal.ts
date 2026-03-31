@@ -264,6 +264,12 @@ export interface CreateComplaintPayload {
   evidenceUrls?: string[];
 }
 
+export interface OwnerTransactionExportQuery {
+  [key: string]: string | number | boolean | undefined;
+  startDate?: string;
+  endDate?: string;
+}
+
 export interface MatchCaregiverQuery {
   serviceType: PetServiceType;
   petSpecies: PetSpecies;

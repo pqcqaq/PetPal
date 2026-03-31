@@ -62,6 +62,7 @@ import type {
   MatchedCaregiverPage,
   OrderDetailRecord,
   OrderRecord,
+  OwnerTransactionExportQuery,
   PetProfileRecord,
   ServiceRequestRecord,
   UpsertCaregiverProfilePayload,
@@ -439,6 +440,10 @@ export const createApiFactory = (options: ClientOptions) => {
             method: 'POST',
             data: payload,
           }),
+        exportTransactions: createDownloadEndpoint<OwnerTransactionExportQuery>(
+          '/petpal/orders/transactions/export',
+          'petpal-owner-transactions.xlsx',
+        ),
       },
       match: {
         caregivers: (query: MatchCaregiverQuery) =>

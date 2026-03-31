@@ -3192,3 +3192,59 @@ gantt
 1. 补管理端投诉处理动作与 process log 追加接口，形成真正的“处理进度”闭环。
 2. 为主人端补交易记录导出与退款进度查询，继续完成 P1-M3 售后目标。
 3. 评估投诉证据上传的权限与存储策略，避免长期依赖手工 URL。
+
+### 14.50 2026-04-01（P1-M3 Slice 33）
+
+**概述**：继续完成 P1-M3 售后侧目标，本轮补齐“主人近一年交易记录导出”闭环，让订单、支付、退款、评价与投诉概况可以按登录用户范围导出为 Excel。
+
+已完成：
+
+- API 契约与下载入口：
+  - `packages/api-common/src/types/petpal.ts`
+  - `packages/api-common/src/api/factory.ts`
+    - 新增 `OwnerTransactionExportQuery`。
+    - 新增 `api.petpal.orders.exportTransactions(query)` 下载端点。
+- 后端业务与导出路由：
+  - `apps/backend/src/services/petpal-service.ts`
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `GET /api/petpal/orders/transactions/export`。
+    - 服务层通过 `getRequestActorId()` 读取当前请求用户，强制限定仅导出本人订单。
+    - 默认导出最近 365 天内交易记录，并限制导出时间窗不超过 366 天。
+    - 导出列覆盖：
+      - 订单号、订单状态、服务类型
+      - 预约时间、订单总额、已付、已退、净实收
+      - 支付单号、退款单号、最近退款状态
+      - 投诉数、评价星级、下单时间、关闭时间
+    - 路由顺序已调整为先注册 `/orders/transactions/export`，避免被 `/orders/:id` 误吞。
+- Web 主人工作台：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+    - 在“需求与订单”卡片标题区新增“导出近一年交易”按钮。
+    - 复用现有 `ListExportButton` 与下载链路，无需新增前端下载协议。
+- 定向测试与代码审计：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增主人交易导出用例，校验：
+      - 导出响应为 Excel 文件
+      - 工作表结构正确
+      - 导出结果不会混入其他用户订单
+      - 超过 366 天的查询范围返回 400
+    - 审计重点确认：
+      - 导出服务按登录用户作用域裁剪
+      - 导出路由未被订单详情动态路由覆盖
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（15/15）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+风险与缓解：
+
+- 风险：当前导出按订单创建时间窗口筛选，尚未提供按支付时间或退款时间的独立筛选口径。
+- 缓解：先满足“近一年交易记录导出”的核心诉求；后续如运营或财务侧明确要求，再扩展为多时间口径导出。
+
+下一步（1-3）：
+
+1. 补齐主人端退款进度查询与状态展示，继续完成售后信息透明化。
+2. 为管理端补投诉处理动作、指派与结案能力，形成纠纷处置闭环。
+3. 评估是否为交易导出增加筛选条件面板，例如订单状态、服务类型与时间口径切换。
