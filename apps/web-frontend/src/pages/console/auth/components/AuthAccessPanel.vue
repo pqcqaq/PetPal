@@ -3,14 +3,14 @@
     <div class="auth-access-panel__shell">
       <div class="auth-access-panel__topbar">
         <RouterLink to="/" class="auth-access-panel__back">返回首页</RouterLink>
-        <span class="auth-access-panel__mark">控制台入口</span>
+        <span class="auth-access-panel__mark">PetPal 后台</span>
       </div>
 
       <div class="auth-access-panel__intro">
         <p class="auth-access-panel__eyebrow">{{ isLogin ? '欢迎回来' : '创建账号' }}</p>
-        <h2>{{ isLogin ? '登录控制台' : '注册后进入控制台' }}</h2>
+        <h2>{{ isLogin ? '登录 PetPal 后台' : '注册后进入 PetPal 后台' }}</h2>
         <p class="auth-access-panel__copy">
-          {{ isLogin ? '输入账号信息后继续。' : '填写基础信息后即可创建账号并进入系统。' }}
+          {{ isLogin ? '输入账号信息后继续。' : '填写基础信息后即可创建账号并进入后台工作区。' }}
         </p>
       </div>
 

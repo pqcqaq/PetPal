@@ -4333,6 +4333,44 @@ gantt
 2. 继续围绕根级后台首页补更贴近值班的摘要和快捷动作。
 3. 继续排查 App 端与 Web 端零散的旧术语、兼容壳层和非 PetPal 主产品表达。
 
+### 14.90 2026-04-01（P1-M3 Slice 73）
+
+**概述**：继续清理用户直接可见的旧模板语言，本轮把登录页、注册页和认证展示面板中的“控制台”表述统一切换为 PetPal 后台语义，并同步调整动态菜单页默认标题。
+
+已完成：
+
+- `apps/web-frontend/src/pages/console/auth/components/AuthShowcasePanel.vue`
+  - 登录展示面板顶部标识改为 `PetPal Admin`。
+  - 说明文案聚焦 PetPal 后台治理区，不再强调通用权限控制台。
+- `apps/web-frontend/src/pages/console/auth/components/AuthAccessPanel.vue`
+  - `控制台入口`、`登录控制台`、`注册后进入控制台` 等文案统一改为 `PetPal 后台` 语义。
+- `apps/web-frontend/src/pages/console/auth/components/AuthLoginStrategyForm.vue`
+- `apps/web-frontend/src/pages/console/auth/components/AuthRegisterStrategyForm.vue`
+  - 提交按钮文案分别改为“登录 PetPal 后台”“注册并进入 PetPal 后台”。
+- `apps/web-frontend/src/stores/menus.ts`
+  - 动态菜单页缺省标题从 `控制台` 调整为 `宠托帮后台`。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认登录页和注册页的用户可见入口语言已经进一步贴近 PetPal 产品，不再保留模板式“控制台”措辞。
+- 已确认本轮没有修改认证接口、账号字段或登录流程，只做入口文案和动态页面默认标题收敛。
+- 已确认动态菜单页如果已有显式标题，会继续优先使用业务标题，本轮默认值调整不会覆盖已有配置。
+
+风险与缓解：
+
+- 风险：仓库中仍有一部分面向开发者的架构文档、计划文档和工程说明保留历史 RBAC / console 表述。
+- 缓解：本轮优先清理终端用户能直接看到的入口；后续可以集中收束开发者文档和项目记忆，减少历史模板叙述干扰。
+
+下一步（1-3）：
+
+1. 继续清理开发者文档和产品文档中的历史 RBAC / console 模板叙述。
+2. 继续围绕根级 PetPal 后台首页补更贴近值班的摘要与直接动作。
+3. 继续审查 App 端与 Web 端零散的兼容壳层和旧命名，收尾产品化替换。
+
 ### 14.77 2026-04-01（P1-M3 Slice 60）
 
 **概述**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

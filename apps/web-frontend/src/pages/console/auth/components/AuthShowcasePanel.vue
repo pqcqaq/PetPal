@@ -2,10 +2,10 @@
   <section class="auth-showcase-panel">
     <div class="auth-showcase-panel__inner">
       <div class="auth-showcase-panel__masthead">
-        <span class="auth-showcase-panel__eyebrow">权限控制台</span>
-        <h1>清晰的入口，专注的管理体验。</h1>
+        <span class="auth-showcase-panel__eyebrow">PetPal Admin</span>
+        <h1>清晰的入口，直接进入宠托帮后台。</h1>
         <p>
-          进入系统后统一管理用户、角色、权限、菜单和审计信息，页面会按当前权限自动展开。
+          登录后优先进入 PetPal 后台治理区，投诉、审核、回调和运营页会按当前账号已开通能力自动展开。
         </p>
       </div>
 

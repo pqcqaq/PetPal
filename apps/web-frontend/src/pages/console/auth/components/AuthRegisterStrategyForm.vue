@@ -37,7 +37,7 @@
     </div>
 
     <el-button type="primary" class="auth-form-submit page-form-grid__full" :loading="submitting" @click="emit('submit')">
-      注册并进入控制台
+      注册并进入 PetPal 后台
     </el-button>
   </el-form>
 </template>

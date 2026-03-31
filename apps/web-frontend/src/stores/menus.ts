@@ -136,7 +136,7 @@ export const useMenuStore = defineStore('menus', {
             permission: node.permission?.code,
             keepAlive: pageDefinition.keepAlive,
             cacheName: pageDefinition.cacheName,
-            title: node.title || pageDefinition.title || '控制台',
+            title: node.title || pageDefinition.title || '宠托帮后台',
             caption: node.caption || pageDefinition.caption || 'Workbench',
             description: node.description || pageDefinition.description || '',
             code: node.code || pageDefinition.code || '',

@@ -24,7 +24,7 @@
     </div>
 
     <el-button type="primary" class="auth-form-submit page-form-grid__full" :loading="submitting" @click="emit('submit')">
-      登录控制台
+      登录 PetPal 后台
     </el-button>
   </el-form>
 </template>
@@ -145,5 +145,4 @@ const resolveVerificationHint = (strategy: AuthStrategyDescriptor) => {
   font-weight: 700;
 }
 </style>
-
 
