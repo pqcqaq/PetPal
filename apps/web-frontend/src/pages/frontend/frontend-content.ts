@@ -33,7 +33,7 @@ export const capabilityCards = [
   },
 ] as const;
 
-export const consoleHighlights = [
+export const adminHighlights = [
   {
     title: '投诉工单治理',
     description: '支持负责人分配、批量结案和 SLA 风险跟踪。',

@@ -12,6 +12,8 @@ import { useWorkbenchStore } from '@/stores/workbench';
 import { pinia } from '@/stores';
 
 const SYNC_DEBOUNCE_MS = 120;
+const CONSOLE_NAMESPACE = '/console';
+const PETPAL_ADMIN_NAMESPACE = '/petpal-admin';
 
 const hasStatus = (error: unknown): error is { status: number } =>
   typeof error === 'object'
@@ -39,26 +41,47 @@ export const installAdminRealtimeSync = (router: Router) => {
     syncTimer = null;
   };
 
-  const reconcileConsoleRoute = async () => {
+  const isConsoleTarget = (path: string) =>
+    path === CONSOLE_NAMESPACE || path.startsWith(`${CONSOLE_NAMESPACE}/`);
+
+  const isPetPalAdminTarget = (path: string) =>
+    path === PETPAL_ADMIN_NAMESPACE || path.startsWith(`${PETPAL_ADMIN_NAMESPACE}/`);
+
+  const reconcileAdminRoute = async () => {
     const currentRoute = router.currentRoute.value;
-    if (!auth.isAuthenticated || !currentRoute.path.startsWith('/console')) {
+    if (!auth.isAuthenticated) {
       return;
     }
 
-    if (currentRoute.path === '/console') {
-      if (menus.homePath !== '/console') {
+    if (isConsoleTarget(currentRoute.path)) {
+      if (currentRoute.path === CONSOLE_NAMESPACE) {
+        if (menus.homePath !== CONSOLE_NAMESPACE) {
+          await router.replace(menus.homePath);
+        }
+        return;
+      }
+
+      if (!menus.hasPagePath(currentRoute.path)) {
+        await router.replace(menus.homePath);
+        return;
+      }
+
+      if (typeof currentRoute.meta.permission === 'string' && !auth.hasPermission(currentRoute.meta.permission)) {
         await router.replace(menus.homePath);
       }
       return;
     }
 
-    if (!menus.hasPagePath(currentRoute.path)) {
-      await router.replace(menus.homePath);
+    if (!isPetPalAdminTarget(currentRoute.path)) {
+      return;
+    }
+
+    if (currentRoute.path === PETPAL_ADMIN_NAMESPACE) {
       return;
     }
 
     if (typeof currentRoute.meta.permission === 'string' && !auth.hasPermission(currentRoute.meta.permission)) {
-      await router.replace(menus.homePath);
+      await router.replace(PETPAL_ADMIN_NAMESPACE);
     }
   };
 
@@ -99,7 +122,7 @@ export const installAdminRealtimeSync = (router: Router) => {
         workbench.syncWithMenus();
       }
 
-      await reconcileConsoleRoute();
+      await reconcileAdminRoute();
     } catch (error) {
       if (hasStatus(error) && (error.status === 401 || error.status === 403)) {
         await handleUnauthorizedSync();

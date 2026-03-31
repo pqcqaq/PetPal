@@ -7,7 +7,7 @@
     </p>
 
     <div class="frontend-page__hero-actions">
-      <RouterLink class="frontend-page__button is-primary" :to="consoleTarget">{{ consoleLabel }}</RouterLink>
+      <RouterLink class="frontend-page__button is-primary" :to="adminTarget">{{ adminLabel }}</RouterLink>
       <RouterLink class="frontend-page__button is-secondary" to="/petpal">进入主人服务台</RouterLink>
     </div>
 
@@ -23,8 +23,8 @@
 
 <script setup lang="ts">
 defineProps<{
-  consoleTarget: string;
-  consoleLabel: string;
+  adminTarget: string;
+  adminLabel: string;
   signals: Array<{ label: string; value: string; note: string }>;
 }>();
 </script>

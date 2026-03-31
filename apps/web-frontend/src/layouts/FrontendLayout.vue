@@ -2,8 +2,8 @@
   <div class="frontend-shell">
     <FrontendHeader
       :nav-items="navItems"
-      :console-target="consoleTarget"
-      :console-label="consoleLabel"
+      :admin-target="adminTarget"
+      :admin-label="adminLabel"
       :user-label="userLabel"
     />
 
@@ -13,8 +13,8 @@
 
     <FrontendFooter
       :nav-items="navItems"
-      :console-target="consoleTarget"
-      :console-label="consoleLabel"
+      :admin-target="adminTarget"
+      :admin-label="adminLabel"
     />
   </div>
 </template>
@@ -28,14 +28,14 @@ import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();
 const navItems = frontendNavItems.map((item) => ({ ...item }));
-const consoleTarget = computed(() => {
+const adminTarget = computed(() => {
   if (!auth.isAuthenticated) {
     return '/login';
   }
 
   return '/petpal-admin';
 });
-const consoleLabel = computed(() => auth.isAuthenticated ? '进入 PetPal 后台' : '登录 PetPal 后台');
+const adminLabel = computed(() => auth.isAuthenticated ? '进入 PetPal 后台' : '登录 PetPal 后台');
 const userLabel = computed(() => auth.isAuthenticated ? `当前用户 · ${auth.user?.nickname ?? auth.user?.username ?? '已登录'}` : '');
 </script>
 

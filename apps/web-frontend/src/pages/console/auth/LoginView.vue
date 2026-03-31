@@ -124,6 +124,13 @@ const authConfig = reactive<AuthStrategyCollection>(createEmptyConfig());
 const loginForms = reactive<Record<string, StrategyFormState>>({});
 const registerForms = reactive<Record<string, StrategyFormState>>({});
 const sendingCodes = reactive<Record<string, boolean>>({});
+const petPalAdminPermissions = [
+  'petpal.complaint.read',
+  'petpal.complaint.manage',
+  'petpal.caregiver.audit',
+  'petpal.callback-audit.read',
+  'petpal.callback-alert.read',
+] as const;
 const capabilityItems = [
   {
     title: '统一入口',
@@ -135,7 +142,7 @@ const capabilityItems = [
   },
   {
     title: '管理清晰',
-    copy: '用户、角色、权限和菜单都在同一控制台完成管理。',
+    copy: '登录后可直接进入 PetPal 后台治理区或主人服务台。',
   },
 ];
 
@@ -174,6 +181,12 @@ const syncActiveTab = () => {
   }
 };
 
+const resolvePostAuthTarget = () => (
+  petPalAdminPermissions.some((permission) => auth.hasPermission(permission))
+    ? '/petpal-admin'
+    : '/console'
+);
+
 const resolveSafeReturnTo = () => {
   const value = typeof route.query.returnTo === 'string' ? route.query.returnTo : '';
   if (!value) {
@@ -205,7 +218,7 @@ const finishAuthNavigation = async () => {
     return;
   }
 
-  await router.push('/console');
+  await router.push(resolvePostAuthTarget());
 };
 
 const loadStrategies = async () => {
@@ -341,7 +354,7 @@ const submitRegister = async () => {
 
 const startOauthLogin = async (providerCode: string) => {
   try {
-    const result = await api.auth.oauthAuthorizeUrl(providerCode, resolveSafeReturnTo() || '/console');
+    const result = await api.auth.oauthAuthorizeUrl(providerCode, resolveSafeReturnTo() || resolvePostAuthTarget());
     window.location.assign(result.redirectUrl);
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '拉起第三方登录失败'));

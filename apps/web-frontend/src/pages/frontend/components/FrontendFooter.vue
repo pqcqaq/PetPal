@@ -17,7 +17,7 @@
 
         <div>
           <span>入口</span>
-          <RouterLink :to="consoleTarget">{{ consoleLabel }}</RouterLink>
+          <RouterLink :to="adminTarget">{{ adminLabel }}</RouterLink>
           <RouterLink to="/login">登录页</RouterLink>
         </div>
       </section>
@@ -28,8 +28,8 @@
 <script setup lang="ts">
 defineProps<{
   navItems: Array<{ label: string; to: string; eyebrow: string }>;
-  consoleTarget: string;
-  consoleLabel: string;
+  adminTarget: string;
+  adminLabel: string;
 }>();
 </script>
 

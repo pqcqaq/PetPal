@@ -23,8 +23,8 @@
 
       <div class="frontend-header__actions">
         <span v-if="userLabel" class="frontend-user-badge">{{ userLabel }}</span>
-        <RouterLink class="frontend-console-link" :to="consoleTarget">
-          {{ consoleLabel }}
+        <RouterLink class="frontend-admin-link" :to="adminTarget">
+          {{ adminLabel }}
         </RouterLink>
       </div>
     </div>
@@ -36,8 +36,8 @@ import { useRoute } from 'vue-router';
 
 defineProps<{
   navItems: Array<{ label: string; to: string; eyebrow: string }>;
-  consoleTarget: string;
-  consoleLabel: string;
+  adminTarget: string;
+  adminLabel: string;
   userLabel: string;
 }>();
 
@@ -150,7 +150,7 @@ const route = useRoute();
   font-weight: 700;
 }
 
-.frontend-console-link {
+.frontend-admin-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;

@@ -20,8 +20,8 @@
     >
       <div class="admin-brand admin-brand--simple">
         <div class="admin-brand__copy">
-          <h1>管理后台</h1>
-          <span>RBAC Control</span>
+          <h1>宠托帮后台</h1>
+          <span>PetPal Admin</span>
         </div>
 
         <button
@@ -57,7 +57,7 @@
           <div class="shell-header__inner">
             <div class="shell-header__left">
               <el-breadcrumb separator="/">
-                <el-breadcrumb-item>RBAC Control</el-breadcrumb-item>
+                <el-breadcrumb-item>PetPal Admin</el-breadcrumb-item>
                 <el-breadcrumb-item
                   v-for="item in breadcrumbs"
                   :key="item.id"
@@ -264,8 +264,8 @@ const pageMeta = computed(() => {
   const currentPage = menus.getPageByPath(route.path);
 
   return {
-    title: currentPage?.title || String(route.meta.title ?? '控制台'),
-    caption: currentPage?.caption || String(route.meta.caption ?? 'RBAC Admin'),
+    title: currentPage?.title || String(route.meta.title ?? '宠托帮后台'),
+    caption: currentPage?.caption || String(route.meta.caption ?? 'PetPal Admin'),
     description: currentPage?.description || String(route.meta.description ?? route.meta.caption ?? ''),
   };
 });

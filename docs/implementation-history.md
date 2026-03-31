@@ -1653,6 +1653,43 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 99. PetPal 根级后台补齐默认落点与实时同步适配（P1-M3 Slice 72）
+
+**内容**：主要治理页已经迁入根级后台后，本轮继续收口入口与运行时行为，补齐登录后的默认后台落点、根级后台的实时同步适配，并清理公开前台与后台壳层里残留的 `console` / `RBAC Control` 语义。
+
+变更摘要：
+
+- `apps/web-frontend/src/realtime/admin-sync.ts`
+  - 实时同步路由校正逻辑从仅覆盖 `/console/**` 扩展到同时覆盖 `/petpal-admin/**`。
+  - 当根级后台页面权限被回收时，会回退到 `/petpal-admin`，不再只针对旧控制台路径处理。
+- `apps/web-frontend/src/pages/console/auth/LoginView.vue`
+  - 登录、注册与 OAuth 登录完成后，默认优先落到 `/petpal-admin`（当当前账号具备 PetPal 后台权限时）。
+  - 第三方登录默认回跳目标同步改为根级后台优先。
+  - 登录页能力说明改为 PetPal 产品语义，不再强调“同一控制台管理”。
+- `apps/web-frontend/src/layouts/FrontendLayout.vue`
+- `apps/web-frontend/src/pages/frontend/components/FrontendHeader.vue`
+- `apps/web-frontend/src/pages/frontend/components/FrontendFooter.vue`
+- `apps/web-frontend/src/pages/frontend/home/HomeView.vue`
+- `apps/web-frontend/src/pages/frontend/home/components/HomeHero.vue`
+- `apps/web-frontend/src/pages/frontend/home/components/HomeAdminPreview.vue`
+- `apps/web-frontend/src/pages/frontend/frontend-content.ts`
+  - 公开前台组件中的 `consoleTarget` / `consoleLabel`、`consoleHighlights`、`HomeConsolePreview` 等命名统一切为 PetPal Admin 语义。
+  - 公开页继续引导进入根级 `/petpal-admin`，但组件与样式命名不再沿用旧 `console` 概念。
+- `apps/web-frontend/src/layouts/ConsoleLayout.vue`
+  - 后台壳层中的用户可见品牌从 `RBAC Control` / `RBAC Admin` 调整为 `PetPal Admin` / `宠托帮后台`。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认根级 `/petpal-admin/**` 页面现在也会纳入后台实时同步后的权限与路由校正逻辑，不再只覆盖旧 `/console/**`。
+- 已确认登录与第三方登录在具备 PetPal 后台权限时会优先进入根级后台，符合“直接定义在根下”的要求。
+- 已确认公开前台和后台壳层中残留的 `console` / `RBAC Control` 用户可见语义已进一步收敛，没有改变既有接口契约。
+
+Git commit：待本切片提交。
+
 ## 87. App 端资料页去掉权限中心式表达（P1-M3 Slice 60）
 
 **内容**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

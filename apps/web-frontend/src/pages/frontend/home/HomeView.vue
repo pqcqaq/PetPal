@@ -1,6 +1,6 @@
 <template>
   <div class="frontend-page">
-    <HomeHero :console-target="consoleTarget" :console-label="consoleLabel" :signals="signals" />
+    <HomeHero :admin-target="adminTarget" :admin-label="adminLabel" :signals="signals" />
 
     <section class="frontend-card intro-card">
       <span class="frontend-card__eyebrow">使用方式</span>
@@ -11,24 +11,24 @@
     </section>
 
     <HomeCapabilityGrid :cards="cards" />
-    <HomeConsolePreview :highlights="highlights" />
+    <HomeAdminPreview :highlights="highlights" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { capabilityCards, consoleHighlights, projectSignals } from '../frontend-content';
+import { adminHighlights, capabilityCards, projectSignals } from '../frontend-content';
 import { useAuthStore } from '@/stores/auth';
 import HomeCapabilityGrid from './components/HomeCapabilityGrid.vue';
-import HomeConsolePreview from './components/HomeConsolePreview.vue';
+import HomeAdminPreview from './components/HomeAdminPreview.vue';
 import HomeHero from './components/HomeHero.vue';
 
 const auth = useAuthStore();
 const signals = projectSignals.map((item) => ({ ...item }));
 const cards = capabilityCards.map((item) => ({ ...item, bullets: [...item.bullets] }));
-const highlights = consoleHighlights.map((item) => ({ ...item }));
-const consoleTarget = computed(() => auth.isAuthenticated ? '/petpal-admin' : '/login');
-const consoleLabel = computed(() => auth.isAuthenticated ? '进入 PetPal 后台' : '登录 PetPal 后台');
+const highlights = adminHighlights.map((item) => ({ ...item }));
+const adminTarget = computed(() => auth.isAuthenticated ? '/petpal-admin' : '/login');
+const adminLabel = computed(() => auth.isAuthenticated ? '进入 PetPal 后台' : '登录 PetPal 后台');
 </script>
 
 <style scoped lang="scss">
