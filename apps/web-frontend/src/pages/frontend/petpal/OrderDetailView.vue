@@ -235,6 +235,100 @@
           </div>
         </article>
 
+        <article v-if="isOwnerView" class="frontend-card petpal-order-detail__complaints">
+          <span class="frontend-card__eyebrow">投诉与进度</span>
+          <div class="petpal-complaint-panel__header">
+            <div class="petpal-complaint-panel__headline">
+              <h3>
+                {{
+                  complaints.length > 0
+                    ? `共 ${complaints.length} 条投诉记录`
+                    : canCreateComplaint
+                      ? '暂无投诉，可发起售后反馈'
+                      : '暂无投诉记录'
+                }}
+              </h3>
+              <p v-if="activeComplaint">
+                当前存在进行中的投诉，平台处理进度会同步展示在这里。
+              </p>
+              <p v-else-if="canCreateComplaint">
+                若对服务过程、费用或安全存在争议，可在这里发起投诉。
+              </p>
+              <p v-else>
+                当前没有可发起或进行中的投诉。
+              </p>
+            </div>
+            <el-button v-if="canCreateComplaint" type="danger" plain @click="openComplaintDialog">
+              发起投诉
+            </el-button>
+          </div>
+
+          <template v-if="complaints.length > 0">
+            <div class="petpal-complaint-list">
+              <article
+                v-for="complaint in complaints"
+                :key="complaint.id"
+                class="petpal-complaint-card"
+              >
+                <div class="petpal-complaint-card__header">
+                  <div>
+                    <h4>{{ getComplaintTypeLabel(complaint.complaintType) }}</h4>
+                    <p>{{ formatDateTime(complaint.createdAt) }} · 投诉对象：{{ getComplaintTargetRoleLabel(complaint.targetRole) }}</p>
+                  </div>
+                  <el-tag :type="getComplaintStatusType(complaint.status)">
+                    {{ getComplaintStatusLabel(complaint.status) }}
+                  </el-tag>
+                </div>
+
+                <p class="petpal-complaint-card__description">{{ complaint.description }}</p>
+
+                <div v-if="complaint.evidenceUrls.length > 0" class="petpal-service-log-media">
+                  <a
+                    v-for="(url, index) in complaint.evidenceUrls"
+                    :key="`${complaint.id}-${url}`"
+                    class="petpal-service-log-media__item"
+                    :href="url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <img
+                      v-if="isPreviewableImage(url)"
+                      :src="url"
+                      :alt="`投诉证据 ${index + 1}`"
+                      loading="lazy"
+                    />
+                    <div v-else class="petpal-service-log-media__file">
+                      {{ getMediaLinkLabel(url, index) }}
+                    </div>
+                    <span class="petpal-service-log-media__meta">
+                      {{ isPreviewableImage(url) ? '查看证据' : '打开证据链接' }}
+                    </span>
+                  </a>
+                </div>
+
+                <div v-if="complaint.resultSummary" class="petpal-complaint-card__result">
+                  <strong>处理结论：</strong>{{ complaint.resultSummary }}
+                </div>
+
+                <div class="petpal-complaint-progress">
+                  <div
+                    v-for="log in complaint.processLogs"
+                    :key="log.id"
+                    class="petpal-complaint-progress__item"
+                  >
+                    <strong>{{ getComplaintActionLabel(log.actionType) }}</strong>
+                    <span>{{ formatDateTime(log.createdAt) }}</span>
+                    <p v-if="log.note">{{ log.note }}</p>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </template>
+          <div v-else class="petpal-empty">
+            <p>{{ canCreateComplaint ? '当前还没有投诉记录' : '暂无投诉进度可展示' }}</p>
+          </div>
+        </article>
+
         <!-- 支付时间线 -->
         <article class="frontend-card petpal-order-detail__payments">
           <span class="frontend-card__eyebrow">支付记录</span>
@@ -382,6 +476,65 @@
           </el-button>
         </template>
       </el-dialog>
+
+      <el-dialog
+        v-model="complaintDialogVisible"
+        title="发起投诉"
+        width="620px"
+        :close-on-click-modal="!complaintSubmitting"
+        :close-on-press-escape="!complaintSubmitting"
+        @closed="resetComplaintDialog"
+      >
+        <el-form label-position="top">
+          <el-form-item label="投诉对象">
+            <el-select v-model="complaintForm.targetRole" style="width: 100%">
+              <el-option label="照料者" value="CAREGIVER" />
+              <el-option label="平台" value="PLATFORM" />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="投诉类型">
+            <el-select v-model="complaintForm.complaintType" style="width: 100%">
+              <el-option label="服务质量" value="SERVICE" />
+              <el-option label="费用争议" value="FEE" />
+              <el-option label="安全问题" value="SAFETY" />
+              <el-option label="欺诈风险" value="FRAUD" />
+              <el-option label="其他问题" value="OTHER" />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="投诉说明" required>
+            <el-input
+              v-model="complaintForm.description"
+              type="textarea"
+              :rows="5"
+              maxlength="2000"
+              show-word-limit
+              placeholder="请描述争议事实、发生时间和希望平台协助处理的内容"
+            />
+          </el-form-item>
+
+          <el-form-item label="证据链接">
+            <el-select
+              v-model="complaintForm.evidenceUrls"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              placeholder="可粘贴图片、视频或文件链接"
+              style="width: 100%"
+            />
+            <div class="petpal-dialog-hint">{{ complaintEvidenceHint }}</div>
+          </el-form-item>
+        </el-form>
+
+        <template #footer>
+          <el-button :disabled="complaintSubmitting" @click="complaintDialogVisible = false">取消</el-button>
+          <el-button type="danger" :loading="complaintSubmitting" @click="submitComplaint">
+            提交投诉
+          </el-button>
+        </template>
+      </el-dialog>
     </div>
   </div>
 </template>
@@ -394,6 +547,12 @@ import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
 import type {
+  ComplaintActionType,
+  ComplaintRecord,
+  ComplaintStatus,
+  ComplaintTargetRole,
+  ComplaintType,
+  CreateComplaintPayload,
   CreateOrderReviewPayload,
   OrderDetailRecord,
   OrderOperatorRole,
@@ -415,11 +574,15 @@ const auth = useAuthStore();
 
 const order = ref<OrderDetailRecord | null>(null);
 const orderNo = ref('');
+const complaints = ref<ComplaintRecord[]>([]);
 const loading = ref(false);
 const reviewDialogVisible = ref(false);
 const reviewSubmitting = ref(false);
+const complaintDialogVisible = ref(false);
+const complaintSubmitting = ref(false);
 
 const reviewPresetTags = ['准时签到', '沟通顺畅', '反馈及时', '服务细致', '宠物状态稳定', '环境整洁'];
+const complaintEvidenceHint = '可粘贴已上传附件 URL，后续会补充直接上传证据能力';
 
 const createEmptyReviewForm = () => ({
   rating: 5,
@@ -428,11 +591,30 @@ const createEmptyReviewForm = () => ({
   isAnonymous: false,
 });
 
+const createEmptyComplaintForm = () => ({
+  targetRole: 'CAREGIVER' as ComplaintTargetRole,
+  complaintType: 'SERVICE' as ComplaintType,
+  description: '',
+  evidenceUrls: [] as string[],
+});
+
 const reviewForm = reactive(createEmptyReviewForm());
+const complaintForm = reactive(createEmptyComplaintForm());
 
 const isOwnerView = computed(() => Boolean(auth.user?.id && order.value?.ownerId === auth.user.id));
 const canCreateReview = computed(() =>
   Boolean(isOwnerView.value && order.value?.orderStatus === 'COMPLETED' && !order.value?.review),
+);
+const activeComplaint = computed(() =>
+  complaints.value.find((item) => item.status === 'OPEN' || item.status === 'PROCESSING') ?? null,
+);
+const canCreateComplaint = computed(() =>
+  Boolean(
+    isOwnerView.value
+    && order.value
+    && ['SERVING', 'COMPLETED', 'PARTIAL_REFUNDED', 'REFUNDED', 'DISPUTED'].includes(order.value.orderStatus)
+    && !activeComplaint.value,
+  ),
 );
 
 const formatAmount = (value: unknown) => {
@@ -518,6 +700,7 @@ const getTimelineEventLabel = (eventType: OrderTimelineEventType): string => {
     SERVICE_LOGGED: '上传服务记录',
     CHECKED_OUT: '照料者签退',
     COMPLETED: '业主确认完成',
+    DISPUTED: '发起投诉',
     CANCELLED: '订单取消',
     REFUND_APPLIED: '发起退款',
     REFUND_DONE: '退款完成',
@@ -533,6 +716,7 @@ const getTimelineEventClass = (eventType: OrderTimelineEventType): string => {
     SERVICE_LOGGED: 'primary',
     CHECKED_OUT: 'success',
     COMPLETED: 'success',
+    DISPUTED: 'error',
     CANCELLED: 'error',
     REFUND_APPLIED: 'warning',
     REFUND_DONE: 'info',
@@ -669,6 +853,57 @@ const getRefundTypeLabel = (type: RefundType): string => {
   return labels[type] || type;
 };
 
+const getComplaintTargetRoleLabel = (role: ComplaintTargetRole): string => {
+  const labels: Record<ComplaintTargetRole, string> = {
+    CAREGIVER: '照料者',
+    PLATFORM: '平台',
+  };
+  return labels[role] || role;
+};
+
+const getComplaintTypeLabel = (type: ComplaintType): string => {
+  const labels: Record<ComplaintType, string> = {
+    SAFETY: '安全问题',
+    FEE: '费用争议',
+    SERVICE: '服务质量',
+    FRAUD: '欺诈风险',
+    OTHER: '其他问题',
+  };
+  return labels[type] || type;
+};
+
+const getComplaintStatusLabel = (status: ComplaintStatus): string => {
+  const labels: Record<ComplaintStatus, string> = {
+    OPEN: '待受理',
+    PROCESSING: '处理中',
+    RESOLVED: '已解决',
+    REJECTED: '已驳回',
+  };
+  return labels[status] || status;
+};
+
+const getComplaintStatusType = (status: ComplaintStatus): 'primary' | 'success' | 'warning' | 'info' | 'danger' => {
+  const types: Record<ComplaintStatus, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
+    OPEN: 'warning',
+    PROCESSING: 'primary',
+    RESOLVED: 'success',
+    REJECTED: 'info',
+  };
+  return types[status] || 'info';
+};
+
+const getComplaintActionLabel = (actionType: ComplaintActionType): string => {
+  const labels: Record<ComplaintActionType, string> = {
+    OPEN: '已提交投诉',
+    ASSIGN: '已分配处理人',
+    INVESTIGATE: '调查核实',
+    CALL_USER: '联系用户',
+    PENALTY: '处罚处理',
+    CLOSE: '投诉结案',
+  };
+  return labels[actionType] || actionType;
+};
+
 const getTimelineDetails = (event: OrderTimelineRecord) => {
   const details: string[] = [];
   const previousStatus = getRecordString(event.eventPayload, 'previousStatus');
@@ -677,9 +912,17 @@ const getTimelineDetails = (event: OrderTimelineRecord) => {
   const happenedAt = getRecordString(event.eventPayload, 'happenedAt');
   const mediaCount = getRecordNumber(event.eventPayload, 'mediaCount');
   const geoText = formatGeoValue(event.eventPayload?.geo);
+  const complaintType = getRecordString(event.eventPayload, 'complaintType');
+  const targetRole = getRecordString(event.eventPayload, 'targetRole');
 
   if (previousStatus && nextStatus) {
     details.push(`状态流转：${getOrderStatusLabel(previousStatus as OrderStatus)} -> ${getOrderStatusLabel(nextStatus as OrderStatus)}`);
+  }
+  if (complaintType) {
+    details.push(`投诉类型：${getComplaintTypeLabel(complaintType as ComplaintType)}`);
+  }
+  if (targetRole) {
+    details.push(`投诉对象：${getComplaintTargetRoleLabel(targetRole as ComplaintTargetRole)}`);
   }
   if (note) {
     details.push(`备注：${note}`);
@@ -735,6 +978,15 @@ const openReviewDialog = () => {
   reviewDialogVisible.value = true;
 };
 
+const resetComplaintDialog = () => {
+  Object.assign(complaintForm, createEmptyComplaintForm());
+};
+
+const openComplaintDialog = () => {
+  resetComplaintDialog();
+  complaintDialogVisible.value = true;
+};
+
 const submitReview = async () => {
   if (!order.value) {
     return;
@@ -765,12 +1017,55 @@ const submitReview = async () => {
   }
 };
 
+const submitComplaint = async () => {
+  if (!order.value) {
+    return;
+  }
+
+  const description = complaintForm.description.trim();
+  if (description.length < 5) {
+    ElMessage.error('请填写至少 5 个字的投诉说明');
+    return;
+  }
+
+  complaintSubmitting.value = true;
+  try {
+    const payload: CreateComplaintPayload = {
+      targetRole: complaintForm.targetRole,
+      complaintType: complaintForm.complaintType,
+      description,
+      evidenceUrls: complaintForm.evidenceUrls
+        .map((item) => item.trim())
+        .filter(Boolean),
+    };
+    await api.petpal.orders.createComplaint(order.value.id, payload);
+    complaintDialogVisible.value = false;
+    await reload();
+    ElMessage.success('投诉已提交');
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '提交投诉失败'));
+  } finally {
+    complaintSubmitting.value = false;
+  }
+};
+
 const reload = async () => {
   loading.value = true;
   try {
     const detail = await api.petpal.orders.detail(orderId);
     order.value = detail;
     orderNo.value = detail.orderNo;
+
+    if (auth.user?.id && detail.ownerId === auth.user.id) {
+      try {
+        complaints.value = await api.petpal.orders.complaints(orderId);
+      } catch (error) {
+        complaints.value = [];
+        ElMessage.error(getErrorMessage(error, '加载投诉进度失败'));
+      }
+    } else {
+      complaints.value = [];
+    }
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '加载订单详情失败'));
   } finally {
@@ -1049,6 +1344,106 @@ onMounted(() => {
   border-radius: 10px;
   background: #fafafa;
   color: #666;
+}
+
+.petpal-complaint-panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.petpal-complaint-panel__headline h3 {
+  margin: 0;
+  color: #333;
+}
+
+.petpal-complaint-panel__headline p {
+  margin: 0.5rem 0 0;
+  color: #666;
+  line-height: 1.6;
+}
+
+.petpal-complaint-list {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.petpal-complaint-card {
+  display: grid;
+  gap: 0.875rem;
+  padding: 1rem;
+  border: 1px solid #ebeef5;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+}
+
+.petpal-complaint-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.petpal-complaint-card__header h4 {
+  margin: 0;
+  color: #333;
+}
+
+.petpal-complaint-card__header p {
+  margin: 0.375rem 0 0;
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.petpal-complaint-card__description,
+.petpal-complaint-card__result {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  border-radius: 10px;
+  background: #f7f8fb;
+  color: #333;
+  line-height: 1.7;
+}
+
+.petpal-complaint-progress {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.petpal-complaint-progress__item {
+  padding: 0.75rem 0.875rem;
+  border-left: 3px solid #dbeafe;
+  background: #f9fbff;
+  border-radius: 0 10px 10px 0;
+}
+
+.petpal-complaint-progress__item strong {
+  display: block;
+  color: #1f2937;
+}
+
+.petpal-complaint-progress__item span {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.petpal-complaint-progress__item p {
+  margin: 0.5rem 0 0;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.petpal-dialog-hint {
+  margin-top: 0.5rem;
+  color: #6b7280;
+  font-size: 0.8125rem;
+  line-height: 1.5;
 }
 
 .petpal-empty {

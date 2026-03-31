@@ -499,6 +499,58 @@ describe('PetPal API integration', () => {
     assert.equal(reviewedDetailResponse.body.data.review.content, '照料过程透明，宠物状态很好');
     assert.deepEqual(reviewedDetailResponse.body.data.review.tags, ['准时签到', '沟通顺畅']);
 
+    const complaintResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/complaints`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .send({
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: '服务完成后发现沟通与交付细节存在争议，希望平台介入核查',
+        evidenceUrls: [
+          'https://static.example.test/petpal/complaint-1.jpg',
+        ],
+      })
+      .expect(200);
+
+    assert.equal(complaintResponse.body.data.status, 'OPEN');
+    assert.equal(complaintResponse.body.data.targetRole, 'CAREGIVER');
+    assert.equal(complaintResponse.body.data.complaintType, 'SERVICE');
+    assert.ok(Array.isArray(complaintResponse.body.data.processLogs));
+    assert.equal(complaintResponse.body.data.processLogs[0].actionType, 'OPEN');
+
+    const duplicateComplaintResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/complaints`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .send({
+        targetRole: 'PLATFORM',
+        complaintType: 'OTHER',
+        description: '重复发起投诉',
+      })
+      .expect(400);
+
+    assert.equal(duplicateComplaintResponse.body.message, 'Active complaint already exists for order');
+
+    const complaintListResponse = await request(app)
+      .get(`/api/petpal/orders/${order.id}/complaints`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(complaintListResponse.body.data.length, 1);
+    assert.equal(complaintListResponse.body.data[0].status, 'OPEN');
+    assert.equal(complaintListResponse.body.data[0].processLogs[0].actionType, 'OPEN');
+
+    const disputedDetailResponse = await request(app)
+      .get(`/api/petpal/orders/${order.id}`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(disputedDetailResponse.body.data.orderStatus, 'DISPUTED');
+    assert.ok(
+      disputedDetailResponse.body.data.timeline.some(
+        (item: { eventType: string }) => item.eventType === 'DISPUTED',
+      ),
+    );
+
     const persistedCaregiverProfile = await prisma.caregiverProfile.findUnique({
       where: {
         id: caregiverProfile.id,
@@ -537,7 +589,7 @@ describe('PetPal API integration', () => {
     });
 
     assert.ok(persistedOrder);
-    assert.equal(persistedOrder.orderStatus, 'COMPLETED');
+    assert.equal(persistedOrder.orderStatus, 'DISPUTED');
     assert.ok(persistedOrder.closedAt);
     assert.equal(persistedOrder.serviceRequest?.status, 'CLOSED');
   });
@@ -642,6 +694,18 @@ describe('PetPal API integration', () => {
       .expect(400);
 
     assert.equal(earlyReviewResponse.body.message, 'Only completed orders can be reviewed');
+
+    const earlyComplaintResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/complaints`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .send({
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: '服务尚未开始，暂不应进入投诉流程',
+      })
+      .expect(400);
+
+    assert.equal(earlyComplaintResponse.body.message, 'Only serving or settled orders can create complaints');
 
     await request(app)
       .post(`/api/petpal/caregiver/orders/${order.id}/accept`)

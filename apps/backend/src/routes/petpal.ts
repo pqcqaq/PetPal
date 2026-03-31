@@ -106,6 +106,13 @@ const orderReviewSchema = z.object({
   isAnonymous: z.boolean().optional(),
 });
 
+const orderComplaintSchema = z.object({
+  targetRole: z.enum(['CAREGIVER', 'PLATFORM']),
+  complaintType: z.enum(['SAFETY', 'FEE', 'SERVICE', 'FRAUD', 'OTHER']),
+  description: z.string().trim().min(5).max(2000),
+  evidenceUrls: z.array(z.string().trim().url().max(500)).max(10).optional(),
+});
+
 const paymentCallbackSchema = z.object({
   payNo: z.string().trim().min(1),
   channelTxnId: z.string().trim().min(1),
@@ -261,6 +268,19 @@ petpalRouter.post('/orders/:id/review', asyncHandler(async (req, res) => {
   const payload = orderReviewSchema.parse(req.body ?? {});
   const order = await petpalService.createOwnerOrderReview(auth.id, String(req.params.id), payload);
   return ok(res, order, 'Order reviewed');
+}));
+
+petpalRouter.get('/orders/:id/complaints', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const complaints = await petpalService.listOwnerOrderComplaints(auth.id, String(req.params.id));
+  return ok(res, complaints, 'Complaint list');
+}));
+
+petpalRouter.post('/orders/:id/complaints', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = orderComplaintSchema.parse(req.body ?? {});
+  const complaint = await petpalService.createOwnerOrderComplaint(auth.id, String(req.params.id), payload);
+  return ok(res, complaint, 'Complaint created');
 }));
 
 petpalRouter.get('/match/caregivers', asyncHandler(async (req, res) => {

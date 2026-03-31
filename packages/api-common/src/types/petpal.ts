@@ -25,11 +25,16 @@ export type OrderTimelineEventType =
   | 'SERVICE_LOGGED'
   | 'CHECKED_OUT'
   | 'COMPLETED'
+  | 'DISPUTED'
   | 'CANCELLED'
   | 'REFUND_APPLIED'
   | 'REFUND_DONE';
 export type OrderOperatorRole = 'OWNER' | 'CAREGIVER' | 'ADMIN' | 'SYSTEM';
 export type ServiceLogType = 'CHECK_IN' | 'FEED' | 'WALK' | 'PLAY' | 'HEALTH' | 'CHECK_OUT' | 'NOTE';
+export type ComplaintTargetRole = 'CAREGIVER' | 'PLATFORM';
+export type ComplaintType = 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
+export type ComplaintStatus = 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
+export type ComplaintActionType = 'OPEN' | 'ASSIGN' | 'INVESTIGATE' | 'CALL_USER' | 'PENALTY' | 'CLOSE';
 
 type AmountValue = number | string;
 
@@ -164,6 +169,31 @@ export interface OrderReviewRecord {
   updatedAt: string;
 }
 
+export interface ComplaintProcessLogRecord {
+  id: string;
+  complaintId: string;
+  actionType: ComplaintActionType;
+  operatorId: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface ComplaintRecord {
+  id: string;
+  orderId: string;
+  complainantId: string;
+  targetRole: ComplaintTargetRole;
+  complaintType: ComplaintType;
+  description: string;
+  evidenceUrls: string[];
+  status: ComplaintStatus;
+  resultSummary: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  processLogs: ComplaintProcessLogRecord[];
+}
+
 export interface OrderRecord {
   id: string;
   orderNo: string;
@@ -225,6 +255,13 @@ export interface CreateOrderReviewPayload {
   tags?: string[];
   content?: string;
   isAnonymous?: boolean;
+}
+
+export interface CreateComplaintPayload {
+  targetRole: ComplaintTargetRole;
+  complaintType: ComplaintType;
+  description: string;
+  evidenceUrls?: string[];
 }
 
 export interface MatchCaregiverQuery {

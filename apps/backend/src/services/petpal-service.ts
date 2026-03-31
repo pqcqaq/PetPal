@@ -285,7 +285,7 @@ const appendOrderTimeline = async (
   client: Prisma.TransactionClient,
   payload: {
     orderId: string;
-    eventType: 'CREATED' | 'ACCEPTED' | 'CHECKED_IN' | 'SERVICE_LOGGED' | 'CHECKED_OUT' | 'COMPLETED' | 'CANCELLED' | 'REFUND_APPLIED' | 'REFUND_DONE';
+    eventType: 'CREATED' | 'ACCEPTED' | 'CHECKED_IN' | 'SERVICE_LOGGED' | 'CHECKED_OUT' | 'COMPLETED' | 'DISPUTED' | 'CANCELLED' | 'REFUND_APPLIED' | 'REFUND_DONE';
     operatorRole: 'OWNER' | 'CAREGIVER' | 'ADMIN' | 'SYSTEM';
     operatorId?: string | null;
     eventPayload?: Prisma.InputJsonValue;
@@ -323,11 +323,59 @@ const appendServiceLog = async (
   }),
 });
 
+const appendComplaintProcessLog = async (
+  client: Prisma.TransactionClient,
+  payload: {
+    complaintId: string;
+    actionType: 'OPEN' | 'ASSIGN' | 'INVESTIGATE' | 'CALL_USER' | 'PENALTY' | 'CLOSE';
+    operatorId?: string | null;
+    note?: string | null;
+  },
+) => client.complaintProcessLog.create({
+  data: withSnowflakeId({
+    complaintId: payload.complaintId,
+    actionType: payload.actionType,
+    operatorId: payload.operatorId ?? null,
+    note: payload.note?.trim() || null,
+  }),
+});
+
 const normalizeReviewTags = (tags?: string[]) => [...new Set(
   (tags ?? [])
     .map((item) => item.trim())
     .filter(Boolean),
 )].slice(0, 8);
+
+const normalizeEvidenceUrls = (urls?: string[]) => [...new Set(
+  (urls ?? [])
+    .map((item) => item.trim())
+    .filter(Boolean),
+)].slice(0, 10);
+
+const complaintInclude = {
+  processLogs: {
+    where: {
+      deleteAt: null,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  },
+} satisfies Prisma.ComplaintInclude;
+
+const loadOrderComplaintsByOrderId = async (
+  client: Prisma.TransactionClient | PrismaClient,
+  orderId: string,
+) => client.complaint.findMany({
+  where: {
+    orderId,
+    deleteAt: null,
+  },
+  include: complaintInclude,
+  orderBy: {
+    createdAt: 'desc',
+  },
+});
 
 const writeCallbackAlertReplayLog = async (input: {
   outboxIds: string[];
@@ -1205,6 +1253,128 @@ export const petpalService = {
       });
 
       return loadOrderDetailById(tx, order.id);
+    });
+  },
+
+  async listOwnerOrderComplaints(ownerId: string, orderId: string) {
+    const order = await prisma.orderMain.findFirst({
+      where: {
+        id: orderId,
+        ownerId,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!order) {
+      throw notFound('Order not found');
+    }
+
+    return loadOrderComplaintsByOrderId(prisma, order.id);
+  },
+
+  async createOwnerOrderComplaint(ownerId: string, orderId: string, payload: {
+    targetRole: 'CAREGIVER' | 'PLATFORM';
+    complaintType: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
+    description: string;
+    evidenceUrls?: string[];
+  }) {
+    return runSerializableTransaction(async (tx) => {
+      const order = await tx.orderMain.findFirst({
+        where: {
+          id: orderId,
+          ownerId,
+          deleteAt: null,
+        },
+        select: {
+          id: true,
+          orderStatus: true,
+        },
+      });
+
+      if (!order) {
+        throw notFound('Order not found');
+      }
+
+      if (!['SERVING', 'COMPLETED', 'PARTIAL_REFUNDED', 'REFUNDED', 'DISPUTED'].includes(order.orderStatus)) {
+        throw badRequest('Only serving or settled orders can create complaints');
+      }
+
+      const activeComplaint = await tx.complaint.findFirst({
+        where: {
+          orderId: order.id,
+          deleteAt: null,
+          status: {
+            in: ['OPEN', 'PROCESSING'],
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (activeComplaint) {
+        throw badRequest('Active complaint already exists for order');
+      }
+
+      const complaint = await tx.complaint.create({
+        data: withSnowflakeId({
+          orderId: order.id,
+          complainantId: ownerId,
+          targetRole: payload.targetRole,
+          complaintType: payload.complaintType,
+          description: payload.description.trim(),
+          evidenceUrls: normalizeEvidenceUrls(payload.evidenceUrls) as Prisma.InputJsonValue,
+          status: 'OPEN',
+        }),
+      });
+
+      await appendComplaintProcessLog(tx, {
+        complaintId: complaint.id,
+        actionType: 'OPEN',
+        operatorId: ownerId,
+        note: '投诉已提交，等待平台处理',
+      });
+
+      if (order.orderStatus !== 'DISPUTED') {
+        await tx.orderMain.update({
+          where: {
+            id: order.id,
+          },
+          data: {
+            orderStatus: 'DISPUTED',
+          },
+        });
+      }
+
+      await appendOrderTimeline(tx, {
+        orderId: order.id,
+        eventType: 'DISPUTED',
+        operatorRole: 'OWNER',
+        operatorId: ownerId,
+        eventPayload: {
+          previousStatus: order.orderStatus,
+          nextStatus: 'DISPUTED',
+          complaintId: complaint.id,
+          complaintType: payload.complaintType,
+          targetRole: payload.targetRole,
+        } as Prisma.InputJsonValue,
+      });
+
+      const created = await tx.complaint.findUnique({
+        where: {
+          id: complaint.id,
+        },
+        include: complaintInclude,
+      });
+
+      if (!created) {
+        throw notFound('Complaint not found');
+      }
+
+      return created;
     });
   },
 

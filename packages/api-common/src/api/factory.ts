@@ -36,6 +36,7 @@ import type {
   UploadPrepareResult,
 } from '../types/files';
 import type {
+  ComplaintRecord,
   CaregiverAuditPayload,
   CaregiverAuditPage,
   CaregiverAuditQuery,
@@ -52,6 +53,7 @@ import type {
   CallbackAuditPage,
   CallbackAuditQuery,
   CallbackAuditStats,
+  CreateComplaintPayload,
   CreateOrderReviewPayload,
   CreatePetPayload,
   CreateServiceLogPayload,
@@ -424,6 +426,16 @@ export const createApiFactory = (options: ClientOptions) => {
         review: (id: string, payload: CreateOrderReviewPayload) =>
           client.request<OrderDetailRecord>({
             url: `/petpal/orders/${id}/review`,
+            method: 'POST',
+            data: payload,
+          }),
+        complaints: (id: string) =>
+          client.request<ComplaintRecord[]>({
+            url: `/petpal/orders/${id}/complaints`,
+          }),
+        createComplaint: (id: string, payload: CreateComplaintPayload) =>
+          client.request<ComplaintRecord>({
+            url: `/petpal/orders/${id}/complaints`,
             method: 'POST',
             data: payload,
           }),

@@ -1076,6 +1076,63 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 59. PetPal 主人投诉发起与进度查看（P1-M3 Slice 32）
+
+**内容**：继续推进 P1-M3 用户反馈能力，补齐主人端投诉发起、投诉进度查看，以及投诉触发订单进入 `DISPUTED` 的主链路。
+
+变更摘要：
+
+- `apps/backend/prisma/enums.prisma`
+  - `OrderTimelineEventType` 新增 `DISPUTED`。
+  - 新增投诉相关枚举：
+    - `ComplaintTargetRole`
+    - `ComplaintType`
+    - `ComplaintStatus`
+    - `ComplaintActionType`
+- `apps/backend/prisma/models/auth.prisma`
+  - `User` 新增投诉人与投诉处理日志反向关系。
+- `apps/backend/prisma/models/petpal.prisma`
+  - `OrderMain` 新增 `complaints` 关系。
+  - 新增 `Complaint` 模型，包含投诉对象、投诉类型、证据链接、状态与结案信息。
+  - 新增 `ComplaintProcessLog` 模型，用于记录投诉处理进度。
+- `apps/backend/prisma/migrations/20260401193000_add_petpal_complaint_tables/migration.sql`
+  - 新增投诉与处理日志表、索引、外键及数据库枚举。
+- `packages/api-common/src/types/petpal.ts`
+  - 新增投诉相关类型与 `CreateComplaintPayload`。
+- `packages/api-common/src/api/factory.ts`
+  - 新增：
+    - `api.petpal.orders.complaints(id)`
+    - `api.petpal.orders.createComplaint(id, payload)`
+- `apps/backend/src/routes/petpal.ts`
+  - 新增：
+    - `GET /api/petpal/orders/:id/complaints`
+    - `POST /api/petpal/orders/:id/complaints`
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增主人投诉查询与创建逻辑。
+  - 投诉创建规则：
+    - 仅订单主人可操作
+    - 仅服务中或已结算订单可投诉
+    - 同一订单仅允许一个活跃投诉
+    - 创建投诉后自动写入首条 `ComplaintProcessLog`
+    - 订单状态推进为 `DISPUTED` 并写入时间线事件
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 履约主路径补充投诉成功、重复投诉失败、投诉列表回读、订单状态与时间线更新断言。
+  - 异常路径补充不允许投诉状态下的 400 断言。
+- `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+  - 主人端订单详情新增投诉与进度区块。
+  - 新增投诉弹窗表单与投诉列表展示。
+  - 新增投诉证据链接展示与投诉进度日志展示。
+  - 时间线新增 `DISPUTED` 事件展示。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。

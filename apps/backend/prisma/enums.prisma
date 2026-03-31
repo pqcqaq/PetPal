@@ -147,6 +147,7 @@ enum OrderTimelineEventType {
   SERVICE_LOGGED
   CHECKED_OUT
   COMPLETED
+  DISPUTED
   CANCELLED
   REFUND_APPLIED
   REFUND_DONE
@@ -193,4 +194,33 @@ enum RefundStatus {
   REJECTED
   SUCCESS
   FAILED
+}
+
+enum ComplaintTargetRole {
+  CAREGIVER
+  PLATFORM
+}
+
+enum ComplaintType {
+  SAFETY
+  FEE
+  SERVICE
+  FRAUD
+  OTHER
+}
+
+enum ComplaintStatus {
+  OPEN
+  PROCESSING
+  RESOLVED
+  REJECTED
+}
+
+enum ComplaintActionType {
+  OPEN
+  ASSIGN
+  INVESTIGATE
+  CALL_USER
+  PENALTY
+  CLOSE
 }

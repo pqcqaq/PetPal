@@ -138,6 +138,7 @@ model OrderMain {
   timelines        OrderTimeline[]
   serviceLogs      ServiceLog[]
   review           Review?
+  complaints       Complaint[]
 
   @@index([ownerId, orderStatus])
   @@index([caregiverId, orderStatus])
@@ -208,6 +209,53 @@ model Review {
   @@index([ownerId, createdAt])
   @@index([caregiverId, createdAt])
   @@index([rating])
+  @@index([deleteAt])
+}
+
+model Complaint {
+  id            String              @id
+  createId      String?
+  updateId      String?
+  orderId       String
+  complainantId String
+  targetRole    ComplaintTargetRole
+  complaintType ComplaintType
+  description   String
+  evidenceUrls  Json?
+  status        ComplaintStatus     @default(OPEN)
+  resultSummary String?
+  closedAt      DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  deleteAt      DateTime?
+  order         OrderMain           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  complainant   User                @relation("PetPalComplaintComplainant", fields: [complainantId], references: [id], onDelete: Cascade)
+  processLogs   ComplaintProcessLog[]
+
+  @@index([orderId, createdAt])
+  @@index([complainantId, status])
+  @@index([status, createdAt])
+  @@index([targetRole, createdAt])
+  @@index([complaintType, createdAt])
+  @@index([deleteAt])
+}
+
+model ComplaintProcessLog {
+  id          String              @id
+  createId    String?
+  updateId    String?
+  complaintId String
+  actionType  ComplaintActionType
+  operatorId  String?
+  note        String?
+  createdAt   DateTime            @default(now())
+  deleteAt    DateTime?
+  complaint   Complaint           @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  operator    User?               @relation("PetPalComplaintOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@index([complaintId, createdAt])
+  @@index([operatorId, createdAt])
+  @@index([actionType, createdAt])
   @@index([deleteAt])
 }
 

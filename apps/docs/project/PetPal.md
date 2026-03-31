@@ -3116,3 +3116,79 @@ gantt
 1. 继续补齐 `complaint` 与处理日志模型，形成“评价后投诉”链路。
 2. 为主人端补退款进度查询与交易记录导出，完成 P1-M3 的售后侧目标。
 3. 评估是否在照料者档案或匹配列表中透出最近评价摘要，而不只显示均分与数量。
+
+### 14.49 2026-04-01（P1-M3 Slice 32）
+
+**概述**：继续推进 P1-M3 用户反馈闭环，本轮补齐“主人发起投诉与查看处理进度”的最小主链路，让订单在发生争议后可以进入 `DISPUTED` 状态并保留处理轨迹。
+
+已完成：
+
+- 投诉模型与迁移：
+  - `apps/backend/prisma/enums.prisma`
+  - `apps/backend/prisma/models/auth.prisma`
+  - `apps/backend/prisma/models/petpal.prisma`
+  - `apps/backend/prisma/migrations/20260401193000_add_petpal_complaint_tables/migration.sql`
+    - 新增投诉相关枚举：
+      - `ComplaintTargetRole`
+      - `ComplaintType`
+      - `ComplaintStatus`
+      - `ComplaintActionType`
+    - 新增 `Complaint` 与 `ComplaintProcessLog` 表。
+    - `OrderTimelineEventType` 扩展 `DISPUTED`，用于沉淀投诉时间线。
+    - `User` 增加投诉人与处理记录的反向关系，便于后续管理端接入。
+- API 契约与后端业务：
+  - `packages/api-common/src/types/petpal.ts`
+  - `packages/api-common/src/api/factory.ts`
+  - `apps/backend/src/routes/petpal.ts`
+  - `apps/backend/src/services/petpal-service.ts`
+    - 新增接口：
+      - `GET /api/petpal/orders/:id/complaints`
+      - `POST /api/petpal/orders/:id/complaints`
+    - 后端规则：
+      - 仅订单主人可查看或发起投诉。
+      - 仅 `SERVING` / `COMPLETED` / `PARTIAL_REFUNDED` / `REFUNDED` / `DISPUTED` 订单允许投诉。
+      - 同一订单同一时刻仅允许存在一个活跃投诉（`OPEN/PROCESSING`）。
+      - 投诉创建后自动追加首条 `ComplaintProcessLog(actionType=OPEN)`。
+      - 订单状态自动推进为 `DISPUTED`，并写入时间线事件。
+- Web 主人端订单详情：
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+    - 新增“投诉与进度”区块，仅在主人视角下展示。
+    - 支持发起投诉弹窗，填写：
+      - 投诉对象
+      - 投诉类型
+      - 投诉说明
+      - 证据链接
+    - 支持展示：
+      - 投诉状态
+      - 投诉描述
+      - 证据链接
+      - 处理进度日志
+    - 订单时间线新增“发起投诉”事件展示，便于与履约、评价、退款串联查看。
+- 定向测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 履约成功路径补充：
+      - 主人提交投诉成功
+      - 重复投诉返回 400
+      - 投诉列表回读成功
+      - 投诉后订单状态变更为 `DISPUTED`
+      - 时间线出现 `DISPUTED` 事件
+    - 异常路径补充：
+      - 未进入可投诉状态前发起投诉返回 400
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+风险与缓解：
+
+- 风险：当前 Web 端证据材料仍以“手工粘贴 URL”为主，尚未补主人侧直接上传体验。
+- 缓解：本轮先把投诉模型、订单状态流转和处理进度链路打通；后续可复用现有附件上传链路，把 `evidenceUrls` 升级为受控上传入口。
+
+下一步（1-3）：
+
+1. 补管理端投诉处理动作与 process log 追加接口，形成真正的“处理进度”闭环。
+2. 为主人端补交易记录导出与退款进度查询，继续完成 P1-M3 售后目标。
+3. 评估投诉证据上传的权限与存储策略，避免长期依赖手工 URL。
