@@ -1302,6 +1302,40 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 63. PetPal Uni 端退款进度摘要同步（P1-M3 Slice 36）
+
+**内容**：继续推进 P1-M3 双端售后体验一致性，本轮将主人端“退款进度摘要”同步到 Uni 端订单详情页，让移动端也能快速判断退款当前所处阶段与剩余可退余额。
+
+变更摘要：
+
+- `apps/app-frontend/src/api/petpal.ts`
+  - 新增 `getOrderRefundProgress(id)`，复用已有 `api.petpal.orders.refundProgress(id)` 共享端点。
+- `apps/app-frontend/src/pages/order-detail/index.vue`
+  - 订单详情加载改为并行请求：
+    - 订单详情
+    - 退款进度摘要
+  - 退款摘要失败时不阻塞主订单详情展示。
+  - 新增“退款进度”区块，展示：
+    - 当前阶段
+    - 阶段说明
+    - 退款申请数
+    - 处理中数量
+    - 已退款数量
+    - 可退余额
+    - 最近一笔退款单号、状态、申请金额、申请/审核时间、退款原因
+  - 补齐移动端时间线枚举缺口，新增 `DISPUTED` 的文案与状态样式映射，避免类型检查失败。
+
+验证结果：
+
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 已确认退款摘要走独立请求并做失败隔离，不会因为售后摘要加载异常导致订单详情整页不可用。
+- 已确认 Uni 端复用既有 owner 范围接口，不引入新的权限放宽路径。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。

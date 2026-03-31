@@ -9,6 +9,8 @@ type _LocationUrl =
   "/pages/auth/register" |
   "/pages/me/me" |
   "/pages/me/profile" |
+  "/pages/order-detail/index" |
+  "/pages/petpal/index" |
   "/pages/settings/index";
 
 interface NavigateToOptions {

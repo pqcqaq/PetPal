@@ -54,10 +54,11 @@
       }
     },
     {
-      "path": "pages/settings/index",
+      "path": "pages/order-detail/index",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "应用设置"
+        "navigationBarTitleText": "订单详情",
+        "enablePullDownRefresh": true
       }
     },
     {
@@ -69,11 +70,10 @@
       }
     },
     {
-      "path": "pages/order-detail/index",
+      "path": "pages/settings/index",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "订单详情",
-        "enablePullDownRefresh": true
+        "navigationBarTitleText": "应用设置"
       }
     }
   ],

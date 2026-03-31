@@ -2,6 +2,7 @@ import type {
   CreatePetPayload,
   CreateServiceRequestPayload,
   MatchCaregiverQuery,
+  OrderRefundProgressRecord,
 } from '@rbac/api-common'
 import { appApi } from './client'
 
@@ -27,6 +28,10 @@ export function listOrders() {
 
 export function getOrderDetail(id: string) {
   return appApi.petpal.orders.detail(id)
+}
+
+export function getOrderRefundProgress(id: string): Promise<OrderRefundProgressRecord> {
+  return appApi.petpal.orders.refundProgress(id)
 }
 
 export function matchCaregivers(query: MatchCaregiverQuery) {
