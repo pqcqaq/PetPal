@@ -1231,6 +1231,8 @@ export const petpalService = {
     filters?: {
       actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
       actorId?: string;
+      startDate?: Date;
+      endDate?: Date;
     },
   ) {
     const take = Math.min(200, Math.max(1, limit));
@@ -1240,6 +1242,10 @@ export const petpalService = {
         callbackOutboxId,
         actionType: filters?.actionType,
         actorId: filters?.actorId,
+        createdAt: {
+          gte: filters?.startDate,
+          lte: filters?.endDate,
+        },
       },
       orderBy: {
         createdAt: 'desc',

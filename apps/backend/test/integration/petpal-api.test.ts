@@ -841,6 +841,15 @@ describe('PetPal API integration', () => {
     assert.ok(filteredReplayLogs.body.data.length >= 1);
     assert.ok(filteredReplayLogs.body.data.every((item: any) => item.actionType === 'REQUEUE_DEAD_BATCH'));
     assert.ok(filteredReplayLogs.body.data.every((item: any) => item.actorId === adminSession.user.id));
+
+    const futureReplayLogs = await request(app)
+      .get(`/api/petpal/admin/callback-alert-outbox/${outboxId}/replay-logs`)
+      .query({ startDate: '2099-01-01T00:00:00.000Z', endDate: '2099-12-31T23:59:59.999Z' })
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(Array.isArray(futureReplayLogs.body.data));
+    assert.equal(futureReplayLogs.body.data.length, 0);
   });
 
   it('rejects tampered active role context and allows valid scoped role context', async () => {

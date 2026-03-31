@@ -288,4 +288,6 @@ export interface CallbackAlertReplayLogQuery {
   limit?: number;
   actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
   actorId?: string;
+  startDate?: string;
+  endDate?: string;
 }

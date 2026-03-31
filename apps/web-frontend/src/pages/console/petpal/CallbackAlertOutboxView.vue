@@ -120,6 +120,15 @@
           clearable
           style="width: 220px"
         />
+        <el-date-picker
+          v-model="replayFilter.range"
+          type="datetimerange"
+          range-separator="至"
+          start-placeholder="开始时间"
+          end-placeholder="结束时间"
+          value-format="YYYY-MM-DDTHH:mm:ss.SSS[Z]"
+          style="width: 360px"
+        />
         <el-button @click="reloadReplayLogs">筛选</el-button>
       </el-space>
       <el-table :data="replayLogs" v-loading="replayLoading" border>
@@ -178,6 +187,7 @@ const currentReplayOutboxId = ref<string>('');
 const replayFilter = ref<{
   actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
   actorId?: string;
+  range?: [string, string] | [];
 }>({});
 const processingTimeoutMinutes = 10;
 const statsData = ref<CallbackAlertOutboxStats>({
@@ -304,6 +314,8 @@ const reloadReplayLogs = async () => {
       limit: 50,
       actionType: replayFilter.value.actionType,
       actorId: replayFilter.value.actorId?.trim() || undefined,
+      startDate: replayFilter.value.range?.[0],
+      endDate: replayFilter.value.range?.[1],
     });
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '加载重放记录失败'));

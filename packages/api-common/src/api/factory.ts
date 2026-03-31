@@ -449,6 +449,8 @@ export const createApiFactory = (options: ClientOptions) => {
               limit: query.limit ?? 50,
               actionType: query.actionType,
               actorId: query.actorId,
+              startDate: query.startDate,
+              endDate: query.endDate,
             },
           }),
         retryDeadCallbackAlertOutbox: (limit?: number) =>

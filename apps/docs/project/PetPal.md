@@ -2039,3 +2039,36 @@ gantt
 
 - replay logs 过滤维度保持最小必要集（动作、操作人），避免查询复杂度过度增长。
 - API 方法签名改为 query 对象，后续扩展时间范围筛选时不破坏调用方。
+
+### 14.29 2026-04-01（P1 Slice 13）
+
+**概述**：为 replay log 增加时间范围筛选，支持按时间窗快速定位重放操作。
+
+已完成：
+
+- 路由与服务层：
+  - `apps/backend/src/routes/petpal.ts`
+    - replay logs 查询参数新增 `startDate`、`endDate`。
+  - `apps/backend/src/services/petpal-service.ts`
+    - replay logs 查询新增 `createdAt` 时间范围过滤。
+- 共享契约与 API 工厂：
+  - `packages/api-common/src/types/petpal.ts` 扩展 replay log query 类型。
+  - `packages/api-common/src/api/factory.ts` 透传 `startDate/endDate`。
+- 前端：
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+    - 抽屉新增“时间范围”筛选控件。
+    - 筛选请求包含时间窗参数。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts` 增加未来时间窗返回空结果断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- 时间范围采用 ISO 字符串在前后端传递，降低时区格式差异导致的解析歧义。
+- 筛选维度保持“动作 + 操作人 + 时间窗”组合，优先服务排障场景。
