@@ -4,7 +4,7 @@ import { tabBar } from './src/tabbar/config'
 export default defineUniPages({
   globalStyle: {
     navigationStyle: 'custom',
-    navigationBarTitleText: '权限管理',
+    navigationBarTitleText: '宠托帮 PetPal',
     navigationBarBackgroundColor: '#f7f7f8',
     navigationBarTextStyle: 'black',
     backgroundColor: '#f5f6f7',

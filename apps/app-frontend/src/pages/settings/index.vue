@@ -21,7 +21,7 @@ import { getErrorMessage } from '@/utils/error'
 
 definePage({
   style: {
-    navigationBarTitleText: '应用设置',
+    navigationBarTitleText: 'PetPal 设置',
   },
 })
 
@@ -36,37 +36,37 @@ const draft = reactive<UserAppPreferences>({
 })
 
 const themeModeOptions = [
-  { label: '跟随系统', value: 'auto', description: '根据系统深浅色切换' },
-  { label: '浅色', value: 'light', description: '适合明亮环境' },
-  { label: '深色', value: 'dark', description: '降低夜间视觉刺激' },
+  { label: '跟随系统', value: 'auto', description: '根据系统深浅色切换 PetPal 界面' },
+  { label: '浅色', value: 'light', description: '适合白天和强光环境' },
+  { label: '深色', value: 'dark', description: '适合夜间和低亮环境' },
 ]
 
 const themePresetOptions = [
-  { label: '石墨', value: 'graphite', description: '低饱和中性色' },
-  { label: '海洋', value: 'ocean', description: '蓝青色强调' },
-  { label: '森林', value: 'forest', description: '绿色强调' },
-  { label: '落日', value: 'sunset', description: '橙暖色强调' },
+  { label: '石墨', value: 'graphite', description: '稳重中性色，适合后台感工作流' },
+  { label: '海洋', value: 'ocean', description: '清爽蓝青，适合信息阅读' },
+  { label: '森林', value: 'forest', description: '偏服务行业的自然绿' },
+  { label: '落日', value: 'sunset', description: '更鲜明的暖色强调' },
 ]
 
 const surfaceOptions = [
-  { label: '柔和', value: 'soft', description: '轻微层次和阴影' },
-  { label: '实体', value: 'solid', description: '更实心的卡片背景' },
-  { label: '玻璃', value: 'glass', description: '半透明表面风格' },
+  { label: '柔和卡片', value: 'soft', description: '轻微层次与阴影' },
+  { label: '实心卡片', value: 'solid', description: '信息块更沉稳、更直给' },
+  { label: '玻璃卡片', value: 'glass', description: '适合更轻盈的视觉层次' },
 ]
 
 const densityOptions = [
-  { label: '舒适', value: 'comfortable', description: '默认间距和字号' },
-  { label: '紧凑', value: 'compact', description: '提高信息密度' },
+  { label: '舒适', value: 'comfortable', description: '信息节奏更从容' },
+  { label: '紧凑', value: 'compact', description: '一屏展示更多订单与档案信息' },
 ]
 
 const tabbarOptions = [
-  { label: '悬浮', value: 'floating', description: '圆角悬浮底栏' },
-  { label: '贴边', value: 'solid', description: '紧贴底部边界' },
+  { label: '悬浮底栏', value: 'floating', description: '更轻、更贴近移动端产品气质' },
+  { label: '贴边底栏', value: 'solid', description: '更稳定、更像传统业务工具' },
 ]
 
 const portalLayoutOptions = [
-  { label: '概览模式', value: 'overview', description: '展示完整模块卡片' },
-  { label: '聚焦模式', value: 'focus', description: '聚焦关键数据和入口' },
+  { label: '概览看板', value: 'overview', description: '首页展示完整业务概览与推荐信息' },
+  { label: '聚焦办事', value: 'focus', description: '首页优先展示关键动作与少量核心信息' },
 ]
 
 const hasChanges = computed(() => {
@@ -82,8 +82,9 @@ const hasChanges = computed(() => {
 })
 
 const previewSummary = computed(() => {
-  const motionText = draft.motionEnabled ? '开' : '关'
-  return `${draft.themePresetId} · ${draft.themeMode} · ${draft.density} · 动效 ${motionText}`
+  const motionText = draft.motionEnabled ? '动效开' : '动效关'
+  const homeLayout = draft.portalLayout === 'focus' ? '聚焦办事' : '概览看板'
+  return `${draft.themePresetId} · ${draft.themeMode} · ${homeLayout} · ${motionText}`
 })
 
 function hydrateDraft() {
@@ -171,14 +172,14 @@ onShow(() => {
 </script>
 
 <template>
-  <AppPageShell title="应用设置" description="配置主题、布局与交互密度，保存后会同步到账号。">
+  <AppPageShell title="PetPal 设置" description="配置首页布局、主题外观和底栏样式，定制移动端办事体验。">
     <AppSection title="即时预览" :description="previewSummary">
       <view class="settings-preview">
         <view class="settings-preview__chip">
-          portal: {{ draft.portalLayout }}
+          首页：{{ draft.portalLayout === 'focus' ? '聚焦办事' : '概览看板' }}
         </view>
         <view class="settings-preview__chip">
-          tabbar: {{ draft.tabbarStyle }}
+          底栏：{{ draft.tabbarStyle === 'floating' ? '悬浮底栏' : '贴边底栏' }}
         </view>
       </view>
     </AppSection>
@@ -203,7 +204,7 @@ onShow(() => {
       </view>
     </AppSection>
 
-    <AppSection title="界面风格">
+    <AppSection title="卡片风格">
       <view class="settings-choice-wrap">
         <AppChoiceChips
           :model-value="draft.surfaceStyle"
@@ -223,7 +224,7 @@ onShow(() => {
       </view>
     </AppSection>
 
-    <AppSection title="底部导航">
+    <AppSection title="底栏样式">
       <view class="settings-choice-wrap">
         <AppChoiceChips
           :model-value="draft.tabbarStyle"
@@ -233,7 +234,7 @@ onShow(() => {
       </view>
     </AppSection>
 
-    <AppSection title="门户布局">
+    <AppSection title="首页布局">
       <view class="settings-choice-wrap">
         <AppChoiceChips
           :model-value="draft.portalLayout"
@@ -250,7 +251,7 @@ onShow(() => {
             页面动效
           </view>
           <view class="settings-toggle-row__desc">
-            关闭后将降低动画时长，适合性能敏感场景。
+            关闭后会减少 PetPal 首页切换、卡片进入和过渡动画。
           </view>
         </view>
         <switch
@@ -266,7 +267,7 @@ onShow(() => {
         恢复默认
       </AppButton>
       <AppButton block size="large" :loading="saving" :disabled="!hasChanges" @click="savePreferences">
-        保存并同步
+        保存到账号
       </AppButton>
     </view>
   </AppPageShell>

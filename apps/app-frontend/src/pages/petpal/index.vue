@@ -33,7 +33,7 @@ defineOptions({
 
 definePage({
   style: {
-    navigationBarTitleText: '宠托帮',
+    navigationBarTitleText: 'PetPal 服务台',
     enablePullDownRefresh: true,
   },
 })
@@ -192,7 +192,7 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <AppPageShell title="宠托帮" description="宠物档案、照料需求、照料者匹配和订单一体化。">
+  <AppPageShell title="PetPal 服务台" description="发布需求、维护宠物档案、匹配照料者并持续跟进订单。">
     <AppSection title="数据状态">
       <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loadingText || '数据已同步'" />
     </AppSection>

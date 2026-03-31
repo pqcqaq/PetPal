@@ -1302,6 +1302,64 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 85. App 端首页与账号页改为 PetPal 产品工作台（P1-M3 Slice 58）
+
+**内容**：响应“app 端不能继续保留 RBAC 模板式门户”的方向，本轮直接替换 Uni 端首页、我的页和设置页实现，把移动端主入口重构为 PetPal 产品工作台。
+
+变更摘要：
+
+- `apps/app-frontend/src/pages/index/index.vue`
+  - 移除原先基于 `dashboard.summary` 的 RBAC 门户概览。
+  - 首页改为直接拉取 PetPal 业务数据：
+    - 宠物档案
+    - 服务需求
+    - 订单列表
+    - 照料者匹配
+  - 重构为 PetPal 首页结构：
+    - 同步状态
+    - 今日概览
+    - 快捷操作
+    - 宠物档案预览
+    - 近期需求
+    - 订单跟进
+    - 推荐照料者
+  - 首页描述和统计完全围绕宠物、需求、订单与售后组织，不再出现角色分布、模块覆盖、审计动态等模板式数据。
+- `apps/app-frontend/src/pages/me/me.vue`
+  - “我的”页改为“我的 PetPal”。
+  - 新增账户与业务合并视图：
+    - 宠物档案数
+    - 服务需求数
+    - 进行中订单数
+    - 售后关注数
+  - 常用入口改为服务台、个人资料、PetPal 设置和返回首页，减少原模板式“个人信息/应用设置”单一账户导向。
+- `apps/app-frontend/src/pages/settings/index.vue`
+  - “应用设置”改为“PetPal 设置”。
+  - 保留现有主题、密度、底栏和首页布局能力，但整体文案改为 PetPal 产品语境：
+    - 首页布局
+    - 底栏样式
+    - 卡片风格
+    - 页面动效
+- 品牌与导航语义同步调整：
+  - `apps/app-frontend/pages.config.ts`
+  - `apps/app-frontend/src/pages.json`
+  - `apps/app-frontend/src/tabbar/config.ts`
+  - `apps/app-frontend/src/pages/petpal/index.vue`
+  - 全局标题改为 `宠托帮 PetPal`。
+  - 首页 tabbar 文案改为“工作台”。
+  - 服务台页面标题改为 `PetPal 服务台`。
+
+验证结果：
+
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 已确认首页主数据源全部切换为 PetPal 业务接口，不再混入 RBAC dashboard 汇总，移动端主入口已经完成产品语义替换。
+- 已确认“我的”页仍保留账号状态、角色与权限数量展示，但仅作为账户状态辅助信息，不再主导页面结构和首屏内容。
+- 已确认本轮仅重构移动端页面与导航语义，没有改动 PetPal 接口契约和后端逻辑，因此不会引入双端协议不一致问题。
+
+Git commit：待本切片提交。
+
 ## 84. PetPal 后台改为根级直达入口（P1-M3 Slice 57）
 
 **内容**：响应“PetPal 不应继续依赖模板式菜单后台”的方向，本轮把核心 PetPal 后台能力从 `/console` 菜单树路径中剥离出来，新增根级 `/petpal-admin/*` 直达工作台。

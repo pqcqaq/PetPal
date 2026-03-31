@@ -1,7 +1,7 @@
 {
   "globalStyle": {
     "navigationStyle": "custom",
-    "navigationBarTitleText": "权限管理",
+    "navigationBarTitleText": "宠托帮 PetPal",
     "navigationBarBackgroundColor": "#f7f7f8",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f5f6f7"
@@ -19,7 +19,7 @@
       "path": "pages/index/index",
       "type": "home",
       "style": {
-        "navigationBarTitleText": "首页",
+        "navigationBarTitleText": "PetPal",
         "enablePullDownRefresh": true
       }
     },
@@ -43,7 +43,7 @@
       "path": "pages/me/me",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "我的"
+        "navigationBarTitleText": "我的 PetPal"
       }
     },
     {
@@ -65,7 +65,7 @@
       "path": "pages/petpal/index",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "宠托帮",
+        "navigationBarTitleText": "PetPal 服务台",
         "enablePullDownRefresh": true
       }
     },
@@ -73,7 +73,7 @@
       "path": "pages/settings/index",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "应用设置"
+        "navigationBarTitleText": "PetPal 设置"
       }
     }
   ],
@@ -94,7 +94,7 @@
         "iconPath": "static/tabbar/home.png",
         "selectedIconPath": "static/tabbar/homeHL.png",
         "pagePath": "pages/index/index",
-        "text": "首页"
+        "text": "工作台"
       },
       {
         "iconPath": "static/tabbar/personal.png",

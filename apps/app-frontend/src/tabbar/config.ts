@@ -14,7 +14,7 @@ export const nativeTabbarList: NativeTabBarItem[] = [
     iconPath: 'static/tabbar/home.png',
     selectedIconPath: 'static/tabbar/homeHL.png',
     pagePath: 'pages/index/index',
-    text: '首页',
+    text: '工作台',
   },
   {
     iconPath: 'static/tabbar/personal.png',
@@ -26,7 +26,7 @@ export const nativeTabbarList: NativeTabBarItem[] = [
 
 export const customTabbarList: CustomTabBarItem[] = [
   {
-    text: '首页',
+    text: '工作台',
     pagePath: 'pages/index/index',
     iconType: 'unocss',
     icon: 'i-carbon-home',
