@@ -129,7 +129,7 @@
           value-format="YYYY-MM-DDTHH:mm:ss.SSS[Z]"
           style="width: 360px"
         />
-        <el-button @click="reloadReplayLogs">筛选</el-button>
+        <el-button @click="applyReplayFilters">筛选</el-button>
       </el-space>
       <el-table :data="replayLogs" v-loading="replayLoading" border>
         <el-table-column prop="createdAt" label="时间" min-width="170" />
@@ -141,6 +141,16 @@
           <template #default="{ row }">{{ row.note || '-' }}</template>
         </el-table-column>
       </el-table>
+      <div class="table-footer">
+        <el-pagination
+          background
+          layout="total, prev, pager, next"
+          :current-page="replayPage"
+          :page-size="replayPageSize"
+          :total="replayTotal"
+          @current-change="changeReplayPage"
+        />
+      </div>
     </el-drawer>
   </PageScaffold>
 </template>
@@ -149,6 +159,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import type {
+  CallbackAlertReplayLogPage,
   CallbackAlertReplayLogRecord,
   CallbackAlertOutboxPage,
   CallbackAlertOutboxRecord,
@@ -183,6 +194,9 @@ const loading = ref(false);
 const replayLoading = ref(false);
 const replayDrawerVisible = ref(false);
 const replayLogs = ref<CallbackAlertReplayLogRecord[]>([]);
+const replayPage = ref(1);
+const replayPageSize = 10;
+const replayTotal = ref(0);
 const currentReplayOutboxId = ref<string>('');
 const replayFilter = ref<{
   actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
@@ -298,7 +312,18 @@ const retryRow = async (id: string) => {
 const openReplayLogs = async (row: CallbackAlertOutboxRecord) => {
   currentReplayOutboxId.value = row.id;
   replayFilter.value = {};
+  replayPage.value = 1;
   replayDrawerVisible.value = true;
+  await reloadReplayLogs();
+};
+
+const applyReplayFilters = async () => {
+  replayPage.value = 1;
+  await reloadReplayLogs();
+};
+
+const changeReplayPage = async (value: number) => {
+  replayPage.value = value;
   await reloadReplayLogs();
 };
 
@@ -310,13 +335,17 @@ const reloadReplayLogs = async () => {
 
   replayLoading.value = true;
   try {
-    replayLogs.value = await api.petpal.admin.callbackAlertOutboxReplayLogs(currentReplayOutboxId.value, {
-      limit: 50,
+    const replayPageData = await api.petpal.admin.callbackAlertOutboxReplayLogs(currentReplayOutboxId.value, {
+      page: replayPage.value,
+      pageSize: replayPageSize,
       actionType: replayFilter.value.actionType,
       actorId: replayFilter.value.actorId?.trim() || undefined,
       startDate: replayFilter.value.range?.[0],
       endDate: replayFilter.value.range?.[1],
     });
+    const data = replayPageData as CallbackAlertReplayLogPage;
+    replayLogs.value = data.items;
+    replayTotal.value = data.pagination.total;
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '加载重放记录失败'));
   } finally {

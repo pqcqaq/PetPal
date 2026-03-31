@@ -57,7 +57,8 @@ const callbackAlertOutboxRetryDeadSchema = z.object({
 });
 
 const callbackAlertOutboxReplayLogQuerySchema = z.object({
-  limit: z.coerce.number().int().positive().max(200).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(100).optional(),
   actionType: z.enum(['REQUEUE', 'REQUEUE_DEAD_BATCH']).optional(),
   actorId: z.string().trim().min(1).max(64).optional(),
   startDate: z.coerce.date().optional(),
@@ -242,8 +243,13 @@ petpalRouter.get('/admin/callback-alert-outbox/stats', requirePermission('petpal
 }));
 
 petpalRouter.get('/admin/callback-alert-outbox/:id/replay-logs', requirePermission('petpal.callback-alert.read'), asyncHandler(async (req, res) => {
-  const query = callbackAlertOutboxReplayLogQuerySchema.parse(req.query ?? {});
-  const result = await petpalService.listCallbackAlertReplayLogs(String(req.params.id), query.limit ?? 50, {
+  const { page, pageSize } = parsePagination(req.query);
+  const query = callbackAlertOutboxReplayLogQuerySchema.parse({
+    ...req.query,
+    page,
+    pageSize,
+  });
+  const result = await petpalService.listCallbackAlertReplayLogs(String(req.params.id), query.page, query.pageSize, {
     actionType: query.actionType,
     actorId: query.actorId,
     startDate: query.startDate,

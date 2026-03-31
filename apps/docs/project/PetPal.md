@@ -2072,3 +2072,37 @@ gantt
 
 - 时间范围采用 ISO 字符串在前后端传递，降低时区格式差异导致的解析歧义。
 - 筛选维度保持“动作 + 操作人 + 时间窗”组合，优先服务排障场景。
+
+### 14.30 2026-04-01（P1 Slice 14）
+
+**概述**：将 replay log 查询升级为标准分页响应（items + pagination），前端抽屉支持翻页巡检。
+
+已完成：
+
+- 路由与服务层：
+  - `apps/backend/src/routes/petpal.ts`
+    - replay logs 查询采用 `page/pageSize` 参数。
+  - `apps/backend/src/services/petpal-service.ts`
+    - `listCallbackAlertReplayLogs` 返回分页结构。
+    - 统计总数并按页返回记录。
+- 共享契约与 API 工厂：
+  - `packages/api-common/src/types/petpal.ts` 新增 `CallbackAlertReplayLogPage`。
+  - `packages/api-common/src/api/factory.ts` replay logs 返回类型改为分页对象。
+- 前端：
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+    - 重放记录抽屉新增分页组件。
+    - 筛选动作改为重置页码并按页查询。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts` 断言更新为分页响应结构。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- replay logs 统一采用与 outbox 列表一致的分页响应格式，降低前端维护成本。
+- 单页大小限制 100，兼顾巡检效率与查询开销。

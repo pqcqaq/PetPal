@@ -802,9 +802,10 @@ describe('PetPal API integration', () => {
       .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
       .expect(200);
 
-    assert.ok(Array.isArray(replayLogsAfterSingleRetry.body.data));
-    assert.equal(replayLogsAfterSingleRetry.body.data[0].actionType, 'REQUEUE');
-    assert.ok(typeof replayLogsAfterSingleRetry.body.data[0].actorId === 'string');
+    assert.ok(Array.isArray(replayLogsAfterSingleRetry.body.data.items));
+    assert.ok(typeof replayLogsAfterSingleRetry.body.data.pagination.total === 'number');
+    assert.equal(replayLogsAfterSingleRetry.body.data.items[0].actionType, 'REQUEUE');
+    assert.ok(typeof replayLogsAfterSingleRetry.body.data.items[0].actorId === 'string');
 
     await prisma.callbackAlertOutbox.update({
       where: { id: outboxId },
@@ -828,7 +829,7 @@ describe('PetPal API integration', () => {
       .expect(200);
 
     assert.ok(
-      replayLogsAfterBatchRetry.body.data.some((item: any) => item.actionType === 'REQUEUE_DEAD_BATCH'),
+      replayLogsAfterBatchRetry.body.data.items.some((item: any) => item.actionType === 'REQUEUE_DEAD_BATCH'),
     );
 
     const filteredReplayLogs = await request(app)
@@ -837,10 +838,10 @@ describe('PetPal API integration', () => {
       .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
       .expect(200);
 
-    assert.ok(Array.isArray(filteredReplayLogs.body.data));
-    assert.ok(filteredReplayLogs.body.data.length >= 1);
-    assert.ok(filteredReplayLogs.body.data.every((item: any) => item.actionType === 'REQUEUE_DEAD_BATCH'));
-    assert.ok(filteredReplayLogs.body.data.every((item: any) => item.actorId === adminSession.user.id));
+    assert.ok(Array.isArray(filteredReplayLogs.body.data.items));
+    assert.ok(filteredReplayLogs.body.data.items.length >= 1);
+    assert.ok(filteredReplayLogs.body.data.items.every((item: any) => item.actionType === 'REQUEUE_DEAD_BATCH'));
+    assert.ok(filteredReplayLogs.body.data.items.every((item: any) => item.actorId === adminSession.user.id));
 
     const futureReplayLogs = await request(app)
       .get(`/api/petpal/admin/callback-alert-outbox/${outboxId}/replay-logs`)
@@ -848,8 +849,8 @@ describe('PetPal API integration', () => {
       .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
       .expect(200);
 
-    assert.ok(Array.isArray(futureReplayLogs.body.data));
-    assert.equal(futureReplayLogs.body.data.length, 0);
+    assert.ok(Array.isArray(futureReplayLogs.body.data.items));
+    assert.equal(futureReplayLogs.body.data.items.length, 0);
   });
 
   it('rejects tampered active role context and allows valid scoped role context', async () => {

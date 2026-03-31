@@ -285,9 +285,20 @@ export interface CallbackAlertReplayLogRecord {
 }
 
 export interface CallbackAlertReplayLogQuery {
-  limit?: number;
+  page?: number;
+  pageSize?: number;
   actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
   actorId?: string;
   startDate?: string;
   endDate?: string;
+}
+
+export interface CallbackAlertReplayLogPage {
+  items: CallbackAlertReplayLogRecord[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }

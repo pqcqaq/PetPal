@@ -742,6 +742,35 @@ Git commit：`feat(p1): add callback alert replay logs for outbox requeue tracea
 
 Git commit：待本切片提交。
 
+## 40. PetPal replay log 分页查询（P1 Slice 14）
+
+**内容**：将 callback alert outbox replay logs 从列表接口升级为分页接口，支持管理端抽屉翻页巡检。
+
+变更摘要：
+
+- `apps/backend/src/routes/petpal.ts`
+  - replay logs 查询参数改为 `page/pageSize`。
+- `apps/backend/src/services/petpal-service.ts`
+  - replay logs 返回 `items + pagination` 分页结构。
+  - 增加总数统计并支持 skip/take。
+- `packages/api-common/src/types/petpal.ts`
+  - 新增 `CallbackAlertReplayLogPage`，扩展 replay log query 分页字段。
+- `packages/api-common/src/api/factory.ts`
+  - replay logs API 返回类型改为分页对象。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 抽屉新增分页控件与页码切换逻辑。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 回放日志断言更新为分页结构。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+Git commit：待本切片提交。
+
 ## 39. PetPal replay log 时间范围筛选（P1 Slice 13）
 
 **内容**：在 callback alert outbox replay log 查询中新增时间窗过滤能力，支持按时间段定位重放记录。

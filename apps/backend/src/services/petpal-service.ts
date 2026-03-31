@@ -1227,7 +1227,8 @@ export const petpalService = {
 
   async listCallbackAlertReplayLogs(
     callbackOutboxId: string,
-    limit = 50,
+    page = 1,
+    pageSize = 10,
     filters?: {
       actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
       actorId?: string;
@@ -1235,30 +1236,47 @@ export const petpalService = {
       endDate?: Date;
     },
   ) {
-    const take = Math.min(200, Math.max(1, limit));
+    const normalizedPage = Math.max(1, page);
+    const normalizedPageSize = Math.min(100, Math.max(1, pageSize));
+    const skip = (normalizedPage - 1) * normalizedPageSize;
+    const where: Prisma.CallbackAlertReplayLogWhereInput = {
+      callbackOutboxId,
+      actionType: filters?.actionType,
+      actorId: filters?.actorId,
+      createdAt: {
+        gte: filters?.startDate,
+        lte: filters?.endDate,
+      },
+    };
 
-    return prisma.callbackAlertReplayLog.findMany({
-      where: {
-        callbackOutboxId,
-        actionType: filters?.actionType,
-        actorId: filters?.actorId,
-        createdAt: {
-          gte: filters?.startDate,
-          lte: filters?.endDate,
+    const [total, items] = await Promise.all([
+      prisma.callbackAlertReplayLog.count({ where }),
+      prisma.callbackAlertReplayLog.findMany({
+        where,
+        orderBy: {
+          createdAt: 'desc',
         },
+        skip,
+        take: normalizedPageSize,
+        select: {
+          id: true,
+          actionType: true,
+          actorId: true,
+          note: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    return {
+      items,
+      pagination: {
+        page: normalizedPage,
+        pageSize: normalizedPageSize,
+        total,
+        totalPages: Math.ceil(total / normalizedPageSize),
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take,
-      select: {
-        id: true,
-        actionType: true,
-        actorId: true,
-        note: true,
-        createdAt: true,
-      },
-    });
+    };
   },
 };
 
