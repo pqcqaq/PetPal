@@ -257,7 +257,9 @@ export interface OrderRecord {
   refunds: RefundRecordBrief[];
 }
 
-export interface OrderDetailRecord extends OrderRecord {
+export interface OrderDetailRecord extends Omit<OrderRecord, 'payments' | 'refunds'> {
+  payments: PaymentRecordDetail[];
+  refunds: RefundRecordDetail[];
   timeline: OrderTimelineRecord[];
   serviceLogs: ServiceLogRecord[];
   review: OrderReviewRecord | null;

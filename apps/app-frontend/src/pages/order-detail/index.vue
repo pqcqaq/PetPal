@@ -15,7 +15,7 @@ import type {
   ServiceLogType,
 } from '@rbac/api-common'
 import dayjs from 'dayjs'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
 import AppSection from '@/components/app-section/app-section.vue'
 import AppButton from '@/components/app-button/app-button.vue'
@@ -142,6 +142,20 @@ const labels = {
   } as Record<string, string>,
 }
 
+type AftersalesTimelineDotClass = 'warning' | 'primary' | 'success' | 'error' | 'closed'
+
+interface AftersalesTimelineItem {
+  id: string
+  occurredAt: string
+  title: string
+  statusLabel: string
+  statusClass: AftersalesTimelineDotClass
+  referenceLabel: string
+  referenceValue: string
+  note: string | null
+  details: string[]
+}
+
 const formatAmount = (value: unknown) => {
   if (!value) return '0.00'
   return Number(value).toFixed(2)
@@ -210,6 +224,153 @@ const getComplaintStatusClass = (status: ComplaintStatus) => {
 const getComplaintActionLabel = (actionType: ComplaintActionType) => {
   return labels.complaintAction[actionType] || actionType
 }
+
+const getRefundAftersalesClass = (status: string): AftersalesTimelineDotClass => {
+  const classes: Record<string, AftersalesTimelineDotClass> = {
+    PENDING: 'warning',
+    APPROVED: 'primary',
+    REJECTED: 'error',
+    SUCCESS: 'success',
+    FAILED: 'error',
+  }
+  return classes[status] || 'closed'
+}
+
+const getComplaintAftersalesClass = (status: ComplaintStatus): AftersalesTimelineDotClass => {
+  const classes: Record<ComplaintStatus, AftersalesTimelineDotClass> = {
+    OPEN: 'warning',
+    PROCESSING: 'primary',
+    RESOLVED: 'success',
+    REJECTED: 'closed',
+  }
+  return classes[status] || 'closed'
+}
+
+const buildRefundAftersalesItems = (refund: OrderDetailRecord['refunds'][number]) => {
+  const items: AftersalesTimelineItem[] = [
+    {
+      id: `${refund.id}-created`,
+      occurredAt: refund.createdAt,
+      title: '退款申请已提交',
+      statusLabel: '退款申请',
+      statusClass: 'warning',
+      referenceLabel: '退款单号',
+      referenceValue: refund.refundNo,
+      note: `申请退款 ¥${formatAmount(refund.refundAmount)}`,
+      details: [
+        `退款类型：${labels.refundType[refund.refundType] || refund.refundType}`,
+        `当前状态：${labels.refundStatus[refund.refundStatus] || refund.refundStatus}`,
+        `退款原因：${refund.refundReason}`,
+      ],
+    },
+  ]
+
+  if (refund.reviewedAt) {
+    const reviewTitle = refund.refundStatus === 'REJECTED'
+      ? '退款申请已驳回'
+      : refund.refundStatus === 'APPROVED'
+        ? '退款审核已通过'
+        : refund.refundStatus === 'SUCCESS'
+          ? '退款审核已完成'
+          : '退款审核状态已更新'
+
+    items.push({
+      id: `${refund.id}-reviewed`,
+      occurredAt: refund.reviewedAt,
+      title: reviewTitle,
+      statusLabel: labels.refundStatus[refund.refundStatus] || refund.refundStatus,
+      statusClass: getRefundAftersalesClass(refund.refundStatus),
+      referenceLabel: '退款单号',
+      referenceValue: refund.refundNo,
+      note: refund.refundStatus === 'REJECTED'
+        ? '平台已完成审核，本次退款申请未通过。'
+        : '平台已完成退款审核，后续结果会继续同步。',
+      details: [
+        `退款金额：¥${formatAmount(refund.refundAmount)}`,
+        `审核人：${refund.reviewedBy || '平台管理员'}`,
+        `退款类型：${labels.refundType[refund.refundType] || refund.refundType}`,
+      ],
+    })
+  }
+
+  if (
+    ['SUCCESS', 'FAILED'].includes(refund.refundStatus)
+    && refund.updatedAt !== refund.reviewedAt
+    && refund.updatedAt !== refund.createdAt
+  ) {
+    items.push({
+      id: `${refund.id}-settled`,
+      occurredAt: refund.updatedAt,
+      title: refund.refundStatus === 'SUCCESS' ? '退款结果已到账' : '退款处理失败',
+      statusLabel: labels.refundStatus[refund.refundStatus] || refund.refundStatus,
+      statusClass: getRefundAftersalesClass(refund.refundStatus),
+      referenceLabel: '退款单号',
+      referenceValue: refund.refundNo,
+      note: refund.refundStatus === 'SUCCESS'
+        ? `退款金额 ¥${formatAmount(refund.refundAmount)} 已完成处理。`
+        : '退款渠道返回失败结果，建议尽快联系平台核查。',
+      details: [
+        `退款类型：${labels.refundType[refund.refundType] || refund.refundType}`,
+        `退款原因：${refund.refundReason}`,
+      ],
+    })
+  }
+
+  return items
+}
+
+const buildComplaintAftersalesItems = (complaint: ComplaintRecord) => {
+  const items: AftersalesTimelineItem[] = []
+
+  if (!complaint.processLogs.some((log) => log.actionType === 'OPEN')) {
+    items.push({
+      id: `${complaint.id}-created`,
+      occurredAt: complaint.createdAt,
+      title: '投诉已提交',
+      statusLabel: getComplaintStatusLabel(complaint.status),
+      statusClass: getComplaintAftersalesClass(complaint.status),
+      referenceLabel: '投诉类型',
+      referenceValue: getComplaintTypeLabel(complaint.complaintType),
+      note: complaint.description,
+      details: [
+        `投诉对象：${getComplaintTargetRoleLabel(complaint.targetRole)}`,
+        `当前状态：${getComplaintStatusLabel(complaint.status)}`,
+      ],
+    })
+  }
+
+  complaint.processLogs.forEach((log) => {
+    items.push({
+      id: log.id,
+      occurredAt: log.createdAt,
+      title: getComplaintActionLabel(log.actionType),
+      statusLabel: getComplaintStatusLabel(complaint.status),
+      statusClass: getComplaintAftersalesClass(complaint.status),
+      referenceLabel: '投诉类型',
+      referenceValue: getComplaintTypeLabel(complaint.complaintType),
+      note: log.note ?? (log.actionType === 'OPEN' ? complaint.description : null),
+      details: [
+        `投诉对象：${getComplaintTargetRoleLabel(complaint.targetRole)}`,
+        `处理人：${log.operatorNickname || complaint.assignedAdminNickname || '平台处理中'}`,
+        `当前状态：${getComplaintStatusLabel(complaint.status)}`,
+        complaint.resultSummary && log.actionType === 'CLOSE' ? `处理结论：${complaint.resultSummary}` : null,
+      ].filter((detail): detail is string => Boolean(detail)),
+    })
+  })
+
+  return items
+}
+
+const aftersalesTimeline = computed<AftersalesTimelineItem[]>(() => {
+  const refundItems = order.value
+    ? order.value.refunds.flatMap((refund) => buildRefundAftersalesItems(refund))
+    : []
+  const complaintItems = complaints.value.flatMap((complaint) => buildComplaintAftersalesItems(complaint))
+
+  return [...refundItems, ...complaintItems].sort((left, right) => (
+    new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime()
+  ))
+})
 
 const getRecordString = (record: Record<string, unknown> | null | undefined, key: string) => {
   const value = record?.[key]
@@ -621,6 +782,41 @@ onLoad((options: Record<string, any>) => {
           </template>
           <view v-else class="petpal-empty">
             <text>当前暂无投诉记录</text>
+          </view>
+        </AppSection>
+
+        <AppSection :title="aftersalesTimeline.length > 0 ? `售后时间线 (${aftersalesTimeline.length})` : '售后时间线'">
+          <template v-if="aftersalesTimeline.length > 0">
+            <view class="petpal-timeline">
+              <view v-for="item in aftersalesTimeline" :key="item.id" class="petpal-timeline-item">
+                <view class="petpal-timeline-dot" :class="`is-${item.statusClass}`" />
+                <view class="petpal-timeline-content">
+                  <view class="petpal-timeline-header">
+                    <text class="petpal-timeline-title">{{ item.title }}</text>
+                    <text class="petpal-timeline-label">{{ item.statusLabel }}</text>
+                  </view>
+                  <view class="petpal-timeline-meta">
+                    <text class="petpal-timeline-meta-item">
+                      <text class="petpal-timeline-meta-label">时间</text>
+                      <text class="petpal-timeline-meta-value">{{ formatDateTime(item.occurredAt) }}</text>
+                    </text>
+                    <text class="petpal-timeline-meta-item">
+                      <text class="petpal-timeline-meta-label">{{ item.referenceLabel }}</text>
+                      <text class="petpal-timeline-meta-value">{{ item.referenceValue }}</text>
+                    </text>
+                  </view>
+                  <view v-if="item.note" class="petpal-note-card">
+                    <text>{{ item.note }}</text>
+                  </view>
+                  <view v-for="detail in item.details" :key="`${item.id}-${detail}`" class="petpal-detail-line">
+                    <text>{{ detail }}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </template>
+          <view v-else class="petpal-empty">
+            <text>当前暂无退款申请或投诉处理记录</text>
           </view>
         </AppSection>
 

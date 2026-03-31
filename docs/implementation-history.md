@@ -1302,6 +1302,47 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 72. PetPal 主人端统一售后时间线（P1-M3 Slice 45）
+
+**内容**：继续推进 P1-M3 主人端售后透明度，本轮在订单详情中补齐“统一售后时间线”，把退款申请、退款审核、退款结果以及投诉处理日志按时间汇总展示，减少用户在退款进度、投诉卡片和退款记录之间来回比对的成本。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 修正 `OrderDetailRecord` 契约，改为覆盖：
+    - `payments: PaymentRecordDetail[]`
+    - `refunds: RefundRecordDetail[]`
+  - 保证订单详情页可以类型安全地读取退款 `createdAt / updatedAt / reviewedBy / refundReason` 等明细字段。
+- `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+  - 新增主人视角“售后时间线”区块。
+  - 汇总展示：
+    - 退款申请节点
+    - 退款审核节点
+    - 退款结果节点（成功/失败）
+    - 投诉处理日志节点
+  - 同步补充：
+    - 单号 / 投诉类型引用信息
+    - 当前状态标签
+    - 退款原因、投诉描述、处理结论等辅助说明
+  - 对投诉首条 `OPEN` 日志做去重处理，避免“投诉已提交”重复展示两次。
+- `apps/app-frontend/src/pages/order-detail/index.vue`
+  - Uni 端订单详情同步新增“售后时间线”区块，保持双端售后可视化一致。
+  - 复用现有移动端时间线、备注卡与状态圆点样式，不新增额外接口请求。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认本轮仅调整共享详情契约，不影响订单列表等仍使用 `OrderRecord` 简版支付/退款字段的调用方。
+- 已确认投诉时间线对首条 `OPEN` process log 做去重，避免投诉创建节点和自动生成的首条处理日志双重渲染。
+- 已确认售后时间线继续复用现有 owner 侧详情数据加载路径，不新增权限放宽或额外后端暴露面。
+
+Git commit：待本切片提交。
+
 ## 71. PetPal 投诉工单批量结案（P1-M3 Slice 44）
 
 **内容**：继续推进 P1-M3 管理端纠纷处理效率，本轮为投诉管理补充真正的批量结案能力，支持运营对多条已核实工单统一填写结案结果与结论，减少逐单关闭的重复操作。
