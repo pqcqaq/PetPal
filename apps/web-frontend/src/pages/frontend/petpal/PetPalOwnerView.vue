@@ -210,6 +210,43 @@
               />
             </el-space>
             <el-space wrap>
+              <el-select
+                v-model="selectedOwnerRefundExportTemplateId"
+                clearable
+                placeholder="常用筛选模板"
+                size="small"
+                style="width: 180px"
+              >
+                <el-option
+                  v-for="template in ownerRefundExportTemplates"
+                  :key="template.id"
+                  :label="template.name"
+                  :value="template.id"
+                />
+              </el-select>
+              <el-button
+                plain
+                size="small"
+                :disabled="!selectedOwnerRefundExportTemplateId"
+                @click="applySelectedOwnerRefundExportTemplate"
+              >
+                应用模板
+              </el-button>
+              <el-button
+                plain
+                size="small"
+                @click="saveCurrentOwnerRefundExportTemplate"
+              >
+                保存为模板
+              </el-button>
+              <el-button
+                plain
+                size="small"
+                :disabled="!selectedOwnerRefundExportTemplateId"
+                @click="deleteSelectedOwnerRefundExportTemplate"
+              >
+                删除模板
+              </el-button>
               <el-button
                 plain
                 size="small"
@@ -628,7 +665,7 @@ import type {
   ServiceLogType,
 } from '@rbac/api-common';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '@/api/client';
 import ListExportButton from '@/components/download/ListExportButton.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -805,7 +842,9 @@ const refundExportServiceTypeOptions: Array<{ label: string; value: PetServiceTy
   { label: '上门陪伴', value: 'DOOR_VISIT' },
 ];
 
-const OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY = 'petpal-owner-refund-export-filters-v1';
+const OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY = 'petpal-owner-refund-export-filters-v2';
+const OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY = 'petpal-owner-refund-export-filters-v1';
+const OWNER_REFUND_EXPORT_TEMPLATE_LIMIT = 5;
 
 type OwnerRefundExportFilterSnapshot = {
   ownerUserId: string;
@@ -819,6 +858,23 @@ type OwnerRefundExportFilterSnapshot = {
   orderNoKeyword: string;
 };
 
+type OwnerRefundExportFilterTemplate = {
+  id: string;
+  name: string;
+  snapshot: OwnerRefundExportFilterSnapshot;
+  updatedAt: string;
+};
+
+type OwnerRefundExportFilterStorageEntry = {
+  lastUsed: OwnerRefundExportFilterSnapshot | null;
+  templates: OwnerRefundExportFilterTemplate[];
+};
+
+type OwnerRefundExportFilterStorage = {
+  version: 2;
+  users: Record<string, OwnerRefundExportFilterStorageEntry>;
+};
+
 const ownerRefundExportDateRange = ref<[Date, Date] | null>(null);
 const ownerRefundExportType = ref<RefundType | ''>('');
 const ownerRefundExportStatus = ref<RefundStatus | ''>('');
@@ -828,6 +884,8 @@ const ownerRefundExportComplaintTargetRole = ref<ComplaintTargetRole | ''>('');
 const ownerRefundExportServiceType = ref<PetServiceType | ''>('');
 const ownerRefundExportOrderNoKeyword = ref('');
 const hasStoredOwnerRefundExportFilters = ref(false);
+const ownerRefundExportTemplates = ref<OwnerRefundExportFilterTemplate[]>([]);
+const selectedOwnerRefundExportTemplateId = ref('');
 
 const toDayBoundaryIsoString = (value: Date, boundary: 'start' | 'end') => {
   const next = new Date(value);
@@ -849,6 +907,16 @@ const resetOwnerRefundExportFilters = () => {
   ownerRefundExportServiceType.value = '';
   ownerRefundExportOrderNoKeyword.value = '';
 };
+
+const createEmptyOwnerRefundExportFilterStorageEntry = (): OwnerRefundExportFilterStorageEntry => ({
+  lastUsed: null,
+  templates: [],
+});
+
+const createEmptyOwnerRefundExportFilterStorage = (): OwnerRefundExportFilterStorage => ({
+  version: 2,
+  users: {},
+});
 
 const buildOwnerRefundExportFilterSnapshot = (): OwnerRefundExportFilterSnapshot | null => {
   const ownerUserId = auth.user?.id;
@@ -874,68 +942,153 @@ const buildOwnerRefundExportFilterSnapshot = (): OwnerRefundExportFilterSnapshot
   };
 };
 
-const readStoredOwnerRefundExportFilterSnapshot = (): OwnerRefundExportFilterSnapshot | null => {
-  if (typeof window === 'undefined') {
+const normalizeOwnerRefundExportDateRange = (value: unknown): [string, string] | null => {
+  if (!Array.isArray(value) || value.length !== 2) {
     return null;
   }
+
+  const [start, end] = value;
+  return typeof start === 'string' && typeof end === 'string' ? [start, end] : null;
+};
+
+const normalizeOwnerRefundExportFilterSnapshot = (
+  value: Partial<OwnerRefundExportFilterSnapshot>,
+): OwnerRefundExportFilterSnapshot | null => {
+  if (typeof value.ownerUserId !== 'string' || value.ownerUserId.length === 0) {
+    return null;
+  }
+
+  return {
+    ownerUserId: value.ownerUserId,
+    dateRange: normalizeOwnerRefundExportDateRange(value.dateRange),
+    refundType: value.refundType === 'FULL' || value.refundType === 'PARTIAL' ? value.refundType : '',
+    refundStatus: value.refundStatus === 'PENDING'
+      || value.refundStatus === 'APPROVED'
+      || value.refundStatus === 'REJECTED'
+      || value.refundStatus === 'SUCCESS'
+      || value.refundStatus === 'FAILED'
+      ? value.refundStatus
+      : '',
+    complaintStatus: value.complaintStatus === 'OPEN'
+      || value.complaintStatus === 'PROCESSING'
+      || value.complaintStatus === 'RESOLVED'
+      || value.complaintStatus === 'REJECTED'
+      ? value.complaintStatus
+      : '',
+    complaintType: value.complaintType === 'SAFETY'
+      || value.complaintType === 'FEE'
+      || value.complaintType === 'SERVICE'
+      || value.complaintType === 'FRAUD'
+      || value.complaintType === 'OTHER'
+      ? value.complaintType
+      : '',
+    complaintTargetRole: value.complaintTargetRole === 'CAREGIVER' || value.complaintTargetRole === 'PLATFORM'
+      ? value.complaintTargetRole
+      : '',
+    serviceType: value.serviceType === 'BOARDING'
+      || value.serviceType === 'WALKING'
+      || value.serviceType === 'FEEDING'
+      || value.serviceType === 'DOOR_VISIT'
+      ? value.serviceType
+      : '',
+    orderNoKeyword: typeof value.orderNoKeyword === 'string' ? value.orderNoKeyword.trim() : '',
+  };
+};
+
+const normalizeOwnerRefundExportFilterTemplate = (
+  value: Partial<OwnerRefundExportFilterTemplate>,
+): OwnerRefundExportFilterTemplate | null => {
+  const snapshot = normalizeOwnerRefundExportFilterSnapshot(value.snapshot ?? {});
+  const name = typeof value.name === 'string' ? value.name.trim() : '';
+  if (!snapshot || typeof value.id !== 'string' || value.id.length === 0 || name.length === 0) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    name: name.slice(0, 20),
+    snapshot,
+    updatedAt: typeof value.updatedAt === 'string' && value.updatedAt.length > 0
+      ? value.updatedAt
+      : new Date().toISOString(),
+  };
+};
+
+const readStoredOwnerRefundExportFilterStorage = (): OwnerRefundExportFilterStorage => {
+  if (typeof window === 'undefined') {
+    return createEmptyOwnerRefundExportFilterStorage();
+  }
+
+  const normalizeStorage = (value: unknown): OwnerRefundExportFilterStorage => {
+    if (!value || typeof value !== 'object' || !('users' in value) || typeof value.users !== 'object' || !value.users) {
+      return createEmptyOwnerRefundExportFilterStorage();
+    }
+
+    const parsedUsers = value.users as Record<string, Partial<OwnerRefundExportFilterStorageEntry>>;
+    const users = Object.fromEntries(
+      Object.entries(parsedUsers).map(([ownerUserId, entry]) => {
+        const lastUsed = normalizeOwnerRefundExportFilterSnapshot(entry.lastUsed ?? {});
+        const templates = Array.isArray(entry.templates)
+          ? entry.templates
+            .map(item => normalizeOwnerRefundExportFilterTemplate(item as Partial<OwnerRefundExportFilterTemplate>))
+            .filter((item): item is OwnerRefundExportFilterTemplate => Boolean(item))
+          : [];
+
+        return [
+          ownerUserId,
+          {
+            lastUsed,
+            templates,
+          } satisfies OwnerRefundExportFilterStorageEntry,
+        ];
+      }),
+    );
+
+    return {
+      version: 2,
+      users,
+    };
+  };
 
   try {
     const raw = window.localStorage.getItem(OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY);
-    if (!raw) {
-      return null;
+    if (raw) {
+      return normalizeStorage(JSON.parse(raw));
     }
 
-    const parsed = JSON.parse(raw) as Partial<OwnerRefundExportFilterSnapshot>;
-    if (typeof parsed.ownerUserId !== 'string' || parsed.ownerUserId.length === 0) {
-      return null;
+    const legacyRaw = window.localStorage.getItem(OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY);
+    if (!legacyRaw) {
+      return createEmptyOwnerRefundExportFilterStorage();
     }
 
-    const normalizeDateRange = () => {
-      if (!Array.isArray(parsed.dateRange) || parsed.dateRange.length !== 2) {
-        return null;
-      }
-      const [start, end] = parsed.dateRange;
-      return typeof start === 'string' && typeof end === 'string' ? [start, end] as [string, string] : null;
-    };
+    const legacySnapshot = normalizeOwnerRefundExportFilterSnapshot(
+      JSON.parse(legacyRaw) as Partial<OwnerRefundExportFilterSnapshot>,
+    );
+    if (!legacySnapshot) {
+      return createEmptyOwnerRefundExportFilterStorage();
+    }
 
     return {
-      ownerUserId: parsed.ownerUserId,
-      dateRange: normalizeDateRange(),
-      refundType: parsed.refundType === 'FULL' || parsed.refundType === 'PARTIAL' ? parsed.refundType : '',
-      refundStatus: parsed.refundStatus === 'PENDING'
-        || parsed.refundStatus === 'APPROVED'
-        || parsed.refundStatus === 'REJECTED'
-        || parsed.refundStatus === 'SUCCESS'
-        || parsed.refundStatus === 'FAILED'
-        ? parsed.refundStatus
-        : '',
-      complaintStatus: parsed.complaintStatus === 'OPEN'
-        || parsed.complaintStatus === 'PROCESSING'
-        || parsed.complaintStatus === 'RESOLVED'
-        || parsed.complaintStatus === 'REJECTED'
-        ? parsed.complaintStatus
-        : '',
-      complaintType: parsed.complaintType === 'SAFETY'
-        || parsed.complaintType === 'FEE'
-        || parsed.complaintType === 'SERVICE'
-        || parsed.complaintType === 'FRAUD'
-        || parsed.complaintType === 'OTHER'
-        ? parsed.complaintType
-        : '',
-      complaintTargetRole: parsed.complaintTargetRole === 'CAREGIVER' || parsed.complaintTargetRole === 'PLATFORM'
-        ? parsed.complaintTargetRole
-        : '',
-      serviceType: parsed.serviceType === 'BOARDING'
-        || parsed.serviceType === 'WALKING'
-        || parsed.serviceType === 'FEEDING'
-        || parsed.serviceType === 'DOOR_VISIT'
-        ? parsed.serviceType
-        : '',
-      orderNoKeyword: typeof parsed.orderNoKeyword === 'string' ? parsed.orderNoKeyword.trim() : '',
+      version: 2,
+      users: {
+        [legacySnapshot.ownerUserId]: {
+          lastUsed: legacySnapshot,
+          templates: [],
+        },
+      },
     };
   } catch {
-    return null;
+    return createEmptyOwnerRefundExportFilterStorage();
   }
+};
+
+const writeStoredOwnerRefundExportFilterStorage = (storage: OwnerRefundExportFilterStorage) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY, JSON.stringify(storage));
+  window.localStorage.removeItem(OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY);
 };
 
 const applyOwnerRefundExportFilterSnapshot = (snapshot: OwnerRefundExportFilterSnapshot) => {
@@ -951,47 +1104,172 @@ const applyOwnerRefundExportFilterSnapshot = (snapshot: OwnerRefundExportFilterS
   ownerRefundExportOrderNoKeyword.value = snapshot.orderNoKeyword;
 };
 
-const refreshStoredOwnerRefundExportFilterAvailability = () => {
-  const snapshot = readStoredOwnerRefundExportFilterSnapshot();
-  hasStoredOwnerRefundExportFilters.value = Boolean(snapshot && snapshot.ownerUserId === auth.user?.id);
-  return snapshot;
+const syncOwnerRefundExportFilterState = () => {
+  const ownerUserId = auth.user?.id;
+  if (!ownerUserId) {
+    hasStoredOwnerRefundExportFilters.value = false;
+    ownerRefundExportTemplates.value = [];
+    selectedOwnerRefundExportTemplateId.value = '';
+    return createEmptyOwnerRefundExportFilterStorageEntry();
+  }
+
+  const storage = readStoredOwnerRefundExportFilterStorage();
+  const entry = storage.users[ownerUserId] ?? createEmptyOwnerRefundExportFilterStorageEntry();
+  hasStoredOwnerRefundExportFilters.value = Boolean(entry.lastUsed);
+  ownerRefundExportTemplates.value = [...entry.templates].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  if (!ownerRefundExportTemplates.value.some(item => item.id === selectedOwnerRefundExportTemplateId.value)) {
+    selectedOwnerRefundExportTemplateId.value = '';
+  }
+  return entry;
+};
+
+const updateCurrentOwnerRefundExportFilterStorage = (
+  updater: (entry: OwnerRefundExportFilterStorageEntry) => OwnerRefundExportFilterStorageEntry,
+) => {
+  const ownerUserId = auth.user?.id;
+  if (!ownerUserId) {
+    return null;
+  }
+
+  const storage = readStoredOwnerRefundExportFilterStorage();
+  const currentEntry = storage.users[ownerUserId] ?? createEmptyOwnerRefundExportFilterStorageEntry();
+  const nextEntry = updater({
+    lastUsed: currentEntry.lastUsed,
+    templates: [...currentEntry.templates],
+  });
+  storage.users[ownerUserId] = nextEntry;
+  writeStoredOwnerRefundExportFilterStorage(storage);
+  syncOwnerRefundExportFilterState();
+  return nextEntry;
 };
 
 const persistOwnerRefundExportFilters = () => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
   const snapshot = buildOwnerRefundExportFilterSnapshot();
   if (!snapshot) {
     return;
   }
 
-  window.localStorage.setItem(OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY, JSON.stringify(snapshot));
-  hasStoredOwnerRefundExportFilters.value = true;
+  updateCurrentOwnerRefundExportFilterStorage(entry => ({
+    ...entry,
+    lastUsed: snapshot,
+  }));
 };
 
 const restoreStoredOwnerRefundExportFilters = () => {
-  const snapshot = refreshStoredOwnerRefundExportFilterAvailability();
-  if (!snapshot || snapshot.ownerUserId !== auth.user?.id) {
+  const entry = syncOwnerRefundExportFilterState();
+  if (!entry.lastUsed) {
     ElMessage.info('暂无可恢复的上次退款导出筛选');
     return;
   }
 
-  applyOwnerRefundExportFilterSnapshot(snapshot);
+  applyOwnerRefundExportFilterSnapshot(entry.lastUsed);
   ElMessage.success('已恢复上次退款导出筛选');
 };
 
 const clearOwnerRefundExportFilters = () => {
   resetOwnerRefundExportFilters();
-  if (typeof window !== 'undefined') {
-    const snapshot = readStoredOwnerRefundExportFilterSnapshot();
-    if (snapshot?.ownerUserId === auth.user?.id) {
-      window.localStorage.removeItem(OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY);
-    }
-  }
-  hasStoredOwnerRefundExportFilters.value = false;
+  updateCurrentOwnerRefundExportFilterStorage(entry => ({
+    ...entry,
+    lastUsed: null,
+  }));
   ElMessage.success('已清空退款导出筛选');
+};
+
+const findSelectedOwnerRefundExportTemplate = () => ownerRefundExportTemplates.value
+  .find(item => item.id === selectedOwnerRefundExportTemplateId.value) ?? null;
+
+const applySelectedOwnerRefundExportTemplate = () => {
+  const template = findSelectedOwnerRefundExportTemplate();
+  if (!template) {
+    ElMessage.info('请先选择要应用的常用模板');
+    return;
+  }
+
+  applyOwnerRefundExportFilterSnapshot(template.snapshot);
+  ElMessage.success(`已应用模板：${template.name}`);
+};
+
+const saveCurrentOwnerRefundExportTemplate = async () => {
+  const snapshot = buildOwnerRefundExportFilterSnapshot();
+  if (!snapshot) {
+    ElMessage.info('登录后才可保存常用筛选模板');
+    return;
+  }
+
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '输入模板名称，便于后续快速复用当前退款导出筛选',
+      '保存常用筛选模板',
+      {
+        inputPlaceholder: '例如：平台责任退款',
+        inputValidator: (inputValue) => {
+          const name = inputValue.trim();
+          if (!name) {
+            return '模板名称不能为空';
+          }
+          if (name.length > 20) {
+            return '模板名称最多 20 个字符';
+          }
+          return true;
+        },
+      },
+    );
+
+    const templateName = value.trim();
+    const existingTemplate = ownerRefundExportTemplates.value.find(item => item.name === templateName) ?? null;
+    if (!existingTemplate && ownerRefundExportTemplates.value.length >= OWNER_REFUND_EXPORT_TEMPLATE_LIMIT) {
+      ElMessage.warning(`最多保存 ${OWNER_REFUND_EXPORT_TEMPLATE_LIMIT} 个常用模板，请先删除旧模板`);
+      return;
+    }
+
+    const nextTemplate: OwnerRefundExportFilterTemplate = {
+      id: existingTemplate?.id ?? `refund-template-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      name: templateName,
+      snapshot,
+      updatedAt: new Date().toISOString(),
+    };
+
+    updateCurrentOwnerRefundExportFilterStorage(entry => ({
+      ...entry,
+      templates: existingTemplate
+        ? entry.templates.map(item => (item.id === existingTemplate.id ? nextTemplate : item))
+        : [nextTemplate, ...entry.templates],
+    }));
+    selectedOwnerRefundExportTemplateId.value = nextTemplate.id;
+    ElMessage.success(existingTemplate ? `已更新模板：${templateName}` : `已保存模板：${templateName}`);
+  } catch (error: unknown) {
+    if (error === 'cancel' || error === 'close') {
+      return;
+    }
+    throw error;
+  }
+};
+
+const deleteSelectedOwnerRefundExportTemplate = async () => {
+  const template = findSelectedOwnerRefundExportTemplate();
+  if (!template) {
+    ElMessage.info('请先选择要删除的常用模板');
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(`确认删除模板“${template.name}”吗？`, '删除常用筛选模板', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    });
+    updateCurrentOwnerRefundExportFilterStorage(entry => ({
+      ...entry,
+      templates: entry.templates.filter(item => item.id !== template.id),
+    }));
+    selectedOwnerRefundExportTemplateId.value = '';
+    ElMessage.success(`已删除模板：${template.name}`);
+  } catch (error: unknown) {
+    if (error === 'cancel' || error === 'close') {
+      return;
+    }
+    throw error;
+  }
 };
 
 const buildOwnerTransactionExportRequest = () => api.petpal.orders.exportTransactions();
@@ -1376,21 +1654,19 @@ const reloadAll = async () => {
 };
 
 watch(() => auth.user?.id, (ownerUserId) => {
-  const snapshot = refreshStoredOwnerRefundExportFilterAvailability();
-  if (ownerUserId && snapshot?.ownerUserId === ownerUserId) {
-    applyOwnerRefundExportFilterSnapshot(snapshot);
+  const entry = syncOwnerRefundExportFilterState();
+  if (ownerUserId && entry.lastUsed) {
+    applyOwnerRefundExportFilterSnapshot(entry.lastUsed);
     return;
   }
 
-  if (!ownerUserId) {
-    hasStoredOwnerRefundExportFilters.value = false;
-  }
+  resetOwnerRefundExportFilters();
 });
 
 onMounted(async () => {
-  const snapshot = refreshStoredOwnerRefundExportFilterAvailability();
-  if (snapshot && snapshot.ownerUserId === auth.user?.id) {
-    applyOwnerRefundExportFilterSnapshot(snapshot);
+  const entry = syncOwnerRefundExportFilterState();
+  if (entry.lastUsed && entry.lastUsed.ownerUserId === auth.user?.id) {
+    applyOwnerRefundExportFilterSnapshot(entry.lastUsed);
   }
   await reloadAll();
 });
