@@ -3875,6 +3875,56 @@ gantt
 2. 继续把 `/petpal-admin` 首页往业务指挥台推进，补更直接的治理摘要和待办提醒。
 3. 继续排查移动端与 Web 端残留的 RBAC 模板语言，确保 PetPal 作为主产品而非附属模块呈现。
 
+### 14.79 2026-04-01（P1-M3 Slice 62）
+
+**概述**：继续清理 Web 公开面中的模板式措辞，本轮把 404、OAuth 授权页和主人端媒体上传提示统一改为 PetPal 产品入口语义，并同步收口公开首页中的内部实现表述。
+
+已完成：
+
+- `apps/web-frontend/src/pages/frontend/not-found/NotFoundView.vue`
+  - 404 页不再提示“进入控制台”。
+  - 未登录用户主按钮改为进入 `/petpal` 主人服务台；已登录用户主按钮改为返回 `/petpal-admin`。
+- `apps/web-frontend/src/pages/frontend/oauth/OAuthAuthorizeView.vue`
+  - 加载态提示改为“准备应用信息与本次授权内容”。
+  - 应用描述从“账号信息和授权范围”改为“PetPal 账号资料与本次授权内容”。
+  - 授权清单标题改为“本次授权内容”。
+- `apps/web-frontend/src/pages/frontend/oauth/OAuthAuthorizeErrorView.vue`
+  - 错误页主按钮按登录态动态切换：
+    - 已登录：返回主人服务台
+    - 未登录：前往登录
+  - 错误说明统一改为“返回发起接入的业务应用后重新发起授权”。
+- `apps/web-frontend/src/pages/frontend/frontend-content.ts`
+  - 公开页能力卡、架构层和原则说明中的内部术语同步收口：
+    - `按权限显示` -> `按账号已开通能力显示`
+    - `权限校验` -> `访问控制`
+    - `RBAC 介绍` -> `通用框架介绍`
+- `apps/web-frontend/src/pages/frontend/architecture/ArchitectureView.vue`
+  - 首屏说明改为强调后台入口已改成根级直达。
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 服务记录媒体上传提示不再直接暴露 `file.upload` 权限码。
+  - 媒体上传失败提示改为产品化能力提示。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认 OAuth 授权页和错误页没有改动会话获取、决策提交和错误跳转逻辑，仅调整了用户可见文案与目标入口。
+- 已确认 404 页未引入新的受保护入口，未登录用户只会被导向公开的主人服务台。
+- 已确认主人端媒体上传仍沿用原有能力判定逻辑，只去掉了直接面对用户的权限码暴露。
+
+风险与缓解：
+
+- 风险：OAuth 页面仍保留标准 `OAuth` 术语和 scope 列表结构，后续如要进一步做业务化包装，需要保证不影响协议理解和第三方接入定位。
+- 缓解：本轮只收口用户可见描述，不更改字段结构和协议流程；后续如需再包装，可继续保持底层数据结构不变。
+
+下一步（1-3）：
+
+1. 继续把 `/petpal-admin` 首页做成更直接的业务治理指挥台，而不是仅做入口聚合。
+2. 继续排查 Web 与 App 端残留的技术术语提示，特别是错误态、空态和上传提示。
+3. 继续把 PetPal 后台常用工作流从旧 `console/petpal` 语义中抽离，逐步弱化模板目录痕迹。
+
 ### 14.77 2026-04-01（P1-M3 Slice 60）
 
 **概述**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

@@ -23,7 +23,7 @@ export const capabilityCards = [
     title: '后台直达治理',
     eyebrow: 'Admin Flow',
     description: 'PetPal 后台从模板菜单里剥离出来，投诉、审核和回调治理可直接进入。',
-    bullets: ['根级 `/petpal-admin/*` 直达工作区', '按权限显示投诉、审核、回调审计和告警队列'],
+    bullets: ['根级 `/petpal-admin/*` 直达工作区', '按账号已开通能力显示投诉、审核、回调审计和告警队列'],
   },
   {
     title: '履约与售后留痕',
@@ -62,7 +62,7 @@ export const architectureLayers = [
   {
     title: 'PetPal 后台',
     summary: '承载投诉治理、照料者审核、回调审计与告警队列。',
-    details: ['根级 `/petpal-admin/*` 路由不再依赖菜单树', '继续保留原有权限校验和工作区复用能力'],
+    details: ['根级 `/petpal-admin/*` 路由不再依赖菜单树', '继续保留访问控制和工作区复用能力'],
   },
   {
     title: '认证与偏好同步',
@@ -72,8 +72,8 @@ export const architectureLayers = [
 ] as const;
 
 export const operatingPrinciples = [
-  '公开页只承载产品说明、主人端入口和后台直达入口，不再展示模板式 RBAC 介绍。',
-  '主人服务台聚焦宠物、需求、订单和售后，不混入菜单、角色、审计等底层模板信息。',
+  '公开页只承载产品说明、主人端入口和后台直达入口，不再展示通用框架介绍。',
+  '主人服务台聚焦宠物、需求、订单和售后，不混入菜单树、权限配置等后台实现细节。',
   '后台入口聚焦投诉、审核和回调治理，路径直达，不要求先进入菜单树。',
   '关键履约、退款和投诉动作都要有留痕、可导出、可复核。',
 ] as const;

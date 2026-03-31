@@ -595,7 +595,7 @@
               </div>
             </template>
             <p v-else class="petpal-service-log-dialog__hint is-warning">
-              当前账号未满足服务记录媒体上传条件，需要照料者档案审核通过或具备 `file.upload` 权限，仍可提交纯文字服务记录。
+              当前账号暂未开通服务记录媒体上传能力，可先提交纯文字服务记录；如需补充图片或视频，请先完成照料者审核或联系管理员开通。
             </p>
 
             <ul v-if="serviceLogForm.files.length > 0" class="petpal-service-log-dialog__file-list">
@@ -1518,7 +1518,7 @@ const submitCaregiverServiceLog = async () => {
   }
 
   if (serviceLogForm.files.length > 0 && !canUploadServiceLogMedia.value) {
-    ElMessage.warning('当前账号没有文件上传权限，请移除媒体后再提交');
+    ElMessage.warning('当前账号暂未开通媒体上传能力，请移除图片或视频后再提交');
     return;
   }
 

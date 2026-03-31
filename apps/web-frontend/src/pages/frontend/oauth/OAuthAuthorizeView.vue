@@ -3,7 +3,7 @@
     <section v-if="loading" class="frontend-card oauth-authorize-page__status">
       <p class="frontend-card__eyebrow">OAuth 授权</p>
       <h2>正在加载授权信息</h2>
-      <p>请稍候，系统正在准备应用与权限范围。</p>
+      <p>请稍候，系统正在准备应用信息与本次授权内容。</p>
     </section>
 
     <section v-else-if="loadError" class="frontend-card oauth-authorize-page__status is-error">
@@ -20,7 +20,7 @@
         <p class="frontend-page__eyebrow">第三方应用申请访问</p>
         <h1>{{ session.application.name }}</h1>
         <p>
-          {{ session.application.description || '该应用正在请求访问你的账号信息和授权范围。' }}
+          {{ session.application.description || '该应用正在请求访问你的 PetPal 账号资料与本次授权内容。' }}
         </p>
       </section>
 
@@ -31,7 +31,7 @@
       </section>
 
       <section class="frontend-card oauth-authorize-page__card">
-        <p class="frontend-card__eyebrow">授权范围</p>
+        <p class="frontend-card__eyebrow">本次授权内容</p>
         <ul class="oauth-authorize-page__scope-list">
           <li v-for="scope in session.scopes" :key="scope.code" class="oauth-authorize-page__scope-item">
             <strong>{{ scope.name }}</strong>
@@ -41,7 +41,7 @@
       </section>
 
       <section class="frontend-card oauth-authorize-page__actions-panel">
-        <p>你可以拒绝或同意，系统会返回到发起授权的应用。</p>
+        <p>你可以拒绝或同意，系统会返回到发起本次接入的业务应用。</p>
         <div class="oauth-authorize-page__actions">
           <button
             class="frontend-page__button is-secondary"

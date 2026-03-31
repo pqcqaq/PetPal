@@ -7,14 +7,14 @@
 
       <div class="frontend-page__hero-actions">
         <RouterLink class="frontend-page__button is-secondary" to="/">回到首页</RouterLink>
-        <RouterLink class="frontend-page__button is-primary" to="/login">前往登录</RouterLink>
+        <RouterLink class="frontend-page__button is-primary" :to="nextTarget">{{ nextLabel }}</RouterLink>
       </div>
     </section>
 
     <section class="frontend-card oauth-authorize-error-page__card">
       <p class="frontend-card__eyebrow">错误信息</p>
       <h3>{{ displayError }}</h3>
-      <p>如需继续，请从业务应用重新发起 OAuth 授权流程。</p>
+      <p>如需继续，请返回发起接入的业务应用后重新发起授权。</p>
     </section>
   </div>
 </template>
@@ -22,8 +22,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
+const auth = useAuthStore();
 
 const displayError = computed(() => {
   const value = typeof route.query.error === 'string' ? route.query.error.trim() : '';
@@ -34,8 +36,11 @@ const displayDescription = computed(() => {
   const value = typeof route.query.error_description === 'string'
     ? route.query.error_description.trim()
     : '';
-  return value || '授权流程未成功完成。';
+  return value || '本次接入授权未成功完成。';
 });
+
+const nextTarget = computed(() => auth.isAuthenticated ? '/petpal' : '/login');
+const nextLabel = computed(() => auth.isAuthenticated ? '返回主人服务台' : '前往登录');
 </script>
 
 <style scoped lang="scss">
