@@ -652,4 +652,31 @@ Git commit：`feat(p1): support batch retry for dead callback alert outbox recor
 - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（9/9）。
 
 Git commit：`feat(p1): harden petpal callback transactions with serializable isolation and retry`。
+
+## 34. PetPal activeRole 越权防护（P1 Slice 8）
+
+**内容**：将 activeRole 校验下沉到后端，阻断角色上下文伪造导致的越权访问风险。
+
+变更摘要：
+
+- `apps/backend/src/middlewares/auth.ts`
+  - 新增 `x-active-role-id` 解析。
+  - local/oAuth 鉴权链路都透传 activeRoleId 到用户上下文构建逻辑。
+- `apps/backend/src/utils/rbac.ts`
+  - `buildCurrentUser` 支持 `activeRoleId` 参数。
+  - activeRole 必须属于当前用户，否则拒绝。
+  - activeRole 有效时权限集合按角色收敛。
+  - 返回用户上下文增加 `activeRole`。
+- `packages/api-common/src/types/auth.ts`
+  - `CurrentUser` 新增 `activeRole` 字段。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增 activeRole 篡改与合法角色上下文边界测试。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+Git commit：`feat(p1): enforce server-side active role validation and scoped permissions`。
 - 高增长场景下需要规划审计表分区与归档策略。

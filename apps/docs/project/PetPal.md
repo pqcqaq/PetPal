@@ -1053,7 +1053,7 @@ flowchart TD
 | --- | --- | --- | --- | --- | --- |
 | R-001 | 支付并发回调导致金额聚合竞态 | P0 | 后端 | Mitigated（Serializable+Retry） | Sprint 1 |
 | R-002 | PostGIS 迁移在不同环境不一致 | P0 | 后端/运维 | Open | Sprint 1 |
-| R-003 | activeRole 被篡改导致越权访问 | P0 | 后端 | Open | Sprint 2 |
+| R-003 | activeRole 被篡改导致越权访问 | P0 | 后端 | Mitigated（Server-side Validation） | Sprint 2 |
 | R-004 | Outbox 重试策略导致消息堆积 | P1 | 后端 | Mitigated（MVP） | Sprint 3 |
 | R-005 | 排序策略切换后指标回落 | P2 | 产品/后端 | Open | Sprint 5 |
 
@@ -1858,6 +1858,38 @@ gantt
 
 - 在现有幂等逻辑基础上，优先使用数据库隔离级别抑制并发写覆盖。
 - 对冲突错误做有限重试，兼顾一致性与吞吐，避免无限重试放大压力。
+
+### 14.24 2026-04-01（P1 Slice 8）
+
+**概述**：activeRole 后端强校验上线，防止前端伪造角色上下文越权。
+
+已完成：
+
+- 认证中间件增强（`apps/backend/src/middlewares/auth.ts`）：
+  - 解析请求头 `x-active-role-id`。
+  - local/oAuth 两种认证模式都将 activeRoleId 传入用户构建链路。
+- 用户上下文构建增强（`apps/backend/src/utils/rbac.ts`）：
+  - `buildCurrentUser` 新增可选参数 `activeRoleId`。
+  - 若 activeRoleId 不属于当前用户，直接拒绝请求。
+  - 若 activeRoleId 有效，则权限集合按该角色收敛。
+  - 返回用户信息增加 `activeRole` 字段。
+- 共享契约更新：
+  - `packages/api-common/src/types/auth.ts` 的 `CurrentUser` 增加 `activeRole`。
+- 集成测试补强（`apps/backend/test/integration/petpal-api.test.ts`）：
+  - 覆盖“伪造 super-admin roleId”返回 401。
+  - 覆盖“合法 manager roleId”可访问读接口。
+  - 覆盖合法 manager roleId 下仍不能导出（403）。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- activeRole 信任边界下沉到后端，不接受仅前端声明的角色上下文。
+- 在不破坏历史行为前提下，保留“未传 activeRoleId 时按全量角色计算权限”的兼容路径。
 
 - 回调审计持久化：完成。
 - 管理端审计查询 API：完成。

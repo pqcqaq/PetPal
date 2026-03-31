@@ -810,6 +810,37 @@ describe('PetPal API integration', () => {
     assert.equal(retryDeadResponse.body.data.requested, 20);
   });
 
+  it('rejects tampered active role context and allows valid scoped role context', async () => {
+    const { app, prisma } = context;
+
+    const managerSession = await loginAs(app, 'manager', 'Manager123!');
+    const [superAdminRole, managerRole] = await Promise.all([
+      prisma.role.findUnique({ where: { code: 'super-admin' }, select: { id: true } }),
+      prisma.role.findUnique({ where: { code: 'ops-manager' }, select: { id: true } }),
+    ]);
+
+    assert.ok(superAdminRole);
+    assert.ok(managerRole);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-audits')
+      .set('Authorization', `Bearer ${managerSession.tokens.accessToken}`)
+      .set('x-active-role-id', superAdminRole.id)
+      .expect(401);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-audits')
+      .set('Authorization', `Bearer ${managerSession.tokens.accessToken}`)
+      .set('x-active-role-id', managerRole.id)
+      .expect(200);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-audits/export')
+      .set('Authorization', `Bearer ${managerSession.tokens.accessToken}`)
+      .set('x-active-role-id', managerRole.id)
+      .expect(403);
+  });
+
   it('forbids non-admin users from accessing callback audit admin endpoints', async () => {
     const { app } = context;
 

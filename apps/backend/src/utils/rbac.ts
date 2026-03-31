@@ -3,7 +3,7 @@ import type { Prisma } from '../lib/prisma-generated';
 import { prisma } from '../lib/prisma';
 import { cacheDel, cacheGet, cacheSet } from '../lib/redis';
 import { invalidateRealtimeTopicAccessCache } from '../services/realtime-topic-auth';
-import { notFound } from './errors';
+import { forbidden, notFound } from './errors';
 import { mediaAssetWithOwnerInclude } from './file-records';
 import { toPermissionRecord, toRoleSummary, toUserRecord } from './rbac-records';
 import { normalizeUserPreferences } from './user-preferences';
@@ -60,7 +60,41 @@ export const getUserWithRelations = async (userId: string) => {
   return user;
 };
 
-export const getUserPermissionCodes = async (userId: string) => {
+export const getUserPermissionCodes = async (userId: string, activeRoleId?: string | null) => {
+  if (activeRoleId) {
+    const roleRow = await prisma.userRole.findFirst({
+      where: {
+        userId,
+        roleId: activeRoleId,
+        deleteAt: null,
+      },
+      select: {
+        role: {
+          select: {
+            permissions: {
+              where: {
+                deleteAt: null,
+              },
+              select: {
+                permission: {
+                  select: {
+                    code: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!roleRow) {
+      throw forbidden('Active role is not assigned to current user');
+    }
+
+    return [...new Set(roleRow.role.permissions.map((item) => item.permission.code))];
+  }
+
   const cacheKey = `permission-codes:${userId}`;
   const cached = await cacheGet(cacheKey);
   if (cached) {
@@ -81,11 +115,25 @@ export const invalidatePermissionCache = async (userIds: string[]) => {
   ]);
 };
 
-export const buildCurrentUser = async (userId: string) => {
+export const buildCurrentUser = async (
+  userId: string,
+  options: {
+    activeRoleId?: string | null;
+  } = {},
+) => {
   const user = await getUserWithRelations(userId);
+  const activeRole = options.activeRoleId
+    ? user.roles.find((item) => item.roleId === options.activeRoleId)?.role ?? null
+    : null;
+
+  if (options.activeRoleId && !activeRole) {
+    throw forbidden('Active role is not assigned to current user');
+  }
+
   return {
     ...toUserRecord(user),
-    permissions: await getUserPermissionCodes(userId),
+    activeRole: activeRole ? toRoleSummary(activeRole) : null,
+    permissions: await getUserPermissionCodes(userId, options.activeRoleId),
     preferences: normalizeUserPreferences(user.preferences),
   };
 };

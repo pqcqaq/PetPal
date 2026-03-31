@@ -18,6 +18,15 @@ const extractAuthorizationToken = (value?: string | null) =>
     ? value.slice(7)
     : (value ?? null);
 
+const extractActiveRoleId = (value: unknown) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized || null;
+};
+
 export const authMiddleware: RequestHandler = async (req, _res, next) => {
   try {
     const requestClient = req.authClient ?? await authenticateOptionalHeadersClient(req.headers);
@@ -31,6 +40,7 @@ export const authMiddleware: RequestHandler = async (req, _res, next) => {
 
     try {
       const payload = verifyAccessToken(token);
+      const activeRoleId = extractActiveRoleId(req.headers['x-active-role-id']);
       if (payload.type !== 'access') {
         throw unauthorized('Invalid access token');
       }
@@ -38,7 +48,9 @@ export const authMiddleware: RequestHandler = async (req, _res, next) => {
         throw unauthorized('Access token client mismatch');
       }
 
-      const auth = await buildCurrentUser(payload.sub);
+      const auth = await buildCurrentUser(payload.sub, {
+        activeRoleId,
+      });
       if (auth.status !== 'ACTIVE') {
         throw unauthorized('Account disabled');
       }
@@ -50,7 +62,10 @@ export const authMiddleware: RequestHandler = async (req, _res, next) => {
       setRequestActorId(auth.id);
       next();
       return;
-    } catch (_error) {
+    } catch (error) {
+      if (error instanceof HttpError && error.statusCode !== 401) {
+        throw error;
+      }
       // Local JWT verification failed; continue with OAuth access token resolution.
     }
 
@@ -59,7 +74,10 @@ export const authMiddleware: RequestHandler = async (req, _res, next) => {
     }
 
     const oauthContext = await resolveOAuthAccessContext(token);
-    req.auth = oauthContext.user;
+    const oauthActiveRoleId = extractActiveRoleId(req.headers['x-active-role-id']);
+    req.auth = await buildCurrentUser(oauthContext.user.id, {
+      activeRoleId: oauthActiveRoleId,
+    });
     req.authMode = 'oauth';
     req.oauthApplication = {
       id: oauthContext.application.id,

@@ -179,6 +179,7 @@ export interface CurrentUser {
   avatarFile: MediaAssetRecord | null;
   status: UserStatus;
   roles: RoleSummary[];
+  activeRole?: RoleSummary | null;
   permissions: string[];
   preferences: UserPreferences;
 }
