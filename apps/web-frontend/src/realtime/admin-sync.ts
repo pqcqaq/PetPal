@@ -10,10 +10,14 @@ import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menus';
 import { useWorkbenchStore } from '@/stores/workbench';
 import { pinia } from '@/stores';
+import {
+  CONSOLE_NAMESPACE,
+  hasPetPalAdminAccess,
+  PETPAL_ADMIN_NAMESPACE,
+  resolvePreferredAdminEntry,
+} from '@/utils/admin-entry';
 
 const SYNC_DEBOUNCE_MS = 120;
-const CONSOLE_NAMESPACE = '/console';
-const PETPAL_ADMIN_NAMESPACE = '/petpal-admin';
 
 const hasStatus = (error: unknown): error is { status: number } =>
   typeof error === 'object'
@@ -53,21 +57,23 @@ export const installAdminRealtimeSync = (router: Router) => {
       return;
     }
 
+    const preferredAdminEntry = resolvePreferredAdminEntry(auth.permissions, menus.homePath);
+
     if (isConsoleTarget(currentRoute.path)) {
       if (currentRoute.path === CONSOLE_NAMESPACE) {
-        if (menus.homePath !== CONSOLE_NAMESPACE) {
-          await router.replace(menus.homePath);
+        if (preferredAdminEntry !== CONSOLE_NAMESPACE) {
+          await router.replace(preferredAdminEntry);
         }
         return;
       }
 
       if (!menus.hasPagePath(currentRoute.path)) {
-        await router.replace(menus.homePath);
+        await router.replace(preferredAdminEntry);
         return;
       }
 
       if (typeof currentRoute.meta.permission === 'string' && !auth.hasPermission(currentRoute.meta.permission)) {
-        await router.replace(menus.homePath);
+        await router.replace(preferredAdminEntry);
       }
       return;
     }
@@ -76,12 +82,17 @@ export const installAdminRealtimeSync = (router: Router) => {
       return;
     }
 
+    if (!hasPetPalAdminAccess(auth.permissions)) {
+      await router.replace(preferredAdminEntry);
+      return;
+    }
+
     if (currentRoute.path === PETPAL_ADMIN_NAMESPACE) {
       return;
     }
 
     if (typeof currentRoute.meta.permission === 'string' && !auth.hasPermission(currentRoute.meta.permission)) {
-      await router.replace(PETPAL_ADMIN_NAMESPACE);
+      await router.replace(preferredAdminEntry);
     }
   };
 

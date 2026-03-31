@@ -82,6 +82,7 @@ import AuthOAuthProviders from './components/AuthOAuthProviders.vue';
 import AuthRegisterStrategyForm from './components/AuthRegisterStrategyForm.vue';
 import AuthShowcasePanel from './components/AuthShowcasePanel.vue';
 import AuthStrategySelector from './components/AuthStrategySelector.vue';
+import { resolvePreferredAdminEntry } from '@/utils/admin-entry';
 
 type AuthPanelTab = 'login' | 'register';
 
@@ -124,13 +125,6 @@ const authConfig = reactive<AuthStrategyCollection>(createEmptyConfig());
 const loginForms = reactive<Record<string, StrategyFormState>>({});
 const registerForms = reactive<Record<string, StrategyFormState>>({});
 const sendingCodes = reactive<Record<string, boolean>>({});
-const petPalAdminPermissions = [
-  'petpal.complaint.read',
-  'petpal.complaint.manage',
-  'petpal.caregiver.audit',
-  'petpal.callback-audit.read',
-  'petpal.callback-alert.read',
-] as const;
 const capabilityItems = [
   {
     title: '统一入口',
@@ -181,11 +175,7 @@ const syncActiveTab = () => {
   }
 };
 
-const resolvePostAuthTarget = () => (
-  petPalAdminPermissions.some((permission) => auth.hasPermission(permission))
-    ? '/petpal-admin'
-    : '/console'
-);
+const resolvePostAuthTarget = () => resolvePreferredAdminEntry(auth.permissions);
 
 const resolveSafeReturnTo = () => {
   const value = typeof route.query.returnTo === 'string' ? route.query.returnTo : '';

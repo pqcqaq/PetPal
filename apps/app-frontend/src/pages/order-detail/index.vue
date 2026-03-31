@@ -5,6 +5,8 @@ import type {
   ComplaintStatus,
   ComplaintTargetRole,
   ComplaintType,
+  CreateComplaintPayload,
+  CreateOrderReviewPayload,
   OrderDetailRecord,
   OrderOperatorRole,
   OrderRefundProgressRecord,
@@ -15,11 +17,21 @@ import type {
   ServiceLogType,
 } from '@rbac/api-common'
 import dayjs from 'dayjs'
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
+import AppInput from '@/components/app-input/app-input.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
 import AppSection from '@/components/app-section/app-section.vue'
 import AppButton from '@/components/app-button/app-button.vue'
-import { getOrderComplaints, getOrderDetail, getOrderRefundProgress } from '@/api/petpal'
+import AppStatus from '@/components/app-status/app-status.vue'
+import {
+  confirmOrderComplete,
+  createOrderComplaint,
+  getOrderComplaints,
+  getOrderDetail,
+  getOrderRefundProgress,
+  reviewOrder,
+} from '@/api/petpal'
 import { getErrorMessage } from '@/utils/error'
 
 defineOptions({
@@ -155,6 +167,82 @@ interface AftersalesTimelineItem {
   note: string | null
   details: string[]
 }
+
+type YesNoChoice = 'YES' | 'NO'
+
+const reviewSubmitting = ref(false)
+const complaintSubmitting = ref(false)
+const confirmingCompletion = ref(false)
+const reviewExpanded = ref(false)
+const complaintExpanded = ref(false)
+
+const reviewRatingOptions = [
+  { label: '1 分', value: '1', description: '明显不满意' },
+  { label: '2 分', value: '2', description: '仍有较多问题' },
+  { label: '3 分', value: '3', description: '整体合格' },
+  { label: '4 分', value: '4', description: '体验良好' },
+  { label: '5 分', value: '5', description: '愿意继续复购' },
+]
+
+const complaintTargetOptions = [
+  { label: '照料者', value: 'CAREGIVER', description: '针对履约过程和服务质量' },
+  { label: '平台', value: 'PLATFORM', description: '针对平台处理和售后响应' },
+]
+
+const complaintTypeOptions = [
+  { label: '服务质量', value: 'SERVICE', description: '反馈履约质量问题' },
+  { label: '安全问题', value: 'SAFETY', description: '涉及宠物安全和照料风险' },
+  { label: '费用争议', value: 'FEE', description: '针对收费和退款争议' },
+  { label: '欺诈风险', value: 'FRAUD', description: '涉嫌虚假服务或异常收费' },
+  { label: '其他问题', value: 'OTHER', description: '其他需要平台介入的情况' },
+]
+
+const reviewVisibilityOptions = [
+  { label: '实名评价', value: 'NO', description: '展示当前账号昵称' },
+  { label: '匿名评价', value: 'YES', description: '隐藏你的昵称' },
+]
+
+const reviewForm = reactive({
+  rating: '5',
+  tagsText: '准时签到, 沟通顺畅',
+  content: '',
+  isAnonymous: 'NO' as YesNoChoice,
+})
+
+const complaintForm = reactive({
+  targetRole: 'CAREGIVER' as ComplaintTargetRole,
+  complaintType: 'SERVICE' as ComplaintType,
+  description: '',
+  evidenceUrlsText: '',
+})
+
+const activeComplaint = computed(() => complaints.value.find(item => (
+  item.status === 'OPEN' || item.status === 'PROCESSING'
+)) ?? null)
+const canConfirmComplete = computed(() => order.value?.orderStatus === 'SERVING')
+const canCreateReview = computed(() => (
+  Boolean(order.value?.orderStatus === 'COMPLETED' && !order.value?.review)
+))
+const canCreateComplaint = computed(() => Boolean(
+  order.value
+  && ['SERVING', 'COMPLETED', 'PARTIAL_REFUNDED', 'REFUNDED', 'DISPUTED'].includes(order.value.orderStatus)
+  && !activeComplaint.value,
+))
+const ownerActionSummary = computed(() => {
+  if (canConfirmComplete.value) {
+    return '照料服务已在进行中。确认完成前，请先核对服务记录和签到签退时间。'
+  }
+  if (canCreateReview.value) {
+    return '本单已完成且尚未评价。提交评价后会同步影响照料者评分。'
+  }
+  if (activeComplaint.value) {
+    return `当前存在进行中的投诉：${getComplaintStatusLabel(activeComplaint.value.status)}。平台处理进度会在下方持续更新。`
+  }
+  if (order.value?.review) {
+    return '本单评价已经提交，仍可在下方继续查看退款、投诉和履约详情。'
+  }
+  return '这里集中处理完成确认、评价反馈和投诉发起。'
+})
 
 const formatAmount = (value: unknown) => {
   if (!value) return '0.00'
@@ -518,10 +606,10 @@ const openMediaUrl = (mediaUrls: string[], url: string) => {
     return
   }
 
-  // #ifdef H5
-  window.open(url, '_blank', 'noopener,noreferrer')
-  return
-  // #endif
+  if (typeof window !== 'undefined') {
+    window.open(url, '_blank', 'noopener,noreferrer')
+    return
+  }
 
   copyServiceLogMediaUrl(url)
 }
@@ -532,6 +620,123 @@ const openServiceLogMedia = (log: ServiceLogRecord, url: string) => {
 
 const openComplaintEvidence = (evidenceUrls: string[], url: string) => {
   openMediaUrl(evidenceUrls, url)
+}
+
+function resetReviewForm() {
+  reviewForm.rating = '5'
+  reviewForm.tagsText = '准时签到, 沟通顺畅'
+  reviewForm.content = ''
+  reviewForm.isAnonymous = 'NO'
+}
+
+function resetComplaintForm() {
+  complaintForm.targetRole = 'CAREGIVER'
+  complaintForm.complaintType = 'SERVICE'
+  complaintForm.description = ''
+  complaintForm.evidenceUrlsText = ''
+}
+
+async function handleConfirmComplete() {
+  if (!order.value || confirmingCompletion.value) {
+    return
+  }
+
+  const confirmed = await new Promise<boolean>((resolve) => {
+    uni.showModal({
+      title: '确认完成',
+      content: '确认后订单会进入已完成状态，后续可以继续提交评价。',
+      success: (result) => resolve(Boolean(result.confirm)),
+      fail: () => resolve(false),
+    })
+  })
+
+  if (!confirmed) {
+    return
+  }
+
+  confirmingCompletion.value = true
+  try {
+    await confirmOrderComplete(order.value.id)
+    await loadOrderDetail()
+    uni.showToast({ title: '订单已确认完成', icon: 'none' })
+  }
+  catch (err) {
+    uni.showToast({ title: getErrorMessage(err, '确认完成失败'), icon: 'none' })
+  }
+  finally {
+    confirmingCompletion.value = false
+  }
+}
+
+async function submitReview() {
+  if (!order.value) {
+    return
+  }
+
+  const rating = Number(reviewForm.rating)
+  if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+    uni.showToast({ title: '请选择有效评分', icon: 'none' })
+    return
+  }
+
+  reviewSubmitting.value = true
+  try {
+    const payload: CreateOrderReviewPayload = {
+      rating,
+      tags: reviewForm.tagsText
+        .split(/[\n,，]/)
+        .map(item => item.trim())
+        .filter(Boolean),
+      content: reviewForm.content.trim() || undefined,
+      isAnonymous: reviewForm.isAnonymous === 'YES',
+    }
+    order.value = await reviewOrder(order.value.id, payload)
+    reviewExpanded.value = false
+    resetReviewForm()
+    uni.showToast({ title: '评价已提交', icon: 'none' })
+  }
+  catch (err) {
+    uni.showToast({ title: getErrorMessage(err, '提交评价失败'), icon: 'none' })
+  }
+  finally {
+    reviewSubmitting.value = false
+  }
+}
+
+async function submitComplaint() {
+  if (!order.value) {
+    return
+  }
+
+  const description = complaintForm.description.trim()
+  if (description.length < 5) {
+    uni.showToast({ title: '请填写至少 5 个字的投诉说明', icon: 'none' })
+    return
+  }
+
+  complaintSubmitting.value = true
+  try {
+    const payload: CreateComplaintPayload = {
+      targetRole: complaintForm.targetRole,
+      complaintType: complaintForm.complaintType,
+      description,
+      evidenceUrls: complaintForm.evidenceUrlsText
+        .split(/[\n,，]/)
+        .map(item => item.trim())
+        .filter(Boolean),
+    }
+    await createOrderComplaint(order.value.id, payload)
+    complaintExpanded.value = false
+    resetComplaintForm()
+    await loadOrderDetail()
+    uni.showToast({ title: '投诉已提交', icon: 'none' })
+  }
+  catch (err) {
+    uni.showToast({ title: getErrorMessage(err, '提交投诉失败'), icon: 'none' })
+  }
+  finally {
+    complaintSubmitting.value = false
+  }
 }
 
 async function loadOrderDetail() {
@@ -560,6 +765,12 @@ async function loadOrderDetail() {
     complaints.value = complaintsResult.status === 'fulfilled'
       ? complaintsResult.value
       : []
+    if (detail.review) {
+      reviewExpanded.value = false
+    }
+    if (complaints.value.some(item => item.status === 'OPEN' || item.status === 'PROCESSING')) {
+      complaintExpanded.value = false
+    }
   } catch (err) {
     refundProgress.value = null
     complaints.value = []
@@ -587,7 +798,7 @@ function handleGoBack() {
 }
 
 // Uni page lifecycle - receive parameters from navigation
-onLoad((options: Record<string, any>) => {
+onLoad((options: Record<string, string | undefined>) => {
   if (options?.id) {
     orderId.value = options.id
   }
@@ -595,10 +806,142 @@ onLoad((options: Record<string, any>) => {
 </script>
 
 <template>
-  <AppPageShell title="订单详情" :loading="loading" :error="error" @refresh="onPullDownRefresh">
-    <template v-if="order" #default>
-      <div class="petpal-order-container">
-        <!-- 订单基础信息 -->
+  <AppPageShell title="订单详情" description="查看履约、退款、投诉和服务记录。">
+    <template v-if="loading">
+      <AppSection title="同步状态">
+        <AppStatus mode="loading" text="正在加载订单详情" />
+      </AppSection>
+    </template>
+
+    <template v-else-if="order">
+      <view class="petpal-order-container">
+        <AppSection title="订单操作" description="确认完成、提交评价和发起投诉都在这里完成。">
+          <view class="petpal-owner-actions">
+            <view class="petpal-note-card">
+              <text>{{ ownerActionSummary }}</text>
+            </view>
+
+            <view class="petpal-action-grid">
+              <AppButton
+                v-if="canConfirmComplete"
+                :loading="confirmingCompletion"
+                @click="handleConfirmComplete"
+              >
+                确认完成
+              </AppButton>
+              <AppButton
+                v-if="canCreateReview || order.review"
+                type="info"
+                @click="reviewExpanded = !reviewExpanded"
+              >
+                {{ reviewExpanded ? '收起评价' : (order.review ? '查看评价' : '写评价') }}
+              </AppButton>
+              <AppButton
+                v-if="canCreateComplaint || activeComplaint"
+                type="danger"
+                @click="complaintExpanded = !complaintExpanded"
+              >
+                {{ complaintExpanded ? '收起投诉' : (activeComplaint ? '查看投诉进度' : '发起投诉') }}
+              </AppButton>
+            </view>
+
+            <view v-if="order.review && reviewExpanded" class="petpal-action-panel">
+              <view class="petpal-action-panel__header">
+                <text class="petpal-action-panel__title">已提交评价</text>
+                <text class="petpal-action-panel__meta">{{ formatDateTime(order.review.createdAt) }}</text>
+              </view>
+              <view class="petpal-detail-line">
+                <text>评分：{{ order.review.rating }} / 5</text>
+              </view>
+              <view v-if="order.review.tags.length > 0" class="petpal-detail-line">
+                <text>标签：{{ order.review.tags.join('、') }}</text>
+              </view>
+              <view v-if="order.review.content" class="petpal-note-card">
+                <text>{{ order.review.content }}</text>
+              </view>
+              <view class="petpal-detail-line">
+                <text>{{ order.review.isAnonymous ? '当前为匿名评价' : '当前为实名评价' }}</text>
+              </view>
+            </view>
+
+            <view v-else-if="canCreateReview && reviewExpanded" class="petpal-action-panel">
+              <view class="petpal-action-panel__header">
+                <text class="petpal-action-panel__title">提交服务评价</text>
+                <text class="petpal-action-panel__meta">评价会同步影响照料者评分</text>
+              </view>
+              <view class="petpal-form-group">
+                <text class="petpal-form-group__label">服务评分</text>
+                <AppChoiceChips v-model="reviewForm.rating" :options="reviewRatingOptions" />
+              </view>
+              <AppInput v-model="reviewForm.tagsText" label="标签" placeholder="例如：准时签到, 沟通顺畅" />
+              <textarea
+                v-model="reviewForm.content"
+                class="petpal-textarea"
+                :maxlength="240"
+                auto-height
+                placeholder="补充本次照料体验、沟通质量和宠物状态"
+              />
+              <view class="petpal-form-group">
+                <text class="petpal-form-group__label">展示方式</text>
+                <AppChoiceChips v-model="reviewForm.isAnonymous" :options="reviewVisibilityOptions" />
+              </view>
+              <view class="petpal-action-grid">
+                <AppButton type="info" size="medium" @click="reviewExpanded = false">取消</AppButton>
+                <AppButton size="medium" :loading="reviewSubmitting" @click="submitReview">提交评价</AppButton>
+              </view>
+            </view>
+
+            <view v-if="activeComplaint && complaintExpanded" class="petpal-action-panel">
+              <view class="petpal-action-panel__header">
+                <text class="petpal-action-panel__title">进行中的投诉</text>
+                <text class="petpal-action-panel__meta">{{ getComplaintStatusLabel(activeComplaint.status) }}</text>
+              </view>
+              <view class="petpal-note-card">
+                <text>{{ activeComplaint.description }}</text>
+              </view>
+              <view class="petpal-detail-line">
+                <text>投诉对象：{{ getComplaintTargetRoleLabel(activeComplaint.targetRole) }}</text>
+              </view>
+              <view class="petpal-detail-line">
+                <text>投诉类型：{{ getComplaintTypeLabel(activeComplaint.complaintType) }}</text>
+              </view>
+            </view>
+
+            <view v-else-if="canCreateComplaint && complaintExpanded" class="petpal-action-panel">
+              <view class="petpal-action-panel__header">
+                <text class="petpal-action-panel__title">提交投诉</text>
+                <text class="petpal-action-panel__meta">平台会结合证据和履约记录介入处理</text>
+              </view>
+              <view class="petpal-form-group">
+                <text class="petpal-form-group__label">投诉对象</text>
+                <AppChoiceChips v-model="complaintForm.targetRole" :options="complaintTargetOptions" />
+              </view>
+              <view class="petpal-form-group">
+                <text class="petpal-form-group__label">投诉类型</text>
+                <AppChoiceChips v-model="complaintForm.complaintType" :options="complaintTypeOptions" />
+              </view>
+              <textarea
+                v-model="complaintForm.description"
+                class="petpal-textarea"
+                :maxlength="400"
+                auto-height
+                placeholder="详细说明发生的问题、时间点和你期待的平台处理方式"
+              />
+              <textarea
+                v-model="complaintForm.evidenceUrlsText"
+                class="petpal-textarea petpal-textarea--compact"
+                :maxlength="400"
+                auto-height
+                placeholder="可补充证据链接，每行一条或使用逗号分隔"
+              />
+              <view class="petpal-action-grid">
+                <AppButton type="info" size="medium" @click="complaintExpanded = false">取消</AppButton>
+                <AppButton size="medium" type="danger" :loading="complaintSubmitting" @click="submitComplaint">提交投诉</AppButton>
+              </view>
+            </view>
+          </view>
+        </AppSection>
+
         <AppSection title="订单信息">
           <view class="petpal-info-grid">
             <view class="petpal-info-item">
@@ -970,12 +1313,12 @@ onLoad((options: Record<string, any>) => {
         <view class="petpal-order-actions">
           <AppButton type="primary" @click="handleGoBack">返回</AppButton>
         </view>
-      </div>
+      </view>
     </template>
 
-    <template v-else #empty>
+    <template v-else>
       <view class="petpal-empty">
-        <text>订单未找到</text>
+        <text>{{ error || '订单未找到' }}</text>
       </view>
     </template>
   </AppPageShell>
@@ -987,6 +1330,70 @@ onLoad((options: Record<string, any>) => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.petpal-owner-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.petpal-action-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.petpal-action-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e5ebf3;
+  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+}
+
+.petpal-action-panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.petpal-action-panel__title {
+  color: #1f2937;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.petpal-action-panel__meta {
+  color: #667085;
+  font-size: 12px;
+}
+
+.petpal-form-group {
+  display: grid;
+  gap: 8px;
+}
+
+.petpal-form-group__label {
+  color: #667085;
+  font-size: 12px;
+}
+
+.petpal-textarea {
+  width: 100%;
+  min-height: 104px;
+  padding: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #fff;
+  color: #1f2937;
+  line-height: 1.6;
+  box-sizing: border-box;
+}
+
+.petpal-textarea--compact {
+  min-height: 84px;
 }
 
 .petpal-info-grid {

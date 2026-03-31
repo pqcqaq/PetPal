@@ -1718,6 +1718,110 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 101. PetPal 当前实现进度复盘与后续安排（2026-04-01）
+
+**内容**：本节不是新的功能切片，而是一次基于当前代码树的阶段复盘，用来同步“真实已完成能力、仍未完成缺口、下一阶段优先级”，避免实现历史只记录局部切片而缺少整体判断。
+
+阶段结论：
+
+- 项目主线已经明确从通用 RBAC 模板转为 PetPal 真实业务实现，方向没有偏离。
+- 当前整体更接近“后端和 Web 端主流程较强、App 端仍是主要短板”的状态。
+- 按毕业设计“真实可演示、可审计、可测试”的标准估算，整体完成度约为 70%。
+
+当前基线判断：
+
+- 后端约 85%
+  - 主人端宠物、需求、订单、退款、投诉、导出。
+  - 照料者档案、服务、履约动作。
+  - 管理端审核、投诉治理、回调审计、告警 outbox。
+  - PetPal 集成测试覆盖较完整。
+- Web 端约 80%
+  - 主人服务台、订单详情、退款/投诉进度、导出能力已经形成较强闭环。
+  - 根级 `/petpal-admin/*` 已承载投诉、照料者审核、回调审计和告警队列。
+- App 端约 50%
+  - 首页、服务台、我的、订单详情已经 PetPal 化。
+  - 但仍以基础数据展示为主，没有完成“主人工作台 + 照料者工作台 + 售后工作台”的完整重构。
+
+已完成能力摘要：
+
+- 主人端核心链路已经具备：宠物档案、需求发布、匹配、订单、退款/投诉进度。
+- 照料者履约动作已经具备后端和 Web 闭环：接单、签到、服务日志、签退、主人确认完成。
+- 售后与治理能力已经明显超出最小原型：评价、投诉处理、批量分配/结案、退款导出、回调审计和 outbox 值班能力都已存在。
+- 最近几个切片已把 PetPal 后台从 `/console` 菜单依赖中逐步剥离，根级后台入口已经基本成型。
+
+仍未完成的关键缺口：
+
+- App 端没有完全重构成真实可用的 PetPal 主应用。
+- 订单内即时沟通、消息会话、未读态和过程消息回传仍未落地。
+- 健康记录、资质材料、收益分析、规则发布、违规处罚、运营看板仍未形成完整前后端闭环。
+- 最终交付所需的前端定向验证、人工验收脚本、截图图表和答辩材料还未收口。
+
+当前工作区进行中：
+
+- `apps/web-frontend/src/utils/admin-entry.ts`
+- `apps/web-frontend/src/router/index.ts`
+- `apps/web-frontend/src/realtime/admin-sync.ts`
+- `apps/web-frontend/src/layouts/ConsoleLayout.vue`
+- `apps/web-frontend/src/pages/console/auth/LoginView.vue`
+  - 正在统一 PetPal 后台默认落点，目标是让登录完成、路由守卫、实时权限同步和“返回总览”都优先进入 `/petpal-admin`。
+- `apps/app-frontend/src/api/petpal.ts`
+  - 已先扩展照料者履约、评价和投诉相关 API 封装，为下一轮 App 端完整工作流重构做准备。
+
+后续安排：
+
+1. 第一优先级是 App 端完全 PetPal 化，把主人、照料者和售后动作接成一体化工作台。
+2. 第二优先级是补消息、健康记录、资质材料、收益分析和平台治理缺口。
+3. 第三优先级是做定向测试、代码审计、验收脚本、论文素材和答辩材料收口。
+
+## 102. PetPal App 双工作台与后台默认落点收口（P2-M1 Slice 74）
+
+**内容**：完成一轮面向真实可用性的 PetPal 大迭代，重点收口 Web 根级后台默认落点逻辑，并把移动端 `PetPal` 页面从基础展示页重构为“主人工作台 + 照料者工作台 + 订单动作面板”的业务闭环页面。
+
+变更摘要：
+
+- `apps/web-frontend/src/utils/admin-entry.ts`
+  - 抽出后台默认落点解析工具，统一 `/console` 与 `/petpal-admin` 的优先级判断。
+- `apps/web-frontend/src/router/index.ts`
+  - 路由守卫统一复用后台落点逻辑。
+  - 对 PetPal 后台权限不足场景增加统一回退。
+- `apps/web-frontend/src/realtime/admin-sync.ts`
+  - 实时权限同步逻辑改为复用统一落点判断，避免控制台和 PetPal 后台回跳不一致。
+- `apps/web-frontend/src/layouts/ConsoleLayout.vue`
+  - “返回总览”改为跳转到当前账号最合适的后台入口。
+- `apps/web-frontend/src/pages/console/auth/LoginView.vue`
+  - 登录完成后的默认进入逻辑改为复用统一工具，不再散落维护权限名单。
+- `apps/app-frontend/src/api/petpal.ts`
+  - 补齐主人端确认完成、评价、投诉 API 封装。
+  - 补齐照料者档案、服务、履约订单与履约动作 API 封装。
+- `apps/app-frontend/src/pages/petpal/index.vue`
+  - 重构为双模式 PetPal 工作台。
+  - 主人侧支持：宠物建档、需求时间范围、预算与标签、订单跟进、照料者推荐刷新。
+  - 照料者侧支持：档案维护、服务配置新增/编辑、履约订单筛选、接单、签到、服务记录、签退。
+- `apps/app-frontend/src/pages/order-detail/index.vue`
+  - 新增主人动作面板。
+  - 支持：确认完成、提交评价、发起投诉、查看进行中投诉、查看已提交评价。
+  - 同时修正页面壳层使用方式，确保页面进入可稳定构建状态。
+- `apps/app-frontend/src/pages.json`
+  - 同步页面标题元信息为 `PetPal 工作台`。
+- `apps/web-frontend/src/components.d.ts`
+  - 构建同步生成组件类型，补入 `ElRate`。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm --filter @rbac/app-frontend build` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认移动端不再停留在只读服务看板，主人和照料者主流程都具备可执行动作。
+- 已确认订单详情页已补齐主人侧完成确认、评价和投诉入口，售后与履约查看不再割裂。
+- 已确认 Web 后台默认落点逻辑已经统一，登录、路由守卫、实时权限同步和返回总览都不再各自维护一套判断。
+- 已确认本轮仍未覆盖消息会话、媒体上传、收益分析和平台治理补完，这些仍是下一阶段重点。
+
+Git commit：待本切片提交。
+
 ## 87. App 端资料页去掉权限中心式表达（P1-M3 Slice 60）
 
 **内容**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

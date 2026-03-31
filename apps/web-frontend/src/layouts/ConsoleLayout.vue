@@ -242,6 +242,7 @@ import {
 import { findThemePreset, getThemeModeLabel, type ThemeMode } from '@/themes';
 import { uploadAvatarFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
+import { resolvePreferredAdminEntry } from '@/utils/admin-entry';
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menus';
 import { useWorkbenchStore, type PageTransitionMode } from '@/stores/workbench';
@@ -343,7 +344,7 @@ const handleSidebarToggle = () => {
 };
 
 const goDashboard = async () => {
-  await router.push(menus.homePath);
+  await router.push(resolvePreferredAdminEntry(auth.permissions, menus.homePath));
 };
 
 const logout = async () => {

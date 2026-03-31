@@ -65,7 +65,7 @@
       "path": "pages/petpal/index",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "PetPal 服务台",
+        "navigationBarTitleText": "PetPal 工作台",
         "enablePullDownRefresh": true
       }
     },

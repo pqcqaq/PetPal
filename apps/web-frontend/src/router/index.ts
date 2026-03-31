@@ -3,6 +3,12 @@ import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menus';
 import { useWorkbenchStore } from '@/stores/workbench';
 import { beginRouteProgress, endRouteProgress } from '@/utils/app-progress';
+import {
+  CONSOLE_NAMESPACE,
+  hasPetPalAdminAccess,
+  PETPAL_ADMIN_NAMESPACE,
+  resolvePreferredAdminEntry,
+} from '@/utils/admin-entry';
 import { pinia } from '@/stores';
 
 const routes = [
@@ -61,7 +67,7 @@ const routes = [
     ],
   },
   {
-    path: '/petpal-admin',
+    path: PETPAL_ADMIN_NAMESPACE,
     component: () => import('@/layouts/PetPalAdminLayout.vue'),
     meta: { requiresAuth: true, title: '宠托帮后台直达工作台' },
     children: [
@@ -128,7 +134,7 @@ const routes = [
     meta: { guestOnly: true },
   },
   {
-    path: '/console',
+    path: CONSOLE_NAMESPACE,
     name: 'console-root',
     component: () => import('@/layouts/ConsoleLayout.vue'),
     meta: { requiresAuth: true },
@@ -180,8 +186,8 @@ router.beforeEach(async (to) => {
   startRouteProgress();
   const auth = useAuthStore(pinia);
   const menus = useMenuStore(pinia);
-  const isConsoleTarget = to.path === '/console' || to.path.startsWith('/console/');
-  const isPetPalAdminTarget = to.path === '/petpal-admin' || to.path.startsWith('/petpal-admin/');
+  const isConsoleTarget = to.path === CONSOLE_NAMESPACE || to.path.startsWith(`${CONSOLE_NAMESPACE}/`);
+  const isPetPalAdminTarget = to.path === PETPAL_ADMIN_NAMESPACE || to.path.startsWith(`${PETPAL_ADMIN_NAMESPACE}/`);
 
   if (!auth.ready) {
     await auth.bootstrap();
@@ -196,6 +202,8 @@ router.beforeEach(async (to) => {
     await menus.bootstrap(router);
   }
 
+  const preferredAdminEntry = resolvePreferredAdminEntry(auth.permissions, menus.homePath);
+
   if (auth.isAuthenticated && isConsoleTarget && menus.hasPagePath(to.path) && to.name === 'frontend-not-found') {
     return to.fullPath;
   }
@@ -205,22 +213,23 @@ router.beforeEach(async (to) => {
       return true;
     }
 
-    return menus.homePath;
+    return preferredAdminEntry;
   }
 
-  if (auth.isAuthenticated && to.path === '/console' && menus.homePath !== '/console') {
-    return menus.homePath;
+  if (auth.isAuthenticated && isPetPalAdminTarget && !hasPetPalAdminAccess(auth.permissions)) {
+    return preferredAdminEntry;
   }
 
-  if (auth.isAuthenticated && isConsoleTarget && to.path !== '/console' && !menus.hasPagePath(to.path)) {
-    return menus.homePath;
+  if (auth.isAuthenticated && to.path === CONSOLE_NAMESPACE && preferredAdminEntry !== CONSOLE_NAMESPACE) {
+    return preferredAdminEntry;
+  }
+
+  if (auth.isAuthenticated && isConsoleTarget && to.path !== CONSOLE_NAMESPACE && !menus.hasPagePath(to.path)) {
+    return preferredAdminEntry;
   }
 
   if (typeof to.meta.permission === 'string' && !auth.hasPermission(to.meta.permission)) {
-    if (isPetPalAdminTarget) {
-      return '/petpal-admin';
-    }
-    return menus.homePath;
+    return preferredAdminEntry;
   }
 
   return true;
