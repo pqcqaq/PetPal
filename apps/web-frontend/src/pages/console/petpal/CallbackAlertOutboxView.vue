@@ -130,6 +130,7 @@
           style="width: 360px"
         />
         <ListExportButton
+          v-permission="'petpal.callback-alert.export'"
           :request="buildReplayExportRequest"
           error-message="导出重放记录失败"
         />

@@ -2140,3 +2140,37 @@ gantt
 
 - 导出接口采用 query 传递 `outboxId`，复用通用 Excel 导出处理器。
 - 导出上限 5000 条，避免一次性导出造成数据库与内存压力。
+
+### 14.32 2026-04-01（P1 Slice 16）
+
+**概述**：将 callback alert replay log 导出能力拆分为独立权限，避免“可读即可导出”。
+
+已完成：
+
+- RBAC 权限目录：
+  - `apps/backend/src/constants/system-permissions.ts`
+    - 新增 `petpal.callback-alert.export`。
+- 角色策略：
+  - `apps/backend/src/services/system-rbac.ts`
+    - manager 默认排除 `petpal.callback-alert.export`。
+- 路由鉴权：
+  - `apps/backend/src/routes/petpal.ts`
+    - replay log 导出接口改为 `requirePermission('petpal.callback-alert.export')`。
+- 前端：
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+    - 导出按钮增加 `v-permission='petpal.callback-alert.export'`。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - manager 对 replay log 导出接口预期从 200 调整为 403。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- 将导出视为高敏感操作，与查看权限分离，降低数据批量泄露风险。
+- 角色基线遵循“最小权限”原则，导出能力仅保留给高权限角色。

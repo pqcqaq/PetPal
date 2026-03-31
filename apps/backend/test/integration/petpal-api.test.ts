@@ -981,7 +981,7 @@ describe('PetPal API integration', () => {
     await request(app)
       .get('/api/petpal/admin/callback-alert-outbox/replay-logs/export?outboxId=unknown')
       .set(authHeader)
-      .expect(200);
+      .expect(403);
 
     await request(app)
       .post('/api/petpal/admin/callback-alert-outbox/retry-dead')

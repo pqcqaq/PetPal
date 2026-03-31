@@ -264,7 +264,7 @@ petpalRouter.get('/admin/callback-alert-outbox/:id/replay-logs', requirePermissi
 
 petpalRouter.get(
   '/admin/callback-alert-outbox/replay-logs/export',
-  requirePermission('petpal.callback-alert.read'),
+  requirePermission('petpal.callback-alert.export'),
   createExcelExportHandler({
     fileName: () => createTimestampedExcelFileName('petpal-callback-alert-replay-logs'),
     sheetName: 'PetPal Callback Alert Replay Logs',

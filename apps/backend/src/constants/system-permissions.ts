@@ -11,6 +11,7 @@ export const systemPermissionCatalog: readonly SystemPermissionSeed[] = [
   { module: 'petpal', code: 'petpal.callback-audit.read', name: '查看宠托帮回调审计', action: 'read' },
   { module: 'petpal', code: 'petpal.callback-audit.export', name: '导出宠托帮回调审计', action: 'export' },
   { module: 'petpal', code: 'petpal.callback-alert.read', name: '查看宠托帮回调告警队列', action: 'read' },
+  { module: 'petpal', code: 'petpal.callback-alert.export', name: '导出宠托帮回调告警重放记录', action: 'export' },
   { module: 'petpal', code: 'petpal.callback-alert.retry', name: '重试宠托帮回调告警队列', action: 'retry' },
   { module: 'menu', code: 'menu.read', name: '查看菜单管理', action: 'read' },
   { module: 'menu', code: 'menu.create', name: '创建菜单节点', action: 'create' },

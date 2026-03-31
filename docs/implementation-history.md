@@ -742,6 +742,32 @@ Git commit：`feat(p1): add callback alert replay logs for outbox requeue tracea
 
 Git commit：待本切片提交。
 
+## 42. PetPal replay log 导出权限拆分（P1 Slice 16）
+
+**内容**：将 callback alert replay log 导出从 read 权限拆分为独立 export 权限，强化最小授权策略。
+
+变更摘要：
+
+- `apps/backend/src/constants/system-permissions.ts`
+  - 新增 `petpal.callback-alert.export`。
+- `apps/backend/src/services/system-rbac.ts`
+  - manager 默认排除 `petpal.callback-alert.export`。
+- `apps/backend/src/routes/petpal.ts`
+  - replay log 导出接口改为 `requirePermission('petpal.callback-alert.export')`。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 导出按钮添加导出权限门控。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - manager 导出预期改为 403。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+Git commit：待本切片提交。
+
 ## 41. PetPal replay log 导出能力（P1 Slice 15）
 
 **内容**：新增 callback alert outbox replay log Excel 导出，支持按 outbox 与筛选条件导出。
