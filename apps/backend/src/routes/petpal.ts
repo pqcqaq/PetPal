@@ -75,6 +75,9 @@ const parseCallbackAuditQuery = (query: Record<string, unknown>) => ({
 
 const parseCallbackAlertOutboxQuery = (query: Record<string, unknown>) => ({
   status: query.status as 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED' | 'DEAD' | undefined,
+  processingTimeoutMinutes: query.processingTimeoutMinutes
+    ? Number(query.processingTimeoutMinutes)
+    : undefined,
 });
 
 petpalRouter.post('/payments/callback', asyncHandler(async (req, res) => {

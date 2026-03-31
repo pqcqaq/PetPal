@@ -741,3 +741,32 @@ Git commit：`feat(p1): add callback alert replay logs for outbox requeue tracea
 - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
 
 Git commit：待本切片提交。
+
+## 37. PetPal outbox 处理中超时指标（P1 Slice 11）
+
+**内容**：为 callback alert outbox 统计增加“处理中超时数量”，用于发现长时间停留在 PROCESSING 的积压消息。
+
+变更摘要：
+
+- `apps/backend/src/routes/petpal.ts`
+  - outbox 统计查询新增 `processingTimeoutMinutes` 参数解析。
+- `apps/backend/src/services/petpal-service.ts`
+  - `queryCallbackAlertOutboxStats` 新增：
+    - `stuckProcessingCount`
+    - `processingTimeoutMinutes`
+  - 阈值默认 10 分钟，限制范围 1~240。
+- `packages/api-common/src/types/petpal.ts`
+  - 扩展 outbox query/stats 共享类型。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 新增“处理中超时(>N分钟)”统计卡并传入阈值参数。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 增加新字段断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+Git commit：待本切片提交。

@@ -1974,3 +1974,35 @@ gantt
 
 - 指标使用分钟级整数，降低展示噪声并便于阈值告警。
 - 保持统计查询幂等与只读，不引入额外写路径。
+
+### 14.27 2026-04-01（P1 Slice 11）
+
+**概述**：新增 outbox 处理中超时指标，支持按阈值分钟数识别“卡住的处理中消息”。
+
+已完成：
+
+- 路由与服务层：
+  - `apps/backend/src/routes/petpal.ts`
+    - `parseCallbackAlertOutboxQuery` 新增 `processingTimeoutMinutes` 解析。
+  - `apps/backend/src/services/petpal-service.ts`
+    - `queryCallbackAlertOutboxStats` 新增：
+      - `stuckProcessingCount`
+      - `processingTimeoutMinutes`
+    - 默认阈值 10 分钟，限制在 1~240 分钟区间。
+- 共享契约与前端：
+  - `packages/api-common/src/types/petpal.ts` 扩展 outbox query/stats 类型。
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue` 新增“处理中超时”统计卡，并传入阈值参数。
+- 测试补强：
+  - `apps/backend/test/integration/petpal-api.test.ts` 增加新字段断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- 以“分钟阈值 + 处理中状态”定义超时，语义直观且可扩展到告警策略。
+- 阈值通过查询参数传递，保持后端统计接口的通用性。

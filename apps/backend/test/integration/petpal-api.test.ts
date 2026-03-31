@@ -786,6 +786,8 @@ describe('PetPal API integration', () => {
     assert.ok(typeof outboxStatsResponse.body.data.byStatus.DEAD === 'number');
     assert.ok(typeof outboxStatsResponse.body.data.oldestPendingAgeMinutes === 'number');
     assert.ok(typeof outboxStatsResponse.body.data.oldestDeadAgeMinutes === 'number');
+    assert.ok(typeof outboxStatsResponse.body.data.stuckProcessingCount === 'number');
+    assert.ok(typeof outboxStatsResponse.body.data.processingTimeoutMinutes === 'number');
 
     const retryResponse = await request(app)
       .post(`/api/petpal/admin/callback-alert-outbox/${outboxId}/retry`)

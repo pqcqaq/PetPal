@@ -156,6 +156,7 @@ const loading = ref(false);
 const replayLoading = ref(false);
 const replayDrawerVisible = ref(false);
 const replayLogs = ref<CallbackAlertReplayLogRecord[]>([]);
+const processingTimeoutMinutes = 10;
 const statsData = ref<CallbackAlertOutboxStats>({
   total: 0,
   byStatus: {
@@ -167,6 +168,8 @@ const statsData = ref<CallbackAlertOutboxStats>({
   },
   oldestPendingAgeMinutes: 0,
   oldestDeadAgeMinutes: 0,
+  stuckProcessingCount: 0,
+  processingTimeoutMinutes,
 });
 
 const { state: pageState } = usePageState<OutboxPageState>('page:petpal:callback-alert-outbox', {
@@ -191,6 +194,10 @@ const stats = computed(() => [
   { label: '失败', value: statsData.value.byStatus.FAILED },
   { label: '死信', value: statsData.value.byStatus.DEAD },
   { label: '最老死信(分钟)', value: statsData.value.oldestDeadAgeMinutes },
+  {
+    label: `处理中超时(>${statsData.value.processingTimeoutMinutes}分钟)`,
+    value: statsData.value.stuckProcessingCount,
+  },
   { label: '已发送', value: statsData.value.byStatus.SENT },
 ]);
 
@@ -218,7 +225,10 @@ const loadOutbox = async () => {
     loading.value = true;
     const [listRes, statsRes] = await Promise.all([
       api.petpal.admin.callbackAlertOutbox(buildQuery()),
-      api.petpal.admin.callbackAlertOutboxStats({ status: pageState.filters.status }),
+      api.petpal.admin.callbackAlertOutboxStats({
+        status: pageState.filters.status,
+        processingTimeoutMinutes,
+      }),
     ]);
 
     const listData = listRes as CallbackAlertOutboxPage;

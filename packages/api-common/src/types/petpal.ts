@@ -254,6 +254,7 @@ export interface CallbackAlertOutboxQuery {
   page?: number;
   pageSize?: number;
   status?: CallbackAlertOutboxStatus;
+  processingTimeoutMinutes?: number;
 }
 
 export interface CallbackAlertOutboxPage {
@@ -271,6 +272,8 @@ export interface CallbackAlertOutboxStats {
   byStatus: Record<CallbackAlertOutboxStatus, number>;
   oldestPendingAgeMinutes: number;
   oldestDeadAgeMinutes: number;
+  stuckProcessingCount: number;
+  processingTimeoutMinutes: number;
 }
 
 export interface CallbackAlertReplayLogRecord {

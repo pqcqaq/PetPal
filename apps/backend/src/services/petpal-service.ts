@@ -101,6 +101,7 @@ type CallbackAlertOutboxStatus = 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED' | 
 
 type CallbackAlertOutboxQueryFilters = {
   status?: CallbackAlertOutboxStatus;
+  processingTimeoutMinutes?: number;
 };
 
 type CallbackFailureAlertPayload = {
@@ -1060,7 +1061,9 @@ export const petpalService = {
 
   async queryCallbackAlertOutboxStats(filters: CallbackAlertOutboxQueryFilters) {
     const where = buildCallbackAlertOutboxWhere(filters);
-    const [total, statusRows, oldestPending, oldestDead] = await Promise.all([
+    const processingTimeoutMinutes = Math.min(240, Math.max(1, filters.processingTimeoutMinutes ?? 10));
+    const processingTimeoutAt = new Date(Date.now() - processingTimeoutMinutes * 60_000);
+    const [total, statusRows, oldestPending, oldestDead, stuckProcessingCount] = await Promise.all([
       prisma.callbackAlertOutbox.count({ where }),
       prisma.callbackAlertOutbox.groupBy({
         by: ['status'],
@@ -1093,6 +1096,15 @@ export const petpalService = {
           createdAt: true,
         },
       }),
+      prisma.callbackAlertOutbox.count({
+        where: {
+          ...where,
+          status: 'PROCESSING',
+          createdAt: {
+            lte: processingTimeoutAt,
+          },
+        },
+      }),
     ]);
 
     const byStatus: Record<CallbackAlertOutboxStatus, number> = {
@@ -1120,6 +1132,8 @@ export const petpalService = {
       byStatus,
       oldestPendingAgeMinutes,
       oldestDeadAgeMinutes,
+      stuckProcessingCount,
+      processingTimeoutMinutes,
     };
   },
 
