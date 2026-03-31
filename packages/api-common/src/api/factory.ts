@@ -440,6 +440,12 @@ export const createApiFactory = (options: ClientOptions) => {
             url: `/petpal/admin/callback-alert-outbox/${id}/retry`,
             method: 'POST',
           }),
+        retryDeadCallbackAlertOutbox: (limit?: number) =>
+          client.request<{ requested: number; requeued: number }>({
+            url: '/petpal/admin/callback-alert-outbox/retry-dead',
+            method: 'POST',
+            data: limit ? { limit } : {},
+          }),
       },
     },
   };

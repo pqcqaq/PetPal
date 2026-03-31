@@ -1064,6 +1064,49 @@ export const petpalService = {
       },
     });
   },
+
+  async retryDeadCallbackAlertOutboxes(limit = 50) {
+    const take = Math.min(200, Math.max(1, limit));
+
+    const deadRows = await prisma.callbackAlertOutbox.findMany({
+      where: {
+        status: 'DEAD',
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+      take,
+      select: {
+        id: true,
+      },
+    });
+
+    const ids = deadRows.map(item => item.id);
+    if (!ids.length) {
+      return {
+        requested: take,
+        requeued: 0,
+      };
+    }
+
+    const result = await prisma.callbackAlertOutbox.updateMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      data: {
+        status: 'PENDING',
+        nextRetryAt: new Date(),
+        lastError: null,
+      },
+    });
+
+    return {
+      requested: take,
+      requeued: result.count,
+    };
+  },
 };
 
 export const purgeExpiredCallbackAudits = async (olderThanDays = 90) => {

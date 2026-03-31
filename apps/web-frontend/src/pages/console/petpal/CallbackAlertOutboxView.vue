@@ -3,6 +3,14 @@
     <template #actions>
       <el-space>
         <el-button @click="loadOutbox">刷新</el-button>
+        <el-button
+          v-permission="'petpal.callback-alert.retry'"
+          type="warning"
+          plain
+          @click="retryDeadRows"
+        >
+          重试死信（最多 50 条）
+        </el-button>
       </el-space>
     </template>
 
@@ -209,6 +217,16 @@ const retryRow = async (id: string) => {
     await loadOutbox();
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '重试失败'));
+  }
+};
+
+const retryDeadRows = async () => {
+  try {
+    const result = await api.petpal.admin.retryDeadCallbackAlertOutbox(50);
+    ElMessage.success(`已重试 ${result.requeued} 条死信`);
+    await loadOutbox();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '批量重试死信失败'));
   }
 };
 

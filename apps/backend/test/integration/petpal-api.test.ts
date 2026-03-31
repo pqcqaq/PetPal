@@ -792,6 +792,22 @@ describe('PetPal API integration', () => {
 
     assert.equal(retryResponse.body.data.id, outboxId);
     assert.equal(retryResponse.body.data.status, 'PENDING');
+
+    await prisma.callbackAlertOutbox.update({
+      where: { id: outboxId },
+      data: {
+        status: 'DEAD',
+      },
+    });
+
+    const retryDeadResponse = await request(app)
+      .post('/api/petpal/admin/callback-alert-outbox/retry-dead')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({ limit: 20 })
+      .expect(200);
+
+    assert.ok(retryDeadResponse.body.data.requeued >= 1);
+    assert.equal(retryDeadResponse.body.data.requested, 20);
   });
 
   it('forbids non-admin users from accessing callback audit admin endpoints', async () => {
@@ -829,6 +845,12 @@ describe('PetPal API integration', () => {
       .post('/api/petpal/admin/callback-alert-outbox/unknown/retry')
       .set(authHeader)
       .expect(403);
+
+    await request(app)
+      .post('/api/petpal/admin/callback-alert-outbox/retry-dead')
+      .set(authHeader)
+      .send({ limit: 20 })
+      .expect(403);
   });
 
   it('allows manager to read callback audits but forbids export', async () => {
@@ -865,6 +887,12 @@ describe('PetPal API integration', () => {
     await request(app)
       .post('/api/petpal/admin/callback-alert-outbox/unknown/retry')
       .set(authHeader)
+      .expect(403);
+
+    await request(app)
+      .post('/api/petpal/admin/callback-alert-outbox/retry-dead')
+      .set(authHeader)
+      .send({ limit: 20 })
       .expect(403);
   });
 });

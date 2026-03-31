@@ -52,6 +52,10 @@ const refundCallbackSchema = z.object({
   channelPayload: z.unknown().optional(),
 });
 
+const callbackAlertOutboxRetryDeadSchema = z.object({
+  limit: z.number().int().positive().max(200).optional(),
+});
+
 const petpalRouter = Router();
 
 const parseCallbackAuditQuery = (query: Record<string, unknown>) => ({
@@ -229,6 +233,12 @@ petpalRouter.get('/admin/callback-alert-outbox/stats', requirePermission('petpal
 petpalRouter.post('/admin/callback-alert-outbox/:id/retry', requirePermission('petpal.callback-alert.retry'), asyncHandler(async (req, res) => {
   const result = await petpalService.retryCallbackAlertOutbox(String(req.params.id));
   return ok(res, result, 'Callback alert outbox requeued');
+}));
+
+petpalRouter.post('/admin/callback-alert-outbox/retry-dead', requirePermission('petpal.callback-alert.retry'), asyncHandler(async (req, res) => {
+  const payload = callbackAlertOutboxRetryDeadSchema.parse(req.body ?? {});
+  const result = await petpalService.retryDeadCallbackAlertOutboxes(payload.limit ?? 50);
+  return ok(res, result, 'Callback alert outbox dead records requeued');
 }));
 
 export { petpalRouter };

@@ -1800,6 +1800,40 @@ gantt
 - 前端复用现有 `PageScaffold` 与权限指令，保持控制台交互一致性。
 - 先落地“可操作”能力（筛选/重试），后续再扩展高级能力（批量重放、死信对比、重试历史）。
 
+### 14.22 2026-04-01（P1 Slice 6）
+
+**概述**：补齐死信批量重放能力，支持运维一键重试 DEAD 队列。
+
+已完成：
+
+- 后端接口：
+  - 新增 `POST /api/petpal/admin/callback-alert-outbox/retry-dead`。
+  - 支持参数 `limit`（默认 50，最大 200），按创建时间顺序批量重入队。
+- 服务层：
+  - `apps/backend/src/services/petpal-service.ts` 新增 `retryDeadCallbackAlertOutboxes(limit)`。
+  - 仅处理 `DEAD` 状态，更新为 `PENDING` 并重置重试时间与错误信息。
+- 共享契约：
+  - `packages/api-common/src/api/factory.ts` 新增
+    - `api.petpal.admin.retryDeadCallbackAlertOutbox(limit?)`。
+- 前端页面：
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 新增“重试死信（最多 50 条）”按钮，按 `petpal.callback-alert.retry` 权限显隐。
+- 测试补强：
+  - `apps/backend/test/integration/petpal-api.test.ts` 增加 admin 批量重放成功断言。
+  - 增加 member/manager 对该接口的 403 边界断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（9/9）。
+
+关键设计决策：
+
+- 批量重放只面向 `DEAD` 记录，避免影响正常重试中的消息。
+- 限制批量上限为 200，防止一次性大规模重放冲击下游。
+
 - 回调审计持久化：完成。
 - 管理端审计查询 API：完成。
 - 管理端审计 UI：完成。

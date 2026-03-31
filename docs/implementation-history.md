@@ -606,4 +606,31 @@ Git commit：`feat(p1): add callback alert outbox admin APIs with permission bou
 - `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（9/9）。
 
 Git commit：`feat(p1): add callback alert outbox console page and menu integration`。
+
+## 32. PetPal 死信批量重放能力（P1 Slice 6）
+
+**内容**：新增回调告警 outbox 死信批量重放 API 与前端一键重试入口，提升死信处理效率。
+
+变更摘要：
+
+- `apps/backend/src/routes/petpal.ts`
+  - 新增 `POST /api/petpal/admin/callback-alert-outbox/retry-dead`。
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增 `retryDeadCallbackAlertOutboxes(limit)`，仅重放 `DEAD` 状态消息。
+- `packages/api-common/src/api/factory.ts`
+  - 新增 `retryDeadCallbackAlertOutbox(limit?)` 客户端方法。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 新增“重试死信（最多 50 条）”按钮，权限控制 `petpal.callback-alert.retry`。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增 admin 批量重放成功断言。
+  - 新增 member/manager 对批量重放接口的 403 边界断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（9/9）。
+
+Git commit：`feat(p1): support batch retry for dead callback alert outbox records`。
 - 高增长场景下需要规划审计表分区与归档策略。
