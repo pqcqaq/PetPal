@@ -19,18 +19,16 @@
 import { computed } from 'vue';
 import { capabilityCards, consoleHighlights, projectSignals } from '../frontend-content';
 import { useAuthStore } from '@/stores/auth';
-import { useMenuStore } from '@/stores/menus';
 import HomeCapabilityGrid from './components/HomeCapabilityGrid.vue';
 import HomeConsolePreview from './components/HomeConsolePreview.vue';
 import HomeHero from './components/HomeHero.vue';
 
 const auth = useAuthStore();
-const menus = useMenuStore();
 const signals = projectSignals.map((item) => ({ ...item }));
 const cards = capabilityCards.map((item) => ({ ...item, bullets: [...item.bullets] }));
 const highlights = consoleHighlights.map((item) => ({ ...item }));
-const consoleTarget = computed(() => auth.isAuthenticated ? (menus.ready ? menus.homePath : '/console') : '/login');
-const consoleLabel = computed(() => auth.isAuthenticated ? '进入控制台' : '登录控制台');
+const consoleTarget = computed(() => auth.isAuthenticated ? '/petpal-admin' : '/login');
+const consoleLabel = computed(() => auth.isAuthenticated ? '进入 PetPal 后台' : '登录 PetPal 后台');
 </script>
 
 <style scoped lang="scss">

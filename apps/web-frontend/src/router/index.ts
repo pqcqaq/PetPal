@@ -61,6 +61,67 @@ const routes = [
     ],
   },
   {
+    path: '/petpal-admin',
+    component: () => import('@/layouts/PetPalAdminLayout.vue'),
+    meta: { requiresAuth: true, title: '宠托帮后台直达工作台' },
+    children: [
+      {
+        path: '',
+        name: 'petpal-admin-home',
+        component: () => import('@/pages/petpal-admin/PetPalAdminHubView.vue'),
+        meta: {
+          requiresAuth: true,
+          title: '宠托帮后台直达工作台',
+          description: '跳过菜单树，直接访问 PetPal 投诉、审核与回调治理工作区。',
+        },
+      },
+      {
+        path: 'complaints',
+        name: 'petpal-admin-complaints',
+        component: () => import('@/pages/console/petpal/ComplaintAdminView.vue'),
+        meta: {
+          requiresAuth: true,
+          permission: 'petpal.complaint.manage',
+          title: '投诉工单',
+          description: '集中处理投诉分派、批量结案与 SLA 风险工单。',
+        },
+      },
+      {
+        path: 'caregiver-audits',
+        name: 'petpal-admin-caregiver-audits',
+        component: () => import('@/pages/console/petpal/CaregiverAuditView.vue'),
+        meta: {
+          requiresAuth: true,
+          permission: 'petpal.caregiver.audit',
+          title: '照料者审核',
+          description: '审核照料者资质、查看当前审核状态与操作记录。',
+        },
+      },
+      {
+        path: 'callback-audits',
+        name: 'petpal-admin-callback-audits',
+        component: () => import('@/pages/console/petpal/CallbackAuditView.vue'),
+        meta: {
+          requiresAuth: true,
+          permission: 'petpal.callback-audit.read',
+          title: '回调审计',
+          description: '查看支付与退款回调链路、筛选异常并导出审计记录。',
+        },
+      },
+      {
+        path: 'callback-alert-outbox',
+        name: 'petpal-admin-callback-alert-outbox',
+        component: () => import('@/pages/console/petpal/CallbackAlertOutboxView.vue'),
+        meta: {
+          requiresAuth: true,
+          permission: 'petpal.callback-alert.read',
+          title: '告警队列',
+          description: '跟踪回调告警重放、失败重试与积压处理。',
+        },
+      },
+    ],
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('@/pages/console/auth/LoginView.vue'),
@@ -120,12 +181,13 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore(pinia);
   const menus = useMenuStore(pinia);
   const isConsoleTarget = to.path === '/console' || to.path.startsWith('/console/');
+  const isPetPalAdminTarget = to.path === '/petpal-admin' || to.path.startsWith('/petpal-admin/');
 
   if (!auth.ready) {
     await auth.bootstrap();
   }
 
-  if (!auth.isAuthenticated && isConsoleTarget) {
+  if (!auth.isAuthenticated && (isConsoleTarget || isPetPalAdminTarget)) {
     menus.reset(router);
     return '/login';
   }
@@ -155,6 +217,9 @@ router.beforeEach(async (to) => {
   }
 
   if (typeof to.meta.permission === 'string' && !auth.hasPermission(to.meta.permission)) {
+    if (isPetPalAdminTarget) {
+      return '/petpal-admin';
+    }
     return menus.homePath;
   }
 

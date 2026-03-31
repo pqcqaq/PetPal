@@ -25,19 +25,17 @@ import FrontendFooter from '@/pages/frontend/components/FrontendFooter.vue';
 import FrontendHeader from '@/pages/frontend/components/FrontendHeader.vue';
 import { frontendNavItems } from '@/pages/frontend/frontend-content';
 import { useAuthStore } from '@/stores/auth';
-import { useMenuStore } from '@/stores/menus';
 
 const auth = useAuthStore();
-const menus = useMenuStore();
 const navItems = frontendNavItems.map((item) => ({ ...item }));
 const consoleTarget = computed(() => {
   if (!auth.isAuthenticated) {
     return '/login';
   }
 
-  return menus.ready ? menus.homePath : '/console';
+  return '/petpal-admin';
 });
-const consoleLabel = computed(() => auth.isAuthenticated ? '进入控制台' : '登录控制台');
+const consoleLabel = computed(() => auth.isAuthenticated ? '进入 PetPal 后台' : '登录 PetPal 后台');
 const userLabel = computed(() => auth.isAuthenticated ? `当前用户 · ${auth.user?.nickname ?? auth.user?.username ?? '已登录'}` : '');
 </script>
 

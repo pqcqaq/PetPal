@@ -1302,6 +1302,51 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 84. PetPal 后台改为根级直达入口（P1-M3 Slice 57）
+
+**内容**：响应“PetPal 不应继续依赖模板式菜单后台”的方向，本轮把核心 PetPal 后台能力从 `/console` 菜单树路径中剥离出来，新增根级 `/petpal-admin/*` 直达工作台。
+
+变更摘要：
+
+- 新增根级后台导航与布局：
+  - `apps/web-frontend/src/layouts/PetPalAdminLayout.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/navigation.ts`
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalAdminHubView.vue`
+  - 新布局不再依赖动态菜单树，而是固定提供 PetPal 业务导航：
+    - 后台总览
+    - 投诉工单
+    - 照料者审核
+    - 回调审计
+    - 告警队列
+  - 当前账号仅会看到自己有权限进入的工作区，避免“能看到但进不去”的菜单噪音。
+- `apps/web-frontend/src/router/index.ts`
+  - 新增根级路由分支 `/petpal-admin`。
+  - 复用现有 PetPal 控制台页面组件作为直达子路由：
+    - `/petpal-admin/complaints`
+    - `/petpal-admin/caregiver-audits`
+    - `/petpal-admin/callback-audits`
+    - `/petpal-admin/callback-alert-outbox`
+  - 路由守卫补齐 `PetPalAdmin` 命名空间判断：
+    - 未登录访问时统一回到 `/login`
+    - 缺少业务权限时统一回退到 `/petpal-admin` 总览，而不是依赖菜单首页
+- 公开前台入口同步切换到 PetPal 后台直达路径：
+  - `apps/web-frontend/src/layouts/FrontendLayout.vue`
+  - `apps/web-frontend/src/pages/frontend/home/HomeView.vue`
+  - `apps/web-frontend/src/pages/frontend/not-found/NotFoundView.vue`
+  - 前台页头、首页 CTA 与 404 页入口，登录后默认引导进入 `/petpal-admin`，不再优先落到 `/console`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认 `/petpal-admin/*` 路由不依赖后台菜单配置即可进入，避免菜单树错误或路径调整时阻断 PetPal 后台主链路。
+- 已确认各业务子路由继续沿用原有权限码做访问控制，页面内部按钮权限和路由级权限判断保持一致，没有放宽后台权限边界。
+- 已确认本轮只新增直达入口与专用布局，不移除既有 `/console` 菜单后台，避免对其他非 PetPal 控制台能力造成回归。
+
+Git commit：待本切片提交。
+
 ## 83. PetPal 主人端退款导出模板接入账户级同步（P1-M3 Slice 56）
 
 **内容**：继续推进 P1-M3 主人端售后透明度，本轮把退款导出“最近一次筛选 + 常用模板”从页面私有 `localStorage` 升级到 workbench 账户偏好，支持跟随登录账号同步，不再局限于单浏览器局部存储。

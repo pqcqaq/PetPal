@@ -16,10 +16,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import { useMenuStore } from '@/stores/menus';
 
 const auth = useAuthStore();
-const menus = useMenuStore();
-const consoleTarget = computed(() => auth.isAuthenticated ? (menus.ready ? menus.homePath : '/console') : '/login');
-const consoleLabel = computed(() => auth.isAuthenticated ? '返回控制台' : '登录控制台');
+const consoleTarget = computed(() => auth.isAuthenticated ? '/petpal-admin' : '/login');
+const consoleLabel = computed(() => auth.isAuthenticated ? '返回 PetPal 后台' : '登录 PetPal 后台');
 </script>
