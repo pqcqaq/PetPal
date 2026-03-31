@@ -1362,10 +1362,17 @@ export const petpalService = {
       byAction[row.actionType as 'REQUEUE' | 'REQUEUE_DEAD_BATCH'] = row._count._all;
     });
 
+    const batchReplayRatio = total > 0
+      ? Number((byAction.REQUEUE_DEAD_BATCH / total).toFixed(4))
+      : 0;
+    const isBatchReplayDominant = total >= 5 && batchReplayRatio >= 0.7;
+
     return {
       total,
       byAction,
       uniqueActorCount: uniqueActorRows.length,
+      batchReplayRatio,
+      isBatchReplayDominant,
     };
   },
 };

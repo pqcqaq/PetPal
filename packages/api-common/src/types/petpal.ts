@@ -312,4 +312,6 @@ export interface CallbackAlertReplayLogStats {
     REQUEUE_DEAD_BATCH: number;
   };
   uniqueActorCount: number;
+  batchReplayRatio: number;
+  isBatchReplayDominant: boolean;
 }

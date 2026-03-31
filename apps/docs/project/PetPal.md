@@ -2213,3 +2213,36 @@ gantt
 
 - 统计接口复用 replay log 筛选参数，保证列表与统计口径一致。
 - 操作人统计采用非空 actorId 去重，避免系统任务与人工操作混淆。
+
+### 14.34 2026-04-01（P1 Slice 18）
+
+**概述**：增强 replay log 统计风险信号，新增批量重放占比与主导告警标记。
+
+已完成：
+
+- 服务层：
+  - `apps/backend/src/services/petpal-service.ts`
+    - `queryCallbackAlertReplayLogStats` 增加：
+      - `batchReplayRatio`
+      - `isBatchReplayDominant`
+    - 规则：总数 >= 5 且批量重放占比 >= 70% 视为主导告警。
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts` 扩展 replay stats 类型。
+- 前端：
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+    - 抽屉统计区展示“批量占比”。
+    - 当 `isBatchReplayDominant=true` 时展示危险提示标签。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts` 增加新字段类型断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- 风险信号采用“占比 + 最小样本量”组合，降低小样本误报。
+- 批量占比保留 4 位小数用于审计精度，前端展示转换为百分比。

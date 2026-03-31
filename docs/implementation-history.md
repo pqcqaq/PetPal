@@ -742,6 +742,33 @@ Git commit：`feat(p1): add callback alert replay logs for outbox requeue tracea
 
 Git commit：待本切片提交。
 
+## 44. PetPal replay log 风险信号增强（P1 Slice 18）
+
+**内容**：在 replay log 统计中新增“批量重放占比”与“批量主导告警”指标，提升治理可视化能力。
+
+变更摘要：
+
+- `apps/backend/src/services/petpal-service.ts`
+  - `queryCallbackAlertReplayLogStats` 新增：
+    - `batchReplayRatio`
+    - `isBatchReplayDominant`
+  - 判定阈值：总样本 >= 5 且批量占比 >= 70%。
+- `packages/api-common/src/types/petpal.ts`
+  - replay stats 类型新增上述字段。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 抽屉统计区显示批量占比与危险提示标签。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增统计字段类型断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+Git commit：待本切片提交。
+
 ## 43. PetPal replay log 统计能力（P1 Slice 17）
 
 **内容**：新增 callback alert replay log 统计接口，并在管理端抽屉展示动作分布与操作人规模。

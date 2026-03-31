@@ -852,6 +852,8 @@ describe('PetPal API integration', () => {
     assert.ok(typeof replayLogStatsResponse.body.data.byAction.REQUEUE === 'number');
     assert.ok(typeof replayLogStatsResponse.body.data.byAction.REQUEUE_DEAD_BATCH === 'number');
     assert.ok(typeof replayLogStatsResponse.body.data.uniqueActorCount === 'number');
+    assert.ok(typeof replayLogStatsResponse.body.data.batchReplayRatio === 'number');
+    assert.ok(typeof replayLogStatsResponse.body.data.isBatchReplayDominant === 'boolean');
 
     const futureReplayLogs = await request(app)
       .get(`/api/petpal/admin/callback-alert-outbox/${outboxId}/replay-logs`)
