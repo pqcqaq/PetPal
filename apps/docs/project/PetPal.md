@@ -1733,6 +1733,42 @@ gantt
 - 采用数据库 outbox + 定时拉取，优先满足可靠性与可观测性，再逐步演进到外部消息队列。
 - 用 `PENDING/FAILED/PROCESSING/SENT/DEAD` 状态机表达重试生命周期，避免重复投递失控。
 
+### 14.20 2026-04-01（P1 Slice 4）
+
+**概述**：补齐回调告警 outbox 的管理端 API，支持查询、统计与死信手动重试。
+
+已完成：
+
+- 后端 API 扩展（`apps/backend/src/routes/petpal.ts`）：
+  - `GET /api/petpal/admin/callback-alert-outbox`
+  - `GET /api/petpal/admin/callback-alert-outbox/stats`
+  - `POST /api/petpal/admin/callback-alert-outbox/:id/retry`
+- 服务层扩展（`apps/backend/src/services/petpal-service.ts`）：
+  - `queryCallbackAlertOutboxes`（分页 + 状态过滤）
+  - `queryCallbackAlertOutboxStats`（按状态聚合）
+  - `retryCallbackAlertOutbox`（手动重入队）
+- 权限模型：
+  - 新增 `petpal.callback-alert.read`
+  - 新增 `petpal.callback-alert.retry`
+  - manager 默认仅保留 read，禁止 retry（最小权限原则）
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts` 新增 outbox 记录、分页、统计类型。
+  - `packages/api-common/src/api/factory.ts` 新增 outbox 查询/统计/重试接口。
+- 测试增强（`apps/backend/test/integration/petpal-api.test.ts`）：
+  - 新增管理员 outbox 管理能力测试。
+  - 新增非管理员与 manager 权限边界测试。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（9/9）。
+
+关键设计决策：
+
+- 把“死信重放”能力前置到 API 层，先保障运维可操作，再扩展到可视化页面。
+- 管理权限拆分为 read/retry，避免普通运营角色误触重放操作。
+
 - 回调审计持久化：完成。
 - 管理端审计查询 API：完成。
 - 管理端审计 UI：完成。

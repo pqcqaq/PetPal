@@ -726,6 +726,74 @@ describe('PetPal API integration', () => {
     assert.ok(exportResponse.body.length > 0);
   });
 
+  it('admin can query callback alert outbox and requeue dead messages', async () => {
+    const { app, prisma } = context;
+
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+
+    const baseOrder = await prisma.orderMain.findUnique({
+      where: { orderNo: 'PP202603300001' },
+      select: { id: true },
+    });
+    assert.ok(baseOrder);
+
+    const failedPayment = await prisma.paymentRecord.create({
+      data: {
+        id: `pay-outbox-${Date.now().toString(36)}`,
+        orderId: baseOrder.id,
+        payNo: `PAY-OUTBOX-${Date.now()}`,
+        bizType: 'BALANCE',
+        payChannel: 'WECHAT',
+        payStatus: 'PENDING',
+        payAmount: 12,
+      },
+    });
+
+    await request(app)
+      .post('/api/petpal/payments/callback')
+      .set('x-petpal-callback-token', 'petpal-dev-callback-token')
+      .send({
+        payNo: failedPayment.payNo,
+        channelTxnId: `WXTXN-OUTBOX-${Date.now()}`,
+        success: false,
+      })
+      .expect(200);
+
+    const outboxListResponse = await request(app)
+      .get('/api/petpal/admin/callback-alert-outbox?status=PENDING')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(Array.isArray(outboxListResponse.body.data.items));
+    assert.ok(outboxListResponse.body.data.items.length >= 1);
+
+    const outboxId = outboxListResponse.body.data.items[0].id as string;
+
+    await prisma.callbackAlertOutbox.update({
+      where: { id: outboxId },
+      data: {
+        status: 'DEAD',
+        retryCount: 5,
+      },
+    });
+
+    const outboxStatsResponse = await request(app)
+      .get('/api/petpal/admin/callback-alert-outbox/stats')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(typeof outboxStatsResponse.body.data.total === 'number');
+    assert.ok(typeof outboxStatsResponse.body.data.byStatus.DEAD === 'number');
+
+    const retryResponse = await request(app)
+      .post(`/api/petpal/admin/callback-alert-outbox/${outboxId}/retry`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(retryResponse.body.data.id, outboxId);
+    assert.equal(retryResponse.body.data.status, 'PENDING');
+  });
+
   it('forbids non-admin users from accessing callback audit admin endpoints', async () => {
     const { app } = context;
 
@@ -744,6 +812,21 @@ describe('PetPal API integration', () => {
 
     await request(app)
       .get('/api/petpal/admin/callback-audits/export')
+      .set(authHeader)
+      .expect(403);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-alert-outbox')
+      .set(authHeader)
+      .expect(403);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-alert-outbox/stats')
+      .set(authHeader)
+      .expect(403);
+
+    await request(app)
+      .post('/api/petpal/admin/callback-alert-outbox/unknown/retry')
       .set(authHeader)
       .expect(403);
   });
@@ -766,6 +849,21 @@ describe('PetPal API integration', () => {
 
     await request(app)
       .get('/api/petpal/admin/callback-audits/export')
+      .set(authHeader)
+      .expect(403);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-alert-outbox')
+      .set(authHeader)
+      .expect(200);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-alert-outbox/stats')
+      .set(authHeader)
+      .expect(200);
+
+    await request(app)
+      .post('/api/petpal/admin/callback-alert-outbox/unknown/retry')
       .set(authHeader)
       .expect(403);
   });

@@ -165,6 +165,7 @@ export type MatchedCaregiverPage = PaginatedResult<MatchedCaregiverRecord>;
 export type CallbackType = 'PAYMENT_CALLBACK' | 'REFUND_CALLBACK';
 export type CallbackStatus = 'PENDING' | 'SUCCESS' | 'FAILURE' | 'ERROR';
 export type CallbackSourceMode = 'TOKEN' | 'WECHATPAY_HMAC' | 'WECHATPAY_SDK';
+export type CallbackAlertOutboxStatus = 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED' | 'DEAD';
 
 export interface CallbackAuditRecord {
   id: string;
@@ -224,4 +225,48 @@ export interface CallbackAuditStats {
   byStatus: Record<CallbackStatus, number>;
   byType: Record<CallbackType, number>;
   bySourceMode: Record<CallbackSourceMode, number>;
+}
+
+export interface CallbackAlertOutboxRecord {
+  id: string;
+  callbackAuditId: string;
+  eventType: string;
+  status: CallbackAlertOutboxStatus;
+  retryCount: number;
+  maxRetries: number;
+  nextRetryAt: string;
+  lastError: string | null;
+  payload: Record<string, unknown>;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  callbackAudit: {
+    callbackType: CallbackType;
+    callbackStatus: CallbackStatus;
+    requestId: string;
+    sourceMode: CallbackSourceMode;
+    createdAt: string;
+  };
+}
+
+export interface CallbackAlertOutboxQuery {
+  [key: string]: string | number | boolean | undefined;
+  page?: number;
+  pageSize?: number;
+  status?: CallbackAlertOutboxStatus;
+}
+
+export interface CallbackAlertOutboxPage {
+  items: CallbackAlertOutboxRecord[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface CallbackAlertOutboxStats {
+  total: number;
+  byStatus: Record<CallbackAlertOutboxStatus, number>;
 }

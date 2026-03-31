@@ -65,6 +65,10 @@ const parseCallbackAuditQuery = (query: Record<string, unknown>) => ({
   endDate: query.endDate ? new Date(String(query.endDate)) : undefined,
 });
 
+const parseCallbackAlertOutboxQuery = (query: Record<string, unknown>) => ({
+  status: query.status as 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED' | 'DEAD' | undefined,
+});
+
 petpalRouter.post('/payments/callback', asyncHandler(async (req, res) => {
   const authMeta = verifyPetpalCallbackAuth(req.headers, req.rawBody ?? JSON.stringify(req.body ?? {}));
   const payload = paymentCallbackSchema.parse(req.body);
@@ -204,5 +208,27 @@ petpalRouter.get(
     ],
   }),
 );
+
+petpalRouter.get('/admin/callback-alert-outbox', requirePermission('petpal.callback-alert.read'), asyncHandler(async (req, res) => {
+  const { page, pageSize } = parsePagination(req.query);
+  const filters = parseCallbackAlertOutboxQuery(req.query as Record<string, unknown>);
+  const result = await petpalService.queryCallbackAlertOutboxes({
+    page,
+    pageSize,
+    ...filters,
+  });
+  return ok(res, result, 'Callback alert outbox list');
+}));
+
+petpalRouter.get('/admin/callback-alert-outbox/stats', requirePermission('petpal.callback-alert.read'), asyncHandler(async (req, res) => {
+  const filters = parseCallbackAlertOutboxQuery(req.query as Record<string, unknown>);
+  const result = await petpalService.queryCallbackAlertOutboxStats(filters);
+  return ok(res, result, 'Callback alert outbox stats');
+}));
+
+petpalRouter.post('/admin/callback-alert-outbox/:id/retry', requirePermission('petpal.callback-alert.retry'), asyncHandler(async (req, res) => {
+  const result = await petpalService.retryCallbackAlertOutbox(String(req.params.id));
+  return ok(res, result, 'Callback alert outbox requeued');
+}));
 
 export { petpalRouter };

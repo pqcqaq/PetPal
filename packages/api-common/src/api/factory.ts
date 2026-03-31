@@ -36,6 +36,9 @@ import type {
   UploadPrepareResult,
 } from '../types/files';
 import type {
+  CallbackAlertOutboxPage,
+  CallbackAlertOutboxQuery,
+  CallbackAlertOutboxStats,
   CallbackAuditPage,
   CallbackAuditQuery,
   CallbackAuditStats,
@@ -422,6 +425,21 @@ export const createApiFactory = (options: ClientOptions) => {
           '/petpal/admin/callback-audits/export',
           'petpal-callback-audits.xlsx',
         ),
+        callbackAlertOutbox: (query?: CallbackAlertOutboxQuery) =>
+          client.request<CallbackAlertOutboxPage>({
+            url: '/petpal/admin/callback-alert-outbox',
+            params: query as unknown as QueryParams,
+          }),
+        callbackAlertOutboxStats: (query?: CallbackAlertOutboxQuery) =>
+          client.request<CallbackAlertOutboxStats>({
+            url: '/petpal/admin/callback-alert-outbox/stats',
+            params: query as unknown as QueryParams,
+          }),
+        retryCallbackAlertOutbox: (id: string) =>
+          client.request<{ id: string; status: string }>({
+            url: `/petpal/admin/callback-alert-outbox/${id}/retry`,
+            method: 'POST',
+          }),
       },
     },
   };

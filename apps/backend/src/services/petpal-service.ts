@@ -65,6 +65,12 @@ type CallbackAuditQueryFilters = {
   refundId?: string;
 };
 
+type CallbackAlertOutboxStatus = 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED' | 'DEAD';
+
+type CallbackAlertOutboxQueryFilters = {
+  status?: CallbackAlertOutboxStatus;
+};
+
 type CallbackFailureAlertPayload = {
   callbackAuditId: string;
   callbackStatus: string;
@@ -122,6 +128,18 @@ const enqueueCallbackFailureAlert = async (
     nextRetryAt: new Date(),
   }),
 });
+
+const buildCallbackAlertOutboxWhere = (
+  filters: CallbackAlertOutboxQueryFilters,
+): Prisma.CallbackAlertOutboxWhereInput => {
+  const where: Prisma.CallbackAlertOutboxWhereInput = {};
+
+  if (filters.status) {
+    where.status = filters.status;
+  }
+
+  return where;
+};
 
 export const petpalService = {
   async listPets(ownerId: string) {
@@ -940,6 +958,110 @@ export const petpalService = {
         },
       },
       take: 5000,
+    });
+  },
+
+  async queryCallbackAlertOutboxes(filters: {
+    page?: number;
+    pageSize?: number;
+    status?: CallbackAlertOutboxStatus;
+  }) {
+    const page = Math.max(1, filters.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 20));
+    const skip = (page - 1) * pageSize;
+    const where = buildCallbackAlertOutboxWhere(filters);
+
+    const [total, records] = await Promise.all([
+      prisma.callbackAlertOutbox.count({ where }),
+      prisma.callbackAlertOutbox.findMany({
+        where,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip,
+        take: pageSize,
+        include: {
+          callbackAudit: {
+            select: {
+              callbackType: true,
+              callbackStatus: true,
+              requestId: true,
+              sourceMode: true,
+              createdAt: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      items: records,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    };
+  },
+
+  async queryCallbackAlertOutboxStats(filters: CallbackAlertOutboxQueryFilters) {
+    const where = buildCallbackAlertOutboxWhere(filters);
+    const [total, statusRows] = await Promise.all([
+      prisma.callbackAlertOutbox.count({ where }),
+      prisma.callbackAlertOutbox.groupBy({
+        by: ['status'],
+        where,
+        _count: {
+          _all: true,
+        },
+      }),
+    ]);
+
+    const byStatus: Record<CallbackAlertOutboxStatus, number> = {
+      PENDING: 0,
+      PROCESSING: 0,
+      SENT: 0,
+      FAILED: 0,
+      DEAD: 0,
+    };
+
+    statusRows.forEach((row) => {
+      byStatus[row.status as CallbackAlertOutboxStatus] = row._count._all;
+    });
+
+    return {
+      total,
+      byStatus,
+    };
+  },
+
+  async retryCallbackAlertOutbox(id: string) {
+    const existing = await prisma.callbackAlertOutbox.findUnique({
+      where: {
+        id,
+      },
+      select: {
+        id: true,
+        retryCount: true,
+        maxRetries: true,
+      },
+    });
+
+    if (!existing) {
+      throw notFound('Callback alert outbox record not found');
+    }
+
+    return prisma.callbackAlertOutbox.update({
+      where: {
+        id,
+      },
+      data: {
+        status: 'PENDING',
+        nextRetryAt: new Date(),
+        lastError: null,
+        maxRetries: Math.max(existing.maxRetries, existing.retryCount + 1),
+      },
     });
   },
 };

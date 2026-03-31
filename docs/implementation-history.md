@@ -551,4 +551,38 @@ Git commit：`feat(p1): make callback audit retention timer configurable`。
 - 死信（DEAD）已可识别，后续应补管理端死信重放与巡检面板。
 
 Git commit：`feat(p1): add callback failure alert outbox retry pipeline`。
+
+## 30. PetPal 回调告警 Outbox 管理 API（P1 Slice 4）
+
+**内容**：新增回调告警 outbox 的管理端查询、统计与手动重试 API，补齐死信治理操作面。
+
+变更摘要：
+
+- `apps/backend/src/routes/petpal.ts`
+  - 新增：
+    - `GET /api/petpal/admin/callback-alert-outbox`
+    - `GET /api/petpal/admin/callback-alert-outbox/stats`
+    - `POST /api/petpal/admin/callback-alert-outbox/:id/retry`
+  - 分别绑定 `petpal.callback-alert.read` 与 `petpal.callback-alert.retry` 权限。
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增 outbox 列表、统计、手动重试服务方法。
+- `apps/backend/src/constants/system-permissions.ts`
+  - 新增 `petpal.callback-alert.read`、`petpal.callback-alert.retry`。
+- `apps/backend/src/services/system-rbac.ts`
+  - manager 角色排除 `petpal.callback-alert.retry`。
+- `packages/api-common/src/types/petpal.ts`
+  - 新增 outbox 记录/查询/分页/统计类型。
+- `packages/api-common/src/api/factory.ts`
+  - 新增 outbox 列表、统计、重试 API 工厂方法。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增管理员 outbox 管理能力验证。
+  - 新增 non-admin 与 manager 权限边界验证。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（9/9）。
+
+Git commit：`feat(p1): add callback alert outbox admin APIs with permission boundaries`。
 - 高增长场景下需要规划审计表分区与归档策略。
