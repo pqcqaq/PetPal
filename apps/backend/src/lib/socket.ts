@@ -11,6 +11,7 @@ import {
   REALTIME_SYNC_TARGETS,
   type AuditEventPayload,
   type LiveMessage,
+  type PetPalCallbackAlertPayload,
   type PresenceChangedPayload,
   type RbacUpdatedPayload,
   type RealtimeSyncTarget,
@@ -613,6 +614,15 @@ export const emitAuditEvent = (payload: {
     createdAt: payload.createdAt ?? new Date().toISOString(),
   };
   return publishRealtimeTopic(REALTIME_TOPICS.auditEvent, normalizedPayload);
+};
+
+export const emitPetPalCallbackAlert = (payload: Omit<PetPalCallbackAlertPayload, 'publishedAt'>) => {
+  const normalizedPayload: PetPalCallbackAlertPayload = {
+    ...payload,
+    publishedAt: new Date().toISOString(),
+  };
+
+  return publishRealtimeTopic(REALTIME_TOPICS.petpalCallbackAlert, normalizedPayload);
 };
 
 export const emitRbacUpdated = (

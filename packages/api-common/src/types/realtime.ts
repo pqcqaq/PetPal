@@ -4,6 +4,7 @@ import type { LiveMessage } from './rbac';
 export const REALTIME_TOPICS = {
   auditEvent: '/system/audit/event',
   chatGlobalMessage: '/chat/global/message',
+  petpalCallbackAlert: '/petpal/callback/alert',
   presenceChanged: '/system/presence/changed',
   userRbacUpdated: (userId: string) => `/system/users/${userId}/rbac-updated`,
 } as const;
@@ -27,6 +28,17 @@ export interface AuditEventPayload {
   requestId: string;
   statusCode: number;
   createdAt: string;
+}
+
+export interface PetPalCallbackAlertPayload {
+  callbackAuditId: string;
+  callbackStatus: string;
+  callbackType: string;
+  reason: string;
+  requestId: string;
+  outboxId: string;
+  retryCount: number;
+  publishedAt: string;
 }
 
 export interface RbacUpdatedPayload {
@@ -54,5 +66,6 @@ export interface RealtimePublishEnvelope<TPayload = unknown> {
 export type RealtimeKnownPayload =
   | AuditEventPayload
   | LiveMessage
+  | PetPalCallbackAlertPayload
   | PresenceChangedPayload
   | RbacUpdatedPayload;

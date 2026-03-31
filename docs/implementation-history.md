@@ -510,4 +510,45 @@ Git commit：`feat(p1): add callback audit retention cleanup timer`。
 - `pnpm --filter @rbac/backend lint` 通过。
 
 Git commit：`feat(p1): make callback audit retention timer configurable`。
+
+## 29. PetPal 回调失败告警 Outbox 重试闭环（P1 Slice 3）
+
+**内容**：新增 PetPal 回调失败告警 outbox，打通失败入队、定时投递、失败重试和死信终止。
+
+变更摘要：
+
+- 数据层：
+  - `apps/backend/prisma/models/petpal.prisma` 新增 `CallbackAlertOutbox` 模型。
+  - 新增迁移 `apps/backend/prisma/migrations/20260401090000_add_callback_alert_outbox/migration.sql`。
+  - `apps/backend/prisma/seed-data.ts` 追加 outbox 表清空，确保 seed 幂等。
+- 业务层：
+  - `apps/backend/src/services/petpal-service.ts` 在回调失败路径入队 outbox。
+  - `apps/backend/src/services/petpal-callback-alert-outbox.ts` 新增派发器：
+    - 批量消费、原子抢占、成功置 SENT。
+    - 失败指数退避重试。
+    - 达最大重试置 DEAD。
+- 实时通道：
+  - `packages/api-common/src/types/realtime.ts` 新增 `petpalCallbackAlert` topic 与 payload 类型。
+  - `apps/backend/src/lib/socket.ts` 新增 `emitPetPalCallbackAlert`。
+  - `apps/backend/src/topics/petpal.ts` 注册新主题。
+  - `apps/backend/src/topics/index.ts` 汇总注册新主题。
+  - `apps/backend/src/constants/system-permissions.ts` 新增订阅权限 `realtime.topic.petpal-callback-alert.subscribe`。
+- 调度层：
+  - 新增 `apps/backend/src/timers/petpal-callback-alert-outbox.timer.ts`。
+  - `apps/backend/src/timers/index.ts` 接入定时器。
+  - `apps/backend/src/config/env.ts`、`apps/backend/.env.example` 新增 outbox 调度参数。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts` 增加支付/退款失败回调 outbox 入队断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（8/8）。
+
+风险与后续：
+
+- 当前 outbox 投递目标为实时通道，后续可扩展短信/企业微信/邮件多通道。
+- 死信（DEAD）已可识别，后续应补管理端死信重放与巡检面板。
+
+Git commit：`feat(p1): add callback failure alert outbox retry pipeline`。
 - 高增长场景下需要规划审计表分区与归档策略。

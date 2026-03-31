@@ -239,6 +239,32 @@ describe('PetPal API integration', () => {
     assert.equal(failedPaymentCallback.body.data.idempotent, false);
     assert.equal(failedPaymentCallback.body.data.payStatus, 'FAILED');
 
+    const failedPaymentAudit = await prisma.callbackAudit.findFirst({
+      where: {
+        paymentId: retryPayment.id,
+        callbackType: 'PAYMENT_CALLBACK',
+        callbackStatus: 'FAILURE',
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+      },
+    });
+    assert.ok(failedPaymentAudit);
+
+    const paymentOutbox = await prisma.callbackAlertOutbox.findFirst({
+      where: {
+        callbackAuditId: failedPaymentAudit.id,
+      },
+      select: {
+        status: true,
+      },
+    });
+    assert.ok(paymentOutbox);
+    assert.equal(paymentOutbox.status, 'PENDING');
+
     const recoveredPaymentCallback = await request(app)
       .post('/api/petpal/payments/callback')
       .set('x-petpal-callback-token', 'petpal-dev-callback-token')
@@ -304,6 +330,32 @@ describe('PetPal API integration', () => {
 
     assert.equal(failedRefundCallback.body.data.idempotent, false);
     assert.equal(failedRefundCallback.body.data.refundStatus, 'FAILED');
+
+    const failedRefundAudit = await prisma.callbackAudit.findFirst({
+      where: {
+        refundId: retryRefund.id,
+        callbackType: 'REFUND_CALLBACK',
+        callbackStatus: 'FAILURE',
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+      },
+    });
+    assert.ok(failedRefundAudit);
+
+    const refundOutbox = await prisma.callbackAlertOutbox.findFirst({
+      where: {
+        callbackAuditId: failedRefundAudit.id,
+      },
+      select: {
+        status: true,
+      },
+    });
+    assert.ok(refundOutbox);
+    assert.equal(refundOutbox.status, 'PENDING');
 
     const recoveredRefundCallback = await request(app)
       .post('/api/petpal/refunds/callback')

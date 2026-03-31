@@ -1054,7 +1054,7 @@ flowchart TD
 | R-001 | 支付并发回调导致金额聚合竞态 | P0 | 后端 | Open | Sprint 1 |
 | R-002 | PostGIS 迁移在不同环境不一致 | P0 | 后端/运维 | Open | Sprint 1 |
 | R-003 | activeRole 被篡改导致越权访问 | P0 | 后端 | Open | Sprint 2 |
-| R-004 | Outbox 重试策略导致消息堆积 | P1 | 后端 | Open | Sprint 3 |
+| R-004 | Outbox 重试策略导致消息堆积 | P1 | 后端 | Mitigated（MVP） | Sprint 3 |
 | R-005 | 排序策略切换后指标回落 | P2 | 产品/后端 | Open | Sprint 5 |
 
 ### 13.11 计划甘特图
@@ -1687,6 +1687,51 @@ gantt
 
 - 运维参数配置化优先于硬编码，支持不同环境保留策略差异化。
 - 默认值保持与上一切片一致（启用、90 天、每日 03:20）以避免行为突变。
+
+### 14.19 2026-04-01（P1 Slice 3）
+
+**概述**：落地宠托帮回调失败告警 outbox 重试闭环，覆盖失败入队、定时重试与死信终止。
+
+已完成：
+
+- 数据模型与迁移：
+  - `apps/backend/prisma/models/petpal.prisma` 新增 `CallbackAlertOutbox` 模型。
+  - `apps/backend/prisma/migrations/20260401090000_add_callback_alert_outbox/migration.sql` 新增 outbox 表、索引、外键。
+- 失败回调入队：
+  - `apps/backend/src/services/petpal-service.ts` 在支付/退款回调 `FAILURE` 场景写入 outbox。
+  - 覆盖普通失败和幂等冲突失败场景。
+- 重试与投递：
+  - `apps/backend/src/services/petpal-callback-alert-outbox.ts` 新增 outbox 派发器，支持：
+    - 批量拉取 `PENDING/FAILED` 且到期消息。
+    - 成功置 `SENT`。
+    - 失败指数退避重试（上限 60 分钟）。
+    - 达到最大重试次数置 `DEAD`。
+- 定时任务：
+  - `apps/backend/src/timers/petpal-callback-alert-outbox.timer.ts` 新增 outbox 消费定时器。
+  - 已接入 `apps/backend/src/timers/index.ts`。
+- 实时主题与权限：
+  - `packages/api-common/src/types/realtime.ts` 新增 `REALTIME_TOPICS.petpalCallbackAlert` 与 `PetPalCallbackAlertPayload`。
+  - `apps/backend/src/lib/socket.ts` 新增 `emitPetPalCallbackAlert`。
+  - `apps/backend/src/topics/petpal.ts` 新增主题注册。
+  - `apps/backend/src/constants/system-permissions.ts` 新增权限 `realtime.topic.petpal-callback-alert.subscribe`。
+- 环境配置：
+  - `apps/backend/src/config/env.ts` 与 `apps/backend/.env.example` 新增 outbox 调度配置：
+    - `PETPAL_CALLBACK_ALERT_OUTBOX_ENABLED`
+    - `PETPAL_CALLBACK_ALERT_OUTBOX_RUN_ON_START`
+    - `PETPAL_CALLBACK_ALERT_OUTBOX_INTERVAL_SECONDS`
+    - `PETPAL_CALLBACK_ALERT_OUTBOX_BATCH_SIZE`
+- 测试补强：
+  - `apps/backend/test/integration/petpal-api.test.ts` 增加失败回调 outbox 入队断言（支付/退款）。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（8/8）。
+
+关键设计决策：
+
+- 采用数据库 outbox + 定时拉取，优先满足可靠性与可观测性，再逐步演进到外部消息队列。
+- 用 `PENDING/FAILED/PROCESSING/SENT/DEAD` 状态机表达重试生命周期，避免重复投递失控。
 
 - 回调审计持久化：完成。
 - 管理端审计查询 API：完成。

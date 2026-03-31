@@ -5,6 +5,7 @@ import {
 } from '@rbac/api-common';
 import { auditRealtimeTopicRegistrations } from './audit';
 import { chatRealtimeTopicRegistrations } from './chat';
+import { petpalRealtimeTopicRegistrations } from './petpal';
 import { presenceRealtimeTopicRegistrations } from './presence';
 import { rbacRealtimeTopicRegistrations } from './rbac';
 import type {
@@ -24,6 +25,7 @@ const normalizeRegistration = (
 export const realtimeTopicRegistrations = [
   ...auditRealtimeTopicRegistrations,
   ...chatRealtimeTopicRegistrations,
+  ...petpalRealtimeTopicRegistrations,
   ...presenceRealtimeTopicRegistrations,
   ...rbacRealtimeTopicRegistrations,
 ].map(normalizeRegistration);

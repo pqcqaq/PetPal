@@ -65,6 +65,14 @@ type CallbackAuditQueryFilters = {
   refundId?: string;
 };
 
+type CallbackFailureAlertPayload = {
+  callbackAuditId: string;
+  callbackStatus: string;
+  callbackType: string;
+  reason: string;
+  requestId: string;
+};
+
 const buildCallbackAuditWhere = (filters: CallbackAuditQueryFilters): Prisma.CallbackAuditWhereInput => {
   const where: Prisma.CallbackAuditWhereInput = {};
 
@@ -99,6 +107,21 @@ const buildCallbackAuditWhere = (filters: CallbackAuditQueryFilters): Prisma.Cal
 
   return where;
 };
+
+const enqueueCallbackFailureAlert = async (
+  tx: Prisma.TransactionClient,
+  payload: CallbackFailureAlertPayload,
+) => tx.callbackAlertOutbox.create({
+  data: withSnowflakeId({
+    callbackAuditId: payload.callbackAuditId,
+    payload: payload as unknown as Prisma.InputJsonValue,
+    eventType: 'CALLBACK_FAILURE_ALERT',
+    status: 'PENDING',
+    retryCount: 0,
+    maxRetries: 5,
+    nextRetryAt: new Date(),
+  }),
+});
 
 export const petpalService = {
   async listPets(ownerId: string) {
@@ -428,7 +451,7 @@ export const petpalService = {
         
         // Create audit record for retry/idempotent callback if auditInfo is provided
         if (payload.auditInfo) {
-          await tx.callbackAudit.create({
+          const callbackAudit = await tx.callbackAudit.create({
             data: withSnowflakeId({
               callbackType: 'PAYMENT_CALLBACK',
               paymentId: payment.id,
@@ -446,6 +469,16 @@ export const petpalService = {
               processedAt: new Date(),
             }),
           });
+
+          if (!idempotent) {
+            await enqueueCallbackFailureAlert(tx, {
+              callbackAuditId: callbackAudit.id,
+              callbackStatus: 'FAILURE',
+              callbackType: 'PAYMENT_CALLBACK',
+              requestId: payload.auditInfo.requestId,
+              reason: 'Duplicate payment callback with mismatched channel transaction id',
+            });
+          }
         }
         
         return {
@@ -476,7 +509,7 @@ export const petpalService = {
 
       // Create audit record if auditInfo is provided
       if (payload.auditInfo) {
-        await tx.callbackAudit.create({
+        const callbackAudit = await tx.callbackAudit.create({
           data: withSnowflakeId({
             callbackType: 'PAYMENT_CALLBACK',
             paymentId: payment.id,
@@ -493,6 +526,16 @@ export const petpalService = {
             processedAt: new Date(),
           }),
         });
+
+        if (nextStatus === 'FAILED') {
+          await enqueueCallbackFailureAlert(tx, {
+            callbackAuditId: callbackAudit.id,
+            callbackStatus: 'FAILURE',
+            callbackType: 'PAYMENT_CALLBACK',
+            requestId: payload.auditInfo.requestId,
+            reason: 'Payment callback marked as FAILED',
+          });
+        }
       }
 
       const [paidRows, refundedRows, order] = await Promise.all([
@@ -601,7 +644,7 @@ export const petpalService = {
         
         // Create audit record for retry/idempotent callback if auditInfo is provided
         if (payload.auditInfo) {
-          await tx.callbackAudit.create({
+          const callbackAudit = await tx.callbackAudit.create({
             data: withSnowflakeId({
               callbackType: 'REFUND_CALLBACK',
               refundId: refund.id,
@@ -619,6 +662,16 @@ export const petpalService = {
               processedAt: new Date(),
             }),
           });
+
+          if (!idempotent) {
+            await enqueueCallbackFailureAlert(tx, {
+              callbackAuditId: callbackAudit.id,
+              callbackStatus: 'FAILURE',
+              callbackType: 'REFUND_CALLBACK',
+              requestId: payload.auditInfo.requestId,
+              reason: 'Duplicate refund callback with mismatched channel refund id',
+            });
+          }
         }
         
         return {
@@ -643,7 +696,7 @@ export const petpalService = {
 
       // Create audit record if auditInfo is provided
       if (payload.auditInfo) {
-        await tx.callbackAudit.create({
+        const callbackAudit = await tx.callbackAudit.create({
           data: withSnowflakeId({
             callbackType: 'REFUND_CALLBACK',
             refundId: refund.id,
@@ -660,6 +713,16 @@ export const petpalService = {
             processedAt: new Date(),
           }),
         });
+
+        if (nextStatus === 'FAILED') {
+          await enqueueCallbackFailureAlert(tx, {
+            callbackAuditId: callbackAudit.id,
+            callbackStatus: 'FAILURE',
+            callbackType: 'REFUND_CALLBACK',
+            requestId: payload.auditInfo.requestId,
+            reason: 'Refund callback marked as FAILED',
+          });
+        }
       }
 
       const [paidRows, refundedRows, order] = await Promise.all([

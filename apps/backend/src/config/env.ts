@@ -63,6 +63,10 @@ const envSchema = z.object({
   PETPAL_CALLBACK_AUDIT_RETENTION_ENABLED: booleanFromEnv(true),
   PETPAL_CALLBACK_AUDIT_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   PETPAL_CALLBACK_AUDIT_RETENTION_CRON: z.string().default('20 3 * * *'),
+  PETPAL_CALLBACK_ALERT_OUTBOX_ENABLED: booleanFromEnv(true),
+  PETPAL_CALLBACK_ALERT_OUTBOX_RUN_ON_START: booleanFromEnv(true),
+  PETPAL_CALLBACK_ALERT_OUTBOX_INTERVAL_SECONDS: z.coerce.number().int().positive().default(30),
+  PETPAL_CALLBACK_ALERT_OUTBOX_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173,http://localhost:9000,http://127.0.0.1:9000,http://localhost:3300,http://127.0.0.1:3300'),
 });
 

@@ -214,6 +214,7 @@ model CallbackAudit {
   updatedAt           DateTime @updatedAt
   payment             PaymentRecord? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   refund              RefundRecord? @relation(fields: [refundId], references: [id], onDelete: SetNull)
+  alertOutboxes       CallbackAlertOutbox[]
 
   @@index([requestId])
   @@index([callbackType, callbackStatus])
@@ -221,4 +222,26 @@ model CallbackAudit {
   @@index([refundId])
   @@index([createdAt])
   @@index([sourceMode])
+}
+
+model CallbackAlertOutbox {
+  id              String @id
+  createId        String?
+  updateId        String?
+  callbackAuditId String
+  eventType       String @default("CALLBACK_FAILURE_ALERT")
+  status          String @default("PENDING") // PENDING | PROCESSING | SENT | FAILED | DEAD
+  retryCount      Int @default(0)
+  maxRetries      Int @default(5)
+  nextRetryAt     DateTime @default(now())
+  lastError       String?
+  payload         Json
+  sentAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  callbackAudit   CallbackAudit @relation(fields: [callbackAuditId], references: [id], onDelete: Cascade)
+
+  @@index([callbackAuditId])
+  @@index([status, nextRetryAt])
+  @@index([createdAt])
 }
