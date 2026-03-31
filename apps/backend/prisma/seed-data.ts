@@ -14,6 +14,8 @@ export async function seedDatabase(prisma: PrismaClient) {
       "CallbackAlertOutbox",
       "RefundRecord",
       "PaymentRecord",
+      "ServiceLog",
+      "OrderTimeline",
       "OrderMain",
       "ServiceRequest",
       "CaregiverService",

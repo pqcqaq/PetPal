@@ -39,6 +39,8 @@ import type {
   CaregiverAuditPayload,
   CaregiverAuditPage,
   CaregiverAuditQuery,
+  CaregiverOrderPage,
+  CaregiverOrderQuery,
   CaregiverProfileRecord,
   CaregiverServiceRecord,
   CallbackAlertReplayLogPage,
@@ -51,6 +53,7 @@ import type {
   CallbackAuditQuery,
   CallbackAuditStats,
   CreatePetPayload,
+  CreateServiceLogPayload,
   CreateServiceRequestPayload,
   MatchCaregiverQuery,
   MatchedCaregiverPage,
@@ -412,6 +415,11 @@ export const createApiFactory = (options: ClientOptions) => {
       orders: {
         list: () => client.request<OrderRecord[]>({ url: '/petpal/orders' }),
         detail: (id: string) => client.request<OrderDetailRecord>({ url: `/petpal/orders/${id}` }),
+        confirmComplete: (id: string) =>
+          client.request<OrderDetailRecord>({
+            url: `/petpal/orders/${id}/confirm-complete`,
+            method: 'POST',
+          }),
       },
       match: {
         caregivers: (query: MatchCaregiverQuery) =>
@@ -428,6 +436,11 @@ export const createApiFactory = (options: ClientOptions) => {
             method: 'PUT',
             data: payload,
           }),
+        orders: (query?: CaregiverOrderQuery) =>
+          client.request<CaregiverOrderPage>({
+            url: '/petpal/caregiver/orders',
+            params: query as unknown as QueryParams,
+          }),
         services: () => client.request<CaregiverServiceRecord[]>({ url: '/petpal/caregiver/services' }),
         createService: (payload: UpsertCaregiverServicePayload) =>
           client.request<CaregiverServiceRecord>({
@@ -440,6 +453,29 @@ export const createApiFactory = (options: ClientOptions) => {
             url: `/petpal/caregiver/services/${id}`,
             method: 'PUT',
             data: payload,
+          }),
+        acceptOrder: (orderId: string) =>
+          client.request<OrderDetailRecord>({
+            url: `/petpal/caregiver/orders/${orderId}/accept`,
+            method: 'POST',
+          }),
+        checkInOrder: (orderId: string, payload?: { note?: string; geo?: Record<string, unknown> }) =>
+          client.request<OrderDetailRecord>({
+            url: `/petpal/caregiver/orders/${orderId}/check-in`,
+            method: 'POST',
+            data: payload ?? {},
+          }),
+        addServiceLog: (orderId: string, payload: CreateServiceLogPayload) =>
+          client.request<OrderDetailRecord>({
+            url: `/petpal/caregiver/orders/${orderId}/service-logs`,
+            method: 'POST',
+            data: payload,
+          }),
+        checkOutOrder: (orderId: string, payload?: { note?: string; geo?: Record<string, unknown> }) =>
+          client.request<OrderDetailRecord>({
+            url: `/petpal/caregiver/orders/${orderId}/check-out`,
+            method: 'POST',
+            data: payload ?? {},
           }),
       },
       admin: {

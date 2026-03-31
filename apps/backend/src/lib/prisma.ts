@@ -45,6 +45,15 @@ const auditedModelNames = new Set([
   'OAuthState',
   'OAuthUser',
   'OAuthToken',
+  'PetProfile',
+  'CaregiverProfile',
+  'CaregiverService',
+  'ServiceRequest',
+  'OrderMain',
+  'OrderTimeline',
+  'ServiceLog',
+  'PaymentRecord',
+  'RefundRecord',
 ]);
 
 const softDeleteModelNames = new Set(auditedModelNames);

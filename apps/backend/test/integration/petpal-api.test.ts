@@ -234,6 +234,189 @@ describe('PetPal API integration', () => {
     );
   });
 
+  it('supports caregiver fulfillment actions and owner completion workflow', async () => {
+    const { app, prisma } = context;
+    const ownerSession = await loginAs(app, 'user', 'User123!');
+    const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
+
+    const [pet, caregiverProfile] = await Promise.all([
+      prisma.petProfile.findFirst({
+        where: {
+          ownerId: ownerSession.user.id,
+        },
+        select: {
+          id: true,
+        },
+      }),
+      prisma.caregiverProfile.findFirst({
+        where: {
+          userId: caregiverSession.user.id,
+        },
+        select: {
+          id: true,
+        },
+      }),
+    ]);
+
+    assert.ok(pet);
+    assert.ok(caregiverProfile);
+
+    const requestRecord = await prisma.serviceRequest.create({
+      data: {
+        id: `req-fulfill-${Date.now().toString(36)}`,
+        ownerId: ownerSession.user.id,
+        petId: pet.id,
+        serviceType: 'WALKING',
+        startTime: new Date('2026-04-03T09:00:00.000Z'),
+        endTime: new Date('2026-04-03T10:00:00.000Z'),
+        locationText: '杭州市滨江区',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 88,
+        demandTags: ['dog', 'walk'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfile.id,
+      },
+    });
+
+    const order = await prisma.orderMain.create({
+      data: {
+        id: `order-fulfill-${Date.now().toString(36)}`,
+        orderNo: `PP-FULFILL-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceRequestId: requestRecord.id,
+        serviceType: 'WALKING',
+        appointmentStart: new Date('2026-04-03T09:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-03T10:00:00.000Z'),
+        amountTotal: 88,
+        amountAdjusted: 0,
+        amountPaid: 88,
+        amountRefunded: 0,
+        orderStatus: 'PENDING_ACCEPT',
+      },
+    });
+
+    const caregiverOrdersResponse = await request(app)
+      .get('/api/petpal/caregiver/orders')
+      .query({ status: 'PENDING_ACCEPT' })
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(
+      caregiverOrdersResponse.body.data.items.some(
+        (item: { id: string }) => item.id === order.id,
+      ),
+    );
+
+    const acceptResponse = await request(app)
+      .post(`/api/petpal/caregiver/orders/${order.id}/accept`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(acceptResponse.body.data.orderStatus, 'ACCEPTED');
+    assert.ok(
+      acceptResponse.body.data.timeline.some(
+        (item: { eventType: string }) => item.eventType === 'ACCEPTED',
+      ),
+    );
+
+    const checkInResponse = await request(app)
+      .post(`/api/petpal/caregiver/orders/${order.id}/check-in`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .send({
+        note: '已到达约定地点',
+        geo: { lat: 30.206, lng: 120.211 },
+      })
+      .expect(200);
+
+    assert.equal(checkInResponse.body.data.orderStatus, 'SERVING');
+    assert.ok(
+      checkInResponse.body.data.serviceLogs.some(
+        (item: { logType: string }) => item.logType === 'CHECK_IN',
+      ),
+    );
+
+    await request(app)
+      .post(`/api/petpal/caregiver/orders/${order.id}/check-in`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(400);
+
+    const addLogResponse = await request(app)
+      .post(`/api/petpal/caregiver/orders/${order.id}/service-logs`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .send({
+        logType: 'NOTE',
+        textNote: '已完成 30 分钟遛狗，精神状态良好',
+      })
+      .expect(200);
+
+    assert.ok(
+      addLogResponse.body.data.timeline.some(
+        (item: { eventType: string }) => item.eventType === 'SERVICE_LOGGED',
+      ),
+    );
+    assert.ok(
+      addLogResponse.body.data.serviceLogs.some(
+        (item: { logType: string; textNote: string }) => item.logType === 'NOTE'
+          && item.textNote.includes('30 分钟遛狗'),
+      ),
+    );
+
+    const caregiverDetailResponse = await request(app)
+      .get(`/api/petpal/orders/${order.id}`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(caregiverDetailResponse.body.data.id, order.id);
+
+    const checkOutResponse = await request(app)
+      .post(`/api/petpal/caregiver/orders/${order.id}/check-out`)
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .send({
+        note: '服务结束，宠物状态稳定',
+      })
+      .expect(200);
+
+    assert.ok(
+      checkOutResponse.body.data.timeline.some(
+        (item: { eventType: string }) => item.eventType === 'CHECKED_OUT',
+      ),
+    );
+
+    const confirmResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/confirm-complete`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(confirmResponse.body.data.orderStatus, 'COMPLETED');
+    assert.ok(
+      confirmResponse.body.data.timeline.some(
+        (item: { eventType: string }) => item.eventType === 'COMPLETED',
+      ),
+    );
+
+    const persistedOrder = await prisma.orderMain.findUnique({
+      where: {
+        id: order.id,
+      },
+      select: {
+        orderStatus: true,
+        closedAt: true,
+        serviceRequest: {
+          select: {
+            status: true,
+          },
+        },
+      },
+    });
+
+    assert.ok(persistedOrder);
+    assert.equal(persistedOrder.orderStatus, 'COMPLETED');
+    assert.ok(persistedOrder.closedAt);
+    assert.equal(persistedOrder.serviceRequest?.status, 'CLOSED');
+  });
+
   it('handles payment and refund callbacks with idempotency', async () => {
     const { app, prisma } = context;
 

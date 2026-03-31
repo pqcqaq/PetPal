@@ -10,13 +10,26 @@ export type OrderStatus =
   | 'SERVING'
   | 'COMPLETED'
   | 'CANCELLED'
+  | 'DISPUTED'
   | 'PARTIAL_REFUNDED'
   | 'REFUNDED';
-export type PaymentBizType = 'DEPOSIT' | 'TAIL' | 'ADJUSTMENT';
+export type PaymentBizType = 'DEPOSIT' | 'BALANCE' | 'ADJUSTMENT';
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'CLOSED';
-export type RefundType = 'OWNER_CANCEL' | 'SERVICE_EXCEPTION' | 'DISPUTE';
+export type RefundType = 'FULL' | 'PARTIAL';
 export type RefundStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
 export type CaregiverAuditStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type OrderTimelineEventType =
+  | 'CREATED'
+  | 'ACCEPTED'
+  | 'CHECKED_IN'
+  | 'SERVICE_LOGGED'
+  | 'CHECKED_OUT'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'REFUND_APPLIED'
+  | 'REFUND_DONE';
+export type OrderOperatorRole = 'OWNER' | 'CAREGIVER' | 'ADMIN' | 'SYSTEM';
+export type ServiceLogType = 'CHECK_IN' | 'FEED' | 'WALK' | 'PLAY' | 'HEALTH' | 'CHECK_OUT' | 'NOTE';
 
 type AmountValue = number | string;
 
@@ -115,6 +128,29 @@ export interface RefundRecordDetail extends RefundRecordBrief {
   updatedAt: string;
 }
 
+export interface OrderTimelineRecord {
+  id: string;
+  orderId: string;
+  eventType: OrderTimelineEventType;
+  operatorRole: OrderOperatorRole;
+  operatorId: string | null;
+  eventPayload: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface ServiceLogRecord {
+  id: string;
+  orderId: string;
+  caregiverId: string;
+  logType: ServiceLogType;
+  textNote: string | null;
+  mediaUrls: string[];
+  geo: Record<string, unknown> | null;
+  happenedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface OrderRecord {
   id: string;
   orderNo: string;
@@ -135,7 +171,40 @@ export interface OrderRecord {
   refunds: RefundRecordBrief[];
 }
 
-export type OrderDetailRecord = OrderRecord;
+export interface OrderDetailRecord extends OrderRecord {
+  timeline: OrderTimelineRecord[];
+  serviceLogs: ServiceLogRecord[];
+}
+
+export interface CaregiverOrderRecord extends OrderRecord {
+  ownerNickname: string;
+  petName: string | null;
+  locationText: string | null;
+}
+
+export interface CaregiverOrderQuery {
+  status?: OrderStatus;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CaregiverOrderPage {
+  items: CaregiverOrderRecord[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface CreateServiceLogPayload {
+  logType: ServiceLogType;
+  textNote?: string;
+  mediaUrls?: string[];
+  geo?: Record<string, unknown>;
+  happenedAt?: string;
+}
 
 export interface MatchCaregiverQuery {
   serviceType: PetServiceType;

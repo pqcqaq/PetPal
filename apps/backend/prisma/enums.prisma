@@ -140,6 +140,35 @@ enum OrderStatus {
   REFUNDED
 }
 
+enum OrderTimelineEventType {
+  CREATED
+  ACCEPTED
+  CHECKED_IN
+  SERVICE_LOGGED
+  CHECKED_OUT
+  COMPLETED
+  CANCELLED
+  REFUND_APPLIED
+  REFUND_DONE
+}
+
+enum OrderOperatorRole {
+  OWNER
+  CAREGIVER
+  ADMIN
+  SYSTEM
+}
+
+enum ServiceLogType {
+  CHECK_IN
+  FEED
+  WALK
+  PLAY
+  HEALTH
+  CHECK_OUT
+  NOTE
+}
+
 enum PaymentBizType {
   DEPOSIT
   BALANCE

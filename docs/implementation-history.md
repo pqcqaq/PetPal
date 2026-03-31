@@ -1,6 +1,6 @@
 # Implementation History
 
-Last updated: 2026-03-31
+Last updated: 2026-04-01
 
 本文档记录最近一轮主要实现成果，用于帮助后续开发者快速恢复项目上下文。它不是计划，也不是宣传文案，而是“已经落地了什么”的摘要。
 
@@ -869,6 +869,56 @@ Git commit：待本切片提交。
 - `pnpm --filter @rbac/backend lint` 通过。
 - `pnpm --filter @rbac/web-frontend lint` 通过。
 - `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（11/11）。
+
+Git commit：待本切片提交。
+
+## 52. PetPal 接单履约后端与 Web 工作台（P1-M2 Slice 25）
+
+**内容**：实现照料者履约主链路的后端接口、订单时间线与服务日志模型，并在 Web 前台交付最小履约工作台。
+
+变更摘要：
+
+- `apps/backend/prisma/enums.prisma`
+  - 新增 `OrderTimelineEventType`、`OrderOperatorRole`、`ServiceLogType`。
+- `apps/backend/prisma/models/petpal.prisma`
+  - `OrderMain` 新增 `timelines` / `serviceLogs` 关联。
+  - `CaregiverProfile` 新增 `serviceLogs` 关联。
+  - 新增 `OrderTimeline`、`ServiceLog` 两张履约表。
+- `apps/backend/prisma/migrations/20260401123000_add_petpal_fulfillment_tables/migration.sql`
+  - 新增履约表、索引、外键迁移。
+- `packages/api-common/src/types/petpal.ts`
+  - 新增履约相关共享类型。
+  - 修正支付/退款枚举与后端实际值对齐。
+- `packages/api-common/src/api/factory.ts`
+  - 新增 caregiver 履约动作 API 与 owner 确认完成 API。
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增 caregiver 订单列表、接单、签到、服务记录、签退、业主确认完成服务方法。
+  - 订单详情响应统一输出 `timeline`，修复内部实体 `timelines` 与外部契约不一致问题。
+- `apps/backend/src/routes/petpal.ts`
+  - 新增 6 个履约接口：
+    - `GET /api/petpal/caregiver/orders`
+    - `POST /api/petpal/caregiver/orders/:id/accept`
+    - `POST /api/petpal/caregiver/orders/:id/check-in`
+    - `POST /api/petpal/caregiver/orders/:id/service-logs`
+    - `POST /api/petpal/caregiver/orders/:id/check-out`
+    - `POST /api/petpal/orders/:id/confirm-complete`
+- `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - 新增履约工作台与相关动作按钮。
+  - 业主订单列表新增确认完成动作。
+  - 修复状态筛选控件类型问题，使用空字符串哨兵值替代 `undefined`。
+- `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+  - 补齐新增枚举的前端展示映射。
+- `apps/app-frontend/src/pages/order-detail/index.vue`
+  - 同步补齐移动端详情映射。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增履约链路集成测试，覆盖成功路径与重复签到失败路径。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（12/12）。
 
 Git commit：待本切片提交。
 

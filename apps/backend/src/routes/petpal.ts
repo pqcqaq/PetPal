@@ -8,6 +8,17 @@ import { petpalService } from '../services/petpal-service';
 import { verifyPetpalCallbackAuth } from '../services/petpal-callback-auth';
 import { getRequestId } from '../utils/request-context';
 
+const orderStatusEnum = z.enum([
+  'PENDING_ACCEPT',
+  'ACCEPTED',
+  'SERVING',
+  'COMPLETED',
+  'CANCELLED',
+  'DISPUTED',
+  'PARTIAL_REFUNDED',
+  'REFUNDED',
+]);
+
 const petSchema = z.object({
   name: z.string().trim().min(1).max(50),
   species: z.enum(['DOG', 'CAT', 'OTHER']),
@@ -67,6 +78,25 @@ const caregiverAuditListQuerySchema = z.object({
   auditStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),
   city: z.string().trim().max(50).optional(),
   keyword: z.string().trim().max(50).optional(),
+});
+
+const caregiverOrderQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(100).optional(),
+  status: orderStatusEnum.optional(),
+});
+
+const caregiverOrderActionSchema = z.object({
+  note: z.string().trim().max(500).optional(),
+  geo: z.record(z.string(), z.unknown()).optional(),
+});
+
+const caregiverServiceLogSchema = z.object({
+  logType: z.enum(['CHECK_IN', 'FEED', 'WALK', 'PLAY', 'HEALTH', 'CHECK_OUT', 'NOTE']),
+  textNote: z.string().trim().max(1000).optional(),
+  mediaUrls: z.array(z.string().trim().min(1).max(500)).max(20).optional(),
+  geo: z.record(z.string(), z.unknown()).optional(),
+  happenedAt: z.coerce.date().optional(),
 });
 
 const paymentCallbackSchema = z.object({
@@ -213,6 +243,12 @@ petpalRouter.get('/orders/:id', asyncHandler(async (req, res) => {
   return ok(res, order, 'Order detail');
 }));
 
+petpalRouter.post('/orders/:id/confirm-complete', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const order = await petpalService.confirmOwnerOrderComplete(auth.id, String(req.params.id));
+  return ok(res, order, 'Order completed');
+}));
+
 petpalRouter.get('/match/caregivers', asyncHandler(async (req, res) => {
   const { page, pageSize } = parsePagination(req.query);
   const query = matchQuerySchema.parse(req.query);
@@ -228,6 +264,25 @@ petpalRouter.get('/caregiver/profile', asyncHandler(async (req, res) => {
   const auth = req.auth!;
   const profile = await petpalService.getOrCreateCaregiverProfile(auth.id);
   return ok(res, profile, 'Caregiver profile');
+}));
+
+petpalRouter.get('/caregiver/orders', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const { page, pageSize } = parsePagination(req.query);
+  const query = caregiverOrderQuerySchema.parse({
+    ...req.query,
+    page,
+    pageSize,
+  });
+
+  const result = await petpalService.listCaregiverOrders({
+    userId: auth.id,
+    page: query.page ?? page,
+    pageSize: query.pageSize ?? pageSize,
+    status: query.status,
+  });
+
+  return ok(res, result, 'Caregiver order list');
 }));
 
 petpalRouter.put('/caregiver/profile', asyncHandler(async (req, res) => {
@@ -255,6 +310,33 @@ petpalRouter.put('/caregiver/services/:id', asyncHandler(async (req, res) => {
   const payload = caregiverServiceSchema.parse(req.body ?? {});
   const service = await petpalService.updateCaregiverService(auth.id, String(req.params.id), payload);
   return ok(res, service, 'Caregiver service updated');
+}));
+
+petpalRouter.post('/caregiver/orders/:id/accept', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const order = await petpalService.acceptCaregiverOrder(auth.id, String(req.params.id));
+  return ok(res, order, 'Order accepted');
+}));
+
+petpalRouter.post('/caregiver/orders/:id/check-in', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = caregiverOrderActionSchema.parse(req.body ?? {});
+  const order = await petpalService.checkInCaregiverOrder(auth.id, String(req.params.id), payload);
+  return ok(res, order, 'Order checked in');
+}));
+
+petpalRouter.post('/caregiver/orders/:id/service-logs', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = caregiverServiceLogSchema.parse(req.body ?? {});
+  const order = await petpalService.addCaregiverServiceLog(auth.id, String(req.params.id), payload);
+  return ok(res, order, 'Service log created');
+}));
+
+petpalRouter.post('/caregiver/orders/:id/check-out', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = caregiverOrderActionSchema.parse(req.body ?? {});
+  const order = await petpalService.checkOutCaregiverOrder(auth.id, String(req.params.id), payload);
+  return ok(res, order, 'Order checked out');
 }));
 
 petpalRouter.post('/admin/caregivers/:id/audit', requirePermission('petpal.caregiver.audit'), asyncHandler(async (req, res) => {

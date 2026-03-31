@@ -43,6 +43,7 @@ model CaregiverProfile {
   services         CaregiverService[]
   acceptedRequests ServiceRequest[]     @relation("MatchedCaregiver")
   orders           OrderMain[]
+  serviceLogs      ServiceLog[]
 
   @@index([serviceCity])
   @@index([auditStatus])
@@ -133,11 +134,54 @@ model OrderMain {
   serviceRequest   ServiceRequest?  @relation(fields: [serviceRequestId], references: [id], onDelete: SetNull)
   payments         PaymentRecord[]
   refunds          RefundRecord[]
+  timelines        OrderTimeline[]
+  serviceLogs      ServiceLog[]
 
   @@index([ownerId, orderStatus])
   @@index([caregiverId, orderStatus])
   @@index([serviceRequestId])
   @@index([appointmentStart, appointmentEnd])
+  @@index([deleteAt])
+}
+
+model OrderTimeline {
+  id           String                 @id
+  createId     String?
+  updateId     String?
+  orderId      String
+  eventType    OrderTimelineEventType
+  operatorRole OrderOperatorRole
+  operatorId   String?
+  eventPayload Json?
+  createdAt    DateTime               @default(now())
+  deleteAt     DateTime?
+  order        OrderMain              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([deleteAt])
+}
+
+model ServiceLog {
+  id         String         @id
+  createId   String?
+  updateId   String?
+  orderId     String
+  caregiverId String
+  logType    ServiceLogType
+  textNote   String?
+  mediaUrls  Json?
+  geo        Json?
+  happenedAt DateTime
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  deleteAt   DateTime?
+  order      OrderMain      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  caregiver  CaregiverProfile @relation(fields: [caregiverId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, happenedAt])
+  @@index([caregiverId, happenedAt])
+  @@index([logType])
   @@index([deleteAt])
 }
 

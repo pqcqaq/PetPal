@@ -112,15 +112,31 @@
 
           <el-table :data="orders" size="small" v-loading="ordersLoading">
             <el-table-column prop="orderNo" label="订单号" min-width="180" />
-            <el-table-column prop="orderStatus" label="状态" min-width="120" />
+            <el-table-column prop="orderStatus" label="状态" min-width="120">
+              <template #default="scope">
+                {{ getOrderStatusLabel(scope.row.orderStatus) }}
+              </template>
+            </el-table-column>
             <el-table-column prop="amountTotal" label="总额" min-width="100" />
             <el-table-column prop="amountPaid" label="已付" min-width="100" />
             <el-table-column prop="amountRefunded" label="已退" min-width="100" />
-            <el-table-column label="操作" min-width="100" fixed="right">
+            <el-table-column label="操作" min-width="180" fixed="right">
               <template #default="scope">
-                <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
-                  <el-button link type="primary" size="small">查看详情</el-button>
-                </RouterLink>
+                <el-space>
+                  <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
+                    <el-button link type="primary" size="small">查看详情</el-button>
+                  </RouterLink>
+                  <el-button
+                    v-if="scope.row.orderStatus === 'SERVING'"
+                    link
+                    type="success"
+                    size="small"
+                    :loading="caregiverActionLoadingKey === `confirm:${scope.row.id}`"
+                    @click="confirmOrderComplete(scope.row.id)"
+                  >
+                    确认完成
+                  </el-button>
+                </el-space>
               </template>
             </el-table-column>
           </el-table>
@@ -261,11 +277,93 @@
         </el-table>
       </article>
     </section>
+
+    <section class="frontend-card">
+      <span class="frontend-card__eyebrow">履约工作台</span>
+      <h3>照料者订单与动作</h3>
+      <el-space wrap style="margin-bottom: 12px">
+        <el-select v-model="caregiverOrderQuery.status" style="width: 160px" @change="loadCaregiverOrders">
+          <el-option label="全部状态" value="" />
+          <el-option label="待接单" value="PENDING_ACCEPT" />
+          <el-option label="已接单" value="ACCEPTED" />
+          <el-option label="服务中" value="SERVING" />
+          <el-option label="已完成" value="COMPLETED" />
+        </el-select>
+        <el-button @click="loadCaregiverOrders">刷新履约列表</el-button>
+      </el-space>
+
+      <el-table :data="caregiverOrders" size="small" v-loading="caregiverOrdersLoading">
+        <el-table-column prop="orderNo" label="订单号" min-width="160" />
+        <el-table-column prop="ownerNickname" label="主人" min-width="120" />
+        <el-table-column prop="petName" label="宠物" min-width="120" />
+        <el-table-column prop="locationText" label="地点" min-width="160" />
+        <el-table-column prop="appointmentStart" label="预约开始" min-width="170">
+          <template #default="scope">
+            {{ formatTime(scope.row.appointmentStart) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="orderStatus" label="状态" min-width="120">
+          <template #default="scope">
+            {{ getOrderStatusLabel(scope.row.orderStatus) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="动作" min-width="320" fixed="right">
+          <template #default="scope">
+            <el-space wrap>
+              <el-button
+                v-if="scope.row.orderStatus === 'PENDING_ACCEPT'"
+                link
+                type="primary"
+                size="small"
+                :loading="caregiverActionLoadingKey === `accept:${scope.row.id}`"
+                @click="acceptCaregiverOrder(scope.row.id)"
+              >
+                接单
+              </el-button>
+              <el-button
+                v-if="scope.row.orderStatus === 'ACCEPTED'"
+                link
+                type="warning"
+                size="small"
+                :loading="caregiverActionLoadingKey === `checkin:${scope.row.id}`"
+                @click="checkInCaregiverOrder(scope.row.id)"
+              >
+                签到
+              </el-button>
+              <el-button
+                v-if="scope.row.orderStatus === 'SERVING'"
+                link
+                type="primary"
+                size="small"
+                :loading="caregiverActionLoadingKey === `log:${scope.row.id}`"
+                @click="addCaregiverServiceLog(scope.row.id)"
+              >
+                服务记录
+              </el-button>
+              <el-button
+                v-if="scope.row.orderStatus === 'SERVING'"
+                link
+                type="success"
+                size="small"
+                :loading="caregiverActionLoadingKey === `checkout:${scope.row.id}`"
+                @click="checkOutCaregiverOrder(scope.row.id)"
+              >
+                签退
+              </el-button>
+              <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
+                <el-button link type="info" size="small">详情</el-button>
+              </RouterLink>
+            </el-space>
+          </template>
+        </el-table-column>
+      </el-table>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import type {
+  CaregiverOrderRecord,
   CaregiverProfileRecord,
   CaregiverServiceRecord,
   CreatePetPayload,
@@ -273,11 +371,12 @@ import type {
   MatchCaregiverQuery,
   MatchedCaregiverRecord,
   OrderRecord,
+  OrderStatus,
   PetProfileRecord,
   ServiceRequestRecord,
 } from '@rbac/api-common';
 import { onMounted, reactive, ref } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '@/api/client';
 import { getErrorMessage } from '@/utils/errors';
 
@@ -291,6 +390,7 @@ const orders = ref<OrderRecord[]>([]);
 const matchItems = ref<MatchedCaregiverRecord[]>([]);
 const caregiverProfile = ref<CaregiverProfileRecord | null>(null);
 const caregiverServices = ref<CaregiverServiceRecord[]>([]);
+const caregiverOrders = ref<CaregiverOrderRecord[]>([]);
 
 const petsLoading = ref(false);
 const requestsLoading = ref(false);
@@ -300,6 +400,8 @@ const petSaving = ref(false);
 const requestSaving = ref(false);
 const caregiverProfileSaving = ref(false);
 const caregiverServiceSaving = ref(false);
+const caregiverOrdersLoading = ref(false);
+const caregiverActionLoadingKey = ref('');
 
 const petForm = reactive<CreatePetPayload>({
   name: '',
@@ -352,7 +454,27 @@ const caregiverServiceForm = reactive({
   isActive: true,
 });
 
+const caregiverOrderQuery = reactive<{
+  page: number;
+  pageSize: number;
+  status: OrderStatus | '';
+}>({
+  page: 1,
+  pageSize: 10,
+  status: 'PENDING_ACCEPT',
+});
+
 const formatTime = (value: string) => new Date(value).toLocaleString();
+const getOrderStatusLabel = (status: OrderStatus) => ({
+  PENDING_ACCEPT: '待接单',
+  ACCEPTED: '已接单',
+  SERVING: '服务中',
+  COMPLETED: '已完成',
+  CANCELLED: '已取消',
+  DISPUTED: '纠纷中',
+  PARTIAL_REFUNDED: '部分退款',
+  REFUNDED: '已退款',
+}[status] ?? status);
 
 const loadPets = async () => {
   try {
@@ -422,6 +544,91 @@ const loadCaregiverServices = async () => {
     ElMessage.error(getErrorMessage(error, '加载照料服务失败'));
   }
 };
+
+const loadCaregiverOrders = async () => {
+  try {
+    caregiverOrdersLoading.value = true;
+    const response = await api.petpal.caregiver.orders({
+      page: caregiverOrderQuery.page,
+      pageSize: caregiverOrderQuery.pageSize,
+      status: caregiverOrderQuery.status || undefined,
+    });
+    caregiverOrders.value = response.items;
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '加载履约订单失败'));
+  } finally {
+    caregiverOrdersLoading.value = false;
+  }
+};
+
+const withCaregiverOrderAction = async (
+  key: string,
+  successMessage: string,
+  action: () => Promise<void>,
+) => {
+  try {
+    caregiverActionLoadingKey.value = key;
+    await action();
+    ElMessage.success(successMessage);
+    await Promise.all([loadCaregiverOrders(), loadOrders()]);
+  } catch (error: unknown) {
+    if (error === 'cancel' || error === 'close') {
+      return;
+    }
+    ElMessage.error(getErrorMessage(error, '履约动作执行失败'));
+  } finally {
+    caregiverActionLoadingKey.value = '';
+  }
+};
+
+const acceptCaregiverOrder = async (orderId: string) => withCaregiverOrderAction(
+  `accept:${orderId}`,
+  '已接单',
+  async () => {
+    await api.petpal.caregiver.acceptOrder(orderId);
+  },
+);
+
+const checkInCaregiverOrder = async (orderId: string) => withCaregiverOrderAction(
+  `checkin:${orderId}`,
+  '签到成功',
+  async () => {
+    await api.petpal.caregiver.checkInOrder(orderId);
+  },
+);
+
+const addCaregiverServiceLog = async (orderId: string) => withCaregiverOrderAction(
+  `log:${orderId}`,
+  '服务记录已保存',
+  async () => {
+    const { value } = await ElMessageBox.prompt('填写本次服务记录', '新增服务记录', {
+      inputType: 'textarea',
+      inputPlaceholder: '例如：已遛狗 30 分钟，精神状态正常',
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+    });
+    await api.petpal.caregiver.addServiceLog(orderId, {
+      logType: 'NOTE',
+      textNote: value,
+    });
+  },
+);
+
+const checkOutCaregiverOrder = async (orderId: string) => withCaregiverOrderAction(
+  `checkout:${orderId}`,
+  '签退成功',
+  async () => {
+    await api.petpal.caregiver.checkOutOrder(orderId);
+  },
+);
+
+const confirmOrderComplete = async (orderId: string) => withCaregiverOrderAction(
+  `confirm:${orderId}`,
+  '订单已确认完成',
+  async () => {
+    await api.petpal.orders.confirmComplete(orderId);
+  },
+);
 
 const saveCaregiverProfile = async () => {
   try {
@@ -531,6 +738,7 @@ const reloadAll = async () => {
     loadMatches(),
     loadCaregiverProfile(),
     loadCaregiverServices(),
+    loadCaregiverOrders(),
   ]);
 };
 

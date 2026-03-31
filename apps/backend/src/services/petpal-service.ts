@@ -1,9 +1,6 @@
 import { prisma } from '../lib/prisma';
-import { Prisma } from '../lib/prisma-generated';
+import { Prisma, PrismaClient } from '../lib/prisma-generated';
 import type {
-  CallbackAudit,
-  CaregiverService,
-  OrderMain,
   PetProfile,
   ServiceRequest,
 } from '../lib/prisma-generated';
@@ -173,6 +170,118 @@ const buildCallbackAlertOutboxWhere = (
 
   return where;
 };
+
+const orderDetailInclude = {
+  payments: {
+    where: {
+      deleteAt: null,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  },
+  refunds: {
+    where: {
+      deleteAt: null,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  },
+  timelines: {
+    where: {
+      deleteAt: null,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  },
+  serviceLogs: {
+    where: {
+      deleteAt: null,
+    },
+    orderBy: {
+      happenedAt: 'asc',
+    },
+  },
+} satisfies Prisma.OrderMainInclude;
+
+type OrderDetailEntity = Prisma.OrderMainGetPayload<{
+  include: typeof orderDetailInclude;
+}>;
+
+type OrderDetailRecord = Omit<OrderDetailEntity, 'timelines'> & {
+  timeline: OrderDetailEntity['timelines'];
+};
+
+const toOrderDetailRecord = (order: OrderDetailEntity): OrderDetailRecord => {
+  const { timelines, ...rest } = order;
+  return {
+    ...rest,
+    timeline: timelines,
+  };
+};
+
+const loadOrderDetailById = async (
+  client: Prisma.TransactionClient | PrismaClient,
+  orderId: string,
+) => {
+  const order = await client.orderMain.findUnique({
+    where: {
+      id: orderId,
+    },
+    include: orderDetailInclude,
+  });
+
+  if (!order) {
+    throw notFound('Order not found');
+  }
+
+  assertOrderAmountInvariant(order);
+  return toOrderDetailRecord(order);
+};
+
+const appendOrderTimeline = async (
+  client: Prisma.TransactionClient,
+  payload: {
+    orderId: string;
+    eventType: 'CREATED' | 'ACCEPTED' | 'CHECKED_IN' | 'SERVICE_LOGGED' | 'CHECKED_OUT' | 'COMPLETED' | 'CANCELLED' | 'REFUND_APPLIED' | 'REFUND_DONE';
+    operatorRole: 'OWNER' | 'CAREGIVER' | 'ADMIN' | 'SYSTEM';
+    operatorId?: string | null;
+    eventPayload?: Prisma.InputJsonValue;
+  },
+) => client.orderTimeline.create({
+  data: withSnowflakeId({
+    orderId: payload.orderId,
+    eventType: payload.eventType,
+    operatorRole: payload.operatorRole,
+    operatorId: payload.operatorId ?? null,
+    eventPayload: payload.eventPayload ?? Prisma.JsonNull,
+  }),
+});
+
+const appendServiceLog = async (
+  client: Prisma.TransactionClient,
+  payload: {
+    orderId: string;
+    caregiverId: string;
+    logType: 'CHECK_IN' | 'FEED' | 'WALK' | 'PLAY' | 'HEALTH' | 'CHECK_OUT' | 'NOTE';
+    textNote?: string | null;
+    mediaUrls?: string[];
+    geo?: Record<string, unknown> | null;
+    happenedAt?: Date;
+  },
+) => client.serviceLog.create({
+  data: withSnowflakeId({
+    orderId: payload.orderId,
+    caregiverId: payload.caregiverId,
+    logType: payload.logType,
+    textNote: payload.textNote?.trim() || null,
+    mediaUrls: (payload.mediaUrls ?? []) as Prisma.InputJsonValue,
+    geo: payload.geo ? payload.geo as Prisma.InputJsonValue : Prisma.JsonNull,
+    happenedAt: payload.happenedAt ?? new Date(),
+  }),
+});
 
 const writeCallbackAlertReplayLog = async (input: {
   outboxIds: string[];
@@ -434,6 +543,91 @@ export const petpalService = {
     };
   },
 
+  async listCaregiverOrders(payload: {
+    userId: string;
+    page: number;
+    pageSize: number;
+    status?: 'PENDING_ACCEPT' | 'ACCEPTED' | 'SERVING' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'PARTIAL_REFUNDED' | 'REFUNDED';
+  }) {
+    const where: Prisma.OrderMainWhereInput = {
+      deleteAt: null,
+      caregiver: {
+        userId: payload.userId,
+        deleteAt: null,
+      },
+      orderStatus: payload.status,
+    };
+
+    const [total, rows] = await Promise.all([
+      prisma.orderMain.count({ where }),
+      prisma.orderMain.findMany({
+        where,
+        include: {
+          owner: {
+            select: {
+              nickname: true,
+            },
+          },
+          serviceRequest: {
+            select: {
+              locationText: true,
+              pet: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+          payments: {
+            where: {
+              deleteAt: null,
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
+          refunds: {
+            where: {
+              deleteAt: null,
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
+        },
+        orderBy: [
+          {
+            appointmentStart: 'asc',
+          },
+          {
+            createdAt: 'desc',
+          },
+        ],
+        skip: (payload.page - 1) * payload.pageSize,
+        take: payload.pageSize,
+      }),
+    ]);
+
+    rows.forEach((order) => {
+      assertOrderAmountInvariant(order);
+    });
+
+    return {
+      items: rows.map((order) => ({
+        ...order,
+        ownerNickname: order.owner.nickname,
+        petName: order.serviceRequest?.pet?.name ?? null,
+        locationText: order.serviceRequest?.locationText ?? null,
+      })),
+      pagination: {
+        page: payload.page,
+        pageSize: payload.pageSize,
+        total,
+        totalPages: Math.ceil(total / payload.pageSize),
+      },
+    };
+  },
+
   async listPets(ownerId: string) {
     return prisma.petProfile.findMany({
       where: {
@@ -572,57 +766,24 @@ export const petpalService = {
     return orders;
   },
 
-  async getOwnerOrderDetail(ownerId: string, orderId: string): Promise<OrderMain & {
-    payments: Array<{
-      id: string;
-      payNo: string;
-      bizType: string;
-      payStatus: string;
-      payAmount: Prisma.Decimal;
-      paidAt: Date | null;
-    }>;
-    refunds: Array<{
-      id: string;
-      refundNo: string;
-      refundType: string;
-      refundStatus: string;
-      refundAmount: Prisma.Decimal;
-      reviewedAt: Date | null;
-    }>;
-  }> {
+  async getOwnerOrderDetail(ownerId: string, orderId: string): Promise<OrderDetailRecord> {
     const order = await prisma.orderMain.findFirst({
       where: {
         id: orderId,
-        ownerId,
+        deleteAt: null,
+        OR: [
+          {
+            ownerId,
+          },
+          {
+            caregiver: {
+              userId: ownerId,
+              deleteAt: null,
+            },
+          },
+        ],
       },
-      include: {
-        payments: {
-          where: {
-            deleteAt: null,
-          },
-          select: {
-            id: true,
-            payNo: true,
-            bizType: true,
-            payStatus: true,
-            payAmount: true,
-            paidAt: true,
-          },
-        },
-        refunds: {
-          where: {
-            deleteAt: null,
-          },
-          select: {
-            id: true,
-            refundNo: true,
-            refundType: true,
-            refundStatus: true,
-            refundAmount: true,
-            reviewedAt: true,
-          },
-        },
-      },
+      include: orderDetailInclude,
     });
 
     if (!order) {
@@ -630,7 +791,305 @@ export const petpalService = {
     }
 
     assertOrderAmountInvariant(order);
-    return order;
+    return toOrderDetailRecord(order);
+  },
+
+  async acceptCaregiverOrder(userId: string, orderId: string) {
+    return runSerializableTransaction(async (tx) => {
+      const order = await tx.orderMain.findFirst({
+        where: {
+          id: orderId,
+          deleteAt: null,
+          caregiver: {
+            userId,
+            auditStatus: 'APPROVED',
+            deleteAt: null,
+          },
+        },
+        select: {
+          id: true,
+          orderStatus: true,
+        },
+      });
+
+      if (!order) {
+        throw notFound('Order not found');
+      }
+
+      if (order.orderStatus !== 'PENDING_ACCEPT') {
+        throw badRequest('Only pending orders can be accepted');
+      }
+
+      await tx.orderMain.update({
+        where: {
+          id: order.id,
+        },
+        data: {
+          orderStatus: 'ACCEPTED',
+        },
+      });
+
+      await appendOrderTimeline(tx, {
+        orderId: order.id,
+        eventType: 'ACCEPTED',
+        operatorRole: 'CAREGIVER',
+        operatorId: userId,
+        eventPayload: {
+          previousStatus: order.orderStatus,
+          nextStatus: 'ACCEPTED',
+        } as Prisma.InputJsonValue,
+      });
+
+      return loadOrderDetailById(tx, order.id);
+    });
+  },
+
+  async checkInCaregiverOrder(userId: string, orderId: string, payload?: {
+    note?: string;
+    geo?: Record<string, unknown>;
+  }) {
+    return runSerializableTransaction(async (tx) => {
+      const order = await tx.orderMain.findFirst({
+        where: {
+          id: orderId,
+          deleteAt: null,
+          caregiver: {
+            userId,
+            auditStatus: 'APPROVED',
+            deleteAt: null,
+          },
+        },
+        select: {
+          id: true,
+          caregiverId: true,
+          orderStatus: true,
+        },
+      });
+
+      if (!order) {
+        throw notFound('Order not found');
+      }
+
+      if (order.orderStatus !== 'ACCEPTED') {
+        throw badRequest('Only accepted orders can be checked in');
+      }
+
+      await tx.orderMain.update({
+        where: {
+          id: order.id,
+        },
+        data: {
+          orderStatus: 'SERVING',
+        },
+      });
+
+      const happenedAt = new Date();
+      await appendServiceLog(tx, {
+        orderId: order.id,
+        caregiverId: order.caregiverId,
+        logType: 'CHECK_IN',
+        textNote: payload?.note,
+        geo: payload?.geo ?? null,
+        happenedAt,
+      });
+
+      await appendOrderTimeline(tx, {
+        orderId: order.id,
+        eventType: 'CHECKED_IN',
+        operatorRole: 'CAREGIVER',
+        operatorId: userId,
+        eventPayload: {
+          previousStatus: order.orderStatus,
+          nextStatus: 'SERVING',
+          note: payload?.note ?? null,
+          geo: payload?.geo ?? null,
+          happenedAt: happenedAt.toISOString(),
+        } as Prisma.InputJsonValue,
+      });
+
+      return loadOrderDetailById(tx, order.id);
+    });
+  },
+
+  async addCaregiverServiceLog(userId: string, orderId: string, payload: {
+    logType: 'CHECK_IN' | 'FEED' | 'WALK' | 'PLAY' | 'HEALTH' | 'CHECK_OUT' | 'NOTE';
+    textNote?: string;
+    mediaUrls?: string[];
+    geo?: Record<string, unknown>;
+    happenedAt?: Date;
+  }) {
+    if (!payload.textNote?.trim() && !(payload.mediaUrls?.length)) {
+      throw badRequest('Service log requires text note or media');
+    }
+
+    return runSerializableTransaction(async (tx) => {
+      const order = await tx.orderMain.findFirst({
+        where: {
+          id: orderId,
+          deleteAt: null,
+          caregiver: {
+            userId,
+            auditStatus: 'APPROVED',
+            deleteAt: null,
+          },
+        },
+        select: {
+          id: true,
+          caregiverId: true,
+          orderStatus: true,
+        },
+      });
+
+      if (!order) {
+        throw notFound('Order not found');
+      }
+
+      if (order.orderStatus !== 'SERVING') {
+        throw badRequest('Only serving orders can add service logs');
+      }
+
+      const happenedAt = payload.happenedAt ?? new Date();
+      await appendServiceLog(tx, {
+        orderId: order.id,
+        caregiverId: order.caregiverId,
+        logType: payload.logType,
+        textNote: payload.textNote,
+        mediaUrls: payload.mediaUrls,
+        geo: payload.geo ?? null,
+        happenedAt,
+      });
+
+      await appendOrderTimeline(tx, {
+        orderId: order.id,
+        eventType: 'SERVICE_LOGGED',
+        operatorRole: 'CAREGIVER',
+        operatorId: userId,
+        eventPayload: {
+          logType: payload.logType,
+          note: payload.textNote?.trim() || null,
+          mediaCount: payload.mediaUrls?.length ?? 0,
+          geo: payload.geo ?? null,
+          happenedAt: happenedAt.toISOString(),
+        } as Prisma.InputJsonValue,
+      });
+
+      return loadOrderDetailById(tx, order.id);
+    });
+  },
+
+  async checkOutCaregiverOrder(userId: string, orderId: string, payload?: {
+    note?: string;
+    geo?: Record<string, unknown>;
+  }) {
+    return runSerializableTransaction(async (tx) => {
+      const order = await tx.orderMain.findFirst({
+        where: {
+          id: orderId,
+          deleteAt: null,
+          caregiver: {
+            userId,
+            auditStatus: 'APPROVED',
+            deleteAt: null,
+          },
+        },
+        select: {
+          id: true,
+          caregiverId: true,
+          orderStatus: true,
+        },
+      });
+
+      if (!order) {
+        throw notFound('Order not found');
+      }
+
+      if (order.orderStatus !== 'SERVING') {
+        throw badRequest('Only serving orders can be checked out');
+      }
+
+      const happenedAt = new Date();
+      await appendServiceLog(tx, {
+        orderId: order.id,
+        caregiverId: order.caregiverId,
+        logType: 'CHECK_OUT',
+        textNote: payload?.note,
+        geo: payload?.geo ?? null,
+        happenedAt,
+      });
+
+      await appendOrderTimeline(tx, {
+        orderId: order.id,
+        eventType: 'CHECKED_OUT',
+        operatorRole: 'CAREGIVER',
+        operatorId: userId,
+        eventPayload: {
+          note: payload?.note ?? null,
+          geo: payload?.geo ?? null,
+          happenedAt: happenedAt.toISOString(),
+        } as Prisma.InputJsonValue,
+      });
+
+      return loadOrderDetailById(tx, order.id);
+    });
+  },
+
+  async confirmOwnerOrderComplete(ownerId: string, orderId: string) {
+    return runSerializableTransaction(async (tx) => {
+      const order = await tx.orderMain.findFirst({
+        where: {
+          id: orderId,
+          ownerId,
+          deleteAt: null,
+        },
+        select: {
+          id: true,
+          serviceRequestId: true,
+          orderStatus: true,
+        },
+      });
+
+      if (!order) {
+        throw notFound('Order not found');
+      }
+
+      if (order.orderStatus !== 'SERVING') {
+        throw badRequest('Only serving orders can be completed by owner');
+      }
+
+      await tx.orderMain.update({
+        where: {
+          id: order.id,
+        },
+        data: {
+          orderStatus: 'COMPLETED',
+          closedAt: new Date(),
+        },
+      });
+
+      if (order.serviceRequestId) {
+        await tx.serviceRequest.update({
+          where: {
+            id: order.serviceRequestId,
+          },
+          data: {
+            status: 'CLOSED',
+          },
+        });
+      }
+
+      await appendOrderTimeline(tx, {
+        orderId: order.id,
+        eventType: 'COMPLETED',
+        operatorRole: 'OWNER',
+        operatorId: ownerId,
+        eventPayload: {
+          previousStatus: order.orderStatus,
+          nextStatus: 'COMPLETED',
+        } as Prisma.InputJsonValue,
+      });
+
+      return loadOrderDetailById(tx, order.id);
+    });
   },
 
   async listMatchedCaregivers(payload: {

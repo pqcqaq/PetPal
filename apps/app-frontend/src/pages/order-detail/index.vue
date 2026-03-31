@@ -31,6 +31,7 @@ const labels = {
     SERVING: '服务中',
     COMPLETED: '已完成',
     CANCELLED: '已取消',
+    DISPUTED: '纠纷中',
     PARTIAL_REFUNDED: '部分退款',
     REFUNDED: '全额退款',
   } as Record<string, string>,
@@ -54,13 +55,12 @@ const labels = {
     FAILED: '退款失败',
   } as Record<string, string>,
   refundType: {
-    OWNER_CANCEL: '主人取消',
-    SERVICE_EXCEPTION: '服务异常',
-    DISPUTE: '纠纷',
+    FULL: '全额退款',
+    PARTIAL: '部分退款',
   } as Record<string, string>,
   paymentBizType: {
     DEPOSIT: '定金',
-    TAIL: '尾款',
+    BALANCE: '尾款',
     ADJUSTMENT: '调整',
   } as Record<string, string>,
 }
