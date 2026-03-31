@@ -1,14 +1,14 @@
 <template>
   <section class="frontend-page__hero">
-    <p class="frontend-page__eyebrow">产品概览</p>
-    <h1>简洁的权限管理控制台。</h1>
+    <p class="frontend-page__eyebrow">PetPal Product</p>
+    <h1>把宠物临时照料做成可追溯、可监管的真实产品。</h1>
     <p>
-      统一管理用户、角色、权限、菜单和审计信息，支持多种登录方式，适合后台权限与访问控制场景。
+      从主人端宠物档案、需求发布、订单跟进，到后台投诉治理、照料者审核和回调审计，PetPal 已经围绕实际业务落地。
     </p>
 
     <div class="frontend-page__hero-actions">
       <RouterLink class="frontend-page__button is-primary" :to="consoleTarget">{{ consoleLabel }}</RouterLink>
-      <RouterLink class="frontend-page__button is-secondary" to="/architecture">查看系统结构</RouterLink>
+      <RouterLink class="frontend-page__button is-secondary" to="/petpal">进入主人服务台</RouterLink>
     </div>
 
     <div class="hero-signal-grid">

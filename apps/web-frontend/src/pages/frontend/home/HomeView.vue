@@ -4,9 +4,9 @@
 
     <section class="frontend-card intro-card">
       <span class="frontend-card__eyebrow">使用方式</span>
-      <h2>首页看概览，控制台做操作。</h2>
+      <h2>公开页看产品，主人台和后台直接办事。</h2>
       <p>
-        公开页面用于说明系统和提供入口，控制台用于实际管理。信息更少，路径更清楚，操作也更直接。
+        公开前台只负责说明 PetPal 的业务结构和进入方式。主人服务台负责订单流，后台负责治理流，页面边界已经按真实产品拆开。
       </p>
     </section>
 

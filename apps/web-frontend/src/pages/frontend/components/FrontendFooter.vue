@@ -2,10 +2,10 @@
   <footer class="frontend-footer">
     <div class="frontend-footer__inner">
       <section class="frontend-footer__intro">
-        <p class="frontend-footer__eyebrow">权限控制台</p>
-        <h2>简洁的入口，明确的操作区。</h2>
+        <p class="frontend-footer__eyebrow">PetPal</p>
+        <h2>主人办事直接，后台治理也直接。</h2>
         <p>
-          首页用于概览和入口，控制台用于实际管理。路径简单，信息清楚，适合继续扩展。
+          公开页负责产品说明和入口，主人服务台负责真实订单流，PetPal 后台负责投诉、审核和回调治理。
         </p>
       </section>
 

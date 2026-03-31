@@ -2,10 +2,10 @@
   <header class="frontend-header">
     <div class="frontend-header__inner">
       <RouterLink to="/" class="frontend-brand">
-        <span class="frontend-brand__mark">RB</span>
+        <span class="frontend-brand__mark">PP</span>
         <span class="frontend-brand__copy">
-          <strong>权限控制台</strong>
-          <small>访问管理示例</small>
+          <strong>宠托帮 PetPal</strong>
+          <small>Trusted Pet Care</small>
         </span>
       </RouterLink>
 

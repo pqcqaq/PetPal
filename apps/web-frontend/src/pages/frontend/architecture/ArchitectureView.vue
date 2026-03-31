@@ -1,10 +1,10 @@
 <template>
   <div class="frontend-page">
     <section class="frontend-page__hero">
-      <p class="frontend-page__eyebrow">系统结构</p>
-      <h1>页面结构更清晰，入口更直接。</h1>
+      <p class="frontend-page__eyebrow">产品结构</p>
+      <h1>PetPal 已经按主人流和治理流拆开。</h1>
       <p>
-        公开页面负责概览和入口，认证页负责登录与注册，控制台负责业务操作。不同场景各自独立，使用起来更直接。
+        公开前台负责产品说明，主人服务台负责宠物和订单主流程，PetPal 后台负责投诉、审核和回调治理，入口已经不再沿用模板式控制台结构。
       </p>
     </section>
 
@@ -21,4 +21,3 @@ import ArchitectureOperatingModel from './components/ArchitectureOperatingModel.
 const layers = architectureLayers.map((item) => ({ ...item, details: [...item.details] }));
 const principles = [...operatingPrinciples];
 </script>
-

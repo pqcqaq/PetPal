@@ -3829,6 +3829,57 @@ gantt
 2. 继续补投诉工单的独立值班页或超时提醒，提升后台主动治理能力。
 3. 视售后字段扩展情况，考虑抽离双端共用的时间线聚合逻辑，减少页面内重复映射代码。
 
+### 14.76 2026-04-01（P1-M3 Slice 59）
+
+**概述**：继续响应“项目模板要完全改成 PetPal 落地实现”的方向，本轮把 `web-frontend` 公开前台中残留的“权限控制台 / RBAC 示例”文案整体替换为 PetPal 产品表达。
+
+已完成：
+
+- 公开前台品牌与首页表达全面切换：
+  - `apps/web-frontend/src/pages/frontend/frontend-content.ts`
+  - `apps/web-frontend/src/pages/frontend/home/HomeView.vue`
+  - `apps/web-frontend/src/pages/frontend/home/components/HomeHero.vue`
+  - `apps/web-frontend/src/pages/frontend/home/components/HomeConsolePreview.vue`
+  - 首页信号、能力卡片、后台亮点、结构说明与认证流程描述全部改为 PetPal 业务语境：
+    - 主人服务台
+    - PetPal 后台直达治理
+    - 履约与售后留痕
+    - 投诉工单、照料者审核、回调审计、告警队列
+- 公共品牌与页脚同步去模板化：
+  - `apps/web-frontend/src/pages/frontend/components/FrontendHeader.vue`
+  - `apps/web-frontend/src/pages/frontend/components/FrontendFooter.vue`
+  - 品牌从“权限控制台 / 访问管理示例”改为“宠托帮 PetPal / Trusted Pet Care”
+  - 页脚介绍改为 PetPal 公开页、主人服务台和后台治理的产品分工
+- 结构页与认证页同步改写：
+  - `apps/web-frontend/src/pages/frontend/architecture/ArchitectureView.vue`
+  - `apps/web-frontend/src/pages/frontend/authentication/AuthenticationView.vue`
+  - 对外说明不再强调通用 RBAC 架构，而是明确：
+    - 公开前台
+    - 主人服务台
+    - PetPal 后台
+    - 认证与偏好同步
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认本轮只替换公开前台文案和品牌表达，没有改动后台权限判断、路由守卫和业务接口，不会影响已落地的 PetPal 主流程。
+- 已确认首页 CTA 仍然指向已完成的 PetPal 主人服务台与根级后台入口，没有重新引回旧的模板式 `/console` 入口。
+- 已确认结构页和认证页对外说明已与当前项目真实实现保持一致，避免用户从公开页读到已经失效的模板能力描述。
+
+风险与缓解：
+
+- 风险：当前公开页已经 PetPal 化，但 `app-frontend` 个别二级页和 `web-frontend` 个别错误页/辅助页仍有少量底层账户或权限术语。
+- 缓解：本轮先优先清理用户一眼能看到的公开前台；下一步继续处理移动端资料页等残余模板表达。
+
+下一步（1-3）：
+
+1. 继续重构 `apps/app-frontend/src/pages/me/profile.vue`，去掉权限中心式资料页表达。
+2. 继续清理 Web 端剩余辅助页和错误页里的模板式“控制台”措辞。
+3. 继续按 PetPal 产品流补更多后台摘要信息，让 `/petpal-admin` 首页更接近真实业务指挥台。
+
 ### 14.75 2026-04-01（P1-M3 Slice 58）
 
 **概述**：响应“app 端不能继续保留 RBAC 模板式门户”的方向，本轮直接替换 Uni 端首页、我的页和设置页实现，把移动端主入口重构为 PetPal 产品工作台。

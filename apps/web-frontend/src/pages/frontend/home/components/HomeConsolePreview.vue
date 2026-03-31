@@ -1,10 +1,10 @@
 <template>
   <section class="frontend-page__section-grid">
     <article class="frontend-card console-preview console-preview--lead">
-      <span class="frontend-card__eyebrow">控制台</span>
-      <h2>控制台聚焦实际管理。</h2>
+      <span class="frontend-card__eyebrow">PetPal Admin</span>
+      <h2>后台聚焦投诉、审核和回调治理。</h2>
       <p>
-        页面内容围绕用户、角色、权限和审计，进入后就可以直接开始操作。
+        进入 PetPal 后台后，不再先过一层模板菜单，而是直接进入真实业务工作区。
       </p>
     </article>
 
@@ -44,4 +44,3 @@ defineProps<{
   }
 }
 </style>
-
