@@ -136,6 +136,12 @@
         />
         <el-button @click="applyReplayFilters">筛选</el-button>
       </el-space>
+      <el-space wrap style="margin-bottom: 12px">
+        <el-tag type="info">总记录 {{ replayStats.total }}</el-tag>
+        <el-tag type="success">单条重放 {{ replayStats.byAction.REQUEUE }}</el-tag>
+        <el-tag type="warning">批量重放 {{ replayStats.byAction.REQUEUE_DEAD_BATCH }}</el-tag>
+        <el-tag>操作人数 {{ replayStats.uniqueActorCount }}</el-tag>
+      </el-space>
       <el-table :data="replayLogs" v-loading="replayLoading" border>
         <el-table-column prop="createdAt" label="时间" min-width="170" />
         <el-table-column prop="actionType" label="动作" min-width="150" />
@@ -167,6 +173,7 @@ import type {
   DownloadRequestConfig,
   CallbackAlertReplayLogPage,
   CallbackAlertReplayLogRecord,
+  CallbackAlertReplayLogStats,
   CallbackAlertOutboxPage,
   CallbackAlertOutboxRecord,
   CallbackAlertOutboxStatus,
@@ -204,6 +211,14 @@ const replayLogs = ref<CallbackAlertReplayLogRecord[]>([]);
 const replayPage = ref(1);
 const replayPageSize = 10;
 const replayTotal = ref(0);
+const replayStats = ref<CallbackAlertReplayLogStats>({
+  total: 0,
+  byAction: {
+    REQUEUE: 0,
+    REQUEUE_DEAD_BATCH: 0,
+  },
+  uniqueActorCount: 0,
+});
 const currentReplayOutboxId = ref<string>('');
 const replayFilter = ref<{
   actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
@@ -351,17 +366,22 @@ const reloadReplayLogs = async () => {
 
   replayLoading.value = true;
   try {
-    const replayPageData = await api.petpal.admin.callbackAlertOutboxReplayLogs(currentReplayOutboxId.value, {
+    const replayQuery = {
       page: replayPage.value,
       pageSize: replayPageSize,
       actionType: replayFilter.value.actionType,
       actorId: replayFilter.value.actorId?.trim() || undefined,
       startDate: replayFilter.value.range?.[0],
       endDate: replayFilter.value.range?.[1],
-    });
+    };
+    const [replayPageData, replayStatsData] = await Promise.all([
+      api.petpal.admin.callbackAlertOutboxReplayLogs(currentReplayOutboxId.value, replayQuery),
+      api.petpal.admin.callbackAlertOutboxReplayLogStats(currentReplayOutboxId.value, replayQuery),
+    ]);
     const data = replayPageData as CallbackAlertReplayLogPage;
     replayLogs.value = data.items;
     replayTotal.value = data.pagination.total;
+    replayStats.value = replayStatsData;
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '加载重放记录失败'));
   } finally {

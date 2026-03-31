@@ -1313,6 +1313,61 @@ export const petpalService = {
       },
     });
   },
+
+  async queryCallbackAlertReplayLogStats(
+    callbackOutboxId: string,
+    filters?: {
+      actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
+      actorId?: string;
+      startDate?: Date;
+      endDate?: Date;
+    },
+  ) {
+    const where: Prisma.CallbackAlertReplayLogWhereInput = {
+      callbackOutboxId,
+      actionType: filters?.actionType,
+      actorId: filters?.actorId,
+      createdAt: {
+        gte: filters?.startDate,
+        lte: filters?.endDate,
+      },
+    };
+
+    const [total, byActionRows, uniqueActorRows] = await Promise.all([
+      prisma.callbackAlertReplayLog.count({ where }),
+      prisma.callbackAlertReplayLog.groupBy({
+        by: ['actionType'],
+        where,
+        _count: {
+          _all: true,
+        },
+      }),
+      prisma.callbackAlertReplayLog.groupBy({
+        by: ['actorId'],
+        where: {
+          ...where,
+          actorId: {
+            not: null,
+          },
+        },
+      }),
+    ]);
+
+    const byAction = {
+      REQUEUE: 0,
+      REQUEUE_DEAD_BATCH: 0,
+    };
+
+    byActionRows.forEach((row) => {
+      byAction[row.actionType as 'REQUEUE' | 'REQUEUE_DEAD_BATCH'] = row._count._all;
+    });
+
+    return {
+      total,
+      byAction,
+      uniqueActorCount: uniqueActorRows.length,
+    };
+  },
 };
 
 export const purgeExpiredCallbackAudits = async (olderThanDays = 90) => {

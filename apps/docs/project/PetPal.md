@@ -2174,3 +2174,42 @@ gantt
 
 - 将导出视为高敏感操作，与查看权限分离，降低数据批量泄露风险。
 - 角色基线遵循“最小权限”原则，导出能力仅保留给高权限角色。
+
+### 14.33 2026-04-01（P1 Slice 17）
+
+**概述**：新增 replay log 统计接口与抽屉统计展示，支持快速识别重放动作分布与操作人规模。
+
+已完成：
+
+- 路由与服务层：
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `GET /api/petpal/admin/callback-alert-outbox/:id/replay-logs/stats`。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 新增 `queryCallbackAlertReplayLogStats`，输出：
+      - `total`
+      - `byAction.REQUEUE`
+      - `byAction.REQUEUE_DEAD_BATCH`
+      - `uniqueActorCount`
+- 共享契约与 API 工厂：
+  - `packages/api-common/src/types/petpal.ts` 新增 `CallbackAlertReplayLogStats`。
+  - `packages/api-common/src/api/factory.ts` 新增 `callbackAlertOutboxReplayLogStats`。
+- 前端：
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+    - 抽屉新增统计标签（总记录、单条重放、批量重放、操作人数）。
+    - 列表与统计并行请求，筛选条件保持一致。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增 replay log stats 响应断言。
+    - 新增 stats 接口权限边界断言（member 403 / manager 200）。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- 统计接口复用 replay log 筛选参数，保证列表与统计口径一致。
+- 操作人统计采用非空 actorId 去重，避免系统任务与人工操作混淆。

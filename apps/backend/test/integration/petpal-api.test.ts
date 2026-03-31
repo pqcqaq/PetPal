@@ -843,6 +843,16 @@ describe('PetPal API integration', () => {
     assert.ok(filteredReplayLogs.body.data.items.every((item: any) => item.actionType === 'REQUEUE_DEAD_BATCH'));
     assert.ok(filteredReplayLogs.body.data.items.every((item: any) => item.actorId === adminSession.user.id));
 
+    const replayLogStatsResponse = await request(app)
+      .get(`/api/petpal/admin/callback-alert-outbox/${outboxId}/replay-logs/stats`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(typeof replayLogStatsResponse.body.data.total === 'number');
+    assert.ok(typeof replayLogStatsResponse.body.data.byAction.REQUEUE === 'number');
+    assert.ok(typeof replayLogStatsResponse.body.data.byAction.REQUEUE_DEAD_BATCH === 'number');
+    assert.ok(typeof replayLogStatsResponse.body.data.uniqueActorCount === 'number');
+
     const futureReplayLogs = await request(app)
       .get(`/api/petpal/admin/callback-alert-outbox/${outboxId}/replay-logs`)
       .query({ startDate: '2099-01-01T00:00:00.000Z', endDate: '2099-12-31T23:59:59.999Z' })
@@ -926,6 +936,11 @@ describe('PetPal API integration', () => {
       .expect(403);
 
     await request(app)
+      .get('/api/petpal/admin/callback-alert-outbox/unknown/replay-logs/stats')
+      .set(authHeader)
+      .expect(403);
+
+    await request(app)
       .get('/api/petpal/admin/callback-alert-outbox/replay-logs/export?outboxId=unknown')
       .set(authHeader)
       .expect(403);
@@ -975,6 +990,11 @@ describe('PetPal API integration', () => {
 
     await request(app)
       .get('/api/petpal/admin/callback-alert-outbox/unknown/replay-logs')
+      .set(authHeader)
+      .expect(200);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-alert-outbox/unknown/replay-logs/stats')
       .set(authHeader)
       .expect(200);
 

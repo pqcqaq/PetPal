@@ -304,3 +304,12 @@ export interface CallbackAlertReplayLogPage {
     totalPages: number;
   };
 }
+
+export interface CallbackAlertReplayLogStats {
+  total: number;
+  byAction: {
+    REQUEUE: number;
+    REQUEUE_DEAD_BATCH: number;
+  };
+  uniqueActorCount: number;
+}

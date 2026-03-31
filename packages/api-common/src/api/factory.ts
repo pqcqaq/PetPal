@@ -38,6 +38,7 @@ import type {
 import type {
   CallbackAlertReplayLogPage,
   CallbackAlertReplayLogQuery,
+  CallbackAlertReplayLogStats,
   CallbackAlertOutboxPage,
   CallbackAlertOutboxQuery,
   CallbackAlertOutboxStats,
@@ -448,6 +449,16 @@ export const createApiFactory = (options: ClientOptions) => {
             params: {
               page: query.page,
               pageSize: query.pageSize,
+              actionType: query.actionType,
+              actorId: query.actorId,
+              startDate: query.startDate,
+              endDate: query.endDate,
+            },
+          }),
+        callbackAlertOutboxReplayLogStats: (id: string, query: CallbackAlertReplayLogQuery = {}) =>
+          client.request<CallbackAlertReplayLogStats>({
+            url: `/petpal/admin/callback-alert-outbox/${id}/replay-logs/stats`,
+            params: {
               actionType: query.actionType,
               actorId: query.actorId,
               startDate: query.startDate,

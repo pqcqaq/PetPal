@@ -262,6 +262,17 @@ petpalRouter.get('/admin/callback-alert-outbox/:id/replay-logs', requirePermissi
   return ok(res, result, 'Callback alert outbox replay logs');
 }));
 
+petpalRouter.get('/admin/callback-alert-outbox/:id/replay-logs/stats', requirePermission('petpal.callback-alert.read'), asyncHandler(async (req, res) => {
+  const query = callbackAlertOutboxReplayLogQuerySchema.parse(req.query ?? {});
+  const result = await petpalService.queryCallbackAlertReplayLogStats(String(req.params.id), {
+    actionType: query.actionType,
+    actorId: query.actorId,
+    startDate: query.startDate,
+    endDate: query.endDate,
+  });
+  return ok(res, result, 'Callback alert outbox replay log stats');
+}));
+
 petpalRouter.get(
   '/admin/callback-alert-outbox/replay-logs/export',
   requirePermission('petpal.callback-alert.export'),
