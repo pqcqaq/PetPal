@@ -854,6 +854,14 @@ describe('PetPal API integration', () => {
     assert.ok(typeof replayLogStatsResponse.body.data.uniqueActorCount === 'number');
     assert.ok(typeof replayLogStatsResponse.body.data.batchReplayRatio === 'number');
     assert.ok(typeof replayLogStatsResponse.body.data.isBatchReplayDominant === 'boolean');
+    assert.ok(
+      replayLogStatsResponse.body.data.latestReplayAt === null
+      || typeof replayLogStatsResponse.body.data.latestReplayAt === 'string',
+    );
+    assert.ok(
+      replayLogStatsResponse.body.data.minutesSinceLastReplay === null
+      || typeof replayLogStatsResponse.body.data.minutesSinceLastReplay === 'number',
+    );
 
     const futureReplayLogs = await request(app)
       .get(`/api/petpal/admin/callback-alert-outbox/${outboxId}/replay-logs`)

@@ -2246,3 +2246,35 @@ gantt
 
 - 风险信号采用“占比 + 最小样本量”组合，降低小样本误报。
 - 批量占比保留 4 位小数用于审计精度，前端展示转换为百分比。
+
+### 14.35 2026-04-01（P1 Slice 19）
+
+**概述**：增强 replay log 时效信号，新增“最近重放时间”与“距今分钟数”。
+
+已完成：
+
+- 服务层：
+  - `apps/backend/src/services/petpal-service.ts`
+    - `queryCallbackAlertReplayLogStats` 增加：
+      - `latestReplayAt`
+      - `minutesSinceLastReplay`
+    - 统计逻辑基于筛选结果取最新 `createdAt`，并计算当前时间差。
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts` 扩展 replay stats 字段。
+- 前端：
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+    - 抽屉统计区新增“最近重放”“距今分钟数”标签。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts` 增加字段类型断言（string/null、number/null）。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- 时效信号返回 null 表示无样本，避免前端将 0 误判为“刚发生”。
+- 通过统一 stats 接口返回，避免前端额外计算导致时区与时钟偏差。

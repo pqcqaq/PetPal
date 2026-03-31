@@ -314,4 +314,6 @@ export interface CallbackAlertReplayLogStats {
   uniqueActorCount: number;
   batchReplayRatio: number;
   isBatchReplayDominant: boolean;
+  latestReplayAt: string | null;
+  minutesSinceLastReplay: number | null;
 }

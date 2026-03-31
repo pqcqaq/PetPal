@@ -142,6 +142,8 @@
         <el-tag type="warning">批量重放 {{ replayStats.byAction.REQUEUE_DEAD_BATCH }}</el-tag>
         <el-tag>操作人数 {{ replayStats.uniqueActorCount }}</el-tag>
         <el-tag>批量占比 {{ Number((replayStats.batchReplayRatio * 100).toFixed(1)) }}%</el-tag>
+        <el-tag type="info">最近重放 {{ replayStats.latestReplayAt || '-' }}</el-tag>
+        <el-tag>距今 {{ replayStats.minutesSinceLastReplay ?? '-' }} 分钟</el-tag>
         <el-tag v-if="replayStats.isBatchReplayDominant" type="danger">批量重放占比偏高</el-tag>
       </el-space>
       <el-table :data="replayLogs" v-loading="replayLoading" border>
@@ -222,6 +224,8 @@ const replayStats = ref<CallbackAlertReplayLogStats>({
   uniqueActorCount: 0,
   batchReplayRatio: 0,
   isBatchReplayDominant: false,
+  latestReplayAt: null,
+  minutesSinceLastReplay: null,
 });
 const currentReplayOutboxId = ref<string>('');
 const replayFilter = ref<{

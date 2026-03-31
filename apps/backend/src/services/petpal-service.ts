@@ -1333,7 +1333,7 @@ export const petpalService = {
       },
     };
 
-    const [total, byActionRows, uniqueActorRows] = await Promise.all([
+    const [total, byActionRows, uniqueActorRows, latestReplay] = await Promise.all([
       prisma.callbackAlertReplayLog.count({ where }),
       prisma.callbackAlertReplayLog.groupBy({
         by: ['actionType'],
@@ -1351,6 +1351,15 @@ export const petpalService = {
           },
         },
       }),
+      prisma.callbackAlertReplayLog.findFirst({
+        where,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        select: {
+          createdAt: true,
+        },
+      }),
     ]);
 
     const byAction = {
@@ -1366,6 +1375,10 @@ export const petpalService = {
       ? Number((byAction.REQUEUE_DEAD_BATCH / total).toFixed(4))
       : 0;
     const isBatchReplayDominant = total >= 5 && batchReplayRatio >= 0.7;
+    const latestReplayAt = latestReplay?.createdAt.toISOString() ?? null;
+    const minutesSinceLastReplay = latestReplay
+      ? Math.floor((Date.now() - latestReplay.createdAt.getTime()) / 60000)
+      : null;
 
     return {
       total,
@@ -1373,6 +1386,8 @@ export const petpalService = {
       uniqueActorCount: uniqueActorRows.length,
       batchReplayRatio,
       isBatchReplayDominant,
+      latestReplayAt,
+      minutesSinceLastReplay,
     };
   },
 };

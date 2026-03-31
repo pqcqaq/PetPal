@@ -742,6 +742,31 @@ Git commit：`feat(p1): add callback alert replay logs for outbox requeue tracea
 
 Git commit：待本切片提交。
 
+## 45. PetPal replay log 时效信号（P1 Slice 19）
+
+**内容**：在 replay log 统计中新增“最近重放时间”和“距今分钟数”，提升值班诊断效率。
+
+变更摘要：
+
+- `apps/backend/src/services/petpal-service.ts`
+  - replay stats 新增 `latestReplayAt` 与 `minutesSinceLastReplay`。
+  - 基于最新 `createdAt` 计算分钟差，空样本返回 null。
+- `packages/api-common/src/types/petpal.ts`
+  - replay stats 类型同步新增字段。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 抽屉统计区新增时效标签。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增时效字段类型断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+Git commit：待本切片提交。
+
 ## 44. PetPal replay log 风险信号增强（P1 Slice 18）
 
 **内容**：在 replay log 统计中新增“批量重放占比”与“批量主导告警”指标，提升治理可视化能力。
