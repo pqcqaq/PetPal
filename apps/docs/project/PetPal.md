@@ -3045,3 +3045,74 @@ gantt
 1. 评估是否为服务日志媒体补充独立权限码，避免长期依赖标签白名单。
 2. 为管理员纠纷排查页复用服务日志媒体与履约时间线展示。
 3. 继续推进 P1-M3 的评价/投诉/售后主链路，避免项目停留在履约阶段。
+
+### 14.48 2026-04-01（P1-M3 Slice 31）
+
+**概述**：启动 P1-M3 用户反馈闭环的第一条主链路，先落地“订单完成后评价”这一最小可交付能力，确保主人端、照料者画像和订单详情都能串起来。
+
+已完成：
+
+- 评价模型与接口：
+  - `apps/backend/prisma/models/auth.prisma`
+  - `apps/backend/prisma/models/petpal.prisma`
+  - `apps/backend/prisma/migrations/20260401183000_add_petpal_review_table/migration.sql`
+    - 新增 `Review` 模型与数据表。
+    - 约束一单一评：`orderId` 唯一。
+    - 绑定关系：
+      - `owner -> User`
+      - `caregiver -> CaregiverProfile`
+      - `order -> OrderMain`
+    - 预留标签、匿名标记、软删除与时间索引，便于后续投诉/统计复用。
+- API 契约与后端业务：
+  - `packages/api-common/src/types/petpal.ts`
+  - `packages/api-common/src/api/factory.ts`
+  - `apps/backend/src/routes/petpal.ts`
+  - `apps/backend/src/services/petpal-service.ts`
+    - 新增 `POST /api/petpal/orders/:id/review`。
+    - 订单详情新增 `review` 字段，前后端可直接复用。
+    - 后端校验规则：
+      - 仅订单主人可提交评价。
+      - 仅 `COMPLETED` 状态订单允许评价。
+      - 每个订单只允许评价一次。
+      - 标签做去空、去重、限长处理。
+    - 评价成功后同步回写照料者 `ratingAvg`、`ratingCount`，让后续匹配与档案展示具备真实评分来源。
+- Web 主人端订单详情：
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+    - 新增“服务评价”区块。
+    - 已评价时展示：
+      - 星级
+      - 标签
+      - 文本内容
+      - 匿名状态
+      - 提交时间
+    - 当前登录用户为订单主人、且订单已完成但尚未评价时：
+      - 显示“提交评价”按钮
+      - 通过弹窗完成评分、标签、文字、匿名选项填写
+      - 提交成功后刷新当前订单详情，不依赖整页跳转
+- 定向测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 在既有履约主路径中补充：
+      - 主人确认完成后提交评价成功
+      - 重复评价返回 400
+      - 详情接口能读到评价结果
+      - 照料者评分统计被正确更新
+    - 在异常路径中补充：
+      - 订单未完成前提交评价返回 400
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+风险与缓解：
+
+- 风险：当前评分统计采用“新增评价即增量回写”，尚未覆盖未来可能出现的“修改评价”或“删除评价后重算”场景。
+- 缓解：本轮保持评价“每单一次、提交后不可编辑”的业务约束；后续如开放管理端申诉改评，再补评分重算任务或聚合修正脚本。
+
+下一步（1-3）：
+
+1. 继续补齐 `complaint` 与处理日志模型，形成“评价后投诉”链路。
+2. 为主人端补退款进度查询与交易记录导出，完成 P1-M3 的售后侧目标。
+3. 评估是否在照料者档案或匹配列表中透出最近评价摘要，而不只显示均分与数量。

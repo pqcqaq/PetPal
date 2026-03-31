@@ -44,6 +44,7 @@ model CaregiverProfile {
   acceptedRequests ServiceRequest[]     @relation("MatchedCaregiver")
   orders           OrderMain[]
   serviceLogs      ServiceLog[]
+  reviews          Review[]
 
   @@index([serviceCity])
   @@index([auditStatus])
@@ -136,6 +137,7 @@ model OrderMain {
   refunds          RefundRecord[]
   timelines        OrderTimeline[]
   serviceLogs      ServiceLog[]
+  review           Review?
 
   @@index([ownerId, orderStatus])
   @@index([caregiverId, orderStatus])
@@ -182,6 +184,30 @@ model ServiceLog {
   @@index([orderId, happenedAt])
   @@index([caregiverId, happenedAt])
   @@index([logType])
+  @@index([deleteAt])
+}
+
+model Review {
+  id          String           @id
+  createId    String?
+  updateId    String?
+  orderId      String          @unique
+  ownerId      String
+  caregiverId  String
+  rating      Int
+  tags        Json?
+  content     String?
+  isAnonymous Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deleteAt    DateTime?
+  order       OrderMain       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  owner       User            @relation("PetPalReviewOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  caregiver   CaregiverProfile @relation(fields: [caregiverId], references: [id], onDelete: Restrict)
+
+  @@index([ownerId, createdAt])
+  @@index([caregiverId, createdAt])
+  @@index([rating])
   @@index([deleteAt])
 }
 

@@ -26,6 +26,7 @@ model User {
   ownerOrders     OrderMain[]          @relation("OrderOwner")
   refundApplies   RefundRecord[]       @relation("RefundApplyUser")
   refundReviews   RefundRecord[]       @relation("RefundReviewer")
+  petpalReviews   Review[]             @relation("PetPalReviewOwner")
 
   @@index([deleteAt])
 }

@@ -52,6 +52,7 @@ import type {
   CallbackAuditPage,
   CallbackAuditQuery,
   CallbackAuditStats,
+  CreateOrderReviewPayload,
   CreatePetPayload,
   CreateServiceLogPayload,
   CreateServiceRequestPayload,
@@ -419,6 +420,12 @@ export const createApiFactory = (options: ClientOptions) => {
           client.request<OrderDetailRecord>({
             url: `/petpal/orders/${id}/confirm-complete`,
             method: 'POST',
+          }),
+        review: (id: string, payload: CreateOrderReviewPayload) =>
+          client.request<OrderDetailRecord>({
+            url: `/petpal/orders/${id}/review`,
+            method: 'POST',
+            data: payload,
           }),
       },
       match: {

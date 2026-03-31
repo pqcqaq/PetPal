@@ -42,6 +42,8 @@ const createFulfillmentScenario = async () => {
     select: {
       id: true,
       auditStatus: true,
+      ratingAvg: true,
+      ratingCount: true,
     },
   });
 
@@ -313,6 +315,7 @@ describe('PetPal API integration', () => {
       prisma,
       ownerSession,
       caregiverSession,
+      caregiverProfile,
       order,
     } = await createFulfillmentScenario();
 
@@ -461,6 +464,63 @@ describe('PetPal API integration', () => {
       ),
     );
 
+    const reviewResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/review`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .send({
+        rating: 5,
+        tags: ['准时签到', '沟通顺畅'],
+        content: '照料过程透明，宠物状态很好',
+        isAnonymous: false,
+      })
+      .expect(200);
+
+    assert.equal(reviewResponse.body.data.review.rating, 5);
+    assert.deepEqual(reviewResponse.body.data.review.tags, ['准时签到', '沟通顺畅']);
+    assert.equal(reviewResponse.body.data.review.content, '照料过程透明，宠物状态很好');
+    assert.equal(reviewResponse.body.data.review.isAnonymous, false);
+
+    const duplicateReviewResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/review`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .send({
+        rating: 4,
+      })
+      .expect(400);
+
+    assert.equal(duplicateReviewResponse.body.message, 'Order review already exists');
+
+    const reviewedDetailResponse = await request(app)
+      .get(`/api/petpal/orders/${order.id}`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(reviewedDetailResponse.body.data.review.rating, 5);
+    assert.equal(reviewedDetailResponse.body.data.review.content, '照料过程透明，宠物状态很好');
+    assert.deepEqual(reviewedDetailResponse.body.data.review.tags, ['准时签到', '沟通顺畅']);
+
+    const persistedCaregiverProfile = await prisma.caregiverProfile.findUnique({
+      where: {
+        id: caregiverProfile.id,
+      },
+      select: {
+        ratingAvg: true,
+        ratingCount: true,
+      },
+    });
+
+    assert.ok(persistedCaregiverProfile);
+    assert.equal(persistedCaregiverProfile.ratingCount, caregiverProfile.ratingCount + 1);
+    assert.equal(
+      Number(persistedCaregiverProfile.ratingAvg),
+      Number(
+        (
+          ((Number(caregiverProfile.ratingAvg) * caregiverProfile.ratingCount) + 5)
+          / (caregiverProfile.ratingCount + 1)
+        ).toFixed(2),
+      ),
+    );
+
     const persistedOrder = await prisma.orderMain.findUnique({
       where: {
         id: order.id,
@@ -571,6 +631,17 @@ describe('PetPal API integration', () => {
       .expect(400);
 
     assert.equal(invalidStateLogResponse.body.message, 'Only serving orders can add service logs');
+
+    const earlyReviewResponse = await request(app)
+      .post(`/api/petpal/orders/${order.id}/review`)
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .send({
+        rating: 4,
+        content: '订单尚未完成',
+      })
+      .expect(400);
+
+    assert.equal(earlyReviewResponse.body.message, 'Only completed orders can be reviewed');
 
     await request(app)
       .post(`/api/petpal/caregiver/orders/${order.id}/accept`)

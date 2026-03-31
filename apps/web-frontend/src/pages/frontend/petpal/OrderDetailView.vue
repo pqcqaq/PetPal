@@ -174,6 +174,67 @@
           </div>
         </article>
 
+        <article class="frontend-card petpal-order-detail__review">
+          <span class="frontend-card__eyebrow">服务评价</span>
+          <div class="petpal-review-card__header">
+            <div class="petpal-review-card__headline">
+              <h3>
+                {{
+                  order.review
+                    ? '已提交评价'
+                    : canCreateReview
+                      ? '服务已完成，等待评价'
+                      : '暂无评价'
+                }}
+              </h3>
+              <p v-if="order.review">
+                评价提交于 {{ formatDateTime(order.review.createdAt) }}
+              </p>
+              <p v-else-if="canCreateReview">
+                评价将用于完善照料者服务画像与后续匹配结果。
+              </p>
+              <p v-else-if="order.orderStatus === 'COMPLETED'">
+                当前订单尚未收到宠物主人的评价。
+              </p>
+              <p v-else>
+                订单完成后才能提交评价。
+              </p>
+            </div>
+            <el-button v-if="canCreateReview" type="primary" @click="openReviewDialog">
+              提交评价
+            </el-button>
+          </div>
+
+          <template v-if="order.review">
+            <div class="petpal-review-card__body">
+              <el-rate :model-value="order.review.rating" disabled show-score text-color="#c2410c" />
+              <div class="petpal-review-card__meta">
+                <el-tag size="small" :type="order.review.isAnonymous ? 'info' : 'success'">
+                  {{ order.review.isAnonymous ? '匿名评价' : '实名评价' }}
+                </el-tag>
+                <span>标签数：{{ order.review.tags.length }}</span>
+              </div>
+              <div v-if="order.review.tags.length > 0" class="petpal-review-card__tags">
+                <el-tag
+                  v-for="tag in order.review.tags"
+                  :key="tag"
+                  size="small"
+                  effect="plain"
+                >
+                  {{ tag }}
+                </el-tag>
+              </div>
+              <p v-if="order.review.content" class="petpal-review-card__content">{{ order.review.content }}</p>
+              <div v-else class="petpal-review-card__empty-text">
+                本次评价未填写文字说明。
+              </div>
+            </div>
+          </template>
+          <div v-else class="petpal-empty">
+            <p>{{ canCreateReview ? '你可以现在提交本次服务评价' : '当前暂无评价内容' }}</p>
+          </div>
+        </article>
+
         <!-- 支付时间线 -->
         <article class="frontend-card petpal-order-detail__payments">
           <span class="frontend-card__eyebrow">支付记录</span>
@@ -265,16 +326,75 @@
       <div v-else-if="!loading" class="petpal-empty">
         <p>订单未找到</p>
       </div>
+
+      <el-dialog
+        v-model="reviewDialogVisible"
+        title="提交服务评价"
+        width="560px"
+        :close-on-click-modal="!reviewSubmitting"
+        :close-on-press-escape="!reviewSubmitting"
+        @closed="resetReviewDialog"
+      >
+        <el-form label-position="top">
+          <el-form-item label="综合评分" required>
+            <el-rate v-model="reviewForm.rating" />
+          </el-form-item>
+
+          <el-form-item label="评价标签">
+            <el-select
+              v-model="reviewForm.tags"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              placeholder="可选择预设标签，也可直接输入"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="tag in reviewPresetTags"
+                :key="tag"
+                :label="tag"
+                :value="tag"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="文字评价">
+            <el-input
+              v-model="reviewForm.content"
+              type="textarea"
+              :rows="4"
+              maxlength="1000"
+              show-word-limit
+              placeholder="可以补充说明服务过程、沟通感受或宠物状态"
+            />
+          </el-form-item>
+
+          <el-form-item>
+            <el-checkbox v-model="reviewForm.isAnonymous">匿名展示本次评价</el-checkbox>
+          </el-form-item>
+        </el-form>
+
+        <template #footer>
+          <el-button :disabled="reviewSubmitting" @click="reviewDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="reviewSubmitting" @click="submitReview">
+            提交评价
+          </el-button>
+        </template>
+      </el-dialog>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
+import { useAuthStore } from '@/stores/auth';
+import { getErrorMessage } from '@/utils/errors';
 import type {
+  CreateOrderReviewPayload,
   OrderDetailRecord,
   OrderOperatorRole,
   OrderStatus,
@@ -291,10 +411,29 @@ import type {
 
 const router = useRouter();
 const orderId = router.currentRoute.value.params.id as string;
+const auth = useAuthStore();
 
 const order = ref<OrderDetailRecord | null>(null);
 const orderNo = ref('');
 const loading = ref(false);
+const reviewDialogVisible = ref(false);
+const reviewSubmitting = ref(false);
+
+const reviewPresetTags = ['准时签到', '沟通顺畅', '反馈及时', '服务细致', '宠物状态稳定', '环境整洁'];
+
+const createEmptyReviewForm = () => ({
+  rating: 5,
+  tags: [] as string[],
+  content: '',
+  isAnonymous: false,
+});
+
+const reviewForm = reactive(createEmptyReviewForm());
+
+const isOwnerView = computed(() => Boolean(auth.user?.id && order.value?.ownerId === auth.user.id));
+const canCreateReview = computed(() =>
+  Boolean(isOwnerView.value && order.value?.orderStatus === 'COMPLETED' && !order.value?.review),
+);
 
 const formatAmount = (value: unknown) => {
   if (!value) return '0.00';
@@ -587,14 +726,53 @@ const getMediaLinkLabel = (url: string, index: number) => {
   }
 };
 
+const resetReviewDialog = () => {
+  Object.assign(reviewForm, createEmptyReviewForm());
+};
+
+const openReviewDialog = () => {
+  resetReviewDialog();
+  reviewDialogVisible.value = true;
+};
+
+const submitReview = async () => {
+  if (!order.value) {
+    return;
+  }
+
+  if (!reviewForm.rating) {
+    ElMessage.error('请先选择评分');
+    return;
+  }
+
+  reviewSubmitting.value = true;
+  try {
+    const payload: CreateOrderReviewPayload = {
+      rating: reviewForm.rating,
+      tags: reviewForm.tags,
+      content: reviewForm.content.trim() || undefined,
+      isAnonymous: reviewForm.isAnonymous,
+    };
+    const detail = await api.petpal.orders.review(order.value.id, payload);
+    order.value = detail;
+    orderNo.value = detail.orderNo;
+    reviewDialogVisible.value = false;
+    ElMessage.success('评价已提交');
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '提交评价失败'));
+  } finally {
+    reviewSubmitting.value = false;
+  }
+};
+
 const reload = async () => {
   loading.value = true;
   try {
     const detail = await api.petpal.orders.detail(orderId);
     order.value = detail;
     orderNo.value = detail.orderNo;
-  } catch (err) {
-    ElMessage.error('加载订单详情失败');
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '加载订单详情失败'));
   } finally {
     loading.value = false;
   }
@@ -815,6 +993,62 @@ onMounted(() => {
 .petpal-service-log-media__meta {
   font-size: 0.75rem;
   color: #6b7280;
+}
+
+.petpal-review-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.petpal-review-card__headline h3 {
+  margin: 0;
+  color: #333;
+}
+
+.petpal-review-card__headline p {
+  margin: 0.5rem 0 0;
+  color: #666;
+  line-height: 1.6;
+}
+
+.petpal-review-card__body {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.petpal-review-card__meta {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.petpal-review-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.petpal-review-card__content {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  border-radius: 10px;
+  background: #f6f8fb;
+  color: #333;
+  line-height: 1.7;
+}
+
+.petpal-review-card__empty-text {
+  padding: 0.875rem 1rem;
+  border-radius: 10px;
+  background: #fafafa;
+  color: #666;
 }
 
 .petpal-empty {

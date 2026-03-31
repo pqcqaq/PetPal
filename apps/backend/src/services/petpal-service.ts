@@ -204,6 +204,20 @@ const orderDetailInclude = {
       happenedAt: 'asc',
     },
   },
+  review: {
+    select: {
+      id: true,
+      orderId: true,
+      ownerId: true,
+      caregiverId: true,
+      rating: true,
+      tags: true,
+      content: true,
+      isAnonymous: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
 } satisfies Prisma.OrderMainInclude;
 
 type OrderDetailEntity = Prisma.OrderMainGetPayload<{
@@ -308,6 +322,12 @@ const appendServiceLog = async (
     happenedAt: payload.happenedAt ?? new Date(),
   }),
 });
+
+const normalizeReviewTags = (tags?: string[]) => [...new Set(
+  (tags ?? [])
+    .map((item) => item.trim())
+    .filter(Boolean),
+)].slice(0, 8);
 
 const writeCallbackAlertReplayLog = async (input: {
   outboxIds: string[];
@@ -1098,6 +1118,90 @@ export const petpalService = {
           previousStatus: order.orderStatus,
           nextStatus: 'COMPLETED',
         } as Prisma.InputJsonValue,
+      });
+
+      return loadOrderDetailById(tx, order.id);
+    });
+  },
+
+  async createOwnerOrderReview(ownerId: string, orderId: string, payload: {
+    rating: number;
+    tags?: string[];
+    content?: string;
+    isAnonymous?: boolean;
+  }) {
+    return runSerializableTransaction(async (tx) => {
+      const order = await tx.orderMain.findFirst({
+        where: {
+          id: orderId,
+          ownerId,
+          deleteAt: null,
+        },
+        select: {
+          id: true,
+          caregiverId: true,
+          orderStatus: true,
+          review: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw notFound('Order not found');
+      }
+
+      if (order.orderStatus !== 'COMPLETED') {
+        throw badRequest('Only completed orders can be reviewed');
+      }
+
+      if (order.review) {
+        throw badRequest('Order review already exists');
+      }
+
+      const caregiverProfile = await tx.caregiverProfile.findFirst({
+        where: {
+          id: order.caregiverId,
+          deleteAt: null,
+        },
+        select: {
+          id: true,
+          ratingAvg: true,
+          ratingCount: true,
+        },
+      });
+
+      if (!caregiverProfile) {
+        throw notFound('Caregiver profile not found');
+      }
+
+      const tags = normalizeReviewTags(payload.tags);
+      await tx.review.create({
+        data: withSnowflakeId({
+          orderId: order.id,
+          ownerId,
+          caregiverId: caregiverProfile.id,
+          rating: payload.rating,
+          tags: tags as Prisma.InputJsonValue,
+          content: payload.content?.trim() || null,
+          isAnonymous: payload.isAnonymous ?? false,
+        }),
+      });
+
+      const currentRatingAvg = toNumber(caregiverProfile.ratingAvg);
+      const nextRatingCount = caregiverProfile.ratingCount + 1;
+      const nextRatingAvg = ((currentRatingAvg * caregiverProfile.ratingCount) + payload.rating) / nextRatingCount;
+
+      await tx.caregiverProfile.update({
+        where: {
+          id: caregiverProfile.id,
+        },
+        data: {
+          ratingAvg: new Prisma.Decimal(nextRatingAvg.toFixed(2)),
+          ratingCount: nextRatingCount,
+        },
       });
 
       return loadOrderDetailById(tx, order.id);

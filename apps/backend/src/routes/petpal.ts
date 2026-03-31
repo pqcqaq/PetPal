@@ -99,6 +99,13 @@ const caregiverServiceLogSchema = z.object({
   happenedAt: z.coerce.date().optional(),
 });
 
+const orderReviewSchema = z.object({
+  rating: z.coerce.number().int().min(1).max(5),
+  tags: z.array(z.string().trim().min(1).max(20)).max(8).optional(),
+  content: z.string().trim().max(1000).optional(),
+  isAnonymous: z.boolean().optional(),
+});
+
 const paymentCallbackSchema = z.object({
   payNo: z.string().trim().min(1),
   channelTxnId: z.string().trim().min(1),
@@ -247,6 +254,13 @@ petpalRouter.post('/orders/:id/confirm-complete', asyncHandler(async (req, res) 
   const auth = req.auth!;
   const order = await petpalService.confirmOwnerOrderComplete(auth.id, String(req.params.id));
   return ok(res, order, 'Order completed');
+}));
+
+petpalRouter.post('/orders/:id/review', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = orderReviewSchema.parse(req.body ?? {});
+  const order = await petpalService.createOwnerOrderReview(auth.id, String(req.params.id), payload);
+  return ok(res, order, 'Order reviewed');
 }));
 
 petpalRouter.get('/match/caregivers', asyncHandler(async (req, res) => {

@@ -1031,6 +1031,51 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 58. PetPal 订单评价闭环首版（P1-M3 Slice 31）
+
+**内容**：启动 P1-M3 用户反馈能力，先落地“主人对已完成订单提交一次评价”的最小闭环，并将结果回写到照料者评分统计与订单详情页。
+
+变更摘要：
+
+- `apps/backend/prisma/models/auth.prisma`
+  - 用户新增 `petpalReviews` 反向关系，供订单评价记录归属使用。
+- `apps/backend/prisma/models/petpal.prisma`
+  - `CaregiverProfile` 新增 `reviews` 关系。
+  - `OrderMain` 新增 `review` 单条关联。
+  - 新增 `Review` 模型，包含评分、标签、文字、匿名标记与软删除字段。
+- `apps/backend/prisma/migrations/20260401183000_add_petpal_review_table/migration.sql`
+  - 新增 `Review` 表、唯一约束、索引与外键。
+- `packages/api-common/src/types/petpal.ts`
+  - 新增 `OrderReviewRecord`、`CreateOrderReviewPayload`。
+  - `OrderDetailRecord` 扩展 `review` 字段。
+- `packages/api-common/src/api/factory.ts`
+  - 新增 `api.petpal.orders.review(id, payload)`。
+- `apps/backend/src/routes/petpal.ts`
+  - 新增 `POST /api/petpal/orders/:id/review` 路由与参数校验。
+- `apps/backend/src/services/petpal-service.ts`
+  - 订单详情查询补齐 `review` 关联。
+  - 新增主人评价创建逻辑：
+    - 仅允许订单主人操作
+    - 仅允许已完成订单评价
+    - 一单只能评价一次
+    - 提交后同步更新照料者 `ratingAvg` / `ratingCount`
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 履约主路径补充评价成功、重复评价失败、详情回读、评分统计更新断言。
+  - 异常路径补充未完成订单禁止评价断言。
+- `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+  - 订单详情新增评价区块。
+  - 主人可在已完成且未评价订单上打开弹窗提交评分、标签、文字与匿名选项。
+  - 已评价订单支持直接展示评分内容。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。

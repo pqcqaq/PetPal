@@ -151,6 +151,19 @@ export interface ServiceLogRecord {
   updatedAt: string;
 }
 
+export interface OrderReviewRecord {
+  id: string;
+  orderId: string;
+  ownerId: string;
+  caregiverId: string;
+  rating: number;
+  tags: string[];
+  content: string | null;
+  isAnonymous: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface OrderRecord {
   id: string;
   orderNo: string;
@@ -174,6 +187,7 @@ export interface OrderRecord {
 export interface OrderDetailRecord extends OrderRecord {
   timeline: OrderTimelineRecord[];
   serviceLogs: ServiceLogRecord[];
+  review: OrderReviewRecord | null;
 }
 
 export interface CaregiverOrderRecord extends OrderRecord {
@@ -204,6 +218,13 @@ export interface CreateServiceLogPayload {
   mediaUrls?: string[];
   geo?: Record<string, unknown>;
   happenedAt?: string;
+}
+
+export interface CreateOrderReviewPayload {
+  rating: number;
+  tags?: string[];
+  content?: string;
+  isAnonymous?: boolean;
 }
 
 export interface MatchCaregiverQuery {
