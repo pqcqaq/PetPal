@@ -4,7 +4,7 @@ import type {
   PetProfile,
   ServiceRequest,
 } from '../lib/prisma-generated';
-import { badRequest, notFound } from '../utils/errors';
+import { badRequest, forbidden, notFound } from '../utils/errors';
 import { withSnowflakeId } from '../utils/persistence';
 
 const toNumber = (value: Prisma.Decimal | number | null | undefined) => {
@@ -239,6 +239,32 @@ const loadOrderDetailById = async (
 
   assertOrderAmountInvariant(order);
   return toOrderDetailRecord(order);
+};
+
+const getApprovedCaregiverProfile = async (
+  client: Prisma.TransactionClient | PrismaClient,
+  userId: string,
+) => {
+  const profile = await client.caregiverProfile.findFirst({
+    where: {
+      userId,
+      deleteAt: null,
+    },
+    select: {
+      id: true,
+      auditStatus: true,
+    },
+  });
+
+  if (!profile) {
+    throw notFound('Caregiver profile not found');
+  }
+
+  if (profile.auditStatus !== 'APPROVED') {
+    throw forbidden('Caregiver profile is not approved');
+  }
+
+  return profile;
 };
 
 const appendOrderTimeline = async (
@@ -549,12 +575,10 @@ export const petpalService = {
     pageSize: number;
     status?: 'PENDING_ACCEPT' | 'ACCEPTED' | 'SERVING' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'PARTIAL_REFUNDED' | 'REFUNDED';
   }) {
+    const caregiverProfile = await getApprovedCaregiverProfile(prisma, payload.userId);
     const where: Prisma.OrderMainWhereInput = {
       deleteAt: null,
-      caregiver: {
-        userId: payload.userId,
-        deleteAt: null,
-      },
+      caregiverId: caregiverProfile.id,
       orderStatus: payload.status,
     };
 
@@ -796,15 +820,12 @@ export const petpalService = {
 
   async acceptCaregiverOrder(userId: string, orderId: string) {
     return runSerializableTransaction(async (tx) => {
+      const caregiverProfile = await getApprovedCaregiverProfile(tx, userId);
       const order = await tx.orderMain.findFirst({
         where: {
           id: orderId,
           deleteAt: null,
-          caregiver: {
-            userId,
-            auditStatus: 'APPROVED',
-            deleteAt: null,
-          },
+          caregiverId: caregiverProfile.id,
         },
         select: {
           id: true,
@@ -849,15 +870,12 @@ export const petpalService = {
     geo?: Record<string, unknown>;
   }) {
     return runSerializableTransaction(async (tx) => {
+      const caregiverProfile = await getApprovedCaregiverProfile(tx, userId);
       const order = await tx.orderMain.findFirst({
         where: {
           id: orderId,
           deleteAt: null,
-          caregiver: {
-            userId,
-            auditStatus: 'APPROVED',
-            deleteAt: null,
-          },
+          caregiverId: caregiverProfile.id,
         },
         select: {
           id: true,
@@ -923,15 +941,12 @@ export const petpalService = {
     }
 
     return runSerializableTransaction(async (tx) => {
+      const caregiverProfile = await getApprovedCaregiverProfile(tx, userId);
       const order = await tx.orderMain.findFirst({
         where: {
           id: orderId,
           deleteAt: null,
-          caregiver: {
-            userId,
-            auditStatus: 'APPROVED',
-            deleteAt: null,
-          },
+          caregiverId: caregiverProfile.id,
         },
         select: {
           id: true,
@@ -982,15 +997,12 @@ export const petpalService = {
     geo?: Record<string, unknown>;
   }) {
     return runSerializableTransaction(async (tx) => {
+      const caregiverProfile = await getApprovedCaregiverProfile(tx, userId);
       const order = await tx.orderMain.findFirst({
         where: {
           id: orderId,
           deleteAt: null,
-          caregiver: {
-            userId,
-            auditStatus: 'APPROVED',
-            deleteAt: null,
-          },
+          caregiverId: caregiverProfile.id,
         },
         select: {
           id: true,

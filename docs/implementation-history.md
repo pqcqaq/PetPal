@@ -944,6 +944,27 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 54. PetPal 履约守卫与失败分支测试（P1-M2 Slice 27）
+
+**内容**：统一履约入口的“审核通过照料者”前置守卫，并补齐履约状态机失败分支的定向集成测试。
+
+变更摘要：
+
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增 `getApprovedCaregiverProfile`，集中校验照料者档案存在且 `auditStatus=APPROVED`。
+  - `listCaregiverOrders` 改为先校验审核状态，再查询履约列表。
+  - `acceptCaregiverOrder`、`checkInCaregiverOrder`、`addCaregiverServiceLog`、`checkOutCaregiverOrder` 改为统一复用上述守卫。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 新增 `createFulfillmentScenario` 测试夹具。
+  - 新增未审核照料者、非关联照料者、状态逆行、空服务记录等失败分支断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（14/14）。
+
+Git commit：待本切片提交。
+
 ## 46. PetPal replay 主导阈值可配置（P1 Slice 20）
 
 **内容**：将 replay 风险主导判定从固定阈值升级为可配置阈值，并在 stats 回传生效阈值。
