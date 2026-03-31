@@ -1626,6 +1626,33 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 98. PetPal 根级后台接管投诉工单页面实现（P1-M3 Slice 71）
+
+**内容**：继续把 PetPal 后台治理页从旧模板目录完全迁出，本轮将投诉工单页的真实实现迁入 `pages/petpal-admin/complaints`，让 `/petpal-admin/complaints` 不再依赖旧 `console/petpal` 页面文件。
+
+变更摘要：
+
+- `apps/web-frontend/src/pages/petpal-admin/complaints/PetPalComplaintAdminView.vue`
+  - 将投诉工单页真实实现平移至根级后台命名空间。
+  - 保留现有批量分配、批量结案、快捷接手、SLA 展示、筛选恢复与处理弹窗逻辑。
+  - 页面 `viewKey` 同步调整为根级后台语义，减少旧模板痕迹。
+- `apps/web-frontend/src/pages/petpal-admin/PetPalComplaintAdminRouteView.vue`
+  - 根级路由包装层改为直接引用新的 `petpal-admin` 页面实现。
+- `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+  - 旧页面退化为兼容壳层，仅转发到新的根级后台页面实现。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认 `/petpal-admin/complaints` 路由不再依赖旧 `console/petpal` 页面文件，根级后台已直接持有投诉工单实现。
+- 已确认投诉工单页的筛选、批量动作、快捷接手、SLA 展示和处理弹窗逻辑均保持原有行为，没有新增接口分支。
+- 已确认旧入口仍保留兼容壳层，迁移期间不会影响历史入口或内部残留导航。
+
+Git commit：待本切片提交。
+
 ## 87. App 端资料页去掉权限中心式表达（P1-M3 Slice 60）
 
 **内容**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。

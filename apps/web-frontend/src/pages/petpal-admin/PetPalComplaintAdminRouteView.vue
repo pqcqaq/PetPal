@@ -1,7 +1,7 @@
 <template>
-  <ComplaintAdminView />
+  <PetPalComplaintAdminView />
 </template>
 
 <script setup lang="ts">
-import ComplaintAdminView from '@/pages/console/petpal/ComplaintAdminView.vue';
+import PetPalComplaintAdminView from '@/pages/petpal-admin/complaints/PetPalComplaintAdminView.vue';
 </script>

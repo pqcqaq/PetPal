@@ -4253,6 +4253,42 @@ gantt
 2. 继续围绕 PetPal 后台首页补更贴近值班的投诉入口和批量动作。
 3. 继续排查 Web 端残余模板术语与旧目录暴露点，收尾根级后台改造。
 
+### 14.88 2026-04-01（P1-M3 Slice 71）
+
+**概述**：继续收口根级后台最后一个主要治理页，本轮将投诉工单页迁入 `petpal-admin/complaints`，使 `/petpal-admin/complaints` 不再依赖旧 `console/petpal` 页面文件。
+
+已完成：
+
+- `apps/web-frontend/src/pages/petpal-admin/complaints/PetPalComplaintAdminView.vue`
+  - 将投诉工单页真实实现迁入根级后台目录。
+  - 保留筛选、批量分配、批量结案、快捷接手、SLA 展示、处理进度展开区和处理弹窗能力。
+  - 页面 `viewKey` 调整为根级后台语义，进一步弱化旧模板命名。
+- `apps/web-frontend/src/pages/petpal-admin/PetPalComplaintAdminRouteView.vue`
+  - 根级后台路由包装层改为直接引用新的根级页面实现。
+- `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+  - 旧页面改为兼容壳层，仅转发到新的根级后台实现。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认根级 `/petpal-admin/complaints` 已开始直接持有页面实现，主要治理页已完成根级命名空间收口。
+- 已确认本轮没有修改投诉工单接口、权限点或处理动作语义，仅迁移前端实现位置并调整根级命名。
+- 已确认旧 `console/petpal` 入口仍可兼容访问，迁移过程中不会打断已有链接和内部跳转。
+
+风险与缓解：
+
+- 风险：虽然主要治理页已经迁到根级目录，但 Web 端仍可能存在零散的旧模板术语、兼容壳层和残余引用。
+- 缓解：本轮完成主要页面收口后，后续可以转入清理兼容层、收束命名和补首页值班动作的阶段。
+
+下一步（1-3）：
+
+1. 继续清理 Web 端残余的旧模板语义、旧目录暴露点和兼容层引用。
+2. 继续围绕根级后台首页补更贴近值班的投诉快捷动作与汇总能力。
+3. 继续审查 App 端与 Web 端是否仍有 RBAC 模板式文案未替换为 PetPal 产品表达。
+
 ### 14.77 2026-04-01（P1-M3 Slice 60）
 
 **概述**：继续清理移动端残余模板语义，本轮重构 `app-frontend` 的资料页，不再直接暴露“权限标识 / 权限码”视图，而改成 PetPal 账户资料和可用能力表达。
