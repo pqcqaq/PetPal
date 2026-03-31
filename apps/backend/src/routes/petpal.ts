@@ -130,6 +130,11 @@ const adminComplaintQuerySchema = z.object({
   keyword: z.string().trim().max(100).optional(),
 });
 
+const adminComplaintStatsQuerySchema = adminComplaintQuerySchema.omit({
+  page: true,
+  pageSize: true,
+});
+
 const adminComplaintActionSchema = z.object({
   actionType: z.enum(['ASSIGN', 'INVESTIGATE', 'CALL_USER', 'PENALTY', 'CLOSE']),
   assigneeId: z.string().trim().min(1).max(64).optional(),
@@ -517,6 +522,13 @@ petpalRouter.get('/admin/complaints', requirePermission('petpal.complaint.read')
   });
 
   return ok(res, result, 'Complaint admin list');
+}));
+
+petpalRouter.get('/admin/complaints/stats', requirePermission('petpal.complaint.read'), asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const query = adminComplaintStatsQuerySchema.parse(req.query ?? {});
+  const result = await petpalService.queryAdminComplaintStats(query, auth.id);
+  return ok(res, result, 'Complaint admin stats');
 }));
 
 petpalRouter.post('/admin/complaints/:id/actions', requirePermission('petpal.complaint.manage'), asyncHandler(async (req, res) => {

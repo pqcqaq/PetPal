@@ -3682,3 +3682,55 @@ gantt
 1. 继续评估是否为投诉工单接入超时提醒或值班看板，提升主动治理能力。
 2. 继续补主人端退款明细列表或售后时间线，完善售后透明度。
 3. 视运营需求，评估是否增加投诉批量催办、批量备注模板或批量关闭能力。
+
+### 14.60 2026-04-01（P1-M3 Slice 43）
+
+**概述**：继续推进 P1-M3 管理端纠纷治理，本轮为投诉管理页补充专用 stats 接口和全量统计卡，让运营不用翻页也能看到当前检索范围内的状态分布、SLA 风险、未指派积压和“我的处理中”负载，形成轻量值班看板。
+
+已完成：
+
+- 共享契约：
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增 `ComplaintAdminStats`。
+  - `packages/api-common/src/api/factory.ts`
+    - 新增 `api.petpal.admin.complaintStats(...)`。
+- 后端投诉管理：
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `GET /api/petpal/admin/complaints/stats`。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 新增投诉值班看板 stats 聚合。
+    - 返回：
+      - 当前范围总量
+      - 各状态数量
+      - 即将超时 / 已超时数量
+      - 未指派数量
+      - 当前管理员负责数量 / 当前管理员处理中数量
+      - 生效中的 SLA 阈值
+    - 统计保留 `complaintType / targetRole / assignedAdminId / unassignedOnly / keyword` 范围条件，但忽略 `status / slaStatus` 单项筛选，避免看板被单列筛选锁死。
+- Web 管理端：
+  - `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+    - 统计卡改为调用后端 stats 接口，不再使用“当前页列表近似统计”。
+    - 新增“我负责”“我的处理中”两张运营视角统计卡。
+- 集成测试：
+  - `apps/backend/test/integration/petpal-complaint-admin-stats.test.ts`
+    - 验证投诉 stats 返回真实状态/SLA/负责人分布。
+    - 验证 `status=OPEN` 时看板统计仍能识别 `PROCESSING` 工单。
+    - 验证非管理员访问 stats 接口返回 `403`。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-complaint-admin-stats.test.ts` 通过（2/2）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+风险与缓解：
+
+- 风险：当前值班看板仍是查询时拉取的静态聚合，尚未接入主动消息提醒或定时播报。
+- 缓解：本轮先优先解决“翻页前先看全局负载”的问题；后续如运营确有需要，再接入超时提醒任务、值班轮值规则或独立看板页。
+
+下一步（1-3）：
+
+1. 继续评估是否为投诉工单接入超时提醒或值班看板独立页，提升主动治理能力。
+2. 继续补主人端退款明细列表或售后时间线，完善售后透明度。
+3. 视运营需求，评估是否增加投诉批量催办、批量备注模板或批量关闭能力。

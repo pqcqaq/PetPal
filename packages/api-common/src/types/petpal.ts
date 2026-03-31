@@ -339,6 +339,18 @@ export interface BatchAssignComplaintsResult {
   items: ComplaintAdminRecord[];
 }
 
+export interface ComplaintAdminStats {
+  total: number;
+  byStatus: Record<ComplaintStatus, number>;
+  dueSoonCount: number;
+  overdueCount: number;
+  unassignedCount: number;
+  assignedToMeCount: number;
+  processingAssignedToMeCount: number;
+  slaLimitHours: number;
+  slaWarningHours: number;
+}
+
 export interface ComplaintAdminPage {
   items: ComplaintAdminRecord[];
   pagination: {

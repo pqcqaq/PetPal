@@ -1302,6 +1302,54 @@ Git commit：待本切片提交。
 
 Git commit：待本切片提交。
 
+## 70. PetPal 投诉值班看板统计（P1-M3 Slice 43）
+
+**内容**：继续推进 P1-M3 管理端纠纷治理，本轮为投诉管理补充专用 stats 接口和全量统计卡，让运营在翻页前就能看到当前检索范围内的待处理、超时、未指派和“我的处理中”分布，形成轻量值班看板。
+
+变更摘要：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 新增 `ComplaintAdminStats` 共享类型。
+- `packages/api-common/src/api/factory.ts`
+  - 新增 `api.petpal.admin.complaintStats(...)`。
+- `apps/backend/src/routes/petpal.ts`
+  - 新增 `GET /api/petpal/admin/complaints/stats`。
+  - 复用既有 `petpal.complaint.read` 权限边界。
+- `apps/backend/src/services/petpal-service.ts`
+  - 拆出投诉管理“统计基准筛选”逻辑。
+  - 新增投诉 stats 查询，返回：
+    - 总量
+    - 各状态数量
+    - 即将超时数
+    - 已超时数
+    - 未指派数
+    - 当前管理员负责数 / 当前管理员处理中数
+    - 生效中的 SLA 阈值
+  - 统计保留 `complaintType / targetRole / assignedAdminId / unassignedOnly / keyword` 范围条件，但忽略 `status / slaStatus` 单项筛选，避免值班总览被单列筛选“锁死”。
+- `apps/backend/test/integration/petpal-complaint-admin-stats.test.ts`
+  - 新增独立集成测试，覆盖：
+    - stats 返回状态分布、SLA 分布和负责人分布
+    - `status=OPEN` 时统计仍能看到 `PROCESSING` 工单
+    - 非管理员访问 stats 接口返回 `403`
+- `apps/web-frontend/src/pages/console/petpal/ComplaintAdminView.vue`
+  - 统计卡改为调用后端 stats 接口，不再基于“当前页列表”做近似统计。
+  - 新增“我负责”“我的处理中”两张运营视角统计卡。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-complaint-admin-stats.test.ts` 通过（2/2）。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+
+代码审计结论：
+
+- 已确认 stats 接口沿用投诉读取权限，不新增越权可见面。
+- 已确认统计口径显式忽略 `status / slaStatus` 单项筛选，避免运营在切到某一列后失去全局排班判断。
+- 已确认前端统计卡改为读取后端真实聚合结果，避免分页列表下“当前页统计”误导值班判断。
+
+Git commit：待本切片提交。
+
 ## 69. PetPal 投诉 SLA 阈值配置化（P1-M3 Slice 42）
 
 **内容**：继续推进 P1-M3 投诉工单时效治理，本轮将后台投诉 SLA 从代码常量收敛为后端环境配置项，便于不同部署环境按运营节奏调整“处理时限”和“预警窗口”，同时补一条独立集成测试验证配置边界确实生效。

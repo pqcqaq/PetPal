@@ -158,9 +158,7 @@ type OwnerRefundProgressRecord = {
   refundableBalance: number;
 };
 
-type ComplaintAdminFilters = {
-  page: number;
-  pageSize: number;
+type ComplaintAdminScopeFilters = {
   status?: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
   complaintType?: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
   targetRole?: 'CAREGIVER' | 'PLATFORM';
@@ -169,6 +167,13 @@ type ComplaintAdminFilters = {
   unassignedOnly?: boolean;
   keyword?: string;
 };
+
+type ComplaintAdminFilters = ComplaintAdminScopeFilters & {
+  page: number;
+  pageSize: number;
+};
+
+type ComplaintStatusCounter = Record<'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED', number>;
 
 const OWNER_TRANSACTION_EXPORT_DEFAULT_DAYS = 365;
 const OWNER_TRANSACTION_EXPORT_MAX_DAYS = 366;
@@ -632,7 +637,7 @@ const buildComplaintAdminSlaWhere = (
   };
 };
 
-const buildComplaintAdminWhere = (filters: ComplaintAdminFilters): Prisma.ComplaintWhereInput => {
+const buildComplaintAdminWhere = (filters: ComplaintAdminScopeFilters): Prisma.ComplaintWhereInput => {
   const keyword = filters.keyword?.trim();
   const slaWhere = buildComplaintAdminSlaWhere(filters.slaStatus);
 
@@ -693,6 +698,16 @@ const buildComplaintAdminWhere = (filters: ComplaintAdminFilters): Prisma.Compla
       : undefined,
   };
 };
+
+const toComplaintAdminStatsBaseFilters = (
+  filters: ComplaintAdminScopeFilters,
+): ComplaintAdminScopeFilters => ({
+  complaintType: filters.complaintType,
+  targetRole: filters.targetRole,
+  assignedAdminId: filters.assignedAdminId,
+  unassignedOnly: filters.unassignedOnly,
+  keyword: filters.keyword,
+});
 
 const loadAdminComplaintById = async (
   client: Prisma.TransactionClient | PrismaClient,
@@ -1991,6 +2006,86 @@ export const petpalService = {
         total,
         totalPages: Math.ceil(total / filters.pageSize),
       },
+    };
+  },
+
+  async queryAdminComplaintStats(filters: ComplaintAdminScopeFilters, actorId: string) {
+    const baseFilters = toComplaintAdminStatsBaseFilters(filters);
+    const baseWhere = buildComplaintAdminWhere(baseFilters);
+    const [total, statusRows, dueSoonCount, overdueCount, unassignedCount, assignedToMeCount, processingAssignedToMeCount] = await Promise.all([
+      prisma.complaint.count({ where: baseWhere }),
+      prisma.complaint.groupBy({
+        by: ['status'],
+        where: baseWhere,
+        _count: {
+          _all: true,
+        },
+      }),
+      prisma.complaint.count({
+        where: buildComplaintAdminWhere({
+          ...baseFilters,
+          slaStatus: 'DUE_SOON',
+        }),
+      }),
+      prisma.complaint.count({
+        where: buildComplaintAdminWhere({
+          ...baseFilters,
+          slaStatus: 'OVERDUE',
+        }),
+      }),
+      prisma.complaint.count({
+        where: {
+          AND: [
+            baseWhere,
+            {
+              assignedAdminId: null,
+            },
+          ],
+        },
+      }),
+      prisma.complaint.count({
+        where: {
+          AND: [
+            baseWhere,
+            {
+              assignedAdminId: actorId,
+            },
+          ],
+        },
+      }),
+      prisma.complaint.count({
+        where: {
+          AND: [
+            baseWhere,
+            {
+              assignedAdminId: actorId,
+              status: 'PROCESSING',
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const byStatus = statusRows.reduce<ComplaintStatusCounter>((accumulator, row) => {
+      accumulator[row.status] = row._count._all;
+      return accumulator;
+    }, {
+      OPEN: 0,
+      PROCESSING: 0,
+      RESOLVED: 0,
+      REJECTED: 0,
+    });
+
+    return {
+      total,
+      byStatus,
+      dueSoonCount,
+      overdueCount,
+      unassignedCount,
+      assignedToMeCount,
+      processingAssignedToMeCount,
+      slaLimitHours: env.PETPAL_COMPLAINT_SLA_LIMIT_HOURS,
+      slaWarningHours: env.PETPAL_COMPLAINT_SLA_WARNING_HOURS,
     };
   },
 

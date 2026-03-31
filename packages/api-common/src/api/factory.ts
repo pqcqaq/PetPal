@@ -39,6 +39,7 @@ import type {
   ComplaintAdminRecord,
   ComplaintAdminPage,
   ComplaintAdminQuery,
+  ComplaintAdminStats,
   ComplaintRecord,
   CaregiverAuditPayload,
   CaregiverAuditPage,
@@ -528,6 +529,11 @@ export const createApiFactory = (options: ClientOptions) => {
         complaints: (query?: ComplaintAdminQuery) =>
           client.request<ComplaintAdminPage>({
             url: '/petpal/admin/complaints',
+            params: query as unknown as QueryParams,
+          }),
+        complaintStats: (query?: ComplaintAdminQuery) =>
+          client.request<ComplaintAdminStats>({
+            url: '/petpal/admin/complaints/stats',
             params: query as unknown as QueryParams,
           }),
         handleComplaint: (complaintId: string, payload: ManageComplaintPayload) =>

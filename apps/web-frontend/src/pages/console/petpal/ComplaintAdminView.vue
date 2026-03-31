@@ -313,6 +313,7 @@ import type {
   ComplaintAdminQuery,
   ComplaintAdminRecord,
   ComplaintAdminSlaStatus,
+  ComplaintAdminStats,
   ComplaintStatus,
   ComplaintTargetRole,
   ComplaintType,
@@ -369,6 +370,22 @@ const actionSubmitting = ref(false);
 const quickAssigningId = ref('');
 const activeComplaint = ref<ComplaintAdminRecord | null>(null);
 const adminOptions = ref<UserRecord[]>([]);
+const statsData = ref<ComplaintAdminStats>({
+  total: 0,
+  byStatus: {
+    OPEN: 0,
+    PROCESSING: 0,
+    RESOLVED: 0,
+    REJECTED: 0,
+  },
+  dueSoonCount: 0,
+  overdueCount: 0,
+  unassignedCount: 0,
+  assignedToMeCount: 0,
+  processingAssignedToMeCount: 0,
+  slaLimitHours: 24,
+  slaWarningHours: 6,
+});
 const auth = useAuthStore();
 
 const { state: pageState } = usePageState<State>('page:petpal:complaint-admin', {
@@ -409,21 +426,18 @@ const selectedActionableComplaints = computed(() =>
 );
 
 const stats = computed(() => {
-  const openCount = rows.value.filter(item => item.status === 'OPEN').length;
-  const processingCount = rows.value.filter(item => item.status === 'PROCESSING').length;
-  const closedCount = rows.value.filter(item => item.status === 'RESOLVED' || item.status === 'REJECTED').length;
-  const unassignedCount = rows.value.filter(item => !item.assignedAdminId).length;
-  const dueSoonCount = rows.value.filter(item => item.slaStatus === 'DUE_SOON').length;
-  const overdueCount = rows.value.filter(item => item.slaStatus === 'OVERDUE').length;
+  const closedCount = statsData.value.byStatus.RESOLVED + statsData.value.byStatus.REJECTED;
 
   return [
-    { label: '当前页工单', value: rows.value.length },
-    { label: '待处理', value: openCount },
-    { label: '处理中', value: processingCount },
+    { label: '当前筛选总量', value: statsData.value.total },
+    { label: '待处理', value: statsData.value.byStatus.OPEN },
+    { label: '处理中', value: statsData.value.byStatus.PROCESSING },
     { label: '已结案', value: closedCount },
-    { label: '即将超时', value: dueSoonCount },
-    { label: '已超时', value: overdueCount },
-    { label: '未指派', value: unassignedCount },
+    { label: '即将超时', value: statsData.value.dueSoonCount },
+    { label: '已超时', value: statsData.value.overdueCount },
+    { label: '未指派', value: statsData.value.unassignedCount },
+    { label: '我负责', value: statsData.value.assignedToMeCount },
+    { label: '我的处理中', value: statsData.value.processingAssignedToMeCount },
   ];
 });
 
@@ -552,6 +566,16 @@ const buildQuery = (): ComplaintAdminQuery => ({
   keyword: pageState.filters.keyword?.trim() || undefined,
 });
 
+const buildStatsQuery = (): ComplaintAdminQuery => ({
+  status: pageState.filters.status,
+  complaintType: pageState.filters.complaintType,
+  targetRole: pageState.filters.targetRole,
+  slaStatus: pageState.filters.slaStatus,
+  assignedAdminId: pageState.filters.unassignedOnly ? undefined : pageState.filters.assignedAdminId || undefined,
+  unassignedOnly: pageState.filters.unassignedOnly || undefined,
+  keyword: pageState.filters.keyword?.trim() || undefined,
+});
+
 const loadAdminOptions = async () => {
   try {
     const response = await api.users.list({
@@ -570,9 +594,13 @@ const loadAdminOptions = async () => {
 const loadRows = async () => {
   try {
     loading.value = true;
-    const response = await api.petpal.admin.complaints(buildQuery());
+    const [response, statsResponse] = await Promise.all([
+      api.petpal.admin.complaints(buildQuery()),
+      api.petpal.admin.complaintStats(buildStatsQuery()),
+    ]);
     rows.value = response.items;
     total.value = response.pagination.total;
+    statsData.value = statsResponse;
     selectedComplaints.value = [];
     tableRef.value?.clearSelection();
   } catch (error: unknown) {
