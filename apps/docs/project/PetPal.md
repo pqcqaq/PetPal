@@ -2106,3 +2106,37 @@ gantt
 
 - replay logs 统一采用与 outbox 列表一致的分页响应格式，降低前端维护成本。
 - 单页大小限制 100，兼顾巡检效率与查询开销。
+
+### 14.31 2026-04-01（P1 Slice 15）
+
+**概述**：补齐 replay log 导出能力，支持在重放记录抽屉按当前筛选条件导出 Excel。
+
+已完成：
+
+- 路由与服务层：
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `GET /api/petpal/admin/callback-alert-outbox/replay-logs/export`。
+    - 导出查询参数支持 `outboxId`、`actionType`、`actorId`、`startDate`、`endDate`。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 新增 `listCallbackAlertReplayLogExportRows`，按筛选条件导出并限制最大 5000 条。
+- 共享契约与 API 工厂：
+  - `packages/api-common/src/types/petpal.ts` 扩展 replay log query 支持 `outboxId`。
+  - `packages/api-common/src/api/factory.ts` 新增 `exportCallbackAlertOutboxReplayLogs` 下载端点。
+- 前端：
+  - `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+    - 抽屉筛选区新增导出按钮，导出参数与当前筛选状态保持一致。
+- 测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增非管理员 403、manager 200 的 replay log 导出权限断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+关键设计决策：
+
+- 导出接口采用 query 传递 `outboxId`，复用通用 Excel 导出处理器。
+- 导出上限 5000 条，避免一次性导出造成数据库与内存压力。

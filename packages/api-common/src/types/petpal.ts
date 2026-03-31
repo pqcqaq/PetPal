@@ -285,6 +285,8 @@ export interface CallbackAlertReplayLogRecord {
 }
 
 export interface CallbackAlertReplayLogQuery {
+  [key: string]: string | number | boolean | undefined;
+  outboxId?: string;
   page?: number;
   pageSize?: number;
   actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';

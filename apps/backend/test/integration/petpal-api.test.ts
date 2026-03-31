@@ -926,6 +926,11 @@ describe('PetPal API integration', () => {
       .expect(403);
 
     await request(app)
+      .get('/api/petpal/admin/callback-alert-outbox/replay-logs/export?outboxId=unknown')
+      .set(authHeader)
+      .expect(403);
+
+    await request(app)
       .post('/api/petpal/admin/callback-alert-outbox/retry-dead')
       .set(authHeader)
       .send({ limit: 20 })
@@ -970,6 +975,11 @@ describe('PetPal API integration', () => {
 
     await request(app)
       .get('/api/petpal/admin/callback-alert-outbox/unknown/replay-logs')
+      .set(authHeader)
+      .expect(200);
+
+    await request(app)
+      .get('/api/petpal/admin/callback-alert-outbox/replay-logs/export?outboxId=unknown')
       .set(authHeader)
       .expect(200);
 

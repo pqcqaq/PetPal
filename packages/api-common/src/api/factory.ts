@@ -454,6 +454,10 @@ export const createApiFactory = (options: ClientOptions) => {
               endDate: query.endDate,
             },
           }),
+        exportCallbackAlertOutboxReplayLogs: createDownloadEndpoint<CallbackAlertReplayLogQuery>(
+          '/petpal/admin/callback-alert-outbox/replay-logs/export',
+          'petpal-callback-alert-replay-logs.xlsx',
+        ),
         retryDeadCallbackAlertOutbox: (limit?: number) =>
           client.request<{ requested: number; requeued: number }>({
             url: '/petpal/admin/callback-alert-outbox/retry-dead',

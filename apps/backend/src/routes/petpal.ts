@@ -65,6 +65,10 @@ const callbackAlertOutboxReplayLogQuerySchema = z.object({
   endDate: z.coerce.date().optional(),
 });
 
+const callbackAlertOutboxReplayLogExportQuerySchema = callbackAlertOutboxReplayLogQuerySchema.extend({
+  outboxId: z.string().trim().min(1),
+});
+
 const petpalRouter = Router();
 
 const parseCallbackAuditQuery = (query: Record<string, unknown>) => ({
@@ -257,6 +261,29 @@ petpalRouter.get('/admin/callback-alert-outbox/:id/replay-logs', requirePermissi
   });
   return ok(res, result, 'Callback alert outbox replay logs');
 }));
+
+petpalRouter.get(
+  '/admin/callback-alert-outbox/replay-logs/export',
+  requirePermission('petpal.callback-alert.read'),
+  createExcelExportHandler({
+    fileName: () => createTimestampedExcelFileName('petpal-callback-alert-replay-logs'),
+    sheetName: 'PetPal Callback Alert Replay Logs',
+    parseQuery: (query) => callbackAlertOutboxReplayLogExportQuerySchema.parse(query ?? {}),
+    queryRows: (query) => petpalService.listCallbackAlertReplayLogExportRows(String(query.outboxId), {
+      actionType: query.actionType,
+      actorId: query.actorId,
+      startDate: query.startDate,
+      endDate: query.endDate,
+    }),
+    columns: [
+      { header: 'Outbox ID', width: 26, value: row => row.callbackOutboxId },
+      { header: '动作', width: 20, value: row => row.actionType },
+      { header: '操作人', width: 30, value: row => row.actorId ?? '' },
+      { header: '说明', width: 40, value: row => row.note ?? '' },
+      { header: '创建时间', width: 24, value: row => row.createdAt },
+    ],
+  }),
+);
 
 petpalRouter.post('/admin/callback-alert-outbox/:id/retry', requirePermission('petpal.callback-alert.retry'), asyncHandler(async (req, res) => {
   const result = await petpalService.retryCallbackAlertOutbox(String(req.params.id), {

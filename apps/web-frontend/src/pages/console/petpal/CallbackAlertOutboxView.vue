@@ -129,6 +129,10 @@
           value-format="YYYY-MM-DDTHH:mm:ss.SSS[Z]"
           style="width: 360px"
         />
+        <ListExportButton
+          :request="buildReplayExportRequest"
+          error-message="导出重放记录失败"
+        />
         <el-button @click="applyReplayFilters">筛选</el-button>
       </el-space>
       <el-table :data="replayLogs" v-loading="replayLoading" border>
@@ -159,6 +163,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import type {
+  DownloadRequestConfig,
   CallbackAlertReplayLogPage,
   CallbackAlertReplayLogRecord,
   CallbackAlertOutboxPage,
@@ -166,6 +171,7 @@ import type {
   CallbackAlertOutboxStatus,
   CallbackAlertOutboxStats,
 } from '@rbac/api-common';
+import ListExportButton from '@/components/download/ListExportButton.vue';
 import PageScaffold from '@/components/workbench/PageScaffold.vue';
 import { usePageState } from '@/composables/use-page-state';
 import { api } from '@/api/client';
@@ -326,6 +332,15 @@ const changeReplayPage = async (value: number) => {
   replayPage.value = value;
   await reloadReplayLogs();
 };
+
+const buildReplayExportRequest = (): DownloadRequestConfig =>
+  api.petpal.admin.exportCallbackAlertOutboxReplayLogs({
+    outboxId: currentReplayOutboxId.value,
+    actionType: replayFilter.value.actionType,
+    actorId: replayFilter.value.actorId?.trim() || undefined,
+    startDate: replayFilter.value.range?.[0],
+    endDate: replayFilter.value.range?.[1],
+  });
 
 const reloadReplayLogs = async () => {
   if (!currentReplayOutboxId.value) {

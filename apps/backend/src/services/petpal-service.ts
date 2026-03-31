@@ -1278,6 +1278,41 @@ export const petpalService = {
       },
     };
   },
+
+  async listCallbackAlertReplayLogExportRows(
+    callbackOutboxId: string,
+    filters?: {
+      actionType?: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';
+      actorId?: string;
+      startDate?: Date;
+      endDate?: Date;
+    },
+  ) {
+    const where: Prisma.CallbackAlertReplayLogWhereInput = {
+      callbackOutboxId,
+      actionType: filters?.actionType,
+      actorId: filters?.actorId,
+      createdAt: {
+        gte: filters?.startDate,
+        lte: filters?.endDate,
+      },
+    };
+
+    return prisma.callbackAlertReplayLog.findMany({
+      where,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 5000,
+      select: {
+        callbackOutboxId: true,
+        actionType: true,
+        actorId: true,
+        note: true,
+        createdAt: true,
+      },
+    });
+  },
 };
 
 export const purgeExpiredCallbackAudits = async (olderThanDays = 90) => {

@@ -742,6 +742,35 @@ Git commit：`feat(p1): add callback alert replay logs for outbox requeue tracea
 
 Git commit：待本切片提交。
 
+## 41. PetPal replay log 导出能力（P1 Slice 15）
+
+**内容**：新增 callback alert outbox replay log Excel 导出，支持按 outbox 与筛选条件导出。
+
+变更摘要：
+
+- `apps/backend/src/routes/petpal.ts`
+  - 新增 `GET /api/petpal/admin/callback-alert-outbox/replay-logs/export`。
+  - 导出参数支持 `outboxId/actionType/actorId/startDate/endDate`。
+- `apps/backend/src/services/petpal-service.ts`
+  - 新增 `listCallbackAlertReplayLogExportRows`，并将导出数量上限控制为 5000。
+- `packages/api-common/src/types/petpal.ts`
+  - replay log query 扩展 `outboxId`。
+- `packages/api-common/src/api/factory.ts`
+  - 新增 replay log 导出下载端点。
+- `apps/web-frontend/src/pages/console/petpal/CallbackAlertOutboxView.vue`
+  - 重放记录抽屉新增导出按钮并复用当前筛选条件。
+- `apps/backend/test/integration/petpal-api.test.ts`
+  - 增加 replay log 导出权限边界断言（member 403 / manager 200）。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（10/10）。
+
+Git commit：待本切片提交。
+
 ## 40. PetPal replay log 分页查询（P1 Slice 14）
 
 **内容**：将 callback alert outbox replay logs 从列表接口升级为分页接口，支持管理端抽屉翻页巡检。
