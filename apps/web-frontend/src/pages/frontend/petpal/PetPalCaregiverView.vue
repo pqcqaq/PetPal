@@ -21,7 +21,7 @@
         <div class="petpal-section-heading">
           <div class="petpal-section-heading__meta">
             <h3>照料者主流程</h3>
-            <p>先完成档案，再上架服务，最后集中处理接单和履约。更细的资质上传与高级服务记录暂时保留在兼容工作台。</p>
+            <p>先完成档案，再上架服务，最后集中处理接单和履约。资质材料上传、服务记录和签退动作已经收回当前页面，兼容页只保留少量混合操作。</p>
           </div>
           <div class="petpal-switch-links">
             <RouterLink :to="{ name: 'frontend-petpal' }">主人页</RouterLink>
@@ -58,7 +58,7 @@
         <h3>高级操作</h3>
         <div class="petpal-side-actions">
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-legacy' }">
-            资质材料上传 / 高级履约
+            打开兼容混合工作台
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" to="/petpal-admin/caregiver-audits">
             后台审核台
@@ -97,6 +97,58 @@
               :rows="3"
               placeholder="例如：支持每日两次图文反馈，紧急情况第一时间联系主人"
             />
+          </el-form-item>
+          <el-form-item label="资质材料">
+            <div class="petpal-qualification-panel">
+              <div class="petpal-qualification-panel__actions">
+                <input
+                  ref="qualificationUploadInput"
+                  type="file"
+                  multiple
+                  class="petpal-hidden-file-input"
+                  accept="image/*,.pdf"
+                  @change="onQualificationFilesChange"
+                >
+                <el-button
+                  plain
+                  :loading="qualificationUploading"
+                  :disabled="caregiverProfileForm.qualificationMaterials.length >= 12"
+                  @click="openQualificationFilePicker"
+                >
+                  上传资质材料
+                </el-button>
+                <span class="petpal-qualification-panel__hint">
+                  已上传 {{ caregiverProfileForm.qualificationMaterials.length }}/12 份
+                </span>
+              </div>
+
+              <el-progress
+                v-if="qualificationUploadProgress !== null"
+                :percentage="qualificationUploadProgress"
+                :status="qualificationUploadProgress >= 100 ? 'success' : undefined"
+              />
+
+              <div v-if="caregiverProfileForm.qualificationMaterials.length" class="petpal-qualification-list">
+                <div
+                  v-for="item in caregiverProfileForm.qualificationMaterials"
+                  :key="item.fileId"
+                  class="petpal-qualification-item"
+                >
+                  <div class="petpal-qualification-item__copy">
+                    <strong>{{ item.name }}</strong>
+                    <span>{{ item.mimeType }} · {{ Math.round(item.size / 1024) }} KB</span>
+                  </div>
+                  <el-space>
+                    <el-button link type="primary" size="small" @click="openExternalLink(item.url)">
+                      预览
+                    </el-button>
+                    <el-button link type="danger" size="small" @click="removeQualificationMaterial(item.fileId)">
+                      移除
+                    </el-button>
+                  </el-space>
+                </div>
+              </div>
+            </div>
           </el-form-item>
           <el-form-item>
             <el-space>
@@ -181,7 +233,7 @@
       <div class="petpal-section-heading">
         <div class="petpal-section-heading__meta">
           <h3>照料者订单与动作</h3>
-          <p>在独立照料者页里统一处理接单、签到和详情查看；更细的服务记录与材料上传保留在兼容页。</p>
+          <p>在独立照料者页里统一处理接单、签到、服务记录和签退；兼容页只保留少量仍未迁出的混合操作。</p>
         </div>
         <el-space wrap>
           <el-select v-model="caregiverOrderQuery.status" style="width: 160px" @change="loadCaregiverOrders">
@@ -254,32 +306,153 @@
               >
                 签到
               </el-button>
+              <el-button
+                v-if="scope.row.orderStatus === 'SERVING'"
+                link
+                type="primary"
+                size="small"
+                :loading="caregiverActionLoadingKey === `log:${scope.row.id}`"
+                @click="openCaregiverServiceLogDialog(scope.row.id)"
+              >
+                服务记录
+              </el-button>
+              <el-button
+                v-if="scope.row.orderStatus === 'SERVING'"
+                link
+                type="success"
+                size="small"
+                :loading="caregiverActionLoadingKey === `checkout:${scope.row.id}`"
+                @click="checkOutCaregiverOrder(scope.row.id)"
+              >
+                签退
+              </el-button>
               <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
                 <el-button link type="info" size="small">详情</el-button>
-              </RouterLink>
-              <RouterLink :to="{ name: 'frontend-petpal-legacy' }">
-                <el-button link type="success" size="small">高级履约</el-button>
               </RouterLink>
             </el-space>
           </template>
         </el-table-column>
       </el-table>
     </section>
+
+    <el-dialog
+      v-model="serviceLogDialogVisible"
+      title="新增服务记录"
+      width="680px"
+      :close-on-click-modal="!serviceLogSubmitting"
+      :close-on-press-escape="!serviceLogSubmitting"
+      @closed="resetServiceLogDialog"
+    >
+      <el-form label-position="top">
+        <el-form-item label="记录类型">
+          <el-select v-model="serviceLogForm.logType" style="width: 100%">
+            <el-option
+              v-for="option in serviceLogTypeOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="文字说明">
+          <el-input
+            v-model="serviceLogForm.textNote"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="例如：已遛狗 30 分钟，饮水正常，情绪稳定"
+          />
+        </el-form-item>
+
+        <el-form-item label="服务媒体">
+          <div class="petpal-service-log-dialog__upload">
+            <template v-if="canUploadServiceLogMedia">
+              <input
+                ref="serviceLogFileInput"
+                type="file"
+                multiple
+                accept="image/*,video/*"
+                class="petpal-service-log-dialog__file-input"
+                @change="onServiceLogFilesChange"
+              />
+              <div class="petpal-service-log-dialog__actions">
+                <el-button :disabled="serviceLogSubmitting" @click="openServiceLogFilePicker">选择图片或视频</el-button>
+                <el-button
+                  v-if="serviceLogForm.files.length > 0"
+                  link
+                  type="danger"
+                  :disabled="serviceLogSubmitting"
+                  @click="clearServiceLogFiles"
+                >
+                  清空媒体
+                </el-button>
+              </div>
+            </template>
+            <p v-else class="petpal-service-log-dialog__hint is-warning">
+              当前账号暂未开通服务记录媒体上传能力，可先提交纯文字服务记录；如需补充图片或视频，请先完成照料者审核或联系管理员开通。
+            </p>
+
+            <ul v-if="serviceLogForm.files.length > 0" class="petpal-service-log-dialog__file-list">
+              <li
+                v-for="(file, index) in serviceLogForm.files"
+                :key="`${file.name}-${file.size}-${index}`"
+                class="petpal-service-log-dialog__file-item"
+              >
+                <div class="petpal-service-log-dialog__file-meta">
+                  <strong>{{ file.name }}</strong>
+                  <span>{{ file.type || 'application/octet-stream' }} · {{ formatFileSize(file.size) }}</span>
+                </div>
+                <el-button
+                  link
+                  type="danger"
+                  :disabled="serviceLogSubmitting"
+                  @click="removeServiceLogFile(index)"
+                >
+                  移除
+                </el-button>
+              </li>
+            </ul>
+            <div v-else-if="canUploadServiceLogMedia" class="petpal-service-log-dialog__empty">
+              可选上传图片或视频，保存后会附加到本次服务记录。
+            </div>
+          </div>
+        </el-form-item>
+
+        <el-form-item v-if="serviceLogUploadProgress !== null" label="上传进度">
+          <el-progress
+            :percentage="serviceLogUploadProgress"
+            :status="serviceLogUploadProgress >= 100 ? 'success' : undefined"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button :disabled="serviceLogSubmitting" @click="serviceLogDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="serviceLogSubmitting" @click="submitCaregiverServiceLog">
+          保存记录
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import type {
+  CaregiverQualificationMaterialRecord,
   CaregiverOrderRecord,
   CaregiverProfileRecord,
   CaregiverServiceRecord,
   CreateServiceRequestPayload,
   OrderStatus,
+  ServiceLogType,
 } from '@rbac/api-common';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
+import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
 
 defineOptions({
@@ -293,6 +466,7 @@ type CaregiverProfileFormState = {
   serviceCity: string;
   specialtyTagsText: string;
   serviceCommitment: string;
+  qualificationMaterials: CaregiverQualificationMaterialRecord[];
 };
 
 const auth = useAuthStore();
@@ -300,11 +474,14 @@ const auth = useAuthStore();
 const caregiverProfile = ref<CaregiverProfileRecord | null>(null);
 const caregiverServices = ref<CaregiverServiceRecord[]>([]);
 const caregiverOrders = ref<CaregiverOrderRecord[]>([]);
+const qualificationUploadInput = ref<HTMLInputElement | null>(null);
 
 const caregiverProfileSaving = ref(false);
 const caregiverServiceSaving = ref(false);
 const caregiverOrdersLoading = ref(false);
 const caregiverActionLoadingKey = ref('');
+const qualificationUploading = ref(false);
+const qualificationUploadProgress = ref<number | null>(null);
 
 const caregiverProfileForm = reactive<CaregiverProfileFormState>({
   intro: '',
@@ -313,6 +490,7 @@ const caregiverProfileForm = reactive<CaregiverProfileFormState>({
   serviceCity: '',
   specialtyTagsText: '',
   serviceCommitment: '',
+  qualificationMaterials: [],
 });
 
 const caregiverServiceForm = reactive({
@@ -337,10 +515,36 @@ const caregiverOrderQuery = reactive<{
   status: 'PENDING_ACCEPT',
 });
 
+const serviceLogTypeOptions: Array<{ label: string; value: ServiceLogType }> = [
+  { label: '服务备注', value: 'NOTE' },
+  { label: '喂养记录', value: 'FEED' },
+  { label: '遛宠记录', value: 'WALK' },
+  { label: '陪玩记录', value: 'PLAY' },
+  { label: '健康观察', value: 'HEALTH' },
+];
+
+const createEmptyServiceLogForm = () => ({
+  orderId: '',
+  logType: 'NOTE' as ServiceLogType,
+  textNote: '',
+  files: [] as File[],
+});
+
+const serviceLogDialogVisible = ref(false);
+const serviceLogSubmitting = ref(false);
+const serviceLogUploadProgress = ref<number | null>(null);
+const serviceLogFileInput = ref<HTMLInputElement | null>(null);
+const serviceLogForm = reactive(createEmptyServiceLogForm());
+const canUploadServiceLogMedia = computed(() =>
+  auth.hasPermission('file.upload') || caregiverProfile.value?.auditStatus === 'APPROVED',
+);
+
 const pageLoading = computed(() => (
   caregiverProfileSaving.value
   || caregiverServiceSaving.value
   || caregiverOrdersLoading.value
+  || qualificationUploading.value
+  || serviceLogSubmitting.value
 ));
 
 const unreadConversationCount = computed(() => caregiverOrders.value.reduce((total, item) => (
@@ -361,6 +565,15 @@ const auditTagType = computed(() => {
 });
 
 const formatTime = (value: string) => new Date(value).toLocaleString();
+const formatFileSize = (size: number) => {
+  if (size < 1024) {
+    return `${size} B`;
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 const getOrderStatusLabel = (status: OrderStatus) => ({
   PENDING_ACCEPT: '待接单',
@@ -415,6 +628,91 @@ const splitTagText = (value: string) => [...new Set(
 
 const joinTagText = (tags?: string[]) => (tags ?? []).join('，');
 
+const removeQualificationMaterial = (fileId: string) => {
+  caregiverProfileForm.qualificationMaterials = caregiverProfileForm.qualificationMaterials
+    .filter(item => item.fileId !== fileId);
+};
+
+const openQualificationFilePicker = () => {
+  qualificationUploadInput.value?.click();
+};
+
+const openExternalLink = (url: string) => {
+  window.open(url, '_blank', 'noopener');
+};
+
+const uploadQualificationFiles = async (files: File[]) => {
+  if (!caregiverProfile.value) {
+    ElMessage.warning('请先加载照料者档案');
+    return;
+  }
+
+  if (!files.length) {
+    return;
+  }
+
+  qualificationUploading.value = true;
+  qualificationUploadProgress.value = 0;
+
+  const uploaded: CaregiverQualificationMaterialRecord[] = [];
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+  let completedSize = 0;
+
+  try {
+    for (const file of files) {
+      const result = await uploadAttachmentFile(
+        file,
+        {
+          tag1: 'petpal-caregiver-qualification',
+          tag2: caregiverProfile.value.id,
+        },
+        (percent) => {
+          const currentBytes = Math.round((file.size * percent) / 100);
+          qualificationUploadProgress.value = Math.min(
+            99,
+            Math.round(((completedSize + currentBytes) / Math.max(totalSize, 1)) * 100),
+          );
+        },
+      );
+
+      uploaded.push({
+        fileId: result.fileId,
+        url: result.url,
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+      });
+      completedSize += file.size;
+      qualificationUploadProgress.value = Math.min(
+        99,
+        Math.round((completedSize / Math.max(totalSize, 1)) * 100),
+      );
+    }
+
+    caregiverProfileForm.qualificationMaterials = [
+      ...caregiverProfileForm.qualificationMaterials,
+      ...uploaded,
+    ].slice(0, 12);
+    qualificationUploadProgress.value = 100;
+    ElMessage.success(`已上传 ${uploaded.length} 份资质材料`);
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '上传资质材料失败'));
+  } finally {
+    qualificationUploading.value = false;
+    setTimeout(() => {
+      qualificationUploadProgress.value = null;
+    }, 600);
+  }
+};
+
+const onQualificationFilesChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = '';
+  await uploadQualificationFiles(files);
+};
+
 const loadCaregiverProfile = async () => {
   try {
     const profile = await api.petpal.caregiver.profile();
@@ -425,6 +723,7 @@ const loadCaregiverProfile = async () => {
     caregiverProfileForm.serviceCity = profile.serviceCity || '';
     caregiverProfileForm.specialtyTagsText = joinTagText(profile.specialtyTags);
     caregiverProfileForm.serviceCommitment = profile.serviceCommitment || '';
+    caregiverProfileForm.qualificationMaterials = [...profile.qualificationMaterials];
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '加载照料者档案失败'));
   }
@@ -503,6 +802,125 @@ const checkInCaregiverOrder = async (orderId: string) => withCaregiverOrderActio
   },
 );
 
+const resetServiceLogDialog = () => {
+  Object.assign(serviceLogForm, createEmptyServiceLogForm());
+  serviceLogUploadProgress.value = null;
+  if (serviceLogFileInput.value) {
+    serviceLogFileInput.value.value = '';
+  }
+};
+
+const openCaregiverServiceLogDialog = (orderId: string) => {
+  resetServiceLogDialog();
+  serviceLogForm.orderId = orderId;
+  serviceLogDialogVisible.value = true;
+};
+
+const openServiceLogFilePicker = () => {
+  serviceLogFileInput.value?.click();
+};
+
+const clearServiceLogFiles = () => {
+  serviceLogForm.files = [];
+  if (serviceLogFileInput.value) {
+    serviceLogFileInput.value.value = '';
+  }
+};
+
+const onServiceLogFilesChange = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  serviceLogForm.files = Array.from(input.files ?? []);
+};
+
+const removeServiceLogFile = (index: number) => {
+  serviceLogForm.files.splice(index, 1);
+  if (serviceLogFileInput.value) {
+    serviceLogFileInput.value.value = '';
+  }
+};
+
+const uploadServiceLogMediaFiles = async (orderId: string) => {
+  if (serviceLogForm.files.length === 0) {
+    serviceLogUploadProgress.value = null;
+    return [];
+  }
+
+  const totalBytes = serviceLogForm.files.reduce((sum, file) => sum + file.size, 0);
+  const uploadedUrls: string[] = [];
+  let completedBytes = 0;
+
+  for (const file of serviceLogForm.files) {
+    const uploaded = await uploadAttachmentFile(
+      file,
+      { tag1: 'petpal-service-log', tag2: orderId },
+      (progress) => {
+        const currentBytes = Math.round((file.size * progress) / 100);
+        serviceLogUploadProgress.value = Math.min(
+          99,
+          Math.round(((completedBytes + currentBytes) / totalBytes) * 100),
+        );
+      },
+    );
+    uploadedUrls.push(uploaded.url);
+    completedBytes += file.size;
+    serviceLogUploadProgress.value = Math.min(
+      99,
+      Math.round((completedBytes / totalBytes) * 100),
+    );
+  }
+
+  serviceLogUploadProgress.value = 100;
+  return uploadedUrls;
+};
+
+const submitCaregiverServiceLog = async () => {
+  const orderId = serviceLogForm.orderId;
+  const textNote = serviceLogForm.textNote.trim();
+
+  if (!orderId) {
+    return;
+  }
+
+  if (!textNote && serviceLogForm.files.length === 0) {
+    ElMessage.warning('请填写服务说明或上传至少一个媒体文件');
+    return;
+  }
+
+  if (serviceLogForm.files.length > 0 && !canUploadServiceLogMedia.value) {
+    ElMessage.warning('当前账号暂未开通媒体上传能力，请移除图片或视频后再提交');
+    return;
+  }
+
+  try {
+    serviceLogSubmitting.value = true;
+    caregiverActionLoadingKey.value = `log:${orderId}`;
+    const mediaUrls = await uploadServiceLogMediaFiles(orderId);
+    await api.petpal.caregiver.addServiceLog(orderId, {
+      logType: serviceLogForm.logType,
+      textNote: textNote || undefined,
+      mediaUrls,
+    });
+    serviceLogDialogVisible.value = false;
+    resetServiceLogDialog();
+    ElMessage.success('服务记录已保存');
+    await loadCaregiverOrders();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '保存服务记录失败'));
+  } finally {
+    serviceLogSubmitting.value = false;
+    serviceLogUploadProgress.value = null;
+    caregiverActionLoadingKey.value = '';
+  }
+};
+
+const checkOutCaregiverOrder = async (orderId: string) => withCaregiverOrderAction(
+  `checkout:${orderId}`,
+  '签退成功',
+  async () => {
+    await api.petpal.caregiver.checkOutOrder(orderId);
+  },
+);
+
 const saveCaregiverProfile = async () => {
   try {
     caregiverProfileSaving.value = true;
@@ -513,11 +931,12 @@ const saveCaregiverProfile = async () => {
       serviceCity: caregiverProfileForm.serviceCity.trim() || undefined,
       specialtyTags: splitTagText(caregiverProfileForm.specialtyTagsText),
       serviceCommitment: caregiverProfileForm.serviceCommitment.trim() || undefined,
-      qualificationMaterials: caregiverProfile.value?.qualificationMaterials || [],
+      qualificationMaterials: caregiverProfileForm.qualificationMaterials,
     });
     caregiverProfile.value = profile;
     caregiverProfileForm.specialtyTagsText = joinTagText(profile.specialtyTags);
     caregiverProfileForm.serviceCommitment = profile.serviceCommitment || '';
+    caregiverProfileForm.qualificationMaterials = [...profile.qualificationMaterials];
     ElMessage.success('照料者档案已更新');
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '保存照料者档案失败'));
@@ -683,6 +1102,119 @@ onMounted(() => {
   font-size: 12px;
 }
 
+.petpal-service-log-dialog__upload {
+  display: grid;
+  gap: 12px;
+}
+
+.petpal-service-log-dialog__file-input {
+  display: none;
+}
+
+.petpal-service-log-dialog__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.petpal-service-log-dialog__hint,
+.petpal-service-log-dialog__empty {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f6f8fb;
+  color: #5f6b7a;
+  line-height: 1.6;
+}
+
+.petpal-service-log-dialog__hint.is-warning {
+  background: #fff8e6;
+  color: #8a6200;
+}
+
+.petpal-service-log-dialog__file-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.petpal-service-log-dialog__file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e5ebf3;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.petpal-service-log-dialog__file-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-service-log-dialog__file-meta span {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.petpal-hidden-file-input {
+  display: none;
+}
+
+.petpal-qualification-panel {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.petpal-qualification-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.petpal-qualification-panel__hint {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.petpal-qualification-list {
+  display: grid;
+  gap: 10px;
+}
+
+.petpal-qualification-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e5ebf3;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.petpal-qualification-item__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-qualification-item__copy strong,
+.petpal-qualification-item__copy span {
+  word-break: break-all;
+}
+
+.petpal-qualification-item__copy span {
+  color: #6b7280;
+  font-size: 12px;
+}
+
 @media (max-width: 1200px) {
   .petpal-grid-span-4,
   .petpal-grid-span-5,
@@ -703,6 +1235,11 @@ onMounted(() => {
 
   .petpal-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .petpal-service-log-dialog__file-item,
+  .petpal-qualification-item {
+    flex-direction: column;
   }
 }
 </style>

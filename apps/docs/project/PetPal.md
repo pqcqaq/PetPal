@@ -4949,6 +4949,42 @@ flowchart TD
 2. 继续围绕更主动的售后 / 消息催办与运营治理能力补齐后续缺口。
 3. 在 Web 前台开始按路由拆分主人 / 照料者超级页面，避免新功能继续堆到旧页面。
 
+### 14.104 2026-04-01（P3-M1 Slice 88）
+
+**概述**：继续推进 P3 Web 前台重构，本轮把照料者页仍依赖 `legacy` 的高频动作迁回独立路由，让照料者工作台直接覆盖资质材料上传、服务记录媒体上传和签退动作，继续压缩兼容页职责。
+
+已完成：
+
+- 照料者档案补齐资质材料上传：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue`
+    - 在照料者档案表单中接入资质材料上传、进度反馈、预览和移除能力。
+    - 复用现有附件直传链路与 `qualificationMaterials` 结构，不新增协议面。
+- 照料者履约补齐高级动作：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue`
+    - 在照料者订单表中补齐“服务记录”和“签退”动作。
+    - 新增服务记录弹窗，支持记录类型、文字说明和图片/视频上传。
+    - 沿用现有媒体上传权限判定：已开通 `file.upload` 或审核通过的照料者可以直接上传服务媒体。
+- 照料者页职责收口：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue`
+    - 页面说明和兼容入口文案同步更新，明确当前页已经承接照料者高频操作。
+    - 兼容页入口从“资质材料上传 / 高级履约”降级为通用混合工作台入口。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认资质材料上传继续复用既有 `petpal-caregiver-qualification` 附件标签和 `qualificationMaterials` 数据结构，没有引入新的后端状态或破坏后台审核预览链路。
+- 已确认服务记录媒体上传继续复用既有 `petpal-service-log` 上传链路和照料者履约接口，行为与兼容页保持一致。
+- 已确认照料者页已经可以独立完成“档案 -> 资质材料 -> 服务 -> 接单 -> 签到 -> 服务记录 -> 签退”主链路，`legacy` 依赖面明显收窄。
+
+下一步（1-3）：
+
+1. 继续梳理 `legacy` 中仍未迁出的混合能力，优先评估主人端高级导出与剩余混合动作的拆分路径。
+2. 继续优化照料者页交互细节，例如更明确的审核提示、履约状态提示和空态引导。
+3. 在 Web 端继续压缩 `legacy` 的同时，维持 App 端 Material Design 3 主流程体验收口。
+
 ### 14.103 2026-04-01（P3-M1 Slice 87）
 
 **概述**：继续推进 P3 Web 前台重构，本轮正式把旧的 `PetPalOwnerView.vue` 超级页面切出角色路由，先落地“主人页 / 照料者页 / 兼容页”三段式结构，避免新功能继续堆回混合工作台。
