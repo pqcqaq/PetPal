@@ -154,6 +154,13 @@ function normalizeDemandTagsText(value: unknown) {
   return ''
 }
 
+function normalizeFlowStep(value: string | undefined): RequestFlowStep | undefined {
+  if (value === 'PET' || value === 'SCHEDULE' || value === 'DETAIL' || value === 'REVIEW') {
+    return value
+  }
+  return undefined
+}
+
 function ensurePetSelection(preferredPetId?: string) {
   if (preferredPetId && pets.value.some(item => item.id === preferredPetId)) {
     requestForm.petId = preferredPetId
@@ -164,7 +171,7 @@ function ensurePetSelection(preferredPetId?: string) {
   }
 }
 
-function applyRequestToForm(request: ServiceRequestRecord) {
+function applyRequestToForm(request: ServiceRequestRecord, preferredStep?: RequestFlowStep) {
   hydratingRequest.value = true
   copiedFromRequestId.value = request.id
   requestForm.petId = request.petId
@@ -177,7 +184,7 @@ function applyRequestToForm(request: ServiceRequestRecord) {
   requestForm.city = ''
   requestForm.budgetAmount = request.budgetAmount == null ? '' : String(request.budgetAmount)
   requestForm.demandTagsText = normalizeDemandTagsText(request.demandTags)
-  flowStep.value = 'REVIEW'
+  flowStep.value = preferredStep || 'REVIEW'
   hydratingRequest.value = false
 }
 
@@ -263,7 +270,12 @@ async function loadMatches(showError = false) {
   }
 }
 
-async function loadPage(showError = false, preferredPetId?: string, preferredRequestId?: string) {
+async function loadPage(
+  showError = false,
+  preferredPetId?: string,
+  preferredRequestId?: string,
+  preferredStep?: RequestFlowStep,
+) {
   if (!tokenStore.hasLogin || loading.value) {
     uni.stopPullDownRefresh()
     return
@@ -283,7 +295,7 @@ async function loadPage(showError = false, preferredPetId?: string, preferredReq
     if (preferredRequestId) {
       const preferredRequest = requestRows.find(item => item.id === preferredRequestId)
       if (preferredRequest) {
-        applyRequestToForm(preferredRequest)
+        applyRequestToForm(preferredRequest, preferredStep)
       }
     }
 
@@ -355,7 +367,7 @@ watch(() => requestForm.city, () => {
 
 onLoad((options: Record<string, string | undefined>) => {
   if (tokenStore.hasLogin && (options?.petId || options?.requestId)) {
-    void loadPage(false, options.petId, options.requestId)
+    void loadPage(false, options.petId, options.requestId, normalizeFlowStep(options.step))
   }
 })
 

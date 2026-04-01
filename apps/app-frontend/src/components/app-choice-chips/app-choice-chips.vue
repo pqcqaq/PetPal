@@ -15,8 +15,10 @@ const props = withDefaults(defineProps<{
   modelValue: string
   options: ChoiceChipOption[]
   disabled?: boolean
+  showDescriptions?: boolean
 }>(), {
   disabled: false,
+  showDescriptions: false,
 })
 
 const emit = defineEmits<{
@@ -49,6 +51,9 @@ function handleSelect(value: string) {
     >
       <view class="app-choice-chip__label">
         {{ item.label }}
+      </view>
+      <view v-if="showDescriptions && item.description" class="app-choice-chip__description">
+        {{ item.description }}
       </view>
     </view>
   </view>
@@ -99,5 +104,12 @@ function handleSelect(value: string) {
   line-height: 1.2;
   font-weight: 700;
   color: var(--app-text);
+}
+
+.app-choice-chip__description {
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  line-height: 1.5;
+  color: var(--app-text-secondary);
 }
 </style>

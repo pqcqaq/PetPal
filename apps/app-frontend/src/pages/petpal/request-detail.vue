@@ -3,13 +3,13 @@
  * UX Blueprint
  * User: 已经发布过需求、现在要继续推进匹配或下单的主人
  * Entry: 从主人首页的最近需求、发布成功后的回流、提醒中心中的活跃需求进入
- * First screen: 先看到当前需求状态、服务安排和能否继续下单
- * Primary action: 选择一位照料者并继续结算，或在没有匹配时刷新推荐
- * Secondary actions: 复制当前条件重建一单、返回新建需求、查看安排摘要
+ * First screen: 先看到当前需求状态，再直接切换匹配视角、照料者和下一步动作
+ * Primary action: 排序候选、选中一位照料者并继续结算
+ * Secondary actions: 改时间地点、改预算要求、复制当前条件重建
  * States: 未登录、参数缺失、需求不存在、匹配为空、已匹配可下单、需求已关闭
  */
 import type { MatchedCaregiverRecord, ServiceRequestRecord } from '@rbac/api-common'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
 import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
 import AppList from '@/components/app-list/app-list.vue'
@@ -51,6 +51,8 @@ definePage({
 })
 
 type RequestDetailPanel = 'MATCHES' | 'PLAN' | 'STATE'
+type MatchSortMode = 'RECOMMENDED' | 'PRICE_LOW' | 'RATING_HIGH' | 'DISTANCE_NEAR'
+type RequestFlowStep = 'SCHEDULE' | 'DETAIL' | 'REVIEW'
 
 const tokenStore = useTokenStore()
 
@@ -63,6 +65,7 @@ const requestRecord = ref<ServiceRequestRecord | null>(null)
 const matchItems = ref<MatchedCaregiverRecord[]>([])
 const selectedServiceId = ref('')
 const activePanel = ref<RequestDetailPanel>('MATCHES')
+const matchSortMode = ref<MatchSortMode>('RECOMMENDED')
 
 const panelOptions = [
   { label: '匹配', value: 'MATCHES' },
@@ -70,14 +73,121 @@ const panelOptions = [
   { label: '进度', value: 'STATE' },
 ]
 
+const matchSortOptions = [
+  { label: '综合', value: 'RECOMMENDED' },
+  { label: '更省', value: 'PRICE_LOW' },
+  { label: '高分', value: 'RATING_HIGH' },
+  { label: '更近', value: 'DISTANCE_NEAR' },
+]
+
+function getDistanceValue(item: MatchedCaregiverRecord) {
+  return item.distanceKm == null ? Number.POSITIVE_INFINITY : Number(item.distanceKm)
+}
+
+function sortMatches(
+  items: MatchedCaregiverRecord[],
+  mode: MatchSortMode,
+  matchedCaregiverId?: string | null,
+) {
+  return [...items].sort((left, right) => {
+    const leftMatched = matchedCaregiverId && left.caregiverId === matchedCaregiverId ? 1 : 0
+    const rightMatched = matchedCaregiverId && right.caregiverId === matchedCaregiverId ? 1 : 0
+
+    if (mode === 'RECOMMENDED' && leftMatched !== rightMatched) {
+      return rightMatched - leftMatched
+    }
+
+    if (mode === 'PRICE_LOW') {
+      const priceGap = Number(left.pricePerUnit) - Number(right.pricePerUnit)
+      if (priceGap !== 0) return priceGap
+    }
+
+    if (mode === 'RATING_HIGH') {
+      const ratingGap = Number(right.ratingAvg) - Number(left.ratingAvg)
+      if (ratingGap !== 0) return ratingGap
+      const ratingCountGap = right.ratingCount - left.ratingCount
+      if (ratingCountGap !== 0) return ratingCountGap
+    }
+
+    if (mode === 'DISTANCE_NEAR') {
+      const distanceGap = getDistanceValue(left) - getDistanceValue(right)
+      if (distanceGap !== 0) return distanceGap
+    }
+
+    const recommendedRatingGap = Number(right.ratingAvg) - Number(left.ratingAvg)
+    if (recommendedRatingGap !== 0) return recommendedRatingGap
+
+    const recommendedDistanceGap = getDistanceValue(left) - getDistanceValue(right)
+    if (recommendedDistanceGap !== 0) return recommendedDistanceGap
+
+    return Number(left.pricePerUnit) - Number(right.pricePerUnit)
+  })
+}
+
+function formatDistanceKm(distanceKm: number | null | undefined) {
+  if (distanceKm == null || !Number.isFinite(distanceKm)) {
+    return '距离待确认'
+  }
+  if (distanceKm < 1) {
+    return `${Math.round(distanceKm * 1000)}m`
+  }
+  return `${distanceKm >= 10 ? distanceKm.toFixed(0) : distanceKm.toFixed(1)}km`
+}
+
+function getRequestDurationHours(request: ServiceRequestRecord) {
+  return Math.max(
+    1,
+    Math.ceil(Math.max(0, new Date(request.endTime).getTime() - new Date(request.startTime).getTime()) / (1000 * 60 * 60)),
+  )
+}
+
+const rankedMatchItems = computed(() => sortMatches(
+  matchItems.value,
+  matchSortMode.value,
+  requestRecord.value?.matchedCaregiverId,
+))
+
 const selectedCaregiver = computed(() => {
-  if (!matchItems.value.length) {
+  if (!rankedMatchItems.value.length) {
     return null
   }
-  return matchItems.value.find(item => item.serviceId === selectedServiceId.value)
-    ?? matchItems.value.find(item => item.caregiverId === requestRecord.value?.matchedCaregiverId)
-    ?? matchItems.value[0]
+  return rankedMatchItems.value.find(item => item.serviceId === selectedServiceId.value)
+    ?? rankedMatchItems.value.find(item => item.caregiverId === requestRecord.value?.matchedCaregiverId)
+    ?? rankedMatchItems.value[0]
     ?? null
+})
+
+const quickCandidateOptions = computed(() => rankedMatchItems.value
+  .slice(0, 6)
+  .map(item => ({
+    label: item.caregiverName,
+    value: item.serviceId,
+    description: `¥${formatAmount(item.pricePerUnit)} · ${formatDistanceKm(item.distanceKm)}`,
+  })))
+
+const alternativeCaregivers = computed(() => rankedMatchItems.value
+  .filter(item => item.serviceId !== selectedCaregiver.value?.serviceId)
+  .slice(0, 3))
+
+const selectedCaregiverMetrics = computed(() => {
+  const caregiver = selectedCaregiver.value
+  if (!caregiver) {
+    return []
+  }
+  return [
+    {
+      label: '报价',
+      value: `¥${formatAmount(caregiver.pricePerUnit)}/${caregiver.unitType}`,
+    },
+    {
+      label: '评分',
+      value: `${formatAmount(caregiver.ratingAvg)} / ${caregiver.ratingCount}`,
+    },
+    {
+      label: '距离',
+      value: formatDistanceKm(caregiver.distanceKm),
+    },
+  ]
 })
 
 const canCheckoutNow = computed(() => Boolean(
@@ -93,17 +203,14 @@ const requestMetrics = computed(() => {
     {
       label: '预算',
       value: `¥${formatAmount(request.budgetAmount)}`,
-      tone: 'default',
     },
     {
       label: '匹配',
       value: `${matchItems.value.length} 人`,
-      tone: matchItems.value.length ? 'success' : 'default',
     },
     {
       label: '更新',
       value: formatDateTime(request.updatedAt),
-      tone: 'default',
     },
   ]
 })
@@ -122,7 +229,7 @@ const requestSummaryRows = computed(() => {
     {
       title: '服务时间',
       label: formatRange(request.startTime, request.endTime),
-      value: `${Math.max(1, Math.ceil(Math.max(0, new Date(request.endTime).getTime() - new Date(request.startTime).getTime()) / (1000 * 60 * 60)))} 小时`,
+      value: `${getRequestDurationHours(request)} 小时`,
     },
     {
       title: '服务地点',
@@ -137,9 +244,32 @@ const requestSummaryRows = computed(() => {
   ]
 })
 
+const stateRows = computed(() => {
+  const request = requestRecord.value
+  return [
+    {
+      title: '当前状态',
+      label: request ? getRequestStatusLabel(request.status) : '--',
+      value: request && isRequestActive(request.status) ? '处理中' : '已结束',
+    },
+    {
+      title: '当前候选',
+      label: selectedCaregiver.value
+        ? `${selectedCaregiver.value.caregiverName} · ${formatDistanceKm(selectedCaregiver.value.distanceKm)}`
+        : '还没有照料者',
+      value: selectedCaregiver.value ? `¥${formatAmount(selectedCaregiver.value.pricePerUnit)}` : '待匹配',
+    },
+    {
+      title: '下一步',
+      label: canCheckoutNow.value ? '可以直接继续下单' : '先刷新匹配或调整条件',
+      value: canCheckoutNow.value ? '结算' : '调整',
+    },
+  ]
+})
+
 const progressSteps = computed(() => {
   const request = requestRecord.value
-  const matched = Boolean(matchItems.value.length || request?.matchedCaregiverId)
+  const matched = Boolean(rankedMatchItems.value.length || request?.matchedCaregiverId)
   const payable = Boolean(request && canRequestCheckout(request))
   return [
     {
@@ -163,7 +293,7 @@ const primaryActionLabel = computed(() => {
     return '刷新'
   }
   if (!isRequestActive(request.status)) {
-    return '复制条件新建'
+    return '按当前条件重建'
   }
   if (canCheckoutNow.value) {
     return '继续下单'
@@ -181,8 +311,12 @@ function syncSelectedCaregiver() {
     return
   }
 
-  const matchedService = matchItems.value.find(item => item.caregiverId === requestRecord.value?.matchedCaregiverId)
-  selectedServiceId.value = matchedService?.serviceId || matchItems.value[0].serviceId
+  const rankedItems = sortMatches(
+    matchItems.value,
+    matchSortMode.value,
+    requestRecord.value?.matchedCaregiverId,
+  )
+  selectedServiceId.value = rankedItems[0]?.serviceId || ''
 }
 
 async function loadMatches(showError = false, resetSelection = false) {
@@ -271,6 +405,14 @@ function openNewRequest() {
   uni.redirectTo({ url: PETPAL_REQUEST_PAGE })
 }
 
+function openRequestStep(step: RequestFlowStep) {
+  if (!requestRecord.value) {
+    openNewRequest()
+    return
+  }
+  uni.redirectTo({ url: `${PETPAL_REQUEST_PAGE}?requestId=${requestRecord.value.id}&step=${step}` })
+}
+
 function duplicateRequest() {
   if (!requestRecord.value) {
     openNewRequest()
@@ -316,6 +458,13 @@ function handlePrimaryAction() {
 
   void loadMatches(true, true)
 }
+
+watch(matchSortMode, () => {
+  if (!matchItems.value.length) {
+    return
+  }
+  syncSelectedCaregiver()
+})
 
 onLoad((options: Record<string, string | undefined>) => {
   requestId.value = options.requestId || ''
@@ -381,50 +530,71 @@ onPullDownRefresh(() => {
         </AppSection>
 
         <AppSection v-if="activePanel === 'MATCHES'" :title="matchItems.length ? `匹配照料者 (${matchItems.length})` : '匹配照料者'">
-          <view class="request-toolbar">
-            <AppButton size="medium" type="info" :loading="matchesLoading" @click="loadMatches(true, true)">刷新推荐</AppButton>
-            <AppButton size="medium" type="info" @click="duplicateRequest">复制条件</AppButton>
-          </view>
+          <view class="request-stack">
+            <AppChoiceChips v-model="matchSortMode" :options="matchSortOptions" />
 
-          <view v-if="selectedCaregiver" class="selected-caregiver">
-            <view class="selected-caregiver__copy">
-              <view class="selected-caregiver__tags">
-                <AppTag type="success">当前选中</AppTag>
-                <AppTag type="default">{{ selectedCaregiver.city || '城市待补充' }}</AppTag>
-              </view>
-              <text class="selected-caregiver__title">{{ selectedCaregiver.caregiverName }}</text>
-              <text class="selected-caregiver__meta">
-                评分 {{ formatAmount(selectedCaregiver.ratingAvg) }} · {{ selectedCaregiver.ratingCount }} 条评价
-              </text>
+            <AppChoiceChips
+              v-if="quickCandidateOptions.length"
+              v-model="selectedServiceId"
+              :options="quickCandidateOptions"
+              show-descriptions
+            />
+
+            <view class="request-toolbar">
+              <AppButton size="medium" type="info" :loading="matchesLoading" @click="loadMatches(true, true)">刷新推荐</AppButton>
+              <AppButton size="medium" type="info" @click="openRequestStep('SCHEDULE')">改时间地点</AppButton>
+              <AppButton size="medium" type="info" @click="openRequestStep('DETAIL')">改预算要求</AppButton>
             </view>
-            <AppTag type="primary">¥{{ formatAmount(selectedCaregiver.pricePerUnit) }}/{{ selectedCaregiver.unitType }}</AppTag>
-          </view>
 
-          <view v-if="matchItems.length" class="match-grid">
-            <view
-              v-for="item in matchItems"
-              :key="item.serviceId"
-              class="match-tile"
-              :class="selectedServiceId === item.serviceId ? 'match-tile--active' : ''"
-              @click="selectedServiceId = item.serviceId"
-            >
-              <view class="match-tile__top">
-                <view class="match-tile__copy">
-                  <text class="match-tile__title">{{ item.caregiverName }}</text>
-                  <text class="match-tile__meta">{{ item.city || '城市待补充' }}</text>
+            <view v-if="selectedCaregiver" class="selected-caregiver">
+              <view class="selected-caregiver__headline">
+                <view class="selected-caregiver__copy">
+                  <view class="selected-caregiver__tags">
+                    <AppTag type="success">当前选中</AppTag>
+                    <AppTag type="default">{{ selectedCaregiver.city || '城市待补充' }}</AppTag>
+                  </view>
+                  <text class="selected-caregiver__title">{{ selectedCaregiver.caregiverName }}</text>
+                  <text class="selected-caregiver__meta">
+                    {{ formatDistanceKm(selectedCaregiver.distanceKm) }} · 评分 {{ formatAmount(selectedCaregiver.ratingAvg) }} · {{ selectedCaregiver.ratingCount }} 条评价
+                  </text>
                 </view>
-                <AppTag :type="selectedServiceId === item.serviceId ? 'success' : 'default'">
-                  {{ selectedServiceId === item.serviceId ? '已选' : '可选' }}
-                </AppTag>
+                <AppTag type="primary">¥{{ formatAmount(selectedCaregiver.pricePerUnit) }}/{{ selectedCaregiver.unitType }}</AppTag>
               </view>
-              <view class="match-tile__bottom">
-                <text class="match-tile__price">¥{{ formatAmount(item.pricePerUnit) }}/{{ item.unitType }}</text>
-                <text class="match-tile__score">评分 {{ formatAmount(item.ratingAvg) }}</text>
+
+              <view class="selected-caregiver__metrics">
+                <view
+                  v-for="metric in selectedCaregiverMetrics"
+                  :key="metric.label"
+                  class="selected-caregiver__metric"
+                >
+                  <text class="selected-caregiver__metric-label">{{ metric.label }}</text>
+                  <text class="selected-caregiver__metric-value">{{ metric.value }}</text>
+                </view>
+              </view>
+
+              <view class="request-toolbar">
+                <AppButton size="medium" type="info" @click="duplicateRequest">复制条件</AppButton>
+                <AppButton size="medium" @click="openCheckout">继续下单</AppButton>
               </view>
             </view>
-          </view>
-          <view v-else class="request-empty">
-            <AppStatus :mode="matchesLoading ? 'loading' : 'empty'" :text="matchesLoading ? '正在刷新匹配' : '当前没有可用照料者'" />
+
+            <AppList v-if="alternativeCaregivers.length">
+              <AppListItem
+                v-for="item in alternativeCaregivers"
+                :key="item.serviceId"
+                :title="item.caregiverName"
+                :label="`${formatDistanceKm(item.distanceKm)} · 评分 ${formatAmount(item.ratingAvg)}`"
+                :value="`¥${formatAmount(item.pricePerUnit)}/${item.unitType}`"
+                value-emphasis
+                clickable
+                is-link
+                @click="selectedServiceId = item.serviceId"
+              />
+            </AppList>
+
+            <view v-if="!matchItems.length" class="request-empty">
+              <AppStatus :mode="matchesLoading ? 'loading' : 'empty'" :text="matchesLoading ? '正在刷新匹配' : '当前没有可用照料者'" />
+            </view>
           </view>
         </AppSection>
 
@@ -440,8 +610,9 @@ onPullDownRefresh(() => {
             />
           </AppList>
           <view class="request-toolbar">
-            <AppButton size="medium" type="info" @click="duplicateRequest">复制条件</AppButton>
-            <AppButton size="medium" @click="openNewRequest">新建需求</AppButton>
+            <AppButton size="medium" type="info" @click="openRequestStep('SCHEDULE')">改时间地点</AppButton>
+            <AppButton size="medium" type="info" @click="openRequestStep('DETAIL')">改预算要求</AppButton>
+            <AppButton size="medium" @click="duplicateRequest">复制条件</AppButton>
           </view>
         </AppSection>
 
@@ -458,9 +629,20 @@ onPullDownRefresh(() => {
             </view>
           </view>
 
+          <AppList>
+            <AppListItem
+              v-for="item in stateRows"
+              :key="item.title"
+              :title="item.title"
+              :label="item.label"
+              :value="item.value"
+              value-emphasis
+            />
+          </AppList>
+
           <view class="request-toolbar">
             <AppButton size="medium" type="info" :loading="matchesLoading" @click="loadMatches(true, true)">刷新匹配</AppButton>
-            <AppButton size="medium" type="info" @click="duplicateRequest">复制条件</AppButton>
+            <AppButton size="medium" type="info" @click="openRequestStep('REVIEW')">重新确认</AppButton>
             <AppButton size="medium" @click="handlePrimaryAction">{{ primaryActionLabel }}</AppButton>
           </view>
         </AppSection>
@@ -469,7 +651,7 @@ onPullDownRefresh(() => {
           <AppButton block size="large" :loading="matchesLoading" @click="handlePrimaryAction">
             {{ primaryActionLabel }}
           </AppButton>
-          <AppButton block size="large" type="info" @click="openNewRequest">新建需求</AppButton>
+          <AppButton block size="large" type="info" @click="openRequestStep('DETAIL')">调整当前需求</AppButton>
         </view>
       </template>
 
@@ -496,9 +678,10 @@ onPullDownRefresh(() => {
 
 <style scoped lang="scss">
 .request-stage,
+.request-stage__metric,
+.request-stack,
 .selected-caregiver,
-.match-tile,
-.request-stage__metric {
+.selected-caregiver__metric {
   display: grid;
   gap: 14rpx;
 }
@@ -513,7 +696,8 @@ onPullDownRefresh(() => {
   box-shadow: var(--app-elevation-1);
 }
 
-.request-stage__copy {
+.request-stage__copy,
+.selected-caregiver__copy {
   display: grid;
   gap: 10rpx;
 }
@@ -527,8 +711,7 @@ onPullDownRefresh(() => {
 }
 
 .request-stage__title,
-.selected-caregiver__title,
-.match-tile__title {
+.selected-caregiver__title {
   color: var(--app-text);
   font-size: 32rpx;
   line-height: 1.25;
@@ -536,34 +719,35 @@ onPullDownRefresh(() => {
 }
 
 .request-stage__meta,
-.selected-caregiver__meta,
-.match-tile__meta,
 .request-stage__metric-label,
-.progress-node__label,
-.match-tile__score {
+.selected-caregiver__meta,
+.selected-caregiver__metric-label,
+.progress-node__label {
   color: var(--app-text-secondary);
   font-size: 22rpx;
   line-height: 1.6;
 }
 
 .request-stage__metrics,
-.match-grid {
+.selected-caregiver__metrics {
   display: grid;
   gap: 16rpx;
 }
 
-.request-stage__metrics {
+.request-stage__metrics,
+.selected-caregiver__metrics {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.request-stage__metric {
+.request-stage__metric,
+.selected-caregiver__metric {
   padding: 18rpx 20rpx;
   border-radius: 22rpx;
   background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container-high) 100%);
 }
 
 .request-stage__metric-value,
-.match-tile__price {
+.selected-caregiver__metric-value {
   color: var(--app-text);
   font-size: 28rpx;
   line-height: 1.25;
@@ -577,47 +761,11 @@ onPullDownRefresh(() => {
   background: linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
 }
 
-.selected-caregiver__copy {
-  display: grid;
-  gap: 10rpx;
-}
-
-.match-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.match-tile {
-  padding: 22rpx;
-  border-radius: var(--app-shape-xl);
-  border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
-  box-shadow: var(--app-elevation-1);
-  transition:
-    transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
-    box-shadow var(--app-motion-duration-medium) var(--app-motion-easing-standard),
-    border-color var(--app-motion-duration-medium) var(--app-motion-easing-standard);
-}
-
-.match-tile--active {
-  border-color: rgba(15, 118, 110, 0.24);
-  background:
-    radial-gradient(circle at top right, rgba(15, 118, 110, 0.12), transparent 30%),
-    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
-  box-shadow: var(--app-elevation-2);
-  transform: translateY(-2rpx);
-}
-
-.match-tile__top,
-.match-tile__bottom {
+.selected-caregiver__headline {
   display: flex;
-  gap: 12rpx;
+  gap: 16rpx;
   align-items: flex-start;
   justify-content: space-between;
-}
-
-.match-tile__copy {
-  display: grid;
-  gap: 8rpx;
 }
 
 .progress-rail {
@@ -667,12 +815,11 @@ onPullDownRefresh(() => {
 
 @media (max-width: 680px) {
   .request-stage__metrics,
-  .match-grid {
+  .selected-caregiver__metrics {
     grid-template-columns: 1fr;
   }
 
-  .match-tile__top,
-  .match-tile__bottom {
+  .selected-caregiver__headline {
     flex-direction: column;
   }
 }
