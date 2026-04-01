@@ -24,7 +24,41 @@
       </div>
     </section>
 
-    <section class="frontend-page__section-grid">
+    <template v-if="auth.isAuthenticated">
+      <section v-if="pageLoadState === 'error'" class="frontend-card">
+        <PetPalStatePanel
+          eyebrow="兼容入口"
+          title="兼容概览加载失败"
+          :description="pageLoadErrorMessage"
+          tone="danger"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" :loading="loading" @click="reloadAll">重试兼容概览</el-button>
+            <RouterLink :to="{ name: 'frontend-petpal' }">
+              <el-button size="small">去主人服务台</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+      </section>
+
+      <template v-else>
+        <section v-if="partialLoadNotice" class="frontend-card">
+          <PetPalStatePanel
+            eyebrow="加载提示"
+            title="兼容概览部分数据未完整加载"
+            :description="partialLoadNotice"
+            tone="warning"
+          >
+            <template #actions>
+              <el-button size="small" type="primary" :loading="loading" @click="reloadAll">重新加载</el-button>
+              <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+                <el-button size="small">先看提醒中心</el-button>
+              </RouterLink>
+            </template>
+          </PetPalStatePanel>
+        </section>
+
+        <section class="frontend-page__section-grid">
       <article class="frontend-card petpal-grid-span-3" v-loading="loading">
         <span class="frontend-card__eyebrow">主人资产</span>
         <strong class="petpal-summary-value">{{ pets.length }}</strong>
@@ -45,9 +79,9 @@
         <strong class="petpal-summary-value">{{ caregiverPriorityOrders.length }}</strong>
         <p class="petpal-summary-copy">优先处理待接单、服务中和照料者侧未读沟通。</p>
       </article>
-    </section>
+        </section>
 
-    <section class="frontend-page__section-grid">
+        <section class="frontend-page__section-grid">
       <article class="frontend-card petpal-grid-span-3">
         <span class="frontend-card__eyebrow">主人主流程</span>
         <h3>宠物 / 需求 / 订单</h3>
@@ -88,9 +122,9 @@
           打开售后中心
         </RouterLink>
       </article>
-    </section>
+        </section>
 
-    <section class="frontend-page__section-grid">
+        <section class="frontend-page__section-grid">
       <article class="frontend-card petpal-grid-span-6" v-loading="loading">
         <span class="frontend-card__eyebrow">主人优先处理</span>
         <div class="petpal-section-heading">
@@ -101,7 +135,39 @@
           <el-tag type="info">未读 {{ ownerUnreadCount }}</el-tag>
         </div>
 
-        <div v-if="ownerPriorityOrders.length" class="petpal-priority-list">
+        <PetPalStatePanel
+          v-if="ownerSectionState === 'role_unavailable'"
+          eyebrow="主人兼容视角"
+          title="当前账号未开通主人订单兼容概览"
+          description="旧入口不会再强行混合展示当前账号无权访问的主人订单。你可以直接去照料者工作台或切换账号。"
+          tone="warning"
+        >
+          <template #actions>
+            <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
+              <el-button size="small" type="primary">去照料者工作台</el-button>
+            </RouterLink>
+            <RouterLink to="/login">
+              <el-button size="small">切换账号</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+
+        <PetPalStatePanel
+          v-else-if="ownerSectionState === 'error'"
+          eyebrow="主人兼容视角"
+          title="主人订单兼容概览加载失败"
+          :description="ownerSectionErrorMessage"
+          tone="danger"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" :loading="loading" @click="reloadAll">重试兼容概览</el-button>
+            <RouterLink :to="{ name: 'frontend-petpal' }">
+              <el-button size="small">去主人服务台</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+
+        <div v-else-if="ownerPriorityOrders.length" class="petpal-priority-list">
           <div v-for="item in ownerPriorityOrders" :key="item.id" class="petpal-priority-item">
             <div class="petpal-priority-copy">
               <strong>{{ item.orderNo }}</strong>
@@ -134,7 +200,39 @@
           <el-tag type="success">未读 {{ caregiverUnreadCount }}</el-tag>
         </div>
 
-        <div v-if="caregiverPriorityOrders.length" class="petpal-priority-list">
+        <PetPalStatePanel
+          v-if="caregiverSectionState === 'role_unavailable'"
+          eyebrow="照料者兼容视角"
+          title="当前账号未开通照料者订单兼容概览"
+          description="旧入口不会再把无权访问的照料者订单混进这里。你可以直接回到主人服务台或切换到照料者账号。"
+          tone="warning"
+        >
+          <template #actions>
+            <RouterLink :to="{ name: 'frontend-petpal' }">
+              <el-button size="small" type="primary">去主人服务台</el-button>
+            </RouterLink>
+            <RouterLink to="/login">
+              <el-button size="small">切换账号</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+
+        <PetPalStatePanel
+          v-else-if="caregiverSectionState === 'error'"
+          eyebrow="照料者兼容视角"
+          title="照料者订单兼容概览加载失败"
+          :description="caregiverSectionErrorMessage"
+          tone="danger"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" :loading="loading" @click="reloadAll">重试兼容概览</el-button>
+            <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
+              <el-button size="small">去照料者工作台</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+
+        <div v-else-if="caregiverPriorityOrders.length" class="petpal-priority-list">
           <div v-for="item in caregiverPriorityOrders" :key="item.id" class="petpal-priority-item">
             <div class="petpal-priority-copy">
               <strong>{{ item.orderNo }}</strong>
@@ -157,14 +255,33 @@
           当前没有需要优先处理的照料者侧订单；如果尚未开启照料者能力，可直接忽略这部分并进入主人服务台。
         </p>
       </article>
-    </section>
+        </section>
 
-    <section class="frontend-card">
+        <section class="frontend-card">
       <span class="frontend-card__eyebrow">兼容策略</span>
       <h3>旧入口只保留跳转与概览</h3>
       <p class="petpal-compat-note">
         后续新的 PetPal Web 功能不再继续加回这个页面。`/petpal/legacy` 只承担旧链接兼容、概览汇总和任务分发职责，避免重新长成混合超级页面。
       </p>
+        </section>
+      </template>
+    </template>
+
+    <section v-else class="frontend-card">
+      <PetPalStatePanel
+        eyebrow="开始使用"
+        title="登录后查看兼容概览"
+        description="兼容入口只保留旧书签兼容、概览汇总和任务分发。未登录时不加载任何主人或照料者业务数据。"
+      >
+        <template #actions>
+          <RouterLink to="/login">
+            <el-button size="small" type="primary">去登录</el-button>
+          </RouterLink>
+          <RouterLink :to="{ name: 'frontend-petpal' }">
+            <el-button size="small">去主人服务台</el-button>
+          </RouterLink>
+        </template>
+      </PetPalStatePanel>
     </section>
   </div>
 </template>
@@ -182,6 +299,7 @@ import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
+import PetPalStatePanel from './PetPalStatePanel.vue';
 import {
   getPetPalConversationUnreadCount,
   getPetPalOrderStatusLabel,
@@ -190,6 +308,9 @@ import {
 defineOptions({
   name: 'PetPalLegacyWorkbenchView',
 });
+
+type PageLoadState = 'idle' | 'ready' | 'error';
+type SectionLoadState = 'idle' | 'ready' | 'role_unavailable' | 'error';
 
 const auth = useAuthStore();
 
@@ -209,11 +330,25 @@ const requests = ref<ServiceRequestRecord[]>([]);
 const ownerOrders = ref<OrderRecord[]>([]);
 const caregiverOrders = ref<CaregiverOrderRecord[]>([]);
 const loading = ref(false);
+const pageLoadState = ref<PageLoadState>('idle');
+const pageLoadErrorMessage = ref('');
+const partialLoadNotice = ref('');
+const ownerSectionState = ref<SectionLoadState>('idle');
+const caregiverSectionState = ref<SectionLoadState>('idle');
+const ownerSectionErrorMessage = ref('');
+const caregiverSectionErrorMessage = ref('');
 
 const formatTime = (value: string) => new Date(value).toLocaleString();
 
 const getOrderStatusLabel = getPetPalOrderStatusLabel;
 const getConversationUnreadCount = getPetPalConversationUnreadCount;
+
+const mergePageNotice = (items: string[]) => {
+  const normalized = items
+    .map(item => item.trim().replace(/[。.]$/, ''))
+    .filter(Boolean);
+  return normalized.length ? `${normalized.join('；')}。` : '';
+};
 
 const orderPriorityWeight = (status: OrderStatus, unread: number) => {
   const statusWeight = ({
@@ -295,6 +430,13 @@ const reloadAll = async () => {
   }
 
   loading.value = true;
+  pageLoadState.value = 'idle';
+  pageLoadErrorMessage.value = '';
+  partialLoadNotice.value = '';
+  ownerSectionState.value = 'idle';
+  caregiverSectionState.value = 'idle';
+  ownerSectionErrorMessage.value = '';
+  caregiverSectionErrorMessage.value = '';
   const results = await Promise.allSettled([
     loadPets(),
     loadRequests(),
@@ -303,29 +445,61 @@ const reloadAll = async () => {
   ]);
   loading.value = false;
 
+  const notices: string[] = [];
+  let successCount = 0;
+
   if (results[0].status === 'rejected') {
     pets.value = [];
-    ElMessage.error(getErrorMessage(results[0].reason, '加载宠物概览失败'));
+    notices.push(getErrorMessage(results[0].reason, '加载宠物概览失败'));
+  } else {
+    successCount += 1;
   }
 
   if (results[1].status === 'rejected') {
     requests.value = [];
-    ElMessage.error(getErrorMessage(results[1].reason, '加载需求概览失败'));
+    notices.push(getErrorMessage(results[1].reason, '加载需求概览失败'));
+  } else {
+    successCount += 1;
   }
 
   if (results[2].status === 'rejected') {
     ownerOrders.value = [];
-    if (!isRoleUnavailableError(results[2].reason)) {
-      ElMessage.error(getErrorMessage(results[2].reason, '加载主人订单概览失败'));
+    if (isRoleUnavailableError(results[2].reason)) {
+      ownerSectionState.value = 'role_unavailable';
+      notices.push('主人订单兼容视角当前不可用，可直接去主人服务台继续处理');
+    } else {
+      ownerSectionState.value = 'error';
+      ownerSectionErrorMessage.value = getErrorMessage(results[2].reason, '加载主人订单概览失败');
+      notices.push(ownerSectionErrorMessage.value);
     }
+  } else {
+    successCount += 1;
+    ownerSectionState.value = 'ready';
   }
 
   if (results[3].status === 'rejected') {
     caregiverOrders.value = [];
-    if (!isRoleUnavailableError(results[3].reason)) {
-      ElMessage.error(getErrorMessage(results[3].reason, '加载照料者订单概览失败'));
+    if (isRoleUnavailableError(results[3].reason)) {
+      caregiverSectionState.value = 'role_unavailable';
+      notices.push('照料者订单兼容视角当前不可用，可直接去照料者工作台继续处理');
+    } else {
+      caregiverSectionState.value = 'error';
+      caregiverSectionErrorMessage.value = getErrorMessage(results[3].reason, '加载照料者订单概览失败');
+      notices.push(caregiverSectionErrorMessage.value);
     }
+  } else {
+    successCount += 1;
+    caregiverSectionState.value = 'ready';
   }
+
+  if (successCount === 0) {
+    pageLoadState.value = 'error';
+    pageLoadErrorMessage.value = mergePageNotice(notices) || '兼容概览暂时不可用，请稍后重试。';
+    return;
+  }
+
+  pageLoadState.value = 'ready';
+  partialLoadNotice.value = mergePageNotice(notices);
 };
 
 onMounted(() => {

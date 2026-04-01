@@ -21,7 +21,41 @@
       </div>
     </section>
 
-    <section class="frontend-page__section-grid">
+    <template v-if="auth.isAuthenticated">
+      <section v-if="pageLoadState === 'error'" class="frontend-card">
+        <PetPalStatePanel
+          eyebrow="照料者工作台"
+          title="照料者工作台加载失败"
+          :description="pageLoadErrorMessage"
+          tone="danger"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" :loading="pageLoading" @click="reloadAll">重试加载</el-button>
+            <RouterLink :to="{ name: 'frontend-petpal-legacy' }">
+              <el-button size="small">去兼容入口</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+      </section>
+
+      <template v-else>
+        <section v-if="partialLoadNotice" class="frontend-card">
+          <PetPalStatePanel
+            eyebrow="加载提示"
+            title="照料者工作台部分数据未完整加载"
+            :description="partialLoadNotice"
+            tone="warning"
+          >
+            <template #actions>
+              <el-button size="small" type="primary" :loading="pageLoading" @click="reloadAll">重新加载</el-button>
+              <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+                <el-button size="small">先看提醒中心</el-button>
+              </RouterLink>
+            </template>
+          </PetPalStatePanel>
+        </section>
+
+        <section class="frontend-page__section-grid">
       <article class="frontend-card petpal-grid-span-8">
         <span class="frontend-card__eyebrow">当前概览</span>
         <div class="petpal-section-heading">
@@ -237,10 +271,24 @@
             </template>
           </el-table-column>
         </el-table>
-      </article>
-    </section>
 
-    <section class="frontend-card">
+        <PetPalStatePanel
+          v-if="caregiverServices.length === 0"
+          eyebrow="服务设置"
+          title="还没有可售照料服务"
+          description="照料者档案保存后，建议至少创建一条可上架服务，主人侧才能更稳定地看到你的报价和能力。"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" :loading="caregiverServiceSaving" @click="createCaregiverService">新增首个服务</el-button>
+            <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+              <el-button size="small">看提醒中心</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+      </article>
+        </section>
+
+        <section class="frontend-card">
       <span class="frontend-card__eyebrow">履约工作台</span>
       <div class="petpal-section-heading">
         <div class="petpal-section-heading__meta">
@@ -248,14 +296,14 @@
           <p>在独立照料者页里统一处理接单、签到、服务记录和签退；兼容页只保留少量仍未迁出的混合操作。</p>
         </div>
         <el-space wrap>
-          <el-select v-model="caregiverOrderQuery.status" style="width: 160px" @change="loadCaregiverOrders">
+          <el-select v-model="caregiverOrderQuery.status" style="width: 160px" @change="refreshCaregiverOrders">
             <el-option label="全部状态" value="" />
             <el-option label="待接单" value="PENDING_ACCEPT" />
             <el-option label="已接单" value="ACCEPTED" />
             <el-option label="服务中" value="SERVING" />
             <el-option label="已完成" value="COMPLETED" />
           </el-select>
-          <el-button @click="loadCaregiverOrders">刷新履约列表</el-button>
+          <el-button @click="refreshCaregiverOrders">刷新履约列表</el-button>
         </el-space>
       </div>
 
@@ -345,6 +393,39 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <PetPalStatePanel
+        v-if="!caregiverOrdersLoading && caregiverOrders.length === 0"
+        eyebrow="履约工作台"
+        title="当前筛选下没有照料者订单"
+        description="可以先完成照料者档案和服务设置，等待主人下单后再回来处理接单、签到、服务记录和签退动作。"
+      >
+        <template #actions>
+          <el-button size="small" type="primary" :loading="pageLoading" @click="reloadAll">刷新工作台</el-button>
+          <RouterLink :to="{ name: 'frontend-petpal-messages' }">
+            <el-button size="small">去消息中心</el-button>
+          </RouterLink>
+        </template>
+      </PetPalStatePanel>
+        </section>
+      </template>
+    </template>
+
+    <section v-else class="frontend-card">
+      <PetPalStatePanel
+        eyebrow="开始使用"
+        title="登录后进入照料者工作台"
+        description="照料者工作台会集中展示入驻档案、服务设置、履约订单和跨订单沟通相关能力。未登录时不加载任何照料者业务数据。"
+      >
+        <template #actions>
+          <RouterLink to="/login">
+            <el-button size="small" type="primary">去登录</el-button>
+          </RouterLink>
+          <RouterLink :to="{ name: 'frontend-petpal' }">
+            <el-button size="small">先看主人服务台</el-button>
+          </RouterLink>
+        </template>
+      </PetPalStatePanel>
     </section>
 
     <el-dialog
@@ -466,10 +547,13 @@ import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
+import PetPalStatePanel from './PetPalStatePanel.vue';
 
 defineOptions({
   name: 'PetPalCaregiverView',
 });
+
+type PageLoadState = 'idle' | 'ready' | 'error';
 
 type CaregiverProfileFormState = {
   intro: string;
@@ -488,6 +572,10 @@ const caregiverServices = ref<CaregiverServiceRecord[]>([]);
 const caregiverOrders = ref<CaregiverOrderRecord[]>([]);
 const qualificationUploadInput = ref<HTMLInputElement | null>(null);
 
+const pageLoadState = ref<PageLoadState>('idle');
+const pageLoadErrorMessage = ref('');
+const partialLoadNotice = ref('');
+const pageReloading = ref(false);
 const caregiverProfileSaving = ref(false);
 const caregiverServiceSaving = ref(false);
 const caregiverOrdersLoading = ref(false);
@@ -552,16 +640,32 @@ const canUploadServiceLogMedia = computed(() =>
 );
 
 const pageLoading = computed(() => (
-  caregiverProfileSaving.value
+  pageReloading.value
+  || caregiverProfileSaving.value
   || caregiverServiceSaving.value
   || caregiverOrdersLoading.value
   || qualificationUploading.value
   || serviceLogSubmitting.value
 ));
 
+const hasStatusCode = (error: unknown): error is { status: number } => (
+  typeof error === 'object'
+  && error !== null
+  && typeof Reflect.get(error, 'status') === 'number'
+);
+
+const isMissingResourceError = (error: unknown) => hasStatusCode(error) && error.status === 404;
+
 const unreadConversationCount = computed(() => caregiverOrders.value.reduce((total, item) => (
   total + getConversationUnreadCount(item.conversation, 'caregiver')
 ), 0));
+
+const mergePageNotice = (items: string[]) => {
+  const normalized = items
+    .map(item => item.trim().replace(/[。.]$/, ''))
+    .filter(Boolean);
+  return normalized.length ? `${normalized.join('；')}。` : '';
+};
 
 const auditTagType = computed(() => {
   if (!caregiverProfile.value) {
@@ -725,7 +829,7 @@ const onQualificationFilesChange = async (event: Event) => {
   await uploadQualificationFiles(files);
 };
 
-const loadCaregiverProfile = async () => {
+const loadCaregiverProfile = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
     const profile = await api.petpal.caregiver.profile();
     caregiverProfile.value = profile;
@@ -736,20 +840,45 @@ const loadCaregiverProfile = async () => {
     caregiverProfileForm.specialtyTagsText = joinTagText(profile.specialtyTags);
     caregiverProfileForm.serviceCommitment = profile.serviceCommitment || '';
     caregiverProfileForm.qualificationMaterials = [...profile.qualificationMaterials];
+    return null;
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '加载照料者档案失败'));
+    caregiverProfile.value = null;
+    caregiverProfileForm.intro = '';
+    caregiverProfileForm.experienceYears = 0;
+    caregiverProfileForm.serviceRadiusKm = 5;
+    caregiverProfileForm.serviceCity = '';
+    caregiverProfileForm.specialtyTagsText = '';
+    caregiverProfileForm.serviceCommitment = '';
+    caregiverProfileForm.qualificationMaterials = [];
+    if (isMissingResourceError(error)) {
+      return null;
+    }
+    const message = getErrorMessage(error, '加载照料者档案失败');
+    if (showFeedback) {
+      ElMessage.error(message);
+    }
+    return message;
   }
 };
 
-const loadCaregiverServices = async () => {
+const loadCaregiverServices = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
     caregiverServices.value = await api.petpal.caregiver.services();
+    return null;
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '加载照料服务失败'));
+    caregiverServices.value = [];
+    if (isMissingResourceError(error)) {
+      return null;
+    }
+    const message = getErrorMessage(error, '加载照料服务失败');
+    if (showFeedback) {
+      ElMessage.error(message);
+    }
+    return message;
   }
 };
 
-const loadCaregiverOrders = async () => {
+const loadCaregiverOrders = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
     caregiverOrdersLoading.value = true;
     const response = await api.petpal.caregiver.orders({
@@ -758,11 +887,24 @@ const loadCaregiverOrders = async () => {
       status: caregiverOrderQuery.status || undefined,
     });
     caregiverOrders.value = response.items;
+    return null;
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '加载履约订单失败'));
+    caregiverOrders.value = [];
+    if (isMissingResourceError(error)) {
+      return null;
+    }
+    const message = getErrorMessage(error, '加载履约订单失败');
+    if (showFeedback) {
+      ElMessage.error(message);
+    }
+    return message;
   } finally {
     caregiverOrdersLoading.value = false;
   }
+};
+
+const refreshCaregiverOrders = () => {
+  void loadCaregiverOrders();
 };
 
 const reloadAll = async () => {
@@ -771,11 +913,29 @@ const reloadAll = async () => {
     return;
   }
 
-  await Promise.all([
-    loadCaregiverProfile(),
-    loadCaregiverServices(),
-    loadCaregiverOrders(),
-  ]);
+  pageLoadState.value = 'idle';
+  pageLoadErrorMessage.value = '';
+  partialLoadNotice.value = '';
+  pageReloading.value = true;
+
+  try {
+    const notices = (await Promise.all([
+      loadCaregiverProfile({ showFeedback: false }),
+      loadCaregiverServices({ showFeedback: false }),
+      loadCaregiverOrders({ showFeedback: false }),
+    ])).filter((item): item is string => Boolean(item));
+
+    if (notices.length === 3) {
+      pageLoadState.value = 'error';
+      pageLoadErrorMessage.value = mergePageNotice(notices) || '照料者工作台暂时不可用，请稍后重试。';
+      return;
+    }
+
+    pageLoadState.value = 'ready';
+    partialLoadNotice.value = mergePageNotice(notices);
+  } finally {
+    pageReloading.value = false;
+  }
 };
 
 const withCaregiverOrderAction = async (

@@ -24,7 +24,41 @@
       </div>
     </section>
 
-    <section class="frontend-page__section-grid">
+    <template v-if="auth.isAuthenticated">
+      <section v-if="pageLoadState === 'error'" class="frontend-card">
+        <PetPalStatePanel
+          eyebrow="主人服务台"
+          title="主人工作台加载失败"
+          :description="pageLoadErrorMessage"
+          tone="danger"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" :loading="pageLoading" @click="reloadAll">重试加载</el-button>
+            <RouterLink :to="{ name: 'frontend-petpal-legacy' }">
+              <el-button size="small">去兼容入口</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+      </section>
+
+      <template v-else>
+        <section v-if="partialLoadNotice" class="frontend-card">
+          <PetPalStatePanel
+            eyebrow="加载提示"
+            title="主人工作台部分数据未完整加载"
+            :description="partialLoadNotice"
+            tone="warning"
+          >
+            <template #actions>
+              <el-button size="small" type="primary" :loading="pageLoading" @click="reloadAll">重新加载</el-button>
+              <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+                <el-button size="small">先看提醒中心</el-button>
+              </RouterLink>
+            </template>
+          </PetPalStatePanel>
+        </section>
+
+        <section class="frontend-page__section-grid">
       <article class="frontend-card petpal-grid-span-8">
         <span class="frontend-card__eyebrow">当前概览</span>
         <div class="petpal-section-heading">
@@ -204,10 +238,24 @@
             </template>
           </el-table-column>
         </el-table>
-      </article>
-    </section>
 
-    <section class="frontend-page__section-grid">
+        <PetPalStatePanel
+          v-if="!petsLoading && pets.length === 0"
+          eyebrow="宠物列表"
+          title="还没有宠物档案"
+          description="主人主流程建议从宠物建档开始。先补齐第一只宠物的基础信息、喂养备注和紧急联系人，再继续发布需求。"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" @click="resetPetForm">开始建档</el-button>
+            <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+              <el-button size="small">看提醒中心</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+      </article>
+        </section>
+
+        <section class="frontend-page__section-grid">
       <article class="frontend-card petpal-grid-span-5">
         <span class="frontend-card__eyebrow">服务需求</span>
         <h3>发布需求</h3>
@@ -453,6 +501,20 @@
                 </template>
               </el-table-column>
             </el-table>
+
+            <PetPalStatePanel
+              v-if="!requestsLoading && requests.length === 0"
+              eyebrow="近期需求"
+              title="当前还没有主人需求"
+              description="可以直接在左侧发布第一条真实照料需求，或先去宠物档案补充更多信息再回来发布。"
+            >
+              <template #actions>
+                <el-button size="small" type="primary" :loading="pageLoading" @click="reloadAll">刷新需求区</el-button>
+                <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+                  <el-button size="small">看提醒中心</el-button>
+                </RouterLink>
+              </template>
+            </PetPalStatePanel>
           </div>
 
           <div class="petpal-mini-panel">
@@ -508,12 +570,25 @@
                 </template>
               </el-table-column>
             </el-table>
+
+            <PetPalStatePanel
+              v-if="!ordersLoading && orders.length === 0"
+              eyebrow="订单跟进"
+              title="当前还没有主人订单"
+              description="订单会在需求匹配和下单完成后出现在这里。你可以继续发布需求，或先去匹配列表看是否有合适照料者。"
+            >
+              <template #actions>
+                <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+                  <el-button size="small" type="primary">看提醒中心</el-button>
+                </RouterLink>
+              </template>
+            </PetPalStatePanel>
           </div>
         </div>
       </article>
-    </section>
+        </section>
 
-    <section class="frontend-card">
+        <section class="frontend-card">
       <span class="frontend-card__eyebrow">匹配照料者</span>
       <div class="petpal-section-heading">
         <div class="petpal-section-heading__meta">
@@ -545,7 +620,7 @@
           <el-input v-model="matchQuery.city" placeholder="可选" style="width: 180px" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="matchLoading" @click="loadMatches">开始匹配</el-button>
+          <el-button type="primary" :loading="matchLoading" @click="refreshMatches">开始匹配</el-button>
         </el-form-item>
       </el-form>
 
@@ -561,6 +636,39 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <PetPalStatePanel
+        v-if="!matchLoading && matchItems.length === 0"
+        eyebrow="匹配结果"
+        title="当前筛选下没有合适照料者"
+        description="可以尝试放宽城市或服务类型筛选，或者先进入提醒中心和消息中心处理已在推进中的订单。"
+      >
+        <template #actions>
+        <el-button size="small" type="primary" :loading="matchLoading" @click="refreshMatches">重新匹配</el-button>
+          <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
+            <el-button size="small">查看照料者工作台</el-button>
+          </RouterLink>
+        </template>
+      </PetPalStatePanel>
+        </section>
+      </template>
+    </template>
+
+    <section v-else class="frontend-card">
+      <PetPalStatePanel
+        eyebrow="开始使用"
+        title="登录后进入主人服务台"
+        description="主人服务台会集中展示宠物建档、需求发布、订单跟进、匹配照料者和导出相关能力。未登录时不加载任何主人业务数据。"
+      >
+        <template #actions>
+          <RouterLink to="/login">
+            <el-button size="small" type="primary">去登录</el-button>
+          </RouterLink>
+          <RouterLink :to="{ name: 'frontend-petpal-legacy' }">
+            <el-button size="small">看兼容入口</el-button>
+          </RouterLink>
+        </template>
+      </PetPalStatePanel>
     </section>
   </div>
 </template>
@@ -592,10 +700,13 @@ import ListExportButton from '@/components/download/ListExportButton.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useWorkbenchStore } from '@/stores/workbench';
 import { getErrorMessage } from '@/utils/errors';
+import PetPalStatePanel from './PetPalStatePanel.vue';
 
 defineOptions({
   name: 'PetPalOwnerView',
 });
+
+type PageLoadState = 'idle' | 'ready' | 'error';
 
 type PetFormState = {
   name: string;
@@ -633,6 +744,9 @@ const matchLoading = ref(false);
 const petSaving = ref(false);
 const requestSaving = ref(false);
 const ownerActionLoadingKey = ref('');
+const pageLoadState = ref<PageLoadState>('idle');
+const pageLoadErrorMessage = ref('');
+const partialLoadNotice = ref('');
 
 const petForm = reactive<PetFormState>({
   name: '',
@@ -776,6 +890,13 @@ const pageLoading = computed(() => (
 const unreadOwnerConversationCount = computed(() => orders.value.reduce((total, item) => (
   total + getConversationUnreadCount(item.conversation, 'owner')
 ), 0));
+
+const mergePageNotice = (items: string[]) => {
+  const normalized = items
+    .map(item => item.trim().replace(/[。.]$/, ''))
+    .filter(Boolean);
+  return normalized.length ? `${normalized.join('；')}。` : '';
+};
 
 const formatTime = (value: string) => new Date(value).toLocaleString();
 
@@ -1310,43 +1431,61 @@ const startEditPet = (pet: PetProfileRecord) => {
   };
 };
 
-const loadPets = async () => {
+const loadPets = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
     petsLoading.value = true;
     pets.value = await api.petpal.pets.list();
     if (!requestForm.petId && pets.value.length > 0) {
       requestForm.petId = pets.value[0].id;
     }
+    return null;
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '加载宠物失败'));
+    pets.value = [];
+    const message = getErrorMessage(error, '加载宠物失败');
+    if (showFeedback) {
+      ElMessage.error(message);
+    }
+    return message;
   } finally {
     petsLoading.value = false;
   }
 };
 
-const loadRequests = async () => {
+const loadRequests = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
     requestsLoading.value = true;
     requests.value = await api.petpal.requests.list();
+    return null;
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '加载需求失败'));
+    requests.value = [];
+    const message = getErrorMessage(error, '加载需求失败');
+    if (showFeedback) {
+      ElMessage.error(message);
+    }
+    return message;
   } finally {
     requestsLoading.value = false;
   }
 };
 
-const loadOrders = async () => {
+const loadOrders = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
     ordersLoading.value = true;
     orders.value = await api.petpal.orders.list();
+    return null;
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '加载订单失败'));
+    orders.value = [];
+    const message = getErrorMessage(error, '加载订单失败');
+    if (showFeedback) {
+      ElMessage.error(message);
+    }
+    return message;
   } finally {
     ordersLoading.value = false;
   }
 };
 
-const loadMatches = async () => {
+const loadMatches = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
     matchLoading.value = true;
     const page = await api.petpal.match.caregivers({
@@ -1354,11 +1493,21 @@ const loadMatches = async () => {
       city: matchQuery.city || undefined,
     });
     matchItems.value = page.items;
+    return null;
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '匹配照料者失败'));
+    matchItems.value = [];
+    const message = getErrorMessage(error, '匹配照料者失败');
+    if (showFeedback) {
+      ElMessage.error(message);
+    }
+    return message;
   } finally {
     matchLoading.value = false;
   }
+};
+
+const refreshMatches = () => {
+  void loadMatches();
 };
 
 const withOwnerOrderAction = async (
@@ -1387,12 +1536,25 @@ const reloadAll = async () => {
     return;
   }
 
-  await Promise.all([
-    loadPets(),
-    loadRequests(),
-    loadOrders(),
-    loadMatches(),
-  ]);
+  pageLoadState.value = 'idle';
+  pageLoadErrorMessage.value = '';
+  partialLoadNotice.value = '';
+
+  const notices = (await Promise.all([
+    loadPets({ showFeedback: false }),
+    loadRequests({ showFeedback: false }),
+    loadOrders({ showFeedback: false }),
+    loadMatches({ showFeedback: false }),
+  ])).filter((item): item is string => Boolean(item));
+
+  if (notices.length === 4) {
+    pageLoadState.value = 'error';
+    pageLoadErrorMessage.value = mergePageNotice(notices) || '主人服务台暂时不可用，请稍后重试。';
+    return;
+  }
+
+  pageLoadState.value = 'ready';
+  partialLoadNotice.value = mergePageNotice(notices);
 };
 
 const createPet = async () => {
