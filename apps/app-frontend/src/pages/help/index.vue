@@ -11,6 +11,7 @@ import {
   PETPAL_AFTERSALES_PAGE,
   PETPAL_CAREGIVER_HOME_PAGE,
   PETPAL_CAREGIVER_PROFILE_PAGE,
+  PETPAL_GETTING_STARTED_PAGE,
   PETPAL_MESSAGES_PAGE,
   PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_OWNER_HOME_PAGE,
@@ -63,6 +64,13 @@ const helpScenes = computed<HelpSceneCard[]>(() => [
     actionUrl: PETPAL_OWNER_HOME_PAGE,
   },
   {
+    title: '使用起步向导',
+    text: '如果你不确定先走主人路径还是照料者路径，先在起步向导里查看当前最值得优先完成的步骤。',
+    tags: ['新手引导', '角色切换', '步骤分解'],
+    actionLabel: '进入起步向导',
+    actionUrl: PETPAL_GETTING_STARTED_PAGE,
+  },
+  {
     title: '开始照料者入驻',
     text: '如果你要接单，先维护入驻资料、资质材料和服务配置，再进入履约订单。',
     tags: ['入驻资料', '资质材料', '服务配置'],
@@ -96,7 +104,7 @@ const faqCards = computed<FaqCard[]>(() => [
   },
   {
     question: '如果我同时是主人和照料者，该从哪里进入？',
-    answer: '先从角色入口选择当前要处理的任务流。需要管理照料者入驻、服务和接单时进入照料者首页，需要建档、下单和售后时进入主人首页。',
+    answer: '先从角色入口或起步向导选择当前要处理的任务流。需要管理照料者入驻、服务和接单时进入照料者首页，需要建档、下单和售后时进入主人首页。',
   },
   {
     question: '账号资料、设置和帮助为什么单独拆页？',
@@ -131,6 +139,10 @@ function openMessages() {
 
 function openNotifications() {
   openHelpAction(PETPAL_NOTIFICATIONS_PAGE)
+}
+
+function openGettingStarted() {
+  openHelpAction(PETPAL_GETTING_STARTED_PAGE)
 }
 
 function openAccountSupport() {
@@ -170,6 +182,7 @@ onShow(() => {
         </view>
         <view class="help-hero__actions">
           <AppButton size="medium" @click="openAccountSupport">账户支持</AppButton>
+          <AppButton size="medium" type="info" @click="openGettingStarted">起步向导</AppButton>
           <AppButton size="medium" type="info" @click="openSettings">体验设置</AppButton>
           <AppButton size="medium" type="info" @click="openNotifications">通知中心</AppButton>
           <AppButton size="medium" type="danger" @click="openMessages">消息中心</AppButton>
@@ -205,6 +218,11 @@ onShow(() => {
 
     <AppSection title="账户与支持" description="帮助、资料、设置和账户支持保持独立，但彼此互相可达。">
       <view class="help-support-grid">
+        <view class="help-support-card">
+          <text class="help-support-card__title">起步向导</text>
+          <text class="help-support-card__text">按主人路径和照料者路径查看当前最值得优先完成的步骤。</text>
+          <AppButton size="medium" type="info" @click="openGettingStarted">进入起步向导</AppButton>
+        </view>
         <view class="help-support-card">
           <text class="help-support-card__title">账户支持</text>
           <text class="help-support-card__text">查看当前账号状态、推荐动作和同步情况。</text>

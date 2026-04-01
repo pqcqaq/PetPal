@@ -17,6 +17,7 @@ import {
   isOrderAftersalesTracked,
   PETPAL_AFTERSALES_PAGE,
   PETPAL_CAREGIVER_EARNINGS_PAGE,
+  PETPAL_GETTING_STARTED_PAGE,
   PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_REMINDERS_PAGE,
 } from '@/pages/petpal/owner-shared'
@@ -197,6 +198,14 @@ function openNotificationsCenter() {
   uni.navigateTo({ url: PETPAL_NOTIFICATIONS_PAGE })
 }
 
+function openGettingStartedGuide() {
+  if (!tokenStore.hasLogin) {
+    handleLogin()
+    return
+  }
+  uni.navigateTo({ url: PETPAL_GETTING_STARTED_PAGE })
+}
+
 function openHelpCenter() {
   uni.navigateTo({ url: HELP_PAGE })
 }
@@ -319,6 +328,10 @@ onShow(() => {
             <text class="petpal-shortcut-card__title">通知中心</text>
             <text class="petpal-shortcut-card__text">{{ notificationShortcutText }}</text>
           </view>
+          <view class="petpal-shortcut-card" @click="openGettingStartedGuide">
+            <text class="petpal-shortcut-card__title">起步向导</text>
+            <text class="petpal-shortcut-card__text">按主人路径和照料者路径查看当前最值得优先完成的步骤。</text>
+          </view>
           <view class="petpal-shortcut-card" @click="openProfile">
             <text class="petpal-shortcut-card__title">个人资料</text>
             <text class="petpal-shortcut-card__text">更新昵称、头像和联系方式。</text>
@@ -341,6 +354,7 @@ onShow(() => {
       <AppSection title="常用入口">
         <AppList>
           <AppListItem title="进入服务台" label="继续发布需求、维护宠物档案和查看匹配。" is-link clickable @click="openServiceBoard" />
+          <AppListItem title="起步向导" label="按主人路径和照料者路径查看当前最值得优先完成的步骤。" is-link clickable @click="openGettingStartedGuide" />
           <AppListItem title="通知中心" :label="notificationShortcutText" is-link clickable @click="openNotificationsCenter" />
           <AppListItem title="提醒中心" label="集中查看主人端、照料者端和售后相关待办。" is-link clickable @click="openRemindersCenter" />
           <AppListItem title="售后中心" label="集中查看退款、投诉和争议处理，不再只依赖订单详情入口。" is-link clickable @click="openAftersalesCenter" />

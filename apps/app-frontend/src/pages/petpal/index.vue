@@ -9,6 +9,7 @@ import { LOGIN_PAGE } from '@/router/config'
 import { useTokenStore, useUserStore } from '@/store'
 import {
   PETPAL_CAREGIVER_HOME_PAGE,
+  PETPAL_GETTING_STARTED_PAGE,
   PETPAL_MESSAGES_PAGE,
   PETPAL_OWNER_HOME_PAGE,
   PETPAL_REMINDERS_PAGE,
@@ -61,6 +62,10 @@ function openReminders() {
   uni.redirectTo({ url: PETPAL_REMINDERS_PAGE })
 }
 
+function openGettingStarted() {
+  uni.redirectTo({ url: PETPAL_GETTING_STARTED_PAGE })
+}
+
 onShow(() => {
   if (!tokenStore.hasLogin) {
     return
@@ -87,6 +92,7 @@ onShow(() => {
           <view class="hub-hero__actions">
             <AppButton size="medium" @click="openOwnerFlow">主人任务流</AppButton>
             <AppButton size="medium" type="info" @click="openCaregiverFlow">照料者任务流</AppButton>
+            <AppButton size="medium" type="info" @click="openGettingStarted">起步向导</AppButton>
             <AppButton size="medium" type="danger" @click="openReminders">提醒中心</AppButton>
           </view>
         </view>
@@ -120,6 +126,11 @@ onShow(() => {
 
       <AppSection title="辅助入口" description="把提醒、消息和兼容入口保留在角色选择页下方，减少来回跳转。">
         <view class="hub-support-grid">
+          <view class="hub-support-card">
+            <text class="hub-support-card__title">起步向导</text>
+            <text class="hub-support-card__text">把主人路径、照料者路径和角色切换建议拆成明确步骤。</text>
+            <AppButton size="medium" type="info" @click="openGettingStarted">进入起步向导</AppButton>
+          </view>
           <view class="hub-support-card">
             <text class="hub-support-card__title">提醒中心</text>
             <text class="hub-support-card__text">集中查看主人端、照料者端和售后相关待办。</text>
@@ -241,7 +252,7 @@ onShow(() => {
 
 .hub-support-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16rpx;
 }
 

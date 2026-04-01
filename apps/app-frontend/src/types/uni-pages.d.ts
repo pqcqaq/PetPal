@@ -19,6 +19,7 @@ type _LocationUrl =
   "/pages/petpal/caregiver-orders" |
   "/pages/petpal/caregiver-profile" |
   "/pages/petpal/caregiver-services" |
+  "/pages/petpal/getting-started" |
   "/pages/petpal/index" |
   "/pages/petpal/messages" |
   "/pages/petpal/orders" |

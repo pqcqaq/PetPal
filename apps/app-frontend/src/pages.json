@@ -133,6 +133,14 @@
       }
     },
     {
+      "path": "pages/petpal/getting-started",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "起步向导",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/petpal/index",
       "type": "page",
       "style": {

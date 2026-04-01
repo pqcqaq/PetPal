@@ -17,7 +17,12 @@ import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { listOrders, listPets, listServiceRequests, matchCaregivers } from '@/api/petpal'
-import { isOrderAftersalesTracked, PETPAL_NOTIFICATIONS_PAGE, PETPAL_REMINDERS_PAGE } from '@/pages/petpal/owner-shared'
+import {
+  isOrderAftersalesTracked,
+  PETPAL_GETTING_STARTED_PAGE,
+  PETPAL_NOTIFICATIONS_PAGE,
+  PETPAL_REMINDERS_PAGE,
+} from '@/pages/petpal/owner-shared'
 import { useNotificationStore, useTokenStore, useUiStore, useUserStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
 
@@ -158,6 +163,10 @@ function openNotifications() {
   uni.navigateTo({ url: PETPAL_NOTIFICATIONS_PAGE })
 }
 
+function openGettingStarted() {
+  uni.navigateTo({ url: PETPAL_GETTING_STARTED_PAGE })
+}
+
 function openMine() {
   uni.switchTab({ url: '/pages/me/me' })
 }
@@ -267,6 +276,7 @@ onPullDownRefresh(() => {
     <AppSection title="快捷操作" description="把常用 PetPal 动作放到首页第一屏。">
       <AppList>
         <AppListItem title="进入服务台" label="发布需求、维护宠物档案和查看匹配照料者。" is-link clickable @click="openServiceBoard" />
+        <AppListItem title="起步向导" label="按主人路径和照料者路径查看当前最值得优先完成的步骤。" is-link clickable @click="openGettingStarted" />
         <AppListItem title="通知中心" :label="notificationHint" is-link clickable @click="openNotifications" />
         <AppListItem title="提醒中心" label="集中查看主人端、照料者端和售后相关待办。" is-link clickable @click="openReminders" />
         <AppListItem title="查看我的资料" label="更新昵称、头像、联系方式与账号状态。" is-link clickable @click="openProfile" />

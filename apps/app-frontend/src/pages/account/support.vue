@@ -14,6 +14,7 @@ import { useTokenStore, useUiStore, useUserStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
 import {
   PETPAL_CAREGIVER_PROFILE_PAGE,
+  PETPAL_GETTING_STARTED_PAGE,
   PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_OWNER_HOME_PAGE,
   PETPAL_REMINDERS_PAGE,
@@ -113,8 +114,8 @@ const supportActions = computed<SupportActionCard[]>(() => {
       title: '先建立第一只宠物档案',
       text: '没有宠物档案时，主人主流程无法稳定复用下单信息。',
       priority: 'HIGH',
-      actionLabel: '进入主人首页',
-      actionUrl: PETPAL_OWNER_HOME_PAGE,
+      actionLabel: '打开起步向导',
+      actionUrl: `${PETPAL_GETTING_STARTED_PAGE}?view=OWNER`,
     })
   }
 
@@ -143,8 +144,8 @@ const supportActions = computed<SupportActionCard[]>(() => {
       title: '如果你要接单，先建立照料者档案',
       text: '照料者档案、资质材料和服务配置需要先完成，后续才能稳定接单。',
       priority: 'MEDIUM',
-      actionLabel: '进入入驻中心',
-      actionUrl: PETPAL_CAREGIVER_PROFILE_PAGE,
+      actionLabel: '打开起步向导',
+      actionUrl: `${PETPAL_GETTING_STARTED_PAGE}?view=CAREGIVER`,
     })
   }
 
@@ -263,6 +264,7 @@ onPullDownRefresh(() => {
             </text>
           </view>
           <view class="account-support-hero__actions">
+            <AppButton size="medium" @click="navigateTo(PETPAL_GETTING_STARTED_PAGE)">起步向导</AppButton>
             <AppButton size="medium" @click="navigateTo(PETPAL_NOTIFICATIONS_PAGE)">通知中心</AppButton>
             <AppButton size="medium" @click="navigateTo(PETPAL_REMINDERS_PAGE)">提醒中心</AppButton>
             <AppButton size="medium" type="info" @click="navigateTo(HELP_PAGE)">帮助中心</AppButton>
@@ -308,6 +310,7 @@ onPullDownRefresh(() => {
 
       <AppSection title="帮助入口" description="帮助、资料、设置和提醒保持独立页面，但可以在账户支持页里互相跳转。">
         <AppList>
+          <AppListItem title="起步向导" label="按主人路径和照料者路径查看当前最值得优先完成的步骤。" is-link clickable @click="navigateTo(PETPAL_GETTING_STARTED_PAGE)" />
           <AppListItem title="通知中心" label="统一查看提醒、未读沟通和账户提示，并追踪已读状态。" is-link clickable @click="navigateTo(PETPAL_NOTIFICATIONS_PAGE)" />
           <AppListItem title="帮助中心" label="查看主人、照料者、售后和账户支持场景说明。" is-link clickable @click="navigateTo(HELP_PAGE)" />
           <AppListItem title="个人资料" label="编辑昵称、邮箱和头像。" is-link clickable @click="navigateTo(PROFILE_PAGE)" />
