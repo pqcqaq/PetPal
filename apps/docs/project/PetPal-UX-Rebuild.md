@@ -279,6 +279,7 @@ Web：
   - `pages/petpal/pets.vue`
   - `pages/petpal/request.vue`
   - `pages/petpal/orders.vue`
+- `pages/petpal/request.vue` 已继续改为真正的分步向导，按“宠物 / 时间 / 要求 / 确认”推进，不再把全部字段和推荐卡片直接堆在一屏里。
 - App 端已新增照料者主流程页面：
   - `pages/petpal/caregiver-home.vue`
   - `pages/petpal/caregiver-earnings.vue`
