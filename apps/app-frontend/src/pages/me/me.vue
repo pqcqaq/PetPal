@@ -40,6 +40,9 @@ const pets = ref<PetProfileRecord[]>([])
 const requests = ref<ServiceRequestRecord[]>([])
 const orders = ref<OrderRecord[]>([])
 
+const HELP_PAGE = '/pages/help/index'
+const ACCOUNT_SUPPORT_PAGE = '/pages/account/support'
+
 const displayName = computed(() => userInfo.value.nickname || userInfo.value.username || '未登录')
 const pageDescription = computed(() => {
   if (!tokenStore.hasLogin) {
@@ -180,6 +183,18 @@ function openRemindersCenter() {
   uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
 }
 
+function openHelpCenter() {
+  uni.navigateTo({ url: HELP_PAGE })
+}
+
+function openAccountSupport() {
+  if (!tokenStore.hasLogin) {
+    handleLogin()
+    return
+  }
+  uni.navigateTo({ url: ACCOUNT_SUPPORT_PAGE })
+}
+
 function openHome() {
   uni.switchTab({ url: '/pages/index/index' })
 }
@@ -290,6 +305,14 @@ onShow(() => {
             <text class="petpal-shortcut-card__title">体验设置</text>
             <text class="petpal-shortcut-card__text">调整首页布局、主题和底栏样式。</text>
           </view>
+          <view class="petpal-shortcut-card" @click="openAccountSupport">
+            <text class="petpal-shortcut-card__title">账户支持</text>
+            <text class="petpal-shortcut-card__text">查看账号状态、推荐动作和同步情况。</text>
+          </view>
+          <view class="petpal-shortcut-card" @click="openHelpCenter">
+            <text class="petpal-shortcut-card__title">帮助中心</text>
+            <text class="petpal-shortcut-card__text">按主人、照料者、售后和账户场景查看说明。</text>
+          </view>
         </view>
       </AppSection>
 
@@ -301,6 +324,8 @@ onShow(() => {
           <AppListItem title="照料者收益表现" label="若你已申请照料者，可查看收入、完成率和售后风险。" is-link clickable @click="openCaregiverEarnings" />
           <AppListItem title="个人资料" label="更新昵称、头像和联系方式。" is-link clickable @click="openProfile" />
           <AppListItem title="PetPal 设置" label="调整首页布局、主题和底栏样式。" is-link clickable @click="openSettings" />
+          <AppListItem title="账户支持" label="查看账号状态、推荐动作和同步情况。" is-link clickable @click="openAccountSupport" />
+          <AppListItem title="帮助中心" label="按主人、照料者、售后和账户场景查看说明。" is-link clickable @click="openHelpCenter" />
           <AppListItem title="返回首页" label="回到首页继续查看订单和推荐照料者。" is-link clickable @click="openHome" />
         </AppList>
       </AppSection>

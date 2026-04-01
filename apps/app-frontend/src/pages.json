@@ -24,6 +24,14 @@
       }
     },
     {
+      "path": "pages/account/support",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "账户支持",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/auth/login",
       "type": "page",
       "style": {
@@ -37,6 +45,13 @@
       "style": {
         "navigationStyle": "custom",
         "navigationBarTitleText": "注册"
+      }
+    },
+    {
+      "path": "pages/help/index",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "帮助中心"
       }
     },
     {

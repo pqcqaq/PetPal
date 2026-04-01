@@ -26,6 +26,9 @@ const userStore = useUserStore()
 const tokenStore = useTokenStore()
 const { userInfo } = storeToRefs(userStore)
 
+const HELP_PAGE = '/pages/help/index'
+const ACCOUNT_SUPPORT_PAGE = '/pages/account/support'
+
 const savingProfile = ref(false)
 const profileForm = reactive({
   nickname: '',
@@ -116,6 +119,14 @@ function openReminders() {
   uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
 }
 
+function openHelpCenter() {
+  uni.navigateTo({ url: HELP_PAGE })
+}
+
+function openAccountSupport() {
+  uni.navigateTo({ url: ACCOUNT_SUPPORT_PAGE })
+}
+
 async function handleSaveProfile() {
   if (!tokenStore.hasLogin || savingProfile.value) {
     return
@@ -200,6 +211,9 @@ onShow(() => {
           <AppButton size="medium" @click="openReminders">
             提醒中心
           </AppButton>
+          <AppButton size="medium" type="info" @click="openAccountSupport">
+            账户支持
+          </AppButton>
         </view>
       </view>
 
@@ -280,6 +294,14 @@ onShow(() => {
           :value="item.value"
           :value-emphasis="item.value !== '未开通'"
         />
+      </AppList>
+    </AppSection>
+
+    <AppSection title="帮助与辅助" description="帮助中心和账户支持页从资料页里独立出去，但在这里仍然保持直达入口。">
+      <AppList>
+        <AppListItem title="账户支持" label="查看账号状态、推荐动作和同步情况。" is-link clickable @click="openAccountSupport" />
+        <AppListItem title="帮助中心" label="按主人、照料者、售后和账户场景查看说明。" is-link clickable @click="openHelpCenter" />
+        <AppListItem title="体验设置" label="继续调整主题、首页布局和动效。" is-link clickable @click="openSettings" />
       </AppList>
     </AppSection>
   </AppPageShell>

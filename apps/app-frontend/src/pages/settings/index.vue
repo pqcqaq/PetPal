@@ -20,6 +20,9 @@ import { useUserStore } from '@/store/user'
 import { useTokenStore } from '@/store/token'
 import { getErrorMessage } from '@/utils/error'
 
+const HELP_PAGE = '/pages/help/index'
+const ACCOUNT_SUPPORT_PAGE = '/pages/account/support'
+
 definePage({
   style: {
     navigationBarTitleText: 'PetPal 设置',
@@ -186,6 +189,14 @@ function onPortalLayoutChange(value: string) {
   draft.portalLayout = value as AppPortalLayout
 }
 
+function openHelpCenter() {
+  uni.navigateTo({ url: HELP_PAGE })
+}
+
+function openAccountSupport() {
+  uni.navigateTo({ url: ACCOUNT_SUPPORT_PAGE })
+}
+
 onShow(() => {
   if (!tokenStore.hasLogin) {
     uni.reLaunch({ url: '/pages/auth/login' })
@@ -324,6 +335,33 @@ onShow(() => {
           color="var(--app-accent)"
           @change="handleMotionToggle"
         />
+      </view>
+    </AppSection>
+
+    <AppSection title="帮助与辅助" description="设置页不再同时承担说明文档和账户辅助职责，但仍保留直达入口。">
+      <view class="settings-support-grid">
+        <view class="settings-support-card">
+          <view class="settings-support-card__title">
+            账户支持
+          </view>
+          <view class="settings-support-card__desc">
+            查看账号状态、推荐动作和同步情况，确认当前设置是否与账户状态匹配。
+          </view>
+          <AppButton size="medium" type="info" @click="openAccountSupport">
+            打开账户支持
+          </AppButton>
+        </view>
+        <view class="settings-support-card">
+          <view class="settings-support-card__title">
+            帮助中心
+          </view>
+          <view class="settings-support-card__desc">
+            查看主人、照料者、售后和账户支持场景的操作说明，不再把帮助内容塞在设置页里。
+          </view>
+          <AppButton size="medium" type="info" @click="openHelpCenter">
+            打开帮助中心
+          </AppButton>
+        </view>
       </view>
     </AppSection>
 
@@ -480,6 +518,36 @@ onShow(() => {
   gap: 8rpx;
 }
 
+.settings-support-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  padding: 0 24rpx;
+}
+
+.settings-support-card {
+  display: grid;
+  gap: 12rpx;
+  padding: 24rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  border-radius: var(--app-shape-xl);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
+}
+
+.settings-support-card__title {
+  font-size: 28rpx;
+  line-height: 1.4;
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.settings-support-card__desc {
+  font-size: 22rpx;
+  line-height: 1.62;
+  color: var(--app-text-secondary);
+}
+
 .settings-actions__title {
   font-size: 28rpx;
   line-height: 1.4;
@@ -498,6 +566,7 @@ onShow(() => {
 }
 
 @media (max-width: 680px) {
+  .settings-support-grid,
   .settings-preview-grid {
     grid-template-columns: 1fr;
   }
