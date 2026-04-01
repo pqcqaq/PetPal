@@ -26,6 +26,7 @@ export const PETPAL_REQUEST_DETAIL_PAGE = '/pages/petpal/request-detail'
 export const PETPAL_CHECKOUT_PAGE = '/pages/petpal/checkout'
 export const PETPAL_PAYMENT_RESULT_PAGE = '/pages/petpal/payment-result'
 export const PETPAL_REFUND_RESULT_PAGE = '/pages/petpal/refund-result'
+export const PETPAL_COMPLAINT_RESULT_PAGE = '/pages/petpal/complaint-result'
 export const PETPAL_ORDERS_PAGE = '/pages/petpal/orders'
 export const PETPAL_AFTERSALES_PAGE = '/pages/petpal/aftersales'
 export const PETPAL_REMINDERS_PAGE = '/pages/petpal/reminders'
@@ -328,6 +329,16 @@ export function getRefundProgressStageHint(stage: RefundProgressStage) {
 
 export function getComplaintStatusLabel(status: ComplaintStatus) {
   return complaintStatusLabels[status] || status
+}
+
+export function getComplaintStatusHint(status: ComplaintStatus) {
+  const hints: Record<ComplaintStatus, string> = {
+    OPEN: '投诉已提交，等待平台受理并同步后续处理动作。',
+    PROCESSING: '平台正在核查投诉内容，建议持续关注处理日志和沟通消息。',
+    RESOLVED: '投诉已经完成处理，当前可以回看结论并继续订单后续动作。',
+    REJECTED: '本次投诉未通过，建议先看原因，再决定是否补充材料或重新发起。',
+  }
+  return hints[status] || status
 }
 
 export function getComplaintTypeLabel(type: ComplaintType) {

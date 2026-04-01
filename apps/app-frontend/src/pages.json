@@ -133,6 +133,14 @@
       }
     },
     {
+      "path": "pages/petpal/complaint-result",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "投诉结果",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/petpal/checkout",
       "type": "page",
       "style": {

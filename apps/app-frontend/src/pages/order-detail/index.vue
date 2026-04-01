@@ -52,6 +52,7 @@ import {
 import { useManagedAttachmentUpload } from '@/composables/useManagedAttachmentUpload'
 import {
   PETPAL_CHECKOUT_PAGE,
+  PETPAL_COMPLAINT_RESULT_PAGE,
   PETPAL_ORDER_COMPLAINT_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
   PETPAL_REFUND_RESULT_PAGE,
@@ -1107,6 +1108,10 @@ function openComplaintPage() {
   if (!order.value) {
     return
   }
+  if (activeComplaint.value || complaints.value.length > 0) {
+    uni.navigateTo({ url: `${PETPAL_COMPLAINT_RESULT_PAGE}?orderId=${order.value.id}` })
+    return
+  }
   uni.navigateTo({ url: `${PETPAL_ORDER_COMPLAINT_PAGE}?id=${order.value.id}` })
 }
 
@@ -1338,7 +1343,7 @@ onLoad((options: Record<string, string | undefined>) => {
                 <text>投诉类型：{{ getComplaintTypeLabel(activeComplaint.complaintType) }}</text>
               </view>
               <view class="petpal-action-grid">
-                <AppButton size="medium" type="danger" @click="openComplaintPage">进入投诉页</AppButton>
+                <AppButton size="medium" type="danger" @click="openComplaintPage">查看投诉进度</AppButton>
               </view>
             </view>
           </view>
@@ -1535,6 +1540,15 @@ onLoad((options: Record<string, string | undefined>) => {
 
                 <view class="petpal-detail-line">
                   <text>当前状态：{{ getComplaintStatusLabel(complaint.status) }}</text>
+                </view>
+                <view class="petpal-action-grid">
+                  <AppButton
+                    size="medium"
+                    :type="['OPEN', 'PROCESSING'].includes(complaint.status) ? 'danger' : 'info'"
+                    @click="openComplaintPage"
+                  >
+                    {{ ['OPEN', 'PROCESSING'].includes(complaint.status) ? '查看投诉进度' : '查看投诉结果' }}
+                  </AppButton>
                 </view>
               </view>
             </view>

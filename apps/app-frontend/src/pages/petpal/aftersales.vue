@@ -42,6 +42,7 @@ import {
   getRefundProgressStageLabel,
   isOrderAftersalesTracked,
   PETPAL_AFTERSALES_PAGE,
+  PETPAL_COMPLAINT_RESULT_PAGE,
   PETPAL_MESSAGES_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_REFUND_RESULT_PAGE,
@@ -538,14 +539,23 @@ function openRefundResult(orderId: string) {
   uni.navigateTo({ url: `${PETPAL_REFUND_RESULT_PAGE}?orderId=${orderId}` })
 }
 
+function openComplaintResult(orderId: string) {
+  uni.navigateTo({ url: `${PETPAL_COMPLAINT_RESULT_PAGE}?orderId=${orderId}` })
+}
+
 function openPrimaryAction(entry: AftersalesOrderView) {
   if (entry.activeComplaintCount > 0) {
-    openOrderDetail(entry.order.id, 'aftersales')
+    openComplaintResult(entry.order.id)
     return
   }
 
   if (getRefundStage(entry) !== 'NONE') {
     openRefundResult(entry.order.id)
+    return
+  }
+
+  if (entry.complaints.length > 0) {
+    openComplaintResult(entry.order.id)
     return
   }
 

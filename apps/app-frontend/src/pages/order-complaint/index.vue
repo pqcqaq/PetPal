@@ -35,9 +35,11 @@ import {
   formatDateTime,
   formatRange,
   getComplaintStatusLabel,
+  getComplaintStatusHint,
   getComplaintTargetRoleLabel,
   getComplaintTypeLabel,
   getOrderStatusLabel,
+  PETPAL_COMPLAINT_RESULT_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   serviceTypeLabels,
 } from '../petpal/owner-shared'
@@ -229,6 +231,16 @@ function openOrderAftersales() {
   uni.redirectTo({ url: `${PETPAL_ORDER_DETAIL_PAGE}?id=${orderId.value}&tab=aftersales` })
 }
 
+function openComplaintResultPage(targetComplaintId?: string) {
+  if (!orderId.value) {
+    uni.navigateBack({ delta: 1 })
+    return
+  }
+
+  const complaintQuery = targetComplaintId ? `&complaintId=${targetComplaintId}` : ''
+  uni.redirectTo({ url: `${PETPAL_COMPLAINT_RESULT_PAGE}?orderId=${orderId.value}${complaintQuery}` })
+}
+
 function openEvidenceUrl(url: string) {
   if (typeof window !== 'undefined') {
     window.open(url, '_blank', 'noopener,noreferrer')
@@ -308,10 +320,9 @@ async function submitComplaint() {
         .map(item => item.trim())
         .filter(Boolean),
     }
-    await createOrderComplaint(order.value.id, payload)
+    const complaint = await createOrderComplaint(order.value.id, payload)
     resetComplaintForm()
-    await loadPage(false)
-    uni.showToast({ title: '投诉已提交', icon: 'none' })
+    openComplaintResultPage(complaint.id)
   }
   catch (err) {
     uni.showToast({ title: getErrorMessage(err, '提交投诉失败'), icon: 'none' })
@@ -390,6 +401,7 @@ onPullDownRefresh(() => {
           <text class="order-complaint-card__meta">
             投诉对象：{{ getComplaintTargetRoleLabel(activeComplaint.targetRole) }} · {{ formatDateTime(activeComplaint.updatedAt) }}
           </text>
+          <text class="order-complaint-card__meta">{{ getComplaintStatusHint(activeComplaint.status) }}</text>
           <text class="order-complaint-card__content">{{ activeComplaint.description }}</text>
           <view v-if="activeComplaint.evidenceUrls.length" class="order-complaint-evidence-row">
             <view
@@ -407,6 +419,10 @@ onPullDownRefresh(() => {
               <text class="order-complaint-log-item__meta">{{ formatDateTime(log.createdAt) }}</text>
               <text v-if="log.note" class="order-complaint-log-item__note">{{ log.note }}</text>
             </view>
+          </view>
+          <view class="order-complaint-actions">
+            <AppButton size="medium" type="danger" @click="openComplaintResultPage(activeComplaint.id)">查看投诉结果</AppButton>
+            <AppButton size="medium" type="info" @click="openOrderAftersales">返回售后</AppButton>
           </view>
         </view>
       </AppSection>
@@ -478,6 +494,7 @@ onPullDownRefresh(() => {
             <text class="order-complaint-card__meta">
               投诉对象：{{ getComplaintTargetRoleLabel(complaint.targetRole) }} · {{ formatDateTime(complaint.updatedAt) }}
             </text>
+            <text class="order-complaint-card__meta">{{ getComplaintStatusHint(complaint.status) }}</text>
             <text class="order-complaint-card__content">{{ complaint.description }}</text>
             <view v-if="complaint.evidenceUrls.length" class="order-complaint-evidence-row">
               <view
@@ -490,6 +507,9 @@ onPullDownRefresh(() => {
               </view>
             </view>
             <text v-if="complaint.resultSummary" class="order-complaint-card__result">处理结论：{{ complaint.resultSummary }}</text>
+            <view class="order-complaint-actions">
+              <AppButton size="medium" type="info" @click="openComplaintResultPage(complaint.id)">查看投诉结果</AppButton>
+            </view>
           </view>
         </view>
         <AppStatus v-else text="当前订单暂时不可发起新的投诉。" />

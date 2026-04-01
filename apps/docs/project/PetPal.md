@@ -6917,3 +6917,51 @@ flowchart TD
 1. 继续补主人端投诉结果的独立反馈，不再把投诉处理结论散回订单详情长页里。
 2. 在主人端交易结果链路进一步稳定后，再同步推进 Web 对应页面的同类重构。
 3. 继续压缩退款、投诉和评价之间的回跳成本，让售后结果页都能直接指向正确下一步。
+
+### 14.123 2026-04-02（P3-M1 Slice 113）
+
+**概述**：继续推进 App 主人端交易后段反馈收口，本轮补齐独立投诉结果页，并把售后中心、订单详情和投诉提交成功回流统一接到结果页。
+
+已完成：
+
+- 新增投诉结果页：
+  - `apps/app-frontend/src/pages/petpal/complaint-result.vue`
+    - 新增独立投诉结果页，首屏直接展示投诉状态、最近处理时间、退款联动和下一步动作。
+    - 处理中、已解决和已驳回都已给出明确回流，不再要求用户自己回投诉页或订单长页判断下一步。
+    - 处理日志、证据和历史投诉记录已在同页收口，投诉结果回看不再依赖长滚动。
+- 接通投诉结果入口：
+  - `apps/app-frontend/src/pages/petpal/aftersales.vue`
+    - 售后中心中与投诉相关的主动作已优先进入投诉结果页，先看结果，再决定是否继续售后或重新投诉。
+  - `apps/app-frontend/src/pages/order-detail/index.vue`
+    - 订单详情里的投诉入口已按是否已有投诉记录自动切到投诉结果页，避免继续进入混合页。
+  - `apps/app-frontend/src/pages/order-complaint/index.vue`
+    - 投诉提交成功后已直接回流到投诉结果页，投诉页本身继续收回为“发起投诉”任务页。
+- 路由与共享常量同步：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+  - `apps/app-frontend/src/pages.json`
+  - `apps/app-frontend/src/types/uni-pages.d.ts`
+- 文档同步：
+  - `apps/docs/project/PetPal-Frontend-Blueprint.md`
+  - `apps/docs/project/PetPal-UX-Rebuild.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，投诉结果页全部基于现有 `OrderDetailRecord` 与投诉记录做前端重排。
+- 已确认售后中心、订单详情和投诉提交成功回流都已接到投诉结果页，投诉链路不再依赖用户自己翻日志判断当前状态。
+- 已确认投诉结果页没有暴露开发态枚举词，处理日志动作已收口为用户语言。
+
+风险与缓解：
+
+- 风险：主人端售后结果页已经基本统一，但系统级主动提醒和 Web 对应结果页仍未同步到同样标准。
+- 缓解：下一轮优先补主动提醒与 Web 对应结果页，避免 App 与 Web 在结果反馈上再次分叉。
+
+下一步（1-3）：
+
+1. 继续推进 Web 对应的交易结果 / 售后结果页收口，减少前后端多端体验分裂。
+2. 继续补系统级主动提醒、跨页面主动引导和更细的结果回流。
+3. 在结果页链路基本稳定后，再集中补更多弱网态和最终验收收口。
