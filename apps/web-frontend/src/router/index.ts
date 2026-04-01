@@ -35,6 +35,12 @@ const routes = [
         meta: { publicPage: true, title: '宠托帮照料者工作台' },
       },
       {
+        path: 'petpal/reminders',
+        name: 'frontend-petpal-reminders',
+        component: () => import('@/pages/frontend/petpal/PetPalRemindersView.vue'),
+        meta: { publicPage: true, title: '宠托帮提醒中心' },
+      },
+      {
         path: 'petpal/messages',
         name: 'frontend-petpal-messages',
         component: () => import('@/pages/frontend/petpal/PetPalMessagesView.vue'),

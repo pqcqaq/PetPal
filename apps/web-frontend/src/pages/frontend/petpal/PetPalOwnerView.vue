@@ -9,6 +9,9 @@
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-aftersales' }">
           打开售后中心
         </RouterLink>
+        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-reminders' }">
+          打开提醒中心
+        </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-messages' }">
           打开消息中心
         </RouterLink>
@@ -68,6 +71,9 @@
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-messages' }">
             跨订单消息中心
+          </RouterLink>
+          <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-reminders' }">
+            统一提醒中心
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-aftersales' }">
             退款 / 投诉 / 售后中心

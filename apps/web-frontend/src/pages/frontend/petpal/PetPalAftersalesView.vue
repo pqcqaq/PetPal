@@ -9,6 +9,9 @@
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal' }">
           返回主人服务台
         </RouterLink>
+        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-reminders' }">
+          打开提醒中心
+        </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-messages' }">
           打开消息中心
         </RouterLink>

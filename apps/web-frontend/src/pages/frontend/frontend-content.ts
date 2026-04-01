@@ -2,6 +2,7 @@ export const frontendNavItems = [
   { label: 'PetPal 首页', to: '/', eyebrow: '概览' },
   { label: '主人服务台', to: '/petpal', eyebrow: '业务' },
   { label: '照料者工作台', to: '/petpal/caregiver', eyebrow: '履约' },
+  { label: '提醒中心', to: '/petpal/reminders', eyebrow: '待办' },
   { label: '消息中心', to: '/petpal/messages', eyebrow: '沟通' },
   { label: '售后中心', to: '/petpal/aftersales', eyebrow: '售后' },
   { label: '产品结构', to: '/architecture', eyebrow: '结构' },
@@ -27,6 +28,12 @@ export const capabilityCards = [
     eyebrow: 'Caregiver Flow',
     description: '照料者页独立承接入驻资料、服务配置和履约订单，不再混在主人页面里。',
     bullets: ['独立承接档案、服务和履约动作', '资质材料、服务记录和签退已迁回照料者页，legacy 仅保留兼容入口'],
+  },
+  {
+    title: '跨流程提醒中心',
+    eyebrow: 'Reminder Flow',
+    description: '把主人、照料者、消息和售后相关待办聚合成独立入口，先看优先级再进入具体页面。',
+    bullets: ['独立路由 `/petpal/reminders` 聚合高优先提醒与近 48 小时安排', '支持按主人 / 照料者视角与高优先筛选，避免跨页来回判断'],
   },
   {
     title: '跨订单消息中心',
@@ -84,6 +91,11 @@ export const architectureLayers = [
     title: '照料者工作台',
     summary: '承载照料者档案、服务设置和履约订单基础动作。',
     details: ['独立路由 `/petpal/caregiver` 用于承接照料者工作流', '`/petpal/legacy` 已收缩为旧链接兼容与跨路由概览入口'],
+  },
+  {
+    title: '跨流程提醒中心',
+    summary: '承载主人、照料者、沟通与售后待办的统一聚合与优先级分发。',
+    details: ['独立路由 `/petpal/reminders` 用于统一查看高优先事项与短期安排', '再按角色或业务中心继续进入主人页、照料者页、消息中心和售后中心'],
   },
   {
     title: '跨订单消息中心',

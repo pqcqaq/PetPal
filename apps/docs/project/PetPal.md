@@ -4949,6 +4949,56 @@ flowchart TD
 2. 继续围绕更主动的售后 / 消息催办与运营治理能力补齐后续缺口。
 3. 在 Web 前台开始按路由拆分主人 / 照料者超级页面，避免新功能继续堆到旧页面。
 
+### 14.109 2026-04-01（P3-M1 Slice 93）
+
+**概述**：继续推进 P3 Web 前台重构，本轮补齐独立提醒中心，把主人、照料者、消息与售后相关待办聚合成一个统一分发入口，避免用户在多个独立路由之间自己判断优先级。
+
+已完成：
+
+- Web 前台新增独立提醒中心路由：
+  - `apps/web-frontend/src/router/index.ts`
+    - 新增 `/petpal/reminders` 路由。
+    - 页面标题定义为“宠托帮提醒中心”，继续保持前台根路径直达。
+- 新增提醒中心页面：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalRemindersView.vue`
+    - 聚合主人宠物、需求、订单、照料者档案、服务、订单与主人侧售后信号。
+    - 支持全部 / 主人视角 / 照料者视角切换。
+    - 支持“仅看高优先”和关键词筛选。
+    - 提供高优先提醒、近 48 小时安排、主人提醒和照料者提醒四层结构，不再把所有判断压回 `legacy` 或单一角色页。
+    - 登录前提供明确空态与登录引导，登录后才加载业务数据。
+- 共享文案补齐：
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - 补齐服务类型、主人需求状态和照料者审核状态的共享标签格式化，避免提醒中心再单独散落一套映射逻辑。
+- Web 前台入口联动：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+    - hero 和侧边快捷入口新增“提醒中心”直达按钮。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue`
+    - hero 和侧边快捷入口新增“提醒中心”直达按钮。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalMessagesView.vue`
+    - hero 区新增“提醒中心”直达按钮。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalAftersalesView.vue`
+    - hero 区新增“提醒中心”直达按钮。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalLegacyWorkbenchView.vue`
+    - 兼容入口新增提醒中心跳转，并把“统一待办”加入迁移卡片。
+  - `apps/web-frontend/src/pages/frontend/frontend-content.ts`
+    - 前台导航、能力卡片和结构说明补入提醒中心。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认提醒中心完全复用现有主人宠物、需求、订单、照料者档案、服务、订单、退款进度和投诉接口，没有新增后端协议面或放宽权限边界。
+- 已确认提醒中心对单角色账号做了降级处理：当主人侧或照料者侧接口返回 401 / 403 / 404 时，仅清空对应视角数据，不会把“未开通该角色能力”误报为页面故障。
+- 已确认提醒中心只是聚合与分发入口，没有重新把写操作和混合表单堆回单页，`legacy` 继续维持兼容入口职责。
+
+下一步（1-3）：
+
+1. 继续优化主人页、照料者页、提醒中心、消息中心和售后中心的空态、弱网态、错误恢复与更主动的跨页面引导。
+2. 评估是否抽离 Web 端提醒/售后信号的共享聚合 helper，减少后续路由继续扩展时的重复逻辑。
+3. 在 Web/App 主要路由稳定后，集中推进定向测试、审计补充与最终交付材料收口。
+
 ### 14.108 2026-04-01（P3-M1 Slice 92）
 
 **概述**：继续推进 P3 Web 前台重构，本轮把主人侧退款、投诉和售后协同从订单详情里抽成独立售后中心，让主人可以先按售后优先级集中处理，再进入具体订单。

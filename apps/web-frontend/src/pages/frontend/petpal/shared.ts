@@ -1,11 +1,14 @@
 import type {
+  CaregiverAuditStatus,
   ComplaintStatus,
   ComplaintTargetRole,
   ComplaintType,
   OrderConversationRecord,
   OrderRefundProgressRecord,
   OrderStatus,
+  PetServiceType,
   RefundType,
+  ServiceRequestStatus,
 } from '@rbac/api-common';
 
 export const getPetPalOrderStatusLabel = (status: OrderStatus) => ({
@@ -17,6 +20,27 @@ export const getPetPalOrderStatusLabel = (status: OrderStatus) => ({
   DISPUTED: '纠纷中',
   PARTIAL_REFUNDED: '部分退款',
   REFUNDED: '已退款',
+}[status] ?? status);
+
+export const getPetPalServiceTypeLabel = (serviceType: PetServiceType) => ({
+  BOARDING: '寄养',
+  WALKING: '遛宠',
+  FEEDING: '喂养',
+  DOOR_VISIT: '上门陪伴',
+}[serviceType] ?? serviceType);
+
+export const getPetPalServiceRequestStatusLabel = (status: ServiceRequestStatus) => ({
+  OPEN: '待匹配',
+  MATCHING: '匹配中',
+  CONFIRMED: '已确认',
+  CANCELLED: '已取消',
+  COMPLETED: '已完成',
+}[status] ?? status);
+
+export const getPetPalCaregiverAuditLabel = (status: CaregiverAuditStatus) => ({
+  PENDING: '审核中',
+  APPROVED: '已通过',
+  REJECTED: '已驳回',
 }[status] ?? status);
 
 export const getPetPalConversationUnreadCount = (

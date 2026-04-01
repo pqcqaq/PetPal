@@ -9,6 +9,9 @@
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-messages' }">
           打开消息中心
         </RouterLink>
+        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-reminders' }">
+          打开提醒中心
+        </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal' }">
           返回主人工作台
         </RouterLink>
@@ -62,6 +65,9 @@
         <div class="petpal-side-actions">
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-messages' }">
             跨订单消息中心
+          </RouterLink>
+          <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-reminders' }">
+            统一提醒中心
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-legacy' }">
             打开旧链接兼容入口
