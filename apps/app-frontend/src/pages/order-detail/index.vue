@@ -1,12 +1,16 @@
 <script lang="ts" setup>
 /**
  * UX Blueprint
- * User: 主人或照料者查看单笔订单
- * Entry: 从订单列表、消息中心、售后中心进入
- * First screen: 必须先看到状态、金额、时间和下一步动作
- * Primary action: 依据状态进入沟通、履约、确认完成、售后或评价
- * Secondary actions: 查看支付、退款、服务记录和附件
- * States: 加载中、订单不存在、待确认、待评价、售后中
+ * User: 主人或照料者查看单笔订单，并且要立刻知道“现在处理什么”
+ * Entry: 从订单列表、消息中心、售后中心、支付回流进入
+ * Core scenes:
+ * 1. 首屏先判断当前阶段、待支付金额、未读沟通和售后风险
+ * 2. 支付 / 沟通 / 看履约 / 售后 / 评价都必须在首屏找到，不要求用户滚长页
+ * 3. 总览负责决策，细节再进入沟通 / 履约 / 售后分栏
+ * Primary action: 按状态快速处理支付、沟通、履约、确认完成、评价或投诉
+ * Secondary actions: 查看支付记录、退款记录、服务记录和附件
+ * Feedback: 当前阶段、下一步、未读消息、服务记录数量、售后进度
+ * States: 加载中、订单不存在、待支付、待接单、服务中、待评价、售后中
  */
 import type {
   CaregiverQualificationMaterialRecord,
@@ -30,6 +34,7 @@ import type {
 import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
 import { computed, reactive, ref, watch } from 'vue'
+import AppTag from '@/components/app-tag/app-tag.vue'
 import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
 import AppSection from '@/components/app-section/app-section.vue'
@@ -49,6 +54,9 @@ import {
   PETPAL_CHECKOUT_PAGE,
   PETPAL_ORDER_COMPLAINT_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
+  getConversationHint,
+  getConversationPreview,
+  getOrderTone,
 } from '@/pages/petpal/owner-shared'
 import { useUserStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
@@ -178,6 +186,8 @@ const labels = {
 
 type AftersalesTimelineDotClass = 'warning' | 'primary' | 'success' | 'error' | 'closed'
 type OrderDetailTab = 'overview' | 'chat' | 'service' | 'aftersales'
+type OrderQuickAction = 'PAY' | 'COMPLETE' | 'CHAT' | 'SERVICE' | 'AFTERSALES' | 'REVIEW' | 'COMPLAINT'
+type AppTagTone = 'default' | 'primary' | 'success' | 'warning' | 'danger'
 
 interface AftersalesTimelineItem {
   id: string
@@ -191,9 +201,24 @@ interface AftersalesTimelineItem {
   details: string[]
 }
 
+interface OrderOverviewSignalCard {
+  key: string
+  title: string
+  value: string
+  hint: string
+  tone: 'primary' | 'success' | 'warning' | 'danger' | 'default'
+  action: 'CHAT' | 'SERVICE' | 'AFTERSALES' | null
+}
+
+interface OrderHeroTag {
+  label: string
+  type: AppTagTone
+}
+
 const confirmingCompletion = ref(false)
 const messageSubmitting = ref(false)
 const detailTab = ref<OrderDetailTab>('overview')
+const quickActionSelection = ref('')
 
 const {
   uploading: messageAttachmentUploading,
@@ -252,6 +277,7 @@ const currentConversationUnreadCount = computed(() => {
     : messageConversation.value.caregiverUnreadCount
 })
 const canSendMessage = computed(() => Boolean(order.value))
+const currentConversationRole = computed(() => (isOwnerView.value ? 'owner' : 'caregiver'))
 const ownerActionSummary = computed(() => {
   if (!isOwnerView.value) {
     return '当前先看订单状态、沟通和履约记录。'
@@ -275,6 +301,223 @@ const ownerActionSummary = computed(() => {
     return '评价已提交，仍可继续查看履约和售后。'
   }
   return '在这里处理确认完成、评价和投诉。'
+})
+const currentStageLabel = computed(() => {
+  if (!order.value) {
+    return '同步中'
+  }
+  if (canPayOrder.value) {
+    return `待支付 ¥${formatAmount(outstandingAmount.value)}`
+  }
+  if (order.value.orderStatus === 'PENDING_ACCEPT') {
+    return '等待照料者接单'
+  }
+  if (order.value.orderStatus === 'ACCEPTED') {
+    return '已接单，等待服务开始'
+  }
+  if (order.value.orderStatus === 'SERVING') {
+    return canConfirmComplete.value ? '服务中，待确认完成' : '服务进行中'
+  }
+  if (activeComplaint.value) {
+    return `投诉${getComplaintStatusLabel(activeComplaint.value.status)}`
+  }
+  if (canCreateReview.value) {
+    return '订单已完成，待评价'
+  }
+  if (order.value.review) {
+    return '订单已完成，评价已提交'
+  }
+  return labels.orderStatus[order.value.orderStatus] || order.value.orderStatus
+})
+const currentStageTagType = computed(() => {
+  if (!order.value) {
+    return 'default'
+  }
+  if (canPayOrder.value) {
+    return 'warning'
+  }
+  if (activeComplaint.value) {
+    return 'danger'
+  }
+  const tone = getOrderTone(order.value.orderStatus)
+  if (tone === 'danger') return 'danger'
+  if (tone === 'warning') return 'warning'
+  if (tone === 'success') return 'success'
+  return 'primary'
+})
+const orderHeroTags = computed<OrderHeroTag[]>(() => {
+  if (!order.value) {
+    return []
+  }
+
+  const tags: OrderHeroTag[] = [
+    {
+      label: currentStageLabel.value,
+      type: currentStageTagType.value as AppTagTone,
+    },
+    {
+      label: labels.serviceType[order.value.serviceType] || order.value.serviceType,
+      type: 'primary',
+    },
+  ]
+
+  if (currentConversationUnreadCount.value > 0) {
+    tags.push({
+      label: `${currentConversationUnreadCount.value} 条未读`,
+      type: 'warning',
+    })
+  }
+
+  if (activeComplaint.value) {
+    tags.push({
+      label: '售后处理中',
+      type: 'danger',
+    })
+  }
+  else if (refundProgress.value && refundProgress.value.stage !== 'NONE') {
+    tags.push({
+      label: getRefundProgressStageLabel(refundProgress.value.stage),
+      type: 'warning',
+    })
+  }
+  else if (order.value.review) {
+    tags.push({
+      label: '已评价',
+      type: 'success',
+    })
+  }
+
+  return tags
+})
+const overviewQuickActionOptions = computed(() => {
+  if (!order.value) {
+    return []
+  }
+
+  const options: Array<{ label: string, value: OrderQuickAction, description: string }> = []
+
+  if (canPayOrder.value) {
+    options.push({
+      label: '去支付',
+      value: 'PAY',
+      description: `先完成 ¥${formatAmount(outstandingAmount.value)} 支付`,
+    })
+  }
+
+  options.push({
+    label: '看沟通',
+    value: 'CHAT',
+    description: currentConversationUnreadCount.value > 0
+      ? `${currentConversationUnreadCount.value} 条未读消息`
+      : '查看最近沟通和附件',
+  })
+
+  options.push({
+    label: '看履约',
+    value: 'SERVICE',
+    description: order.value.serviceLogs.length > 0
+      ? `已记录 ${order.value.serviceLogs.length} 条服务日志`
+      : '查看时间线和服务记录',
+  })
+
+  options.push({
+    label: '看售后',
+    value: 'AFTERSALES',
+    description: activeComplaint.value
+      ? `投诉${getComplaintStatusLabel(activeComplaint.value.status)}`
+      : refundProgress.value && refundProgress.value.stage !== 'NONE'
+        ? getRefundProgressStageLabel(refundProgress.value.stage)
+        : '查看退款和投诉进度',
+  })
+
+  if (canConfirmComplete.value) {
+    options.push({
+      label: '确认完成',
+      value: 'COMPLETE',
+      description: '核对服务记录后确认本单收尾',
+    })
+  }
+
+  if (canCreateReview.value || order.value.review) {
+    options.push({
+      label: order.value.review ? '看评价' : '写评价',
+      value: 'REVIEW',
+      description: order.value.review ? '查看已提交评价内容' : '完成订单后的体验反馈',
+    })
+  }
+
+  if (canCreateComplaint.value || activeComplaint.value) {
+    options.push({
+      label: activeComplaint.value ? '看投诉' : '发投诉',
+      value: 'COMPLAINT',
+      description: activeComplaint.value ? '查看处理日志和结果' : '售后争议走平台处理',
+    })
+  }
+
+  return options
+})
+const overviewSignalCards = computed<OrderOverviewSignalCard[]>(() => {
+  if (!order.value) {
+    return []
+  }
+
+  const conversationValue = order.value.conversation
+    ? getConversationPreview(order.value.conversation)
+    : '暂未开始订单沟通'
+  const conversationHint = getConversationHint(order.value.conversation, currentConversationRole.value)
+
+  const serviceValue = order.value.serviceLogs.length > 0
+    ? `已记录 ${order.value.serviceLogs.length} 条服务日志`
+    : order.value.timeline.length > 0
+      ? `当前有 ${order.value.timeline.length} 条履约时间线`
+      : '暂未开始履约记录'
+
+  const aftersalesValue = activeComplaint.value
+    ? `投诉${getComplaintStatusLabel(activeComplaint.value.status)}`
+    : refundProgress.value && refundProgress.value.stage !== 'NONE'
+      ? getRefundProgressStageLabel(refundProgress.value.stage)
+      : '当前无售后'
+
+  const aftersalesHint = activeComplaint.value
+    ? `投诉对象：${getComplaintTargetRoleLabel(activeComplaint.value.targetRole)}`
+    : refundProgress.value && refundProgress.value.stage !== 'NONE'
+      ? getRefundProgressStageHint(refundProgress.value.stage)
+      : '暂未发起退款或投诉'
+
+  return [
+    {
+      key: 'stage',
+      title: '当前阶段',
+      value: currentStageLabel.value,
+      hint: ownerActionSummary.value,
+      tone: canPayOrder.value ? 'warning' : activeComplaint.value ? 'danger' : 'primary',
+      action: null,
+    },
+    {
+      key: 'chat',
+      title: '最近沟通',
+      value: conversationValue,
+      hint: conversationHint,
+      tone: currentConversationUnreadCount.value > 0 ? 'warning' : 'default',
+      action: 'CHAT',
+    },
+    {
+      key: 'service',
+      title: '履约进度',
+      value: serviceValue,
+      hint: order.value.timeline.length > 0 ? `最近更新 ${formatDateTime(order.value.updatedAt)}` : '暂未产生服务轨迹',
+      tone: order.value.orderStatus === 'SERVING' ? 'primary' : order.value.serviceLogs.length > 0 ? 'success' : 'default',
+      action: 'SERVICE',
+    },
+    {
+      key: 'aftersales',
+      title: '售后状态',
+      value: aftersalesValue,
+      hint: aftersalesHint,
+      tone: activeComplaint.value ? 'danger' : refundProgress.value && refundProgress.value.stage !== 'NONE' ? 'warning' : 'default',
+      action: 'AFTERSALES',
+    },
+  ]
 })
 const orderFocusSummary = computed(() => {
   if (!order.value) {
@@ -339,6 +582,37 @@ const getRefundProgressStageClass = (stage: OrderRefundProgressRecord['stage']) 
     FAILED: 'error',
   }
   return classes[stage] || 'closed'
+}
+
+function handleQuickAction(action: OrderQuickAction) {
+  if (action === 'PAY') {
+    openCheckoutPage()
+    return
+  }
+  if (action === 'COMPLETE') {
+    void handleConfirmComplete()
+    return
+  }
+  if (action === 'CHAT') {
+    detailTab.value = 'chat'
+    void markConversationAsRead()
+    return
+  }
+  if (action === 'SERVICE') {
+    detailTab.value = 'service'
+    return
+  }
+  if (action === 'AFTERSALES') {
+    detailTab.value = 'aftersales'
+    return
+  }
+  if (action === 'REVIEW') {
+    openReviewPage()
+    return
+  }
+  if (action === 'COMPLAINT') {
+    openComplaintPage()
+  }
 }
 
 const getComplaintTargetRoleLabel = (role: ComplaintTargetRole) => {
@@ -919,6 +1193,14 @@ watch(orderId, (newId) => {
   }
 })
 
+watch(quickActionSelection, (action) => {
+  if (!action) {
+    return
+  }
+  handleQuickAction(action as OrderQuickAction)
+  quickActionSelection.value = ''
+})
+
 function isOrderDetailTab(value: string | undefined): value is OrderDetailTab {
   return value === 'overview' || value === 'chat' || value === 'service' || value === 'aftersales'
 }
@@ -951,6 +1233,15 @@ onLoad((options: Record<string, string | undefined>) => {
       <view class="petpal-order-container">
         <AppSection title="订单概览">
           <view class="petpal-order-overview-banner">
+            <view class="petpal-order-overview-banner__tags">
+              <AppTag
+                v-for="tag in orderHeroTags"
+                :key="tag.label"
+                :type="tag.type"
+              >
+                {{ tag.label }}
+              </AppTag>
+            </view>
             <view class="petpal-order-overview-banner__headline">
               <text class="petpal-order-overview-banner__title">{{ order.orderNo }}</text>
               <text class="petpal-order-overview-banner__meta">
@@ -976,40 +1267,30 @@ onLoad((options: Record<string, string | undefined>) => {
           <AppChoiceChips v-model="detailTab" :options="detailTabOptions" />
         </AppSection>
 
-        <AppSection v-if="detailTab === 'overview'" title="订单操作">
+        <AppSection v-if="detailTab === 'overview'" title="下一步">
           <view class="petpal-owner-actions">
-            <view class="petpal-note-card">
-              <text>{{ ownerActionSummary }}</text>
-            </view>
+            <AppChoiceChips
+              v-if="overviewQuickActionOptions.length"
+              v-model="quickActionSelection"
+              :options="overviewQuickActionOptions"
+              show-descriptions
+            />
 
-            <view class="petpal-action-grid">
-              <AppButton
-                v-if="canPayOrder"
-                @click="openCheckoutPage"
+            <view class="petpal-signal-grid">
+              <view
+                v-for="signal in overviewSignalCards"
+                :key="signal.key"
+                class="petpal-signal-card"
+                :class="[
+                  `petpal-signal-card--${signal.tone}`,
+                  signal.action ? 'petpal-signal-card--clickable' : '',
+                ]"
+                @click="signal.action && handleQuickAction(signal.action)"
               >
-                去支付
-              </AppButton>
-              <AppButton
-                v-if="canConfirmComplete"
-                :loading="confirmingCompletion"
-                @click="handleConfirmComplete"
-              >
-                确认完成
-              </AppButton>
-              <AppButton
-                v-if="canCreateReview || order.review"
-                type="info"
-                @click="openReviewPage"
-              >
-                {{ order.review ? '查看评价' : '写评价' }}
-              </AppButton>
-              <AppButton
-                v-if="canCreateComplaint || activeComplaint"
-                type="danger"
-                @click="openComplaintPage"
-              >
-                {{ activeComplaint ? '查看投诉进度' : '发起投诉' }}
-              </AppButton>
+                <text class="petpal-signal-card__title">{{ signal.title }}</text>
+                <text class="petpal-signal-card__value">{{ signal.value }}</text>
+                <text class="petpal-signal-card__hint">{{ signal.hint }}</text>
+              </view>
             </view>
 
             <view v-if="order.review" class="petpal-action-panel">
@@ -1581,6 +1862,12 @@ onLoad((options: Record<string, string | undefined>) => {
   color: #f8fafc;
 }
 
+.petpal-order-overview-banner__tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .petpal-order-overview-banner__headline {
   display: grid;
   gap: 4px;
@@ -1631,6 +1918,69 @@ onLoad((options: Record<string, string | undefined>) => {
 .petpal-owner-actions {
   display: grid;
   gap: 12px;
+}
+
+.petpal-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.petpal-signal-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #e5ebf3;
+  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+  transition: transform 160ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.petpal-signal-card--clickable {
+  cursor: pointer;
+}
+
+.petpal-signal-card--clickable:active {
+  transform: scale(0.99);
+}
+
+.petpal-signal-card--primary {
+  border-color: #dbeafe;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.petpal-signal-card--success {
+  border-color: #cce9d5;
+  background: linear-gradient(180deg, #edf9f0 0%, #ffffff 100%);
+}
+
+.petpal-signal-card--warning {
+  border-color: #fde7b3;
+  background: linear-gradient(180deg, #fff9e8 0%, #ffffff 100%);
+}
+
+.petpal-signal-card--danger {
+  border-color: #ffd0d2;
+  background: linear-gradient(180deg, #fff1f2 0%, #ffffff 100%);
+}
+
+.petpal-signal-card__title {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.petpal-signal-card__value {
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.petpal-signal-card__hint {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .petpal-action-grid {
@@ -2219,6 +2569,7 @@ onLoad((options: Record<string, string | undefined>) => {
 }
 
 @media (max-width: 680px) {
+  .petpal-signal-grid,
   .petpal-order-overview-banner__stats {
     grid-template-columns: 1fr;
   }
