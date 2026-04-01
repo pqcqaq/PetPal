@@ -36,6 +36,7 @@ import {
   PETPAL_CAREGIVER_SERVICES_PAGE,
   PETPAL_MESSAGES_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
+  PETPAL_REMINDERS_PAGE,
   serviceTypeLabels,
   speciesLabels,
 } from './owner-shared'
@@ -138,6 +139,10 @@ function openMessages() {
   uni.redirectTo({ url: PETPAL_MESSAGES_PAGE })
 }
 
+function openReminders() {
+  uni.redirectTo({ url: PETPAL_REMINDERS_PAGE })
+}
+
 function openOrderDetail(orderId: string, tab: 'overview' | 'chat' | 'service' = 'overview') {
   uni.navigateTo({ url: `${PETPAL_ORDER_DETAIL_PAGE}?id=${orderId}&tab=${tab}` })
 }
@@ -216,6 +221,7 @@ onPullDownRefresh(() => {
               <AppButton size="medium" @click="openOrders">处理订单</AppButton>
               <AppButton size="medium" type="info" @click="openEarnings">收益表现</AppButton>
               <AppButton size="medium" type="info" @click="openMessages">查看消息</AppButton>
+              <AppButton size="medium" type="danger" @click="openReminders">提醒中心</AppButton>
             </view>
           </view>
         </AppCard>
@@ -246,6 +252,10 @@ onPullDownRefresh(() => {
           <view class="caregiver-quick-card" @click="openEarnings">
             <text class="caregiver-quick-card__title">查看收益表现</text>
             <text class="caregiver-quick-card__text">汇总收入、评分、完成率和售后风险。</text>
+          </view>
+          <view class="caregiver-quick-card caregiver-quick-card--alert" @click="openReminders">
+            <text class="caregiver-quick-card__title">进入提醒中心</text>
+            <text class="caregiver-quick-card__text">把接单、履约、沟通和风险事项集中拉平，先看最紧急的动作。</text>
           </view>
         </view>
       </AppSection>
@@ -440,6 +450,12 @@ onPullDownRefresh(() => {
   background:
     radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 34%),
     linear-gradient(180deg, #ffffff 0%, #fffaf3 100%);
+}
+
+.caregiver-quick-card--alert {
+  background:
+    radial-gradient(circle at top right, rgba(239, 68, 68, 0.14), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #fff8f7 100%);
 }
 
 .caregiver-quick-card__title,

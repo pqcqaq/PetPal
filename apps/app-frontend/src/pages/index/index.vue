@@ -17,6 +17,7 @@ import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { listOrders, listPets, listServiceRequests, matchCaregivers } from '@/api/petpal'
+import { isOrderAftersalesTracked, PETPAL_REMINDERS_PAGE } from '@/pages/petpal/owner-shared'
 import { useTokenStore, useUiStore, useUserStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
 
@@ -56,11 +57,7 @@ const activeOrderCount = computed(() => orders.value.filter(item => (
   || item.orderStatus === 'SERVING'
 )).length)
 
-const aftersaleCount = computed(() => orders.value.filter(item => (
-  item.orderStatus === 'DISPUTED'
-  || item.orderStatus === 'PARTIAL_REFUNDED'
-  || item.orderStatus === 'REFUNDED'
-)).length)
+const aftersaleCount = computed(() => orders.value.filter(item => isOrderAftersalesTracked(item)).length)
 
 const upcomingOrders = computed(() => {
   const limit = isFocusLayout.value ? 2 : 4
@@ -146,6 +143,10 @@ function openProfile() {
 
 function openSettings() {
   uni.navigateTo({ url: '/pages/settings/index' })
+}
+
+function openReminders() {
+  uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
 }
 
 function openMine() {
@@ -247,6 +248,7 @@ onPullDownRefresh(() => {
     <AppSection title="快捷操作" description="把常用 PetPal 动作放到首页第一屏。">
       <AppList>
         <AppListItem title="进入服务台" label="发布需求、维护宠物档案和查看匹配照料者。" is-link clickable @click="openServiceBoard" />
+        <AppListItem title="提醒中心" label="集中查看主人端、照料者端和售后相关待办。" is-link clickable @click="openReminders" />
         <AppListItem title="查看我的资料" label="更新昵称、头像、联系方式与账号状态。" is-link clickable @click="openProfile" />
         <AppListItem title="PetPal 设置" label="调整首页布局、底栏样式与主题外观。" is-link clickable @click="openSettings" />
         <AppListItem title="进入我的" label="查看账号状态、宠物资产和订单提醒。" is-link clickable @click="openMine" />

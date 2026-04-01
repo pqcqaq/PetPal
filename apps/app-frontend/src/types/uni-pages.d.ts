@@ -21,6 +21,7 @@ type _LocationUrl =
   "/pages/petpal/orders" |
   "/pages/petpal/owner-home" |
   "/pages/petpal/pets" |
+  "/pages/petpal/reminders" |
   "/pages/petpal/request" |
   "/pages/petpal/workbench" |
   "/pages/settings/index";

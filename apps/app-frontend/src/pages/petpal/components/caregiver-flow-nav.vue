@@ -6,6 +6,7 @@ import {
   caregiverFlowOptions,
   PETPAL_HUB_PAGE,
   PETPAL_MESSAGES_PAGE,
+  PETPAL_REMINDERS_PAGE,
 } from '../owner-shared'
 
 defineOptions({
@@ -32,6 +33,10 @@ function openHub() {
 function openMessages() {
   redirectTo(PETPAL_MESSAGES_PAGE)
 }
+
+function openReminders() {
+  redirectTo(PETPAL_REMINDERS_PAGE)
+}
 </script>
 
 <template>
@@ -53,6 +58,7 @@ function openMessages() {
     <view class="caregiver-flow-nav__actions">
       <AppButton size="medium" type="info" @click="openHub">角色入口</AppButton>
       <AppButton size="medium" @click="openMessages">消息中心</AppButton>
+      <AppButton size="medium" type="danger" @click="openReminders">提醒中心</AppButton>
     </view>
   </view>
 </template>

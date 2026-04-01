@@ -15,6 +15,7 @@ import {
   isOrderAftersalesTracked,
   PETPAL_AFTERSALES_PAGE,
   PETPAL_CAREGIVER_EARNINGS_PAGE,
+  PETPAL_REMINDERS_PAGE,
 } from '@/pages/petpal/owner-shared'
 import { LOGIN_PAGE, REGISTER_PAGE } from '@/router/config'
 import { useUiStore, useUserStore } from '@/store'
@@ -167,6 +168,14 @@ function openAftersalesCenter() {
   uni.navigateTo({ url: PETPAL_AFTERSALES_PAGE })
 }
 
+function openRemindersCenter() {
+  if (!tokenStore.hasLogin) {
+    handleLogin()
+    return
+  }
+  uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
+}
+
 function openHome() {
   uni.switchTab({ url: '/pages/index/index' })
 }
@@ -262,6 +271,7 @@ onShow(() => {
       <AppSection title="常用入口">
         <AppList>
           <AppListItem title="进入服务台" label="继续发布需求、维护宠物档案和查看匹配。" is-link clickable @click="openServiceBoard" />
+          <AppListItem title="提醒中心" label="集中查看主人端、照料者端和售后相关待办。" is-link clickable @click="openRemindersCenter" />
           <AppListItem title="售后中心" label="集中查看退款、投诉和争议处理，不再只依赖订单详情入口。" is-link clickable @click="openAftersalesCenter" />
           <AppListItem title="照料者收益表现" label="若你已申请照料者，可查看收入、完成率和售后风险。" is-link clickable @click="openCaregiverEarnings" />
           <AppListItem title="个人资料" label="更新昵称、头像和联系方式。" is-link clickable @click="openProfile" />
