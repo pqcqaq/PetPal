@@ -761,13 +761,17 @@ import { useAuthStore } from '@/stores/auth';
 import { useWorkbenchStore } from '@/stores/workbench';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalStatePanel from './PetPalStatePanel.vue';
+import {
+  mergePetPalPageNotice,
+  runPetPalSectionRetry,
+  type PetPalSectionLoadState,
+} from './recovery';
 
 defineOptions({
   name: 'PetPalOwnerView',
 });
 
 type PageLoadState = 'idle' | 'ready' | 'error';
-type SectionLoadState = 'idle' | 'ready' | 'error';
 
 type PetFormState = {
   name: string;
@@ -808,10 +812,10 @@ const ownerActionLoadingKey = ref('');
 const pageLoadState = ref<PageLoadState>('idle');
 const pageLoadErrorMessage = ref('');
 const partialLoadNotice = ref('');
-const petsLoadState = ref<SectionLoadState>('idle');
-const requestsLoadState = ref<SectionLoadState>('idle');
-const ordersLoadState = ref<SectionLoadState>('idle');
-const matchesLoadState = ref<SectionLoadState>('idle');
+const petsLoadState = ref<PetPalSectionLoadState>('idle');
+const requestsLoadState = ref<PetPalSectionLoadState>('idle');
+const ordersLoadState = ref<PetPalSectionLoadState>('idle');
+const matchesLoadState = ref<PetPalSectionLoadState>('idle');
 const petsLoadErrorMessage = ref('');
 const requestsLoadErrorMessage = ref('');
 const ordersLoadErrorMessage = ref('');
@@ -960,15 +964,6 @@ const pageLoading = computed(() => (
 const unreadOwnerConversationCount = computed(() => orders.value.reduce((total, item) => (
   total + getConversationUnreadCount(item.conversation, 'owner')
 ), 0));
-
-const mergePageNotice = (items: string[]) => {
-  const normalized = items
-    .map(item => item.trim().replace(/[。.]$/, ''))
-    .filter(Boolean);
-  return normalized.length ? `${normalized.join('；')}。` : '';
-};
-
-const isReadySectionState = (state: SectionLoadState) => state === 'ready';
 
 const formatTime = (value: string) => new Date(value).toLocaleString();
 
@@ -1603,51 +1598,43 @@ const refreshMatches = () => {
 };
 
 const retryPetsSection = async () => {
-  sectionReloadingKey.value = 'pets';
-  try {
-    await loadPets({ showFeedback: false });
-    if (isReadySectionState(petsLoadState.value)) {
-      ElMessage.success('宠物列表已刷新');
-    }
-  } finally {
-    sectionReloadingKey.value = '';
-  }
+  await runPetPalSectionRetry({
+    key: 'pets',
+    sectionReloadingKey,
+    reload: () => loadPets({ showFeedback: false }),
+    getState: () => petsLoadState.value,
+    successMessage: '宠物列表已刷新',
+  });
 };
 
 const retryRequestsSection = async () => {
-  sectionReloadingKey.value = 'requests';
-  try {
-    await loadRequests({ showFeedback: false });
-    if (isReadySectionState(requestsLoadState.value)) {
-      ElMessage.success('主人需求已刷新');
-    }
-  } finally {
-    sectionReloadingKey.value = '';
-  }
+  await runPetPalSectionRetry({
+    key: 'requests',
+    sectionReloadingKey,
+    reload: () => loadRequests({ showFeedback: false }),
+    getState: () => requestsLoadState.value,
+    successMessage: '主人需求已刷新',
+  });
 };
 
 const retryOrdersSection = async () => {
-  sectionReloadingKey.value = 'orders';
-  try {
-    await loadOrders({ showFeedback: false });
-    if (isReadySectionState(ordersLoadState.value)) {
-      ElMessage.success('主人订单已刷新');
-    }
-  } finally {
-    sectionReloadingKey.value = '';
-  }
+  await runPetPalSectionRetry({
+    key: 'orders',
+    sectionReloadingKey,
+    reload: () => loadOrders({ showFeedback: false }),
+    getState: () => ordersLoadState.value,
+    successMessage: '主人订单已刷新',
+  });
 };
 
 const retryMatchesSection = async () => {
-  sectionReloadingKey.value = 'matches';
-  try {
-    await loadMatches({ showFeedback: false });
-    if (isReadySectionState(matchesLoadState.value)) {
-      ElMessage.success('照料者匹配结果已刷新');
-    }
-  } finally {
-    sectionReloadingKey.value = '';
-  }
+  await runPetPalSectionRetry({
+    key: 'matches',
+    sectionReloadingKey,
+    reload: () => loadMatches({ showFeedback: false }),
+    getState: () => matchesLoadState.value,
+    successMessage: '照料者匹配结果已刷新',
+  });
 };
 
 const withOwnerOrderAction = async (
@@ -1689,12 +1676,12 @@ const reloadAll = async () => {
 
   if (notices.length === 4) {
     pageLoadState.value = 'error';
-    pageLoadErrorMessage.value = mergePageNotice(notices) || '主人服务台暂时不可用，请稍后重试。';
+    pageLoadErrorMessage.value = mergePetPalPageNotice(notices) || '主人服务台暂时不可用，请稍后重试。';
     return;
   }
 
   pageLoadState.value = 'ready';
-  partialLoadNotice.value = mergePageNotice(notices);
+  partialLoadNotice.value = mergePetPalPageNotice(notices);
 };
 
 const createPet = async () => {

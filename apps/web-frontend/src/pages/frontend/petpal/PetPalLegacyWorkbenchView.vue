@@ -301,6 +301,10 @@ import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalStatePanel from './PetPalStatePanel.vue';
 import {
+  mergePetPalPageNotice,
+  type PetPalRoleAwareSectionLoadState,
+} from './recovery';
+import {
   getPetPalConversationUnreadCount,
   getPetPalOrderStatusLabel,
 } from './shared';
@@ -310,7 +314,6 @@ defineOptions({
 });
 
 type PageLoadState = 'idle' | 'ready' | 'error';
-type SectionLoadState = 'idle' | 'ready' | 'role_unavailable' | 'error';
 
 const auth = useAuthStore();
 
@@ -333,8 +336,8 @@ const loading = ref(false);
 const pageLoadState = ref<PageLoadState>('idle');
 const pageLoadErrorMessage = ref('');
 const partialLoadNotice = ref('');
-const ownerSectionState = ref<SectionLoadState>('idle');
-const caregiverSectionState = ref<SectionLoadState>('idle');
+const ownerSectionState = ref<PetPalRoleAwareSectionLoadState>('idle');
+const caregiverSectionState = ref<PetPalRoleAwareSectionLoadState>('idle');
 const ownerSectionErrorMessage = ref('');
 const caregiverSectionErrorMessage = ref('');
 
@@ -342,13 +345,6 @@ const formatTime = (value: string) => new Date(value).toLocaleString();
 
 const getOrderStatusLabel = getPetPalOrderStatusLabel;
 const getConversationUnreadCount = getPetPalConversationUnreadCount;
-
-const mergePageNotice = (items: string[]) => {
-  const normalized = items
-    .map(item => item.trim().replace(/[。.]$/, ''))
-    .filter(Boolean);
-  return normalized.length ? `${normalized.join('；')}。` : '';
-};
 
 const orderPriorityWeight = (status: OrderStatus, unread: number) => {
   const statusWeight = ({
@@ -494,12 +490,12 @@ const reloadAll = async () => {
 
   if (successCount === 0) {
     pageLoadState.value = 'error';
-    pageLoadErrorMessage.value = mergePageNotice(notices) || '兼容概览暂时不可用，请稍后重试。';
+    pageLoadErrorMessage.value = mergePetPalPageNotice(notices) || '兼容概览暂时不可用，请稍后重试。';
     return;
   }
 
   pageLoadState.value = 'ready';
-  partialLoadNotice.value = mergePageNotice(notices);
+  partialLoadNotice.value = mergePetPalPageNotice(notices);
 };
 
 onMounted(() => {

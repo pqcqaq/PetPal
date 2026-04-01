@@ -5018,6 +5018,43 @@ flowchart TD
 2. 评估是否把工作台页的区块加载状态与 notice 聚合逻辑抽成共享 helper，减少剩余 Web 页面重复状态编排。
 3. 在 Web 工作台分区级恢复态稳定后，回到 App 端继续推进更深的 Material 3 动效与主动引导收口。
 
+### 14.113 2026-04-01（P3-M1 Slice 97）
+
+**概述**：继续推进 P3 Web 前台重构，本轮把多个 PetPal 前台页面里重复的恢复态编排抽成共享 helper，优先收口页面级 notice 拼接和分区重试逻辑，为后续继续补弱网态与动作结果引导做准备。
+
+已完成：
+
+- 新增共享恢复态 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/recovery.ts`
+    - 抽离 `mergePetPalPageNotice(...)`，统一页面级提示文案拼接。
+    - 抽离 `runPetPalSectionRetry(...)`，统一分区重试时的 loading key、成功提示和收尾逻辑。
+    - 抽离共享分区状态类型，兼容普通错误态与 `role_unavailable` 语义。
+- 主人服务台与照料者工作台接入共享 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue`
+    - 统一复用页面级 notice 拼接与分区重试工具，减少页面内重复函数。
+- 消息中心与兼容入口同步收口：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalMessagesView.vue`
+    - 主人 / 照料者消息区块的重试逻辑改为复用共享 helper，并保留失败时继续展示内联恢复态。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalLegacyWorkbenchView.vue`
+    - 页面级 notice 拼接与角色感知区块状态类型改为复用共享 helper，避免兼容入口继续复制同类状态工具。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮只抽离前端状态编排 helper，没有新增 API、没有改变权限边界，也没有改变现有恢复态的交互语义。
+- 已确认消息中心继续保持“区块失败时以内联恢复态承接，而不是整页失败或仅弹 toast”的策略。
+- 已确认兼容入口、主人服务台和照料者工作台已开始复用同一套 notice 拼接规则，减少后续继续扩展时的状态分叉风险。
+
+下一步（1-3）：
+
+1. 继续补工作台动作完成后的结果引导与弱网提示，把当前恢复态能力从“加载阶段”扩展到“动作阶段”。
+2. 评估是否把更多区块状态创建逻辑也下沉到共享 composable，进一步减小主人页和照料者页脚本体量。
+3. 在 Web 前台恢复态 helper 稳定后，回到 App 端继续推进 Material 3 动效、主动提醒和跨页面引导收口。
+
 ### 14.110 2026-04-01（P3-M1 Slice 94）
 
 **概述**：继续推进 P3 Web 前台重构，本轮不再让提醒中心、消息中心和售后中心只依赖 toast 提示来表达失败，而是补齐真正可恢复的页面状态，让单角色账号、局部加载失败和筛选为空时都能在页面内自解释并继续操作。

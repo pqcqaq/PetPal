@@ -591,13 +591,17 @@ import { useAuthStore } from '@/stores/auth';
 import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalStatePanel from './PetPalStatePanel.vue';
+import {
+  mergePetPalPageNotice,
+  runPetPalSectionRetry,
+  type PetPalSectionLoadState,
+} from './recovery';
 
 defineOptions({
   name: 'PetPalCaregiverView',
 });
 
 type PageLoadState = 'idle' | 'ready' | 'error';
-type SectionLoadState = 'idle' | 'ready' | 'error';
 
 type CaregiverProfileFormState = {
   intro: string;
@@ -619,9 +623,9 @@ const qualificationUploadInput = ref<HTMLInputElement | null>(null);
 const pageLoadState = ref<PageLoadState>('idle');
 const pageLoadErrorMessage = ref('');
 const partialLoadNotice = ref('');
-const profileLoadState = ref<SectionLoadState>('idle');
-const servicesLoadState = ref<SectionLoadState>('idle');
-const ordersLoadState = ref<SectionLoadState>('idle');
+const profileLoadState = ref<PetPalSectionLoadState>('idle');
+const servicesLoadState = ref<PetPalSectionLoadState>('idle');
+const ordersLoadState = ref<PetPalSectionLoadState>('idle');
 const profileLoadErrorMessage = ref('');
 const servicesLoadErrorMessage = ref('');
 const ordersLoadErrorMessage = ref('');
@@ -710,14 +714,6 @@ const isMissingResourceError = (error: unknown) => hasStatusCode(error) && error
 const unreadConversationCount = computed(() => caregiverOrders.value.reduce((total, item) => (
   total + getConversationUnreadCount(item.conversation, 'caregiver')
 ), 0));
-
-const mergePageNotice = (items: string[]) => {
-  const normalized = items
-    .map(item => item.trim().replace(/[。.]$/, ''))
-    .filter(Boolean);
-  return normalized.length ? `${normalized.join('；')}。` : '';
-};
-const isReadySectionState = (state: SectionLoadState) => state === 'ready';
 
 const auditTagType = computed(() => {
   if (!caregiverProfile.value) {
@@ -978,39 +974,33 @@ const refreshCaregiverOrders = () => {
 };
 
 const retryProfileSection = async () => {
-  sectionReloadingKey.value = 'profile';
-  try {
-    await loadCaregiverProfile({ showFeedback: false });
-    if (isReadySectionState(profileLoadState.value)) {
-      ElMessage.success('照料者档案已刷新');
-    }
-  } finally {
-    sectionReloadingKey.value = '';
-  }
+  await runPetPalSectionRetry({
+    key: 'profile',
+    sectionReloadingKey,
+    reload: () => loadCaregiverProfile({ showFeedback: false }),
+    getState: () => profileLoadState.value,
+    successMessage: '照料者档案已刷新',
+  });
 };
 
 const retryServicesSection = async () => {
-  sectionReloadingKey.value = 'services';
-  try {
-    await loadCaregiverServices({ showFeedback: false });
-    if (isReadySectionState(servicesLoadState.value)) {
-      ElMessage.success('照料服务已刷新');
-    }
-  } finally {
-    sectionReloadingKey.value = '';
-  }
+  await runPetPalSectionRetry({
+    key: 'services',
+    sectionReloadingKey,
+    reload: () => loadCaregiverServices({ showFeedback: false }),
+    getState: () => servicesLoadState.value,
+    successMessage: '照料服务已刷新',
+  });
 };
 
 const retryOrdersSection = async () => {
-  sectionReloadingKey.value = 'orders';
-  try {
-    await loadCaregiverOrders({ showFeedback: false });
-    if (isReadySectionState(ordersLoadState.value)) {
-      ElMessage.success('履约订单已刷新');
-    }
-  } finally {
-    sectionReloadingKey.value = '';
-  }
+  await runPetPalSectionRetry({
+    key: 'orders',
+    sectionReloadingKey,
+    reload: () => loadCaregiverOrders({ showFeedback: false }),
+    getState: () => ordersLoadState.value,
+    successMessage: '履约订单已刷新',
+  });
 };
 
 const reloadAll = async () => {
@@ -1033,12 +1023,12 @@ const reloadAll = async () => {
 
     if (notices.length === 3) {
       pageLoadState.value = 'error';
-      pageLoadErrorMessage.value = mergePageNotice(notices) || '照料者工作台暂时不可用，请稍后重试。';
+      pageLoadErrorMessage.value = mergePetPalPageNotice(notices) || '照料者工作台暂时不可用，请稍后重试。';
       return;
     }
 
     pageLoadState.value = 'ready';
-    partialLoadNotice.value = mergePageNotice(notices);
+    partialLoadNotice.value = mergePetPalPageNotice(notices);
   } finally {
     pageReloading.value = false;
   }

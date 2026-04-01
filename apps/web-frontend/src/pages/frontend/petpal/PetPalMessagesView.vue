@@ -334,6 +334,10 @@ import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalStatePanel from './PetPalStatePanel.vue';
 import {
+  runPetPalSectionRetry,
+  type PetPalRoleAwareSectionLoadState,
+} from './recovery';
+import {
   formatPetPalConversationMeta,
   formatPetPalConversationPreview,
   getPetPalConversationUnreadCount,
@@ -345,7 +349,6 @@ defineOptions({
 });
 
 type MessageScope = 'ALL' | 'OWNER' | 'CAREGIVER';
-type SectionLoadState = 'idle' | 'ready' | 'role_unavailable' | 'error';
 
 const auth = useAuthStore();
 
@@ -360,15 +363,13 @@ const isRoleUnavailableError = (error: unknown) => (
   && [401, 403, 404].includes(error.status)
 );
 
-const isReadySectionState = (state: SectionLoadState) => state === 'ready';
-
 const ownerOrders = ref<OrderRecord[]>([]);
 const caregiverOrders = ref<CaregiverOrderRecord[]>([]);
 const loading = ref(false);
 const markingReadKey = ref('');
 const sectionReloadingKey = ref<'owner' | 'caregiver' | ''>('');
-const ownerLoadState = ref<SectionLoadState>('idle');
-const caregiverLoadState = ref<SectionLoadState>('idle');
+const ownerLoadState = ref<PetPalRoleAwareSectionLoadState>('idle');
+const caregiverLoadState = ref<PetPalRoleAwareSectionLoadState>('idle');
 const ownerLoadErrorMessage = ref('');
 const caregiverLoadErrorMessage = ref('');
 const messageScope = ref<MessageScope>('ALL');
@@ -530,33 +531,27 @@ const reloadAll = async () => {
 };
 
 const retryOwnerSection = async () => {
-  sectionReloadingKey.value = 'owner';
   ownerLoadState.value = 'idle';
-  try {
-    await loadOwnerOrders();
-    if (isReadySectionState(ownerLoadState.value)) {
-      ElMessage.success('主人侧消息已刷新');
-    }
-  } catch {
-    // Keep inline recovery state visible in page.
-  } finally {
-    sectionReloadingKey.value = '';
-  }
+  await runPetPalSectionRetry({
+    key: 'owner',
+    sectionReloadingKey,
+    reload: loadOwnerOrders,
+    getState: () => ownerLoadState.value,
+    successMessage: '主人侧消息已刷新',
+    swallowError: true,
+  });
 };
 
 const retryCaregiverSection = async () => {
-  sectionReloadingKey.value = 'caregiver';
   caregiverLoadState.value = 'idle';
-  try {
-    await loadCaregiverOrders();
-    if (isReadySectionState(caregiverLoadState.value)) {
-      ElMessage.success('照料者侧消息已刷新');
-    }
-  } catch {
-    // Keep inline recovery state visible in page.
-  } finally {
-    sectionReloadingKey.value = '';
-  }
+  await runPetPalSectionRetry({
+    key: 'caregiver',
+    sectionReloadingKey,
+    reload: loadCaregiverOrders,
+    getState: () => caregiverLoadState.value,
+    successMessage: '照料者侧消息已刷新',
+    swallowError: true,
+  });
 };
 
 const markConversationRead = async (orderId: string, target: 'owner' | 'caregiver') => {
