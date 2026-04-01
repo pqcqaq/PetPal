@@ -1,11 +1,15 @@
 <script lang="ts" setup>
 /**
  * UX Blueprint
- * User: 已完成订单的主人
+ * User: 已完成订单的主人，要快速完成一次清晰评价
  * Entry: 从订单详情点击写评价或查看评价进入
- * First screen: 先确认当前订单和评价状态，再在同一屏完成评分与提交
+ * Core scenes:
+ * 1. 首屏先判断这单现在是否能评、是否已评
+ * 2. 在同一屏完成评分、标签和一句话反馈
+ * 3. 已评价时先看结果，不再重复出现提交表单
  * Primary action: 提交评价
- * Secondary actions: 快速补标签、返回订单详情
+ * Secondary actions: 快速补标签、切实名/匿名、返回订单详情
+ * Feedback: 当前阶段、已退金额、服务记录数量、当前评分与标签数量
  * States: 加载中、订单不存在、不可评价、可评价、已评价
  */
 import type {
@@ -46,6 +50,15 @@ definePage({
 })
 
 type YesNoChoice = 'YES' | 'NO'
+type ReviewSignalTone = 'primary' | 'success' | 'warning' | 'default'
+
+interface ReviewSignalCard {
+  key: string
+  title: string
+  value: string
+  hint: string
+  tone: ReviewSignalTone
+}
 
 const userStore = useUserStore()
 const { userInfo } = storeToRefs(userStore)
@@ -93,6 +106,84 @@ const canSubmitReview = computed(() => Boolean(
   && !order.value.review,
 ))
 const selectedTags = computed(() => splitTagText(reviewForm.tagsText))
+const reviewStageLabel = computed(() => {
+  if (order.value?.review) {
+    return '已评价'
+  }
+  if (canSubmitReview.value) {
+    return '待评价'
+  }
+  return '当前不可评价'
+})
+const reviewStageTagType = computed(() => {
+  if (order.value?.review) {
+    return 'success'
+  }
+  if (canSubmitReview.value) {
+    return 'warning'
+  }
+  return 'default'
+})
+const reviewHeroTags = computed(() => {
+  if (!order.value) {
+    return []
+  }
+  const tags = [
+    { label: serviceTypeLabels[order.value.serviceType], type: 'primary' as const },
+    { label: reviewStageLabel.value, type: reviewStageTagType.value as 'success' | 'warning' | 'default' },
+  ]
+
+  if (Number(order.value.amountRefunded) > 0) {
+    tags.push({
+      label: `已退 ¥${formatAmount(order.value.amountRefunded)}`,
+      type: 'warning' as const,
+    })
+  }
+
+  return tags
+})
+const reviewSummaryHint = computed(() => {
+  if (order.value?.review) {
+    return '评价结果已经提交，可直接回看内容。'
+  }
+  if (canSubmitReview.value) {
+    return '先给整体评分，再补标签和一句话反馈。'
+  }
+  return '只有主人在订单完成后才能提交一次评价。'
+})
+const reviewSignalCards = computed<ReviewSignalCard[]>(() => {
+  if (!order.value) {
+    return []
+  }
+
+  return [
+    {
+      key: 'stage',
+      title: '当前阶段',
+      value: reviewStageLabel.value,
+      hint: reviewSummaryHint.value,
+      tone: order.value.review ? 'success' : canSubmitReview.value ? 'warning' : 'default',
+    },
+    {
+      key: 'service',
+      title: '履约记录',
+      value: order.value.serviceLogs.length > 0 ? `${order.value.serviceLogs.length} 条服务记录` : '暂未记录服务日志',
+      hint: order.value.serviceLogs.length > 0 ? '可结合履约记录判断体验' : '可结合沟通和服务结果评价',
+      tone: order.value.serviceLogs.length > 0 ? 'primary' : 'default',
+    },
+    {
+      key: 'draft',
+      title: order.value.review ? '评价结果' : '当前填写',
+      value: order.value.review
+        ? `${order.value.review.rating} / 5 分`
+        : `${reviewForm.rating} / 5 分`,
+      hint: order.value.review
+        ? `${order.value.review.tags.length} 个标签`
+        : `${selectedTags.value.length} 个标签`,
+      tone: order.value.review ? 'success' : 'primary',
+    },
+  ]
+})
 
 function resetReviewForm() {
   reviewForm.rating = '5'
@@ -197,17 +288,34 @@ onPullDownRefresh(() => {
         <view class="order-review-focus">
           <view class="order-review-focus__copy">
             <view class="order-review-focus__tags">
-              <AppTag type="primary">{{ serviceTypeLabels[order.serviceType] }}</AppTag>
-              <AppTag :type="order.review ? 'success' : 'warning'">
-                {{ order.review ? '已评价' : getOrderStatusLabel(order.orderStatus) }}
+              <AppTag
+                v-for="tag in reviewHeroTags"
+                :key="tag.label"
+                :type="tag.type"
+              >
+                {{ tag.label }}
               </AppTag>
             </view>
             <text class="order-review-focus__title">{{ order.orderNo }}</text>
             <text class="order-review-focus__meta">{{ formatRange(order.appointmentStart, order.appointmentEnd) }}</text>
             <text class="order-review-focus__meta">实付 ¥{{ formatAmount(order.amountPaid) }} · 已退 ¥{{ formatAmount(order.amountRefunded) }}</text>
+            <text class="order-review-focus__meta order-review-focus__meta--strong">{{ reviewSummaryHint }}</text>
           </view>
           <view class="order-review-actions">
             <AppButton size="medium" type="info" @click="openOrderDetail">返回订单</AppButton>
+          </view>
+
+          <view class="order-review-signal-grid">
+            <view
+              v-for="signal in reviewSignalCards"
+              :key="signal.key"
+              class="order-review-signal"
+              :class="`order-review-signal--${signal.tone}`"
+            >
+              <text class="order-review-signal__title">{{ signal.title }}</text>
+              <text class="order-review-signal__value">{{ signal.value }}</text>
+              <text class="order-review-signal__hint">{{ signal.hint }}</text>
+            </view>
           </view>
         </view>
       </AppSection>
@@ -238,7 +346,7 @@ onPullDownRefresh(() => {
         <view class="order-review-form">
           <view class="order-review-form__group">
             <text class="order-review-form__label">本次体验</text>
-            <AppChoiceChips v-model="reviewForm.rating" :options="ratingOptions" />
+            <AppChoiceChips v-model="reviewForm.rating" :options="ratingOptions" show-descriptions />
           </view>
 
           <view class="order-review-form__group">
@@ -271,7 +379,7 @@ onPullDownRefresh(() => {
 
           <view class="order-review-form__group">
             <text class="order-review-form__label">展示方式</text>
-            <AppChoiceChips v-model="reviewForm.isAnonymous" :options="visibilityOptions" />
+            <AppChoiceChips v-model="reviewForm.isAnonymous" :options="visibilityOptions" show-descriptions />
           </view>
 
           <view class="order-review-actions">
@@ -297,7 +405,8 @@ onPullDownRefresh(() => {
 <style scoped lang="scss">
 .order-review-focus,
 .order-review-result,
-.order-review-form {
+.order-review-form,
+.order-review-signal {
   display: grid;
   gap: 16rpx;
   padding: 24rpx;
@@ -343,9 +452,55 @@ onPullDownRefresh(() => {
   line-height: 1.6;
 }
 
+.order-review-focus__meta--strong {
+  color: var(--app-text);
+}
+
 .order-review-form__group {
   display: grid;
   gap: 12rpx;
+}
+
+.order-review-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12rpx;
+}
+
+.order-review-signal {
+  padding: 18rpx 20rpx;
+  gap: 10rpx;
+}
+
+.order-review-signal--primary {
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+}
+
+.order-review-signal--success {
+  background: linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
+}
+
+.order-review-signal--warning {
+  background: linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
+}
+
+.order-review-signal__title {
+  color: var(--app-text-secondary);
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+
+.order-review-signal__value {
+  color: var(--app-text);
+  font-size: 28rpx;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.order-review-signal__hint {
+  color: var(--app-text-secondary);
+  font-size: 20rpx;
+  line-height: 1.6;
 }
 
 .order-review-chip {
@@ -386,5 +541,11 @@ onPullDownRefresh(() => {
   color: var(--app-text);
   font-size: 24rpx;
   line-height: 1.7;
+}
+
+@media (max-width: 680px) {
+  .order-review-signal-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

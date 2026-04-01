@@ -3,9 +3,13 @@
  * UX Blueprint
  * User: 需要发起或跟进投诉的主人
  * Entry: 从订单详情点击发起投诉或查看投诉进入
- * First screen: 先确认订单状态和当前投诉进度，再决定提交或继续跟进
+ * Core scenes:
+ * 1. 首屏先判断当前是否可投诉、是否已有进行中的投诉
+ * 2. 可投诉时直接选对象、类型并填写问题，不让用户先看长说明
+ * 3. 已有投诉时先看进度、日志和证据，再决定是否继续跟进
  * Primary action: 提交投诉
- * Secondary actions: 查看历史处理日志、返回订单售后页
+ * Secondary actions: 查看处理日志、补充问题描述、返回订单售后页
+ * Feedback: 当前阶段、投诉数量、退款联动、最近处理时间
  * States: 加载中、订单不存在、不可投诉、可投诉、处理中投诉、已结案投诉
  */
 import type {
@@ -37,6 +41,16 @@ import {
   PETPAL_ORDER_DETAIL_PAGE,
   serviceTypeLabels,
 } from '../petpal/owner-shared'
+
+type ComplaintSignalTone = 'primary' | 'warning' | 'danger' | 'default'
+
+interface ComplaintSignalCard {
+  key: string
+  title: string
+  value: string
+  hint: string
+  tone: ComplaintSignalTone
+}
 
 defineOptions({
   name: 'OrderComplaintPage',
@@ -78,6 +92,13 @@ const complaintTypeOptions = [
   { label: '欺诈风险', value: 'FRAUD', description: '虚假服务或异常行为' },
   { label: '其他问题', value: 'OTHER', description: '其他需要平台介入的情况' },
 ]
+const complaintSnippetSuggestions = [
+  '与约定服务内容不符',
+  '服务记录缺失或明显滞后',
+  '沟通响应慢，处理不及时',
+  '宠物状态异常，需要平台介入',
+  '退款处理进度不清晰',
+]
 
 const isOwnerView = computed(() => Boolean(userInfo.value.id && order.value?.ownerId === userInfo.value.id))
 const activeComplaint = computed(() => complaints.value.find(item => (
@@ -92,6 +113,94 @@ const canCreateComplaint = computed(() => Boolean(
   && ['SERVING', 'COMPLETED', 'PARTIAL_REFUNDED', 'REFUNDED', 'DISPUTED'].includes(order.value.orderStatus)
   && !activeComplaint.value,
 ))
+const complaintStageLabel = computed(() => {
+  if (activeComplaint.value) {
+    return `投诉${getComplaintStatusLabel(activeComplaint.value.status)}`
+  }
+  if (canCreateComplaint.value) {
+    return '可发起投诉'
+  }
+  if (sortedComplaints.value.length > 0) {
+    return '历史投诉可回看'
+  }
+  return '当前不可投诉'
+})
+const complaintStageTagType = computed(() => {
+  if (activeComplaint.value) {
+    return 'danger'
+  }
+  if (canCreateComplaint.value) {
+    return 'warning'
+  }
+  if (sortedComplaints.value.length > 0) {
+    return 'success'
+  }
+  return 'default'
+})
+const complaintHeroTags = computed(() => {
+  if (!order.value) {
+    return []
+  }
+
+  const tags = [
+    { label: serviceTypeLabels[order.value.serviceType], type: 'primary' as const },
+    { label: complaintStageLabel.value, type: complaintStageTagType.value as 'danger' | 'warning' | 'success' | 'default' },
+  ]
+
+  if (Number(order.value.amountRefunded) > 0) {
+    tags.push({
+      label: `已退 ¥${formatAmount(order.value.amountRefunded)}`,
+      type: 'warning' as const,
+    })
+  }
+
+  return tags
+})
+const complaintSummaryHint = computed(() => {
+  if (activeComplaint.value) {
+    return '先看处理日志和结果，再决定是否继续补充证据。'
+  }
+  if (canCreateComplaint.value) {
+    return '先选问题类型，再写清时间点、经过和诉求。'
+  }
+  if (sortedComplaints.value.length > 0) {
+    return '当前这单已有历史投诉记录，可先回看结果。'
+  }
+  return '当前订单暂时不可发起新的投诉。'
+})
+const complaintSignalCards = computed<ComplaintSignalCard[]>(() => {
+  if (!order.value) {
+    return []
+  }
+
+  return [
+    {
+      key: 'stage',
+      title: '当前阶段',
+      value: complaintStageLabel.value,
+      hint: complaintSummaryHint.value,
+      tone: activeComplaint.value ? 'danger' : canCreateComplaint.value ? 'warning' : 'default',
+    },
+    {
+      key: 'count',
+      title: '投诉记录',
+      value: activeComplaint.value ? `${sortedComplaints.value.length} 条记录` : sortedComplaints.value.length > 0 ? `${sortedComplaints.value.length} 条历史记录` : '暂无投诉记录',
+      hint: activeComplaint.value
+        ? `最近更新 ${formatDateTime(activeComplaint.value.updatedAt)}`
+        : sortedComplaints.value.length > 0
+          ? `最近更新 ${formatDateTime(sortedComplaints.value[0].updatedAt)}`
+          : '当前没有售后争议记录',
+      tone: activeComplaint.value ? 'danger' : sortedComplaints.value.length > 0 ? 'primary' : 'default',
+    },
+    {
+      key: 'refund',
+      title: '退款联动',
+      value: Number(order.value.amountRefunded) > 0 ? `已退 ¥${formatAmount(order.value.amountRefunded)}` : '当前未退款',
+      hint: Number(order.value.amountRefunded) > 0 ? '投诉时可结合退款结果说明争议' : '如涉及金额争议，可在描述中说明诉求',
+      tone: Number(order.value.amountRefunded) > 0 ? 'warning' : 'default',
+    },
+  ]
+})
 
 function resetComplaintForm() {
   complaintForm.targetRole = 'CAREGIVER'
@@ -100,12 +209,41 @@ function resetComplaintForm() {
   complaintForm.evidenceUrlsText = ''
 }
 
+function appendComplaintSnippet(text: string) {
+  const current = complaintForm.description.trim()
+  if (!current) {
+    complaintForm.description = text
+    return
+  }
+  if (current.includes(text)) {
+    return
+  }
+  complaintForm.description = `${current}\n${text}`
+}
+
 function openOrderAftersales() {
   if (!orderId.value) {
     uni.navigateBack({ delta: 1 })
     return
   }
   uni.redirectTo({ url: `${PETPAL_ORDER_DETAIL_PAGE}?id=${orderId.value}&tab=aftersales` })
+}
+
+function openEvidenceUrl(url: string) {
+  if (typeof window !== 'undefined') {
+    window.open(url, '_blank', 'noopener,noreferrer')
+    return
+  }
+
+  uni.setClipboardData({
+    data: url,
+    success: () => {
+      uni.showToast({ title: '证据链接已复制', icon: 'none' })
+    },
+    fail: () => {
+      uni.showToast({ title: '当前环境暂不支持直接打开', icon: 'none' })
+    },
+  })
 }
 
 function getComplaintTagType(status: ComplaintRecord['status']) {
@@ -209,17 +347,34 @@ onPullDownRefresh(() => {
         <view class="order-complaint-focus">
           <view class="order-complaint-focus__copy">
             <view class="order-complaint-focus__tags">
-              <AppTag type="primary">{{ serviceTypeLabels[order.serviceType] }}</AppTag>
-              <AppTag :type="activeComplaint ? 'warning' : 'default'">
-                {{ activeComplaint ? '投诉处理中' : getOrderStatusLabel(order.orderStatus) }}
+              <AppTag
+                v-for="tag in complaintHeroTags"
+                :key="tag.label"
+                :type="tag.type"
+              >
+                {{ tag.label }}
               </AppTag>
             </view>
             <text class="order-complaint-focus__title">{{ order.orderNo }}</text>
             <text class="order-complaint-focus__meta">{{ formatRange(order.appointmentStart, order.appointmentEnd) }}</text>
             <text class="order-complaint-focus__meta">实付 ¥{{ formatAmount(order.amountPaid) }} · 已退 ¥{{ formatAmount(order.amountRefunded) }}</text>
+            <text class="order-complaint-focus__meta order-complaint-focus__meta--strong">{{ complaintSummaryHint }}</text>
           </view>
           <view class="order-complaint-actions">
             <AppButton size="medium" type="info" @click="openOrderAftersales">返回售后</AppButton>
+          </view>
+
+          <view class="order-complaint-signal-grid">
+            <view
+              v-for="signal in complaintSignalCards"
+              :key="signal.key"
+              class="order-complaint-signal"
+              :class="`order-complaint-signal--${signal.tone}`"
+            >
+              <text class="order-complaint-signal__title">{{ signal.title }}</text>
+              <text class="order-complaint-signal__value">{{ signal.value }}</text>
+              <text class="order-complaint-signal__hint">{{ signal.hint }}</text>
+            </view>
           </view>
         </view>
       </AppSection>
@@ -236,6 +391,16 @@ onPullDownRefresh(() => {
             投诉对象：{{ getComplaintTargetRoleLabel(activeComplaint.targetRole) }} · {{ formatDateTime(activeComplaint.updatedAt) }}
           </text>
           <text class="order-complaint-card__content">{{ activeComplaint.description }}</text>
+          <view v-if="activeComplaint.evidenceUrls.length" class="order-complaint-evidence-row">
+            <view
+              v-for="url in activeComplaint.evidenceUrls"
+              :key="url"
+              class="order-complaint-evidence-chip"
+              @click="openEvidenceUrl(url)"
+            >
+              <text>查看证据</text>
+            </view>
+          </view>
           <view v-if="activeComplaint.processLogs.length" class="order-complaint-log-list">
             <view v-for="log in activeComplaint.processLogs" :key="log.id" class="order-complaint-log-item">
               <text class="order-complaint-log-item__title">{{ log.operatorNickname || '平台处理' }}</text>
@@ -250,12 +415,26 @@ onPullDownRefresh(() => {
         <view class="order-complaint-form">
           <view class="order-complaint-form__group">
             <text class="order-complaint-form__label">投诉对象</text>
-            <AppChoiceChips v-model="complaintForm.targetRole" :options="complaintTargetOptions" />
+            <AppChoiceChips v-model="complaintForm.targetRole" :options="complaintTargetOptions" show-descriptions />
           </view>
 
           <view class="order-complaint-form__group">
             <text class="order-complaint-form__label">投诉类型</text>
-            <AppChoiceChips v-model="complaintForm.complaintType" :options="complaintTypeOptions" />
+            <AppChoiceChips v-model="complaintForm.complaintType" :options="complaintTypeOptions" show-descriptions />
+          </view>
+
+          <view class="order-complaint-form__group">
+            <text class="order-complaint-form__label">快速补充</text>
+            <view class="order-complaint-evidence-row">
+              <view
+                v-for="snippet in complaintSnippetSuggestions"
+                :key="snippet"
+                class="order-complaint-evidence-chip"
+                @click="appendComplaintSnippet(snippet)"
+              >
+                <text>{{ snippet }}</text>
+              </view>
+            </view>
           </view>
 
           <view class="order-complaint-form__group">
@@ -300,6 +479,16 @@ onPullDownRefresh(() => {
               投诉对象：{{ getComplaintTargetRoleLabel(complaint.targetRole) }} · {{ formatDateTime(complaint.updatedAt) }}
             </text>
             <text class="order-complaint-card__content">{{ complaint.description }}</text>
+            <view v-if="complaint.evidenceUrls.length" class="order-complaint-evidence-row">
+              <view
+                v-for="url in complaint.evidenceUrls"
+                :key="url"
+                class="order-complaint-evidence-chip"
+                @click="openEvidenceUrl(url)"
+              >
+                <text>查看证据</text>
+              </view>
+            </view>
             <text v-if="complaint.resultSummary" class="order-complaint-card__result">处理结论：{{ complaint.resultSummary }}</text>
           </view>
         </view>
@@ -369,12 +558,62 @@ onPullDownRefresh(() => {
   line-height: 1.6;
 }
 
+.order-complaint-focus__meta--strong {
+  color: var(--app-text);
+}
+
 .order-complaint-card__content,
 .order-complaint-log-item__note,
 .order-complaint-card__result {
   color: var(--app-text);
   font-size: 24rpx;
   line-height: 1.7;
+}
+
+.order-complaint-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12rpx;
+}
+
+.order-complaint-signal {
+  display: grid;
+  gap: 10rpx;
+  padding: 18rpx 20rpx;
+  border-radius: var(--app-shape-lg);
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+}
+
+.order-complaint-signal--primary {
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+}
+
+.order-complaint-signal--warning {
+  background: linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
+}
+
+.order-complaint-signal--danger {
+  background: linear-gradient(180deg, var(--app-danger-soft) 0%, var(--app-surface) 100%);
+}
+
+.order-complaint-signal__title {
+  color: var(--app-text-secondary);
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+
+.order-complaint-signal__value {
+  color: var(--app-text);
+  font-size: 28rpx;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.order-complaint-signal__hint {
+  color: var(--app-text-secondary);
+  font-size: 20rpx;
+  line-height: 1.6;
 }
 
 .order-complaint-log-item {
@@ -405,5 +644,29 @@ onPullDownRefresh(() => {
 
 .order-complaint-textarea--compact {
   min-height: 120rpx;
+}
+
+.order-complaint-evidence-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.order-complaint-evidence-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  background: var(--app-surface);
+  color: var(--app-text-secondary);
+}
+
+@media (max-width: 680px) {
+  .order-complaint-signal-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
