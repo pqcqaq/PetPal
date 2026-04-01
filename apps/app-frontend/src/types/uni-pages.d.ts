@@ -11,6 +11,11 @@ type _LocationUrl =
   "/pages/me/profile" |
   "/pages/order-detail/index" |
   "/pages/petpal/index" |
+  "/pages/petpal/orders" |
+  "/pages/petpal/owner-home" |
+  "/pages/petpal/pets" |
+  "/pages/petpal/request" |
+  "/pages/petpal/workbench" |
   "/pages/settings/index";
 
 interface NavigateToOptions {

@@ -97,6 +97,17 @@ Last updated: 2026-03-29
 - 共享表单间距应保持一致，优先通过全局样式或共享组件调整，而不是逐页手工覆盖。
 - Header、Sidebar、Tabs、PageScaffold 要作为统一工作台体验来维护，不要割裂成多个悬浮区块。
 - 登录页、公共前台等对外页面应保持正式、可展示、可截图的视觉质量，不能只满足“能用”。
+- App 端以 Material Design 3 为默认设计方向，要求具备清晰的 surface、elevation、状态色、组件层级和有意义的过渡动画。
+- Web 与 App 的用户操作页面禁止继续向“超级页面”扩张；主人、照料者、售后、消息、设置等逻辑必须按角色和场景拆页。
+- 一个页面只保留一个主任务，长流程优先拆为分步式、标签页或子页面，不在单页上并排堆叠全部表单和全部动作。
+- 订单详情类页面默认拆分为概览、沟通、服务记录、售后等子视图；列表页负责检索与进入详情，不承担完整编辑职责。
+- 关键 UX 元素必须统一设计：
+  - 主按钮层级
+  - 返回路径
+  - 加载态 / 空态 / 错误态 / 禁用态
+  - 上传进度
+  - 危险动作二次确认
+- App 端交互必须优先保证单手操作、底部安全区域可达性和弱网恢复体验，动画只用于引导理解，不得妨碍核心操作。
 
 ## 8. 文档规则
 
@@ -104,7 +115,10 @@ Last updated: 2026-03-29
   - `README.md`
   - `docs/project-memory.md`
   - `docs/development-guidelines.md`
-- 发生阶段性重构时，补充 `docs/implementation-history.md`。
+- 发生 Web / App 体验架构重构时，同步更新：
+  - `apps/docs/project/PetPal.md`
+  - `apps/docs/project/PetPal-UX-Rebuild.md`
+- 发生阶段性重构时，更新 `docs/implementation-history.md`；如果日志已经过长，拆分到 `archives/development-logs/*.md`。
 - `docs/plans/*.md` 是历史设计快照，不应被重写为当前事实说明；如需提醒，只增加说明，不改写其历史语义。
 
 ## 9. TypeScript 与代码质量规则

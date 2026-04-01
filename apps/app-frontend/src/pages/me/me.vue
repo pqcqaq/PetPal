@@ -147,7 +147,7 @@ function openServiceBoard() {
     handleLogin()
     return
   }
-  uni.navigateTo({ url: '/pages/petpal/index' })
+  uni.navigateTo({ url: '/pages/petpal/owner-home' })
 }
 
 function openHome() {

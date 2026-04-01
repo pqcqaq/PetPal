@@ -1,6 +1,6 @@
 # Documentation Guide
 
-本目录用于保存“当前真实状态”和“历史设计过程”两类信息。它不是杂乱备忘录，而是项目继续开发时的文档入口。
+本目录用于保存“当前真实状态”和“文档入口说明”。详细的开发日志不再长期堆放在 `docs/` 目录，而是统一归档到仓库根目录的 `archives/development-logs/`。
 
 ## 建议阅读顺序
 
@@ -8,7 +8,8 @@
 2. `project-memory.md`
 3. `development-guidelines.md`
 4. `implementation-history.md`
-5. `plans/*.md`
+5. `../archives/development-logs/README.md`
+6. `plans/*.md`
 
 ## 文档角色划分
 
@@ -43,11 +44,15 @@
 
 ### `implementation-history.md`
 
-面向恢复上下文，记录最近一轮较大实现的结果，而不是计划。它更接近“项目演化日志”，用于帮助后续会话快速知道已经做了什么。
+面向快速恢复上下文，保留“当前开发总览”和“归档索引”。它不再承担全部逐切片日志的存放职责。
+
+### `../archives/development-logs/*.md`
+
+面向需要追溯历史演进细节的人，按阶段归档详细开发日志。大体积实现历史应继续写入这里，而不是重新堆回 `docs/` 目录。
 
 ### `plans/*.md`
 
-这些文件是历史性的设计快照，保留当时的思考过程和任务拆分，不应被误读为当前唯一事实来源。当前真实状态始终以代码、`project-memory.md` 和 `development-guidelines.md` 为准。
+这些文件是历史性的设计快照，保留当时的思考过程和任务拆分，不应被误读为当前唯一事实来源。当前真实状态始终以代码、`project-memory.md`、`development-guidelines.md` 和 `implementation-history.md` 为准。
 
 ## 文档更新原则
 
@@ -55,8 +60,10 @@
   - `../README.md`
   - `project-memory.md`
   - `development-guidelines.md`
-- 发生重要阶段性重构时，补充或更新：
+- 发生重要阶段性重构时，更新：
   - `implementation-history.md`
+- 若阶段日志过长，拆分归档到：
+  - `../archives/development-logs/*.md`
 - 历史计划文档默认保留，不要把它们重写成当前状态说明；必要时只增加“历史快照”说明。
 
 ## 截图与演示素材
@@ -69,9 +76,10 @@
 
 - 公共前台首页
 - 登录页
-- 控制台工作台
-- 菜单结构管理页
-- 角色/权限管理页
+- PetPal 主人服务台
+- PetPal 后台总览
+- 投诉工单治理页
+- 照料者审核页
 - Uni 客户端页面
 
 ## 维护目标

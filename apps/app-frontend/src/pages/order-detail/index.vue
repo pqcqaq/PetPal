@@ -168,6 +168,7 @@ const labels = {
 }
 
 type AftersalesTimelineDotClass = 'warning' | 'primary' | 'success' | 'error' | 'closed'
+type OrderDetailTab = 'overview' | 'chat' | 'service' | 'aftersales'
 
 interface AftersalesTimelineItem {
   id: string
@@ -189,6 +190,7 @@ const confirmingCompletion = ref(false)
 const reviewExpanded = ref(false)
 const complaintExpanded = ref(false)
 const messageSubmitting = ref(false)
+const detailTab = ref<OrderDetailTab>('overview')
 
 const {
   uploading: messageAttachmentUploading,
@@ -222,6 +224,13 @@ const complaintTypeOptions = [
 const reviewVisibilityOptions = [
   { label: '实名评价', value: 'NO', description: '展示当前账号昵称' },
   { label: '匿名评价', value: 'YES', description: '隐藏你的昵称' },
+]
+
+const detailTabOptions = [
+  { label: '总览', value: 'overview', description: '订单信息、金额和主人动作' },
+  { label: '沟通', value: 'chat', description: '查看消息、附件与未读状态' },
+  { label: '履约', value: 'service', description: '查看时间线和服务记录' },
+  { label: '售后', value: 'aftersales', description: '查看退款、投诉和处理进度' },
 ]
 
 const reviewForm = reactive({
@@ -283,6 +292,39 @@ const ownerActionSummary = computed(() => {
     return '本单评价已经提交，仍可在下方继续查看退款、投诉和履约详情。'
   }
   return '这里集中处理完成确认、评价反馈和投诉发起。'
+})
+const pageDescription = computed(() => {
+  if (detailTab.value === 'chat') {
+    return '聚焦订单沟通、附件回传和未读处理。'
+  }
+  if (detailTab.value === 'service') {
+    return '聚焦签到、服务记录和履约时间线。'
+  }
+  if (detailTab.value === 'aftersales') {
+    return '聚焦退款、投诉和售后处理进展。'
+  }
+  return '查看订单概览、金额信息和主人侧关键操作。'
+})
+const orderFocusSummary = computed(() => {
+  if (!order.value) {
+    return '正在准备订单详情。'
+  }
+  if (detailTab.value === 'chat') {
+    return currentConversationUnreadCount.value > 0
+      ? `当前有 ${currentConversationUnreadCount.value} 条未读消息，建议先确认交接与异常反馈。`
+      : '当前沟通已读，仍可继续补充交接说明或附件。'
+  }
+  if (detailTab.value === 'service') {
+    return order.value.serviceLogs.length > 0
+      ? `已沉淀 ${order.value.serviceLogs.length} 条服务记录和 ${order.value.timeline.length} 个履约事件。`
+      : '照料者尚未上传服务记录，请重点查看履约时间线。'
+  }
+  if (detailTab.value === 'aftersales') {
+    return aftersalesTimeline.value.length > 0
+      ? `已汇总 ${aftersalesTimeline.value.length} 条售后进度，便于集中查看退款和投诉演进。`
+      : '当前没有退款申请或投诉处理记录。'
+  }
+  return ownerActionSummary.value
 })
 
 const formatAmount = (value: unknown) => {
@@ -976,6 +1018,10 @@ watch(orderId, (newId) => {
   }
 })
 
+function isOrderDetailTab(value: string | undefined): value is OrderDetailTab {
+  return value === 'overview' || value === 'chat' || value === 'service' || value === 'aftersales'
+}
+
 // Uni page lifecycle - receive parameters from navigation
 function handleGoBack() {
   uni.navigateBack({ delta: 1 })
@@ -986,11 +1032,14 @@ onLoad((options: Record<string, string | undefined>) => {
   if (options?.id) {
     orderId.value = options.id
   }
+  if (isOrderDetailTab(options?.tab)) {
+    detailTab.value = options.tab
+  }
 })
 </script>
 
 <template>
-  <AppPageShell title="订单详情" description="查看履约、退款、投诉和服务记录。">
+  <AppPageShell title="订单详情" :description="pageDescription">
     <template v-if="loading">
       <AppSection title="同步状态">
         <AppStatus mode="loading" text="正在加载订单详情" />
@@ -999,7 +1048,20 @@ onLoad((options: Record<string, string | undefined>) => {
 
     <template v-else-if="order">
       <view class="petpal-order-container">
-        <AppSection title="订单操作" description="确认完成、提交评价和发起投诉都在这里完成。">
+        <AppSection title="场景导航" description="按任务切换视图，避免在超长详情页中反复滚动查找信息。">
+          <view class="petpal-order-overview-banner">
+            <view class="petpal-order-overview-banner__headline">
+              <text class="petpal-order-overview-banner__title">{{ order.orderNo }}</text>
+              <text class="petpal-order-overview-banner__meta">
+                {{ labels.orderStatus[order.orderStatus] || order.orderStatus }} · {{ labels.serviceType[order.serviceType] || order.serviceType }}
+              </text>
+            </view>
+            <text class="petpal-order-overview-banner__summary">{{ orderFocusSummary }}</text>
+          </view>
+          <AppChoiceChips v-model="detailTab" :options="detailTabOptions" />
+        </AppSection>
+
+        <AppSection v-if="detailTab === 'overview'" title="订单操作" description="确认完成、提交评价和发起投诉都在这里完成。">
           <view class="petpal-owner-actions">
             <view class="petpal-note-card">
               <text>{{ ownerActionSummary }}</text>
@@ -1126,7 +1188,7 @@ onLoad((options: Record<string, string | undefined>) => {
           </view>
         </AppSection>
 
-        <AppSection title="订单信息">
+        <AppSection v-if="detailTab === 'overview'" title="订单信息">
           <view class="petpal-info-grid">
             <view class="petpal-info-item">
               <text class="petpal-info-label">订单号</text>
@@ -1152,7 +1214,7 @@ onLoad((options: Record<string, string | undefined>) => {
         </AppSection>
 
         <!-- 金额信息 -->
-        <AppSection title="金额统计">
+        <AppSection v-if="detailTab === 'overview'" title="金额统计">
           <view class="petpal-amounts-grid">
             <view class="petpal-amount-item">
               <text class="petpal-amount-label">订单总额</text>
@@ -1175,7 +1237,7 @@ onLoad((options: Record<string, string | undefined>) => {
           </view>
         </AppSection>
 
-        <AppSection v-if="refundProgress" title="退款进度">
+        <AppSection v-if="detailTab === 'aftersales' && refundProgress" title="退款进度">
           <view class="petpal-refund-progress">
             <view class="petpal-refund-progress__header">
               <view class="petpal-refund-progress__headline">
@@ -1232,7 +1294,7 @@ onLoad((options: Record<string, string | undefined>) => {
           </view>
         </AppSection>
 
-        <AppSection :title="complaints.length > 0 ? `投诉与进度 (${complaints.length})` : '投诉与进度'">
+        <AppSection v-if="detailTab === 'aftersales'" :title="complaints.length > 0 ? `投诉与进度 (${complaints.length})` : '投诉与进度'">
           <template v-if="complaints.length > 0">
             <view class="petpal-complaint-list">
               <view
@@ -1312,7 +1374,7 @@ onLoad((options: Record<string, string | undefined>) => {
           </view>
         </AppSection>
 
-        <AppSection :title="messageConversation?.messages.length ? `订单沟通 (${messageConversation.messages.length})` : '订单沟通'">
+        <AppSection v-if="detailTab === 'chat'" :title="messageConversation?.messages.length ? `订单沟通 (${messageConversation.messages.length})` : '订单沟通'">
           <view class="petpal-message-panel">
             <view class="petpal-message-panel__header">
               <view class="petpal-message-panel__headline">
@@ -1432,7 +1494,7 @@ onLoad((options: Record<string, string | undefined>) => {
           </view>
         </AppSection>
 
-        <AppSection :title="aftersalesTimeline.length > 0 ? `售后时间线 (${aftersalesTimeline.length})` : '售后时间线'">
+        <AppSection v-if="detailTab === 'aftersales'" :title="aftersalesTimeline.length > 0 ? `售后时间线 (${aftersalesTimeline.length})` : '售后时间线'">
           <template v-if="aftersalesTimeline.length > 0">
             <view class="petpal-timeline">
               <view v-for="item in aftersalesTimeline" :key="item.id" class="petpal-timeline-item">
@@ -1467,7 +1529,7 @@ onLoad((options: Record<string, string | undefined>) => {
           </view>
         </AppSection>
 
-        <AppSection :title="order.timeline.length > 0 ? `履约时间线 (${order.timeline.length})` : '履约时间线'">
+        <AppSection v-if="detailTab === 'service'" :title="order.timeline.length > 0 ? `履约时间线 (${order.timeline.length})` : '履约时间线'">
           <template v-if="order.timeline.length > 0">
             <view class="petpal-timeline">
               <view v-for="event in order.timeline" :key="event.id" class="petpal-timeline-item">
@@ -1499,7 +1561,7 @@ onLoad((options: Record<string, string | undefined>) => {
           </view>
         </AppSection>
 
-        <AppSection :title="order.serviceLogs.length > 0 ? `服务记录 (${order.serviceLogs.length})` : '服务记录'">
+        <AppSection v-if="detailTab === 'service'" :title="order.serviceLogs.length > 0 ? `服务记录 (${order.serviceLogs.length})` : '服务记录'">
           <template v-if="order.serviceLogs.length > 0">
             <view class="petpal-timeline">
               <view v-for="log in order.serviceLogs" :key="log.id" class="petpal-timeline-item">
@@ -1552,7 +1614,7 @@ onLoad((options: Record<string, string | undefined>) => {
         </AppSection>
 
         <!-- 支付时间线 -->
-        <AppSection v-if="order.payments.length > 0" :title="`支付记录 (${order.payments.length})`">
+        <AppSection v-if="detailTab === 'overview' && order.payments.length > 0" :title="`支付记录 (${order.payments.length})`">
           <view class="petpal-timeline">
             <view v-for="payment in order.payments" :key="payment.id" class="petpal-timeline-item">
               <view class="petpal-timeline-dot" :class="`is-${payment.payStatus.toLowerCase()}`" />
@@ -1583,7 +1645,7 @@ onLoad((options: Record<string, string | undefined>) => {
         </AppSection>
 
         <!-- 退款时间线 -->
-        <AppSection v-if="order.refunds.length > 0" :title="`退款记录 (${order.refunds.length})`">
+        <AppSection v-if="detailTab === 'aftersales' && order.refunds.length > 0" :title="`退款记录 (${order.refunds.length})`">
           <view class="petpal-timeline">
             <view v-for="refund in order.refunds" :key="refund.id" class="petpal-timeline-item">
               <view class="petpal-timeline-dot" :class="`is-${refund.refundStatus.toLowerCase()}`" />
@@ -1634,6 +1696,40 @@ onLoad((options: Record<string, string | undefined>) => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.petpal-order-overview-banner {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 34%),
+    linear-gradient(145deg, #115e59 0%, #155e75 52%, #1d4f91 100%);
+  color: #f8fafc;
+}
+
+.petpal-order-overview-banner__headline {
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-order-overview-banner__title {
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.petpal-order-overview-banner__meta {
+  font-size: 12px;
+  color: rgba(248, 250, 252, 0.88);
+}
+
+.petpal-order-overview-banner__summary {
+  font-size: 13px;
+  line-height: 1.7;
+  color: rgba(248, 250, 252, 0.9);
 }
 
 .petpal-owner-actions {

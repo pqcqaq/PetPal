@@ -65,6 +65,46 @@
       "path": "pages/petpal/index",
       "type": "page",
       "style": {
+        "navigationBarTitleText": "PetPal",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/petpal/orders",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "订单跟进",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/petpal/owner-home",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "PetPal 主人首页",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/petpal/pets",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "宠物档案",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/petpal/request",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "发布需求",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/petpal/workbench",
+      "type": "page",
+      "style": {
         "navigationBarTitleText": "PetPal 工作台",
         "enablePullDownRefresh": true
       }
