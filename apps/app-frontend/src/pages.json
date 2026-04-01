@@ -117,6 +117,14 @@
       }
     },
     {
+      "path": "pages/petpal/checkout",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "确认支付",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/petpal/caregiver-home",
       "type": "page",
       "style": {
@@ -145,6 +153,14 @@
       "type": "page",
       "style": {
         "navigationBarTitleText": "服务管理",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/petpal/checkout",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "确认支付",
         "enablePullDownRefresh": true
       }
     },
@@ -216,8 +232,7 @@
       "path": "pages/petpal/workbench",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "PetPal 工作台",
-        "enablePullDownRefresh": true
+        "navigationBarTitleText": "PetPal"
       }
     },
     {

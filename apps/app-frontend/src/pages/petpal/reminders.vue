@@ -104,7 +104,7 @@ const totalUnreadCount = computed(() => ownerUnreadCount.value + caregiverUnread
 
 const ownerAftersalesOrders = computed(() => ownerOrders.value.filter(item => isOrderAftersalesTracked(item)))
 const pendingOwnerRequests = computed(() => requests.value.filter(item => (
-  item.status === 'OPEN' || item.status === 'MATCHING' || item.status === 'CONFIRMED'
+  item.status === 'OPEN' || item.status === 'MATCHED'
 )))
 const ownerServingOrders = computed(() => ownerOrders.value.filter(item => item.orderStatus === 'SERVING'))
 const ownerUpcomingOrders = computed(() => ownerOrders.value

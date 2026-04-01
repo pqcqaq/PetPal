@@ -3,7 +3,14 @@ import type { PaginatedResult } from './common';
 export type PetSpecies = 'DOG' | 'CAT' | 'OTHER';
 export type PetGender = 'MALE' | 'FEMALE' | 'UNKNOWN';
 export type PetServiceType = 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
-export type ServiceRequestStatus = 'OPEN' | 'MATCHING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+export type ServiceRequestStatus =
+  | 'OPEN'
+  | 'MATCHED'
+  | 'CLOSED'
+  | 'MATCHING'
+  | 'CONFIRMED'
+  | 'CANCELLED'
+  | 'COMPLETED';
 export type OrderStatus =
   | 'PENDING_ACCEPT'
   | 'ACCEPTED'
@@ -17,6 +24,7 @@ export type PaymentBizType = 'DEPOSIT' | 'BALANCE' | 'ADJUSTMENT';
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'CLOSED';
 export type RefundType = 'FULL' | 'PARTIAL';
 export type RefundStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
+export type OwnerPayChannel = 'WECHAT_PAY' | 'ALIPAY' | 'BALANCE';
 export type RefundProgressStage =
   | 'NONE'
   | 'PENDING_REVIEW'
@@ -133,6 +141,15 @@ export interface CreateServiceRequestPayload {
   locationLng?: number;
   budgetAmount?: number;
   demandTags?: string[];
+}
+
+export interface CreateOwnerOrderPayload {
+  requestId: string;
+  caregiverServiceId: string;
+}
+
+export interface PayOwnerOrderPayload {
+  payChannel: OwnerPayChannel;
 }
 
 export interface PaymentRecordBrief {

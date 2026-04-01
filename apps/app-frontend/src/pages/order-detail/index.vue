@@ -46,6 +46,7 @@ import {
 } from '@/api/petpal'
 import { useManagedAttachmentUpload } from '@/composables/useManagedAttachmentUpload'
 import {
+  PETPAL_CHECKOUT_PAGE,
   PETPAL_ORDER_COMPLAINT_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
 } from '@/pages/petpal/owner-shared'
@@ -217,6 +218,20 @@ const activeComplaint = computed(() => complaints.value.find(item => (
   item.status === 'OPEN' || item.status === 'PROCESSING'
 )) ?? null)
 const isOwnerView = computed(() => Boolean(userInfo.value.id && order.value?.ownerId === userInfo.value.id))
+const outstandingAmount = computed(() => {
+  if (!order.value) {
+    return 0
+  }
+  return Number(Math.max(
+    0,
+    Number(order.value.amountTotal) + Number(order.value.amountAdjusted) - Number(order.value.amountPaid),
+  ).toFixed(2))
+})
+const canPayOrder = computed(() => Boolean(
+  isOwnerView.value
+  && order.value?.orderStatus === 'PENDING_ACCEPT'
+  && outstandingAmount.value > 0,
+))
 const canConfirmComplete = computed(() => Boolean(isOwnerView.value && order.value?.orderStatus === 'SERVING'))
 const canCreateReview = computed(() => (
   Boolean(isOwnerView.value && order.value?.orderStatus === 'COMPLETED' && !order.value?.review)
@@ -240,6 +255,12 @@ const canSendMessage = computed(() => Boolean(order.value))
 const ownerActionSummary = computed(() => {
   if (!isOwnerView.value) {
     return '当前先看订单状态、沟通和履约记录。'
+  }
+  if (canPayOrder.value) {
+    return '先完成支付，再等待照料者接单。'
+  }
+  if (order.value?.orderStatus === 'PENDING_ACCEPT') {
+    return '已支付，等待照料者确认接单。'
   }
   if (canConfirmComplete.value) {
     return '先核对服务记录，再确认完成。'
@@ -800,6 +821,13 @@ function openReviewPage() {
   uni.navigateTo({ url: `${PETPAL_ORDER_REVIEW_PAGE}?id=${order.value.id}` })
 }
 
+function openCheckoutPage() {
+  if (!order.value) {
+    return
+  }
+  uni.navigateTo({ url: `${PETPAL_CHECKOUT_PAGE}?orderId=${order.value.id}` })
+}
+
 function openComplaintPage() {
   if (!order.value) {
     return
@@ -956,6 +984,12 @@ onLoad((options: Record<string, string | undefined>) => {
 
             <view class="petpal-action-grid">
               <AppButton
+                v-if="canPayOrder"
+                @click="openCheckoutPage"
+              >
+                去支付
+              </AppButton>
+              <AppButton
                 v-if="canConfirmComplete"
                 :loading="confirmingCompletion"
                 @click="handleConfirmComplete"
@@ -1048,26 +1082,30 @@ onLoad((options: Record<string, string | undefined>) => {
 
         <!-- 金额信息 -->
         <AppSection v-if="detailTab === 'overview'" title="金额统计">
-          <view class="petpal-amounts-grid">
-            <view class="petpal-amount-item">
-              <text class="petpal-amount-label">订单总额</text>
-              <text class="petpal-amount-value">¥{{ formatAmount(order.amountTotal) }}</text>
-            </view>
+            <view class="petpal-amounts-grid">
+              <view class="petpal-amount-item">
+                <text class="petpal-amount-label">订单总额</text>
+                <text class="petpal-amount-value">¥{{ formatAmount(order.amountTotal) }}</text>
+              </view>
             <view v-if="Number(order.amountAdjusted) !== 0" class="petpal-amount-item">
               <text class="petpal-amount-label">调整金额</text>
               <text class="petpal-amount-value" :style="{ color: Number(order.amountAdjusted) > 0 ? '#FF6B6B' : '#52C41A' }">
                 {{ Number(order.amountAdjusted) > 0 ? '+ ' : '' }}¥{{ formatAmount(Math.abs(Number(order.amountAdjusted))) }}
               </text>
             </view>
-            <view class="petpal-amount-item">
-              <text class="petpal-amount-label">已支付</text>
-              <text class="petpal-amount-value is-paid">¥{{ formatAmount(order.amountPaid) }}</text>
+              <view class="petpal-amount-item">
+                <text class="petpal-amount-label">已支付</text>
+                <text class="petpal-amount-value is-paid">¥{{ formatAmount(order.amountPaid) }}</text>
+              </view>
+              <view v-if="outstandingAmount > 0" class="petpal-amount-item">
+                <text class="petpal-amount-label">待支付</text>
+                <text class="petpal-amount-value">¥{{ formatAmount(outstandingAmount) }}</text>
+              </view>
+              <view class="petpal-amount-item">
+                <text class="petpal-amount-label">已退款</text>
+                <text class="petpal-amount-value">¥{{ formatAmount(order.amountRefunded) }}</text>
+              </view>
             </view>
-            <view class="petpal-amount-item">
-              <text class="petpal-amount-label">已退款</text>
-              <text class="petpal-amount-value">¥{{ formatAmount(order.amountRefunded) }}</text>
-            </view>
-          </view>
         </AppSection>
 
         <AppSection v-if="detailTab === 'aftersales' && refundProgress" title="退款进度">

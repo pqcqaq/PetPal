@@ -77,8 +77,7 @@ const activeOrderCount = computed(() => orders.value.filter(item => (
 const aftersaleCount = computed(() => orders.value.filter(item => isOrderAftersalesTracked(item)).length)
 const activeRequestCount = computed(() => requests.value.filter(item => (
   item.status === 'OPEN'
-  || item.status === 'MATCHING'
-  || item.status === 'CONFIRMED'
+  || item.status === 'MATCHED'
 )).length)
 const unreadConversationCount = computed(() => orders.value.reduce((total, item) => (
   total + getConversationUnreadCount(item.conversation, 'owner')

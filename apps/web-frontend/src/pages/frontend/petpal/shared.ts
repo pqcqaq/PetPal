@@ -31,6 +31,8 @@ export const getPetPalServiceTypeLabel = (serviceType: PetServiceType) => ({
 
 export const getPetPalServiceRequestStatusLabel = (status: ServiceRequestStatus) => ({
   OPEN: '待匹配',
+  MATCHED: '已匹配',
+  CLOSED: '已关闭',
   MATCHING: '匹配中',
   CONFIRMED: '已确认',
   CANCELLED: '已取消',

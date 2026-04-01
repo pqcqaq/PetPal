@@ -6500,3 +6500,56 @@ flowchart TD
 1. 继续评估是否为主人端补售后消息提醒、催办入口或跨订单退款对账导出。
 2. 继续补投诉工单独立值班页或超时提醒，提升后台主动治理能力。
 3. 视双端共用逻辑增长情况，评估抽离订单详情里的售后聚合与导出辅助函数。
+
+### 14.114 2026-04-02（P3-M1 Slice 103）
+
+**概述**：继续推进 App 端真实用户操作流收口，本轮把主人“活跃需求 -> 继续结算 -> 订单支付”补成可重复进入的链路，并同步收紧消息页与“我的”页的说明式布局。
+
+已完成：
+
+- 主人下单与支付回流：
+  - `apps/app-frontend/src/pages/petpal/request.vue`
+    - 新增“继续已有需求”队列。
+    - 支持恢复活跃需求的宠物、时间、地点、预算与要求。
+    - 已匹配需求支持直接再次进入结算。
+  - `apps/app-frontend/src/pages/petpal/checkout.vue`
+    - 允许只凭 `requestId` 恢复结算上下文。
+    - 返回需求页时继续携带当前需求，避免丢上下文。
+  - `apps/app-frontend/src/pages/petpal/orders.vue`
+    - 待支付订单主动作改为显式“去支付”。
+- 高频页去说明化：
+  - `apps/app-frontend/src/pages/petpal/messages.vue`
+    - 首屏改为“未读数量 + 立即回消息 + 紧凑筛选”。
+  - `apps/app-frontend/src/pages/me/me.vue`
+    - 重构为“账号概览 + 现在处理 + 账户工具”。
+    - 移除重复入口和说明式账户能力列表。
+- 蓝图与执行方案同步：
+  - `apps/docs/project/PetPal-Frontend-Blueprint.md`
+    - Mermaid 用户流补入“继续已有需求”分支。
+  - `apps/docs/project/PetPal-UX-Rebuild.md`
+    - 同步记录活跃需求恢复、结算回流和消息/我的页收口进度。
+  - `docs/implementation-history.md`
+    - 更新当前总览与下一步重点。
+
+验证结果：
+
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过（31/31）。
+
+代码审计结论：
+
+- 已确认活跃需求恢复不新增后端协议面，只复用现有 `requestId`、匹配接口和结算页解析逻辑，没有放宽订单创建边界。
+- 已确认结算页仍沿用后端“同一需求只保留一个有效订单”的约束，不会因为重复进入结算而创建多笔同需求有效订单。
+- 已确认消息页与“我的”页的重构主要收紧前端结构和文案，没有改变权限判断或后端数据边界。
+
+风险与缓解：
+
+- 风险：主人端虽然已能恢复活跃需求并重新进入结算，但独立的需求详情 / 匹配详情页仍未拆出，后续更多请求管理逻辑继续堆在单页时会再次复杂化。
+- 缓解：本轮先优先打通真实交易闭环和高频页可用性；下一轮优先评估独立请求详情页或匹配详情页拆分。
+
+下一步（1-3）：
+
+1. 继续拆主人端“需求详情 / 匹配详情”页，避免活跃需求队列继续承担过多上下文管理职责。
+2. 继续补 App / Web 的弱网反馈、动作后结果引导和跨页面主动引导。
+3. 在主链路继续稳定后，再集中收口系统级提醒、推送和答辩验收材料。

@@ -52,6 +52,15 @@ const requestSchema = z.object({
   demandTags: z.array(z.string()).optional(),
 });
 
+const createOrderSchema = z.object({
+  requestId: z.string().trim().min(1).max(64),
+  caregiverServiceId: z.string().trim().min(1).max(64),
+});
+
+const payOrderSchema = z.object({
+  payChannel: z.enum(['WECHAT_PAY', 'ALIPAY', 'BALANCE']),
+});
+
 const matchQuerySchema = z.object({
   serviceType: z.enum(['BOARDING', 'WALKING', 'FEEDING', 'DOOR_VISIT']),
   petSpecies: z.enum(['DOG', 'CAT', 'OTHER']),
@@ -374,6 +383,13 @@ petpalRouter.get('/orders', asyncHandler(async (req, res) => {
   return ok(res, orders, 'Order list');
 }));
 
+petpalRouter.post('/orders', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = createOrderSchema.parse(req.body);
+  const order = await petpalService.createOwnerOrder(auth.id, payload);
+  return ok(res, order, 'Order created');
+}));
+
 petpalRouter.get(
   '/orders/transactions/export',
   createExcelExportHandler({
@@ -440,6 +456,13 @@ petpalRouter.get('/orders/:id', asyncHandler(async (req, res) => {
   const auth = req.auth!;
   const order = await petpalService.getOwnerOrderDetail(auth.id, String(req.params.id));
   return ok(res, order, 'Order detail');
+}));
+
+petpalRouter.post('/orders/:id/pay', asyncHandler(async (req, res) => {
+  const auth = req.auth!;
+  const payload = payOrderSchema.parse(req.body);
+  const order = await petpalService.payOwnerOrder(auth.id, String(req.params.id), payload);
+  return ok(res, order, 'Order paid');
 }));
 
 petpalRouter.get('/orders/:id/messages', asyncHandler(async (req, res) => {

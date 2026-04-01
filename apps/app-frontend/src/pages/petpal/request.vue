@@ -35,6 +35,8 @@ import {
   formatAmount,
   formatRange,
   getRequestStatusLabel,
+  joinTagText,
+  PETPAL_CHECKOUT_PAGE,
   PETPAL_PETS_PAGE,
   PETPAL_REQUEST_PAGE,
   serviceTypeLabels,
@@ -63,7 +65,9 @@ const creatingRequest = ref(false)
 const pets = ref<PetProfileRecord[]>([])
 const requests = ref<ServiceRequestRecord[]>([])
 const caregivers = ref<MatchedCaregiverRecord[]>([])
+const createdRequestId = ref('')
 const flowStep = ref<RequestFlowStep>('PET')
+const hydratingRequest = ref(false)
 
 const requestForm = reactive({
   petId: '',
@@ -102,9 +106,20 @@ const scheduleSummary = computed(() => {
   return `${startDateTime.value.format('MM-DD HH:mm')} 至 ${endDateTime.value.format('MM-DD HH:mm')}`
 })
 const activeRequestCount = computed(() => requests.value.filter(item => (
-  item.status === 'OPEN' || item.status === 'MATCHING' || item.status === 'CONFIRMED'
+  item.status === 'OPEN' || item.status === 'MATCHED'
 )).length)
 const caregiverHighlights = computed(() => caregivers.value.slice(0, 3))
+const activeRequests = computed(() => [...requests.value]
+  .filter(item => item.status === 'OPEN' || item.status === 'MATCHED')
+  .sort((left, right) => {
+    const leftRank = left.status === 'MATCHED' ? 0 : 1
+    const rightRank = right.status === 'MATCHED' ? 0 : 1
+    if (leftRank !== rightRank) {
+      return leftRank - rightRank
+    }
+    return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+  })
+  .slice(0, 4))
 const recentRequests = computed(() => [...requests.value]
   .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
   .slice(0, 3))
@@ -161,6 +176,17 @@ const reviewRows = computed(() => [
     value: `¥${formatAmount(requestForm.budgetAmount)}`,
   },
 ])
+const createdRequest = computed(() => requests.value.find(item => item.id === createdRequestId.value) ?? null)
+
+function normalizeDemandTagsText(value: unknown) {
+  if (Array.isArray(value)) {
+    return joinTagText(value.map(item => String(item).trim()).filter(Boolean))
+  }
+  if (typeof value === 'string') {
+    return joinTagText(splitTagText(value))
+  }
+  return ''
+}
 
 function ensurePetSelection(preferredPetId?: string) {
   if (preferredPetId && pets.value.some(item => item.id === preferredPetId)) {
@@ -183,6 +209,64 @@ function goToLogin() {
 
 function openPets() {
   uni.redirectTo({ url: PETPAL_PETS_PAGE })
+}
+
+function openCheckout(caregiverServiceId: string) {
+  if (!createdRequestId.value) {
+    uni.showToast({ title: '请先发布需求', icon: 'none' })
+    return
+  }
+  uni.navigateTo({
+    url: `${PETPAL_CHECKOUT_PAGE}?requestId=${createdRequestId.value}&caregiverServiceId=${caregiverServiceId}`,
+  })
+}
+
+function requestCanCheckout(request: ServiceRequestRecord) {
+  return request.status === 'MATCHED' || Boolean(request.matchedCaregiverId)
+}
+
+function getRequestTagType(status: ServiceRequestRecord['status']) {
+  if (status === 'MATCHED') {
+    return 'success'
+  }
+  if (status === 'OPEN') {
+    return 'warning'
+  }
+  return 'default'
+}
+
+function applyRequestToForm(request: ServiceRequestRecord) {
+  hydratingRequest.value = true
+  requestForm.petId = request.petId
+  requestForm.serviceType = request.serviceType
+  requestForm.startDate = dayjs(request.startTime).format('YYYY-MM-DD')
+  requestForm.startTime = dayjs(request.startTime).format('HH:mm')
+  requestForm.endDate = dayjs(request.endTime).format('YYYY-MM-DD')
+  requestForm.endTime = dayjs(request.endTime).format('HH:mm')
+  requestForm.locationText = request.locationText
+  requestForm.city = ''
+  requestForm.budgetAmount = request.budgetAmount == null ? '' : String(request.budgetAmount)
+  requestForm.demandTagsText = normalizeDemandTagsText(request.demandTags)
+  createdRequestId.value = request.id
+  flowStep.value = 'REVIEW'
+  hydratingRequest.value = false
+}
+
+async function resumeRequest(request: ServiceRequestRecord, continueCheckout = false) {
+  applyRequestToForm(request)
+  await loadMatches(continueCheckout)
+
+  if (continueCheckout && requestCanCheckout(request)) {
+    uni.navigateTo({
+      url: `${PETPAL_CHECKOUT_PAGE}?requestId=${request.id}`,
+    })
+    return
+  }
+
+  uni.showToast({
+    title: requestCanCheckout(request) ? '已恢复当前需求' : '已带回当前条件',
+    icon: 'none',
+  })
 }
 
 function goPrevStep() {
@@ -248,7 +332,7 @@ async function loadMatches(showError = false) {
   }
 }
 
-async function loadPage(showError = false, preferredPetId?: string) {
+async function loadPage(showError = false, preferredPetId?: string, preferredRequestId?: string) {
   if (!tokenStore.hasLogin || loading.value) {
     uni.stopPullDownRefresh()
     return
@@ -264,6 +348,12 @@ async function loadPage(showError = false, preferredPetId?: string) {
     pets.value = petRows
     requests.value = requestRows
     ensurePetSelection(preferredPetId)
+    if (preferredRequestId) {
+      const preferredRequest = requestRows.find(item => item.id === preferredRequestId)
+      if (preferredRequest) {
+        applyRequestToForm(preferredRequest)
+      }
+    }
     await loadMatches(false)
   }
   catch (error: unknown) {
@@ -299,7 +389,7 @@ async function submitRequest() {
 
   creatingRequest.value = true
   try {
-    await createServiceRequest({
+    const created = await createServiceRequest({
       petId: requestForm.petId,
       serviceType: requestForm.serviceType,
       startTime: startDateTime.value.toISOString(),
@@ -308,7 +398,8 @@ async function submitRequest() {
       budgetAmount: Number(requestForm.budgetAmount || 0) || undefined,
       demandTags: splitTagText(requestForm.demandTagsText),
     })
-    uni.showToast({ title: '服务需求已发布', icon: 'none' })
+    createdRequestId.value = created.id
+    uni.showToast({ title: '需求已发布', icon: 'none' })
     flowStep.value = 'REVIEW'
     await loadPage(false)
   }
@@ -324,26 +415,26 @@ async function submitRequest() {
 }
 
 watch(() => requestForm.petId, () => {
-  if (tokenStore.hasLogin) {
+  if (tokenStore.hasLogin && !hydratingRequest.value) {
     void loadMatches(false)
   }
 })
 
 watch(() => requestForm.serviceType, () => {
-  if (tokenStore.hasLogin) {
+  if (tokenStore.hasLogin && !hydratingRequest.value) {
     void loadMatches(false)
   }
 })
 
 watch(() => requestForm.city, () => {
-  if (tokenStore.hasLogin && (flowStep.value === 'DETAIL' || flowStep.value === 'REVIEW')) {
+  if (tokenStore.hasLogin && !hydratingRequest.value && (flowStep.value === 'DETAIL' || flowStep.value === 'REVIEW')) {
     void loadMatches(false)
   }
 })
 
 onLoad((options: Record<string, string | undefined>) => {
-  if (options?.petId && tokenStore.hasLogin) {
-    void loadPage(false, options.petId)
+  if (tokenStore.hasLogin && (options?.petId || options?.requestId)) {
+    void loadPage(false, options.petId, options.requestId)
   }
 })
 
@@ -500,7 +591,12 @@ onPullDownRefresh(() => {
           </AppList>
 
           <view class="request-review-notice">
-            <text>{{ caregiverHighlights.length ? `当前已有 ${caregiverHighlights.length} 位照料者符合基础条件。` : '当前还没有匹配到照料者，发布后仍可继续等待匹配。' }}</text>
+            <text v-if="createdRequestId">
+              {{ caregiverHighlights.length ? '需求已发布，直接选一位照料者继续下单。' : '需求已发布，当前还没有可直接下单的照料者。' }}
+            </text>
+            <text v-else>
+              {{ caregiverHighlights.length ? `当前已有 ${caregiverHighlights.length} 位照料者符合基础条件。` : '当前还没有匹配到照料者，发布后仍可继续等待匹配。' }}
+            </text>
           </view>
 
           <view class="request-action-row">
@@ -509,9 +605,82 @@ onPullDownRefresh(() => {
             <AppButton size="medium" :loading="creatingRequest" @click="submitRequest">发布需求</AppButton>
           </view>
         </AppSection>
+
+        <AppSection v-if="createdRequestId" title="下一步：确认照料者">
+          <view class="request-publish-summary">
+            <view class="request-focus__tags">
+              <AppTag type="success">已发布</AppTag>
+              <AppTag type="primary">{{ createdRequest?.pet?.name || selectedPet?.name || '宠物' }}</AppTag>
+              <AppTag type="warning">{{ serviceTypeLabels[requestForm.serviceType] }}</AppTag>
+            </view>
+            <text class="request-focus__hint">{{ scheduleSummary }} · {{ requestForm.locationText.trim() }}</text>
+          </view>
+
+          <view v-if="caregiverHighlights.length" class="request-match-list">
+            <view v-for="caregiver in caregiverHighlights" :key="caregiver.serviceId" class="request-match-card">
+              <view class="request-match-card__header">
+                <view class="request-match-card__copy">
+                  <text class="request-match-card__title">{{ caregiver.caregiverName }}</text>
+                  <text class="request-match-card__meta">
+                    {{ caregiver.city || '城市待补充' }} · 评分 {{ formatAmount(caregiver.ratingAvg) }} · {{ caregiver.unitType }}
+                  </text>
+                </view>
+                <AppTag type="success">¥{{ formatAmount(caregiver.pricePerUnit) }}/{{ caregiver.unitType }}</AppTag>
+              </view>
+              <view class="request-action-row">
+                <AppButton size="medium" type="info" @click="loadMatches(true)">换一批</AppButton>
+                <AppButton size="medium" @click="openCheckout(caregiver.serviceId)">选TA下单</AppButton>
+              </view>
+            </view>
+          </view>
+          <view v-else class="request-empty">
+            <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在刷新照料者' : '当前还没有可直接下单的照料者'" />
+          </view>
+        </AppSection>
       </template>
 
-      <AppSection title="最近需求">
+      <AppSection :title="activeRequests.length ? `继续已有需求 (${activeRequests.length})` : '继续已有需求'">
+        <view v-if="activeRequests.length" class="request-history-list">
+          <view
+            v-for="item in activeRequests"
+            :key="item.id"
+            class="request-history-card"
+            :class="createdRequestId === item.id ? 'request-history-card--active' : ''"
+          >
+            <view class="request-history-card__header">
+              <view class="request-history-card__copy">
+                <view class="request-focus__tags">
+                  <AppTag :type="getRequestTagType(item.status)">
+                    {{ getRequestStatusLabel(item.status) }}
+                  </AppTag>
+                  <AppTag v-if="requestCanCheckout(item)" type="success">
+                    可下单
+                  </AppTag>
+                </view>
+                <text class="request-match-card__title">{{ item.pet?.name || '宠物' }} · {{ serviceTypeLabels[item.serviceType] }}</text>
+                <text class="request-match-card__meta">{{ formatRange(item.startTime, item.endTime) }}</text>
+                <text class="request-match-card__meta">{{ item.locationText }}</text>
+              </view>
+              <AppTag type="primary">¥{{ formatAmount(item.budgetAmount) }}</AppTag>
+            </view>
+            <view class="request-action-row">
+              <AppButton size="medium" type="info" @click="resumeRequest(item)">恢复条件</AppButton>
+              <AppButton
+                v-if="requestCanCheckout(item)"
+                size="medium"
+                @click="resumeRequest(item, true)"
+              >
+                继续结算
+              </AppButton>
+            </view>
+          </view>
+        </view>
+        <view v-else class="request-empty">
+          <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步需求记录' : '当前没有可继续的活跃需求'" />
+        </view>
+      </AppSection>
+
+      <AppSection title="最近需求记录">
         <AppList v-if="recentRequests.length">
           <AppListItem
             v-for="item in recentRequests"
@@ -609,13 +778,69 @@ onPullDownRefresh(() => {
 }
 
 .request-inline-note,
-.request-review-notice {
+.request-review-notice,
+.request-publish-summary {
   padding: 20rpx 24rpx;
   border-radius: 22rpx;
   border: 1rpx solid var(--app-outline-variant);
   background: linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
   color: var(--app-text);
   line-height: 1.7;
+}
+
+.request-match-list {
+  display: grid;
+  gap: 16rpx;
+}
+
+.request-history-list {
+  display: grid;
+  gap: 16rpx;
+}
+
+.request-history-card,
+.request-match-card {
+  display: grid;
+  gap: 16rpx;
+  padding: 24rpx;
+  border-radius: var(--app-shape-xl);
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
+}
+
+.request-history-card--active {
+  border-color: rgba(30, 64, 175, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(53, 89, 224, 0.12), transparent 34%),
+    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+}
+
+.request-history-card__header,
+.request-match-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  align-items: flex-start;
+}
+
+.request-history-card__copy,
+.request-match-card__copy {
+  display: grid;
+  gap: 10rpx;
+}
+
+.request-match-card__title {
+  color: var(--app-text);
+  font-size: 30rpx;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.request-match-card__meta {
+  color: var(--app-text-secondary);
+  font-size: 22rpx;
+  line-height: 1.6;
 }
 
 .request-empty {
@@ -629,6 +854,11 @@ onPullDownRefresh(() => {
 @media (max-width: 680px) {
   .request-picker-grid {
     grid-template-columns: 1fr;
+  }
+
+  .request-history-card__header,
+  .request-match-card__header {
+    flex-direction: column;
   }
 }
 </style>

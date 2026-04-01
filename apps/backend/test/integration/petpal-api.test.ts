@@ -170,6 +170,117 @@ describe('PetPal API integration', () => {
     );
   });
 
+  it('supports owner checkout from matched caregiver to paid order', async () => {
+    const { app, prisma } = context;
+    const memberSession = await loginAs(app, 'user', 'User123!');
+
+    const createPetResponse = await request(app)
+      .post('/api/petpal/pets')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({
+        name: '闪电',
+        species: 'DOG',
+        breed: '边牧',
+        gender: 'MALE',
+        weightKg: 18.5,
+      })
+      .expect(200);
+
+    const createRequestResponse = await request(app)
+      .post('/api/petpal/requests')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({
+        petId: createPetResponse.body.data.id,
+        serviceType: 'WALKING',
+        startTime: '2026-04-03T08:00:00.000Z',
+        endTime: '2026-04-03T09:30:00.000Z',
+        locationText: '杭州市滨江区',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 120,
+        demandTags: ['dog', 'walk'],
+      })
+      .expect(200);
+
+    const matchResponse = await request(app)
+      .get('/api/petpal/match/caregivers')
+      .query({
+        page: 1,
+        pageSize: 10,
+        serviceType: 'WALKING',
+        petSpecies: 'DOG',
+        city: '杭州',
+        lat: 30.206,
+        lng: 120.211,
+      })
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.ok(matchResponse.body.data.items.length >= 1);
+
+    const createOrderResponse = await request(app)
+      .post('/api/petpal/orders')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({
+        requestId: createRequestResponse.body.data.id,
+        caregiverServiceId: matchResponse.body.data.items[0].serviceId,
+      })
+      .expect(200);
+
+    assert.equal(createOrderResponse.body.data.orderStatus, 'PENDING_ACCEPT');
+    assert.equal(Number(createOrderResponse.body.data.amountPaid), 0);
+    assert.equal(createOrderResponse.body.data.payments.length, 1);
+    assert.equal(createOrderResponse.body.data.payments[0].payStatus, 'PENDING');
+
+    const persistedRequest = await prisma.serviceRequest.findUnique({
+      where: {
+        id: createRequestResponse.body.data.id as string,
+      },
+      select: {
+        status: true,
+        matchedCaregiverId: true,
+      },
+    });
+
+    assert.ok(persistedRequest);
+    assert.equal(persistedRequest.status, 'MATCHED');
+    assert.ok(persistedRequest.matchedCaregiverId);
+
+    const payResponse = await request(app)
+      .post(`/api/petpal/orders/${createOrderResponse.body.data.id}/pay`)
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .send({
+        payChannel: 'WECHAT_PAY',
+      })
+      .expect(200);
+
+    assert.equal(payResponse.body.data.orderStatus, 'PENDING_ACCEPT');
+    assert.equal(
+      Number(payResponse.body.data.amountPaid),
+      Number(payResponse.body.data.amountTotal) + Number(payResponse.body.data.amountAdjusted),
+    );
+    assert.ok(payResponse.body.data.payments.some((item: { payStatus: string }) => item.payStatus === 'PAID'));
+
+    const persistedPayment = await prisma.paymentRecord.findFirst({
+      where: {
+        orderId: createOrderResponse.body.data.id as string,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+      select: {
+        payStatus: true,
+        payChannel: true,
+        channelTxnId: true,
+      },
+    });
+
+    assert.ok(persistedPayment);
+    assert.equal(persistedPayment.payStatus, 'PAID');
+    assert.equal(persistedPayment.payChannel, 'WECHAT_PAY');
+    assert.ok(persistedPayment.channelTxnId);
+  });
+
   it('supports owner pet health profile creation and update', async () => {
     const { app, prisma } = context;
     const memberSession = await loginAs(app, 'user', 'User123!');

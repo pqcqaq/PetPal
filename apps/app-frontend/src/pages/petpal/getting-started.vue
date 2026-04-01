@@ -100,8 +100,7 @@ const viewOptions = [
 const displayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || 'PetPal 用户')
 const ownerHasActiveRequests = computed(() => requests.value.some(item => (
   item.status === 'OPEN'
-  || item.status === 'MATCHING'
-  || item.status === 'CONFIRMED'
+  || item.status === 'MATCHED'
 )))
 const ownerHasOrders = computed(() => orders.value.length > 0)
 const ownerHasFullLoop = computed(() => orders.value.some(item => (

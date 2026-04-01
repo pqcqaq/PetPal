@@ -1,4 +1,13 @@
 <script lang="ts" setup>
+/**
+ * UX Blueprint
+ * User: 已登录用户，需要从“我的”页快速进入账户和高频工具
+ * Entry: 底栏我的、订单或通知回流
+ * First screen: 先看到账号状态、未读通知和立即可做的动作
+ * Primary action: 进入服务台、提醒、通知或资料设置
+ * Secondary actions: 帮助、账户支持、退出登录
+ * States: 未登录、通知未读、有进行中订单、有售后、无近期订单
+ */
 import type { OrderRecord, PetProfileRecord, ServiceRequestRecord } from '@rbac/api-common'
 import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
@@ -16,13 +25,12 @@ import {
   getOrderStatusLabel,
   isOrderAftersalesTracked,
   PETPAL_AFTERSALES_PAGE,
-  PETPAL_CAREGIVER_EARNINGS_PAGE,
   PETPAL_GETTING_STARTED_PAGE,
   PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_REMINDERS_PAGE,
 } from '@/pages/petpal/owner-shared'
 import { LOGIN_PAGE, REGISTER_PAGE } from '@/router/config'
-import { useNotificationStore, useUiStore, useUserStore } from '@/store'
+import { useNotificationStore, useUserStore } from '@/store'
 import { useTokenStore } from '@/store/token'
 import { getErrorMessage } from '@/utils/error'
 
@@ -34,7 +42,6 @@ definePage({
 
 const userStore = useUserStore()
 const tokenStore = useTokenStore()
-const uiStore = useUiStore()
 const notificationStore = useNotificationStore()
 const { userInfo } = storeToRefs(userStore)
 
@@ -50,23 +57,7 @@ const displayName = computed(() => userInfo.value.nickname || userInfo.value.use
 const unreadNotificationCount = computed(() => notificationStore.unreadCount)
 const notificationShortcutText = computed(() => unreadNotificationCount.value
   ? `当前有 ${unreadNotificationCount.value} 条未读通知。`
-  : '统一查看提醒、未读沟通和账户提示。')
-const pageDescription = computed(() => {
-  if (!tokenStore.hasLogin) {
-    return '登录后查看你的 PetPal 资料、宠物资产和订单进展。'
-  }
-
-  return `${displayName.value}，这里集中展示账号资料、宠物资产和需要跟进的订单。`
-})
-
-const petpalAdminPermissionPrefixes = ['petpal.complaint.', 'petpal.caregiver.', 'petpal.callback-']
-const canUploadAvatar = computed(() => {
-  const permissions = userInfo.value.permissions || []
-  return permissions.includes('file.upload.avatar') || permissions.includes('file.upload')
-})
-const hasPetPalAdminAccess = computed(() => userInfo.value.permissions.some(permission => (
-  petpalAdminPermissionPrefixes.some(prefix => permission.startsWith(prefix))
-)))
+  : '没有新的通知。')
 const petpalTierSummary = computed(() => {
   if (userInfo.value.roles.some(role => role.code === 'super-admin')) {
     return '平台全量治理账号'
@@ -78,26 +69,7 @@ const petpalTierSummary = computed(() => {
 
   return '主人服务账号'
 })
-const workspaceSummary = computed(() => hasPetPalAdminAccess.value ? '主人服务台 + 治理后台' : '主人服务台')
-const capabilitySummary = computed(() => {
-  const capabilities = ['宠物档案', '需求发布', '订单跟进']
-
-  if (canUploadAvatar.value) {
-    capabilities.push('资料上传')
-  }
-
-  if (hasPetPalAdminAccess.value) {
-    capabilities.push('后台治理')
-  }
-
-  return capabilities.join('、')
-})
 const statusTagType = computed(() => userInfo.value.status === 'ACTIVE' ? 'success' : 'warning')
-const appPreferenceSummary = computed(() => {
-  const app = uiStore.preferences
-  const homeLayout = app.portalLayout === 'focus' ? '聚焦办事' : '概览看板'
-  return `${app.themePresetId} · ${app.themeMode} · ${homeLayout}`
-})
 
 const activeOrderCount = computed(() => orders.value.filter(item => (
   item.orderStatus === 'PENDING_ACCEPT'
@@ -106,31 +78,65 @@ const activeOrderCount = computed(() => orders.value.filter(item => (
 )).length)
 
 const aftersaleCount = computed(() => orders.value.filter(item => isOrderAftersalesTracked(item)).length)
+const activeRequestCount = computed(() => requests.value.filter(item => (
+  item.status === 'OPEN' || item.status === 'MATCHED'
+)).length)
 
 const latestOrders = computed(() => [...orders.value]
   .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
   .slice(0, 3))
 
-const summaryCards = computed(() => [
+const accountSignals = computed(() => [
   {
     label: '宠物档案',
     value: String(pets.value.length),
-    hint: pets.value.length ? '已建档宠物可以直接用于下单。' : '还没有宠物档案。',
+    hint: pets.value.length ? '已建档' : '去建档',
   },
   {
     label: '服务需求',
-    value: String(requests.value.length),
-    hint: requests.value.length ? '记录已发布和已完成的照料需求。' : '当前还没有发布过需求。',
+    value: String(activeRequestCount.value),
+    hint: activeRequestCount.value ? '继续处理' : '暂无进行中',
   },
   {
     label: '进行中订单',
     value: String(activeOrderCount.value),
-    hint: activeOrderCount.value ? '记得关注签到、服务日志和确认完成。' : '当前没有进行中的订单。',
+    hint: activeOrderCount.value ? '跟单中' : '暂无进行中',
   },
   {
-    label: '售后关注',
+    label: '售后',
     value: String(aftersaleCount.value),
-    hint: aftersaleCount.value ? '存在退款、争议或已退款订单。' : '当前没有售后风险订单。',
+    hint: aftersaleCount.value ? '优先处理' : '当前稳定',
+  },
+])
+
+const taskCards = computed(() => [
+  {
+    title: '服务台',
+    value: activeOrderCount.value ? `${activeOrderCount.value} 单` : pets.value.length ? '继续' : '建档',
+    hint: activeOrderCount.value ? '继续跟单、支付和查看详情' : '宠物、需求和订单都从这里继续',
+    tone: 'default' as const,
+    action: openServiceBoard,
+  },
+  {
+    title: '提醒',
+    value: aftersaleCount.value ? `${aftersaleCount.value} 项` : '查看',
+    hint: aftersaleCount.value ? '售后和待办优先处理' : '统一看待办和售后',
+    tone: aftersaleCount.value ? 'alert' as const : 'default' as const,
+    action: openRemindersCenter,
+  },
+  {
+    title: '通知',
+    value: unreadNotificationCount.value ? `${unreadNotificationCount.value} 条` : '已读',
+    hint: notificationShortcutText.value,
+    tone: unreadNotificationCount.value ? 'alert' as const : 'default' as const,
+    action: openNotificationsCenter,
+  },
+  {
+    title: '起步',
+    value: activeRequestCount.value ? '继续' : '查看',
+    hint: '按主人路径继续当前最该做的事',
+    tone: 'default' as const,
+    action: openGettingStartedGuide,
   },
 ])
 
@@ -164,14 +170,6 @@ function openServiceBoard() {
     return
   }
   uni.navigateTo({ url: '/pages/petpal/owner-home' })
-}
-
-function openCaregiverEarnings() {
-  if (!tokenStore.hasLogin) {
-    handleLogin()
-    return
-  }
-  uni.navigateTo({ url: PETPAL_CAREGIVER_EARNINGS_PAGE })
 }
 
 function openAftersalesCenter() {
@@ -216,10 +214,6 @@ function openAccountSupport() {
     return
   }
   uni.navigateTo({ url: ACCOUNT_SUPPORT_PAGE })
-}
-
-function openHome() {
-  uni.switchTab({ url: '/pages/index/index' })
 }
 
 function handleLogout() {
@@ -273,8 +267,8 @@ onShow(() => {
 </script>
 
 <template>
-  <AppPageShell title="我的 PetPal" :description="pageDescription">
-    <view class="app-hero">
+  <AppPageShell title="我的 PetPal">
+    <view class="app-hero app-hero--account">
       <AppAvatar
         class="app-hero__avatar"
         :src="userInfo.avatarUrl || '/static/images/default-avatar.png'"
@@ -300,13 +294,18 @@ onShow(() => {
             {{ unreadNotificationCount ? `通知 ${unreadNotificationCount}` : '通知已读' }}
           </AppTag>
         </view>
+        <view v-if="tokenStore.hasLogin" class="account-hero__actions">
+          <AppButton size="medium" @click="openServiceBoard">服务台</AppButton>
+          <AppButton size="medium" type="info" @click="openNotificationsCenter">通知</AppButton>
+          <AppButton size="medium" type="info" @click="openSettings">设置</AppButton>
+        </view>
       </view>
     </view>
 
     <template v-if="tokenStore.hasLogin">
-      <AppSection title="业务概览">
+      <AppSection title="账号概览">
         <view class="petpal-me-grid">
-          <view v-for="item in summaryCards" :key="item.label" class="petpal-me-card">
+          <view v-for="item in accountSignals" :key="item.label" class="petpal-me-card">
             <text class="petpal-me-card__label">{{ item.label }}</text>
             <text class="petpal-me-card__value">{{ item.value }}</text>
             <text class="petpal-me-card__hint">{{ item.hint }}</text>
@@ -314,60 +313,34 @@ onShow(() => {
         </view>
       </AppSection>
 
-      <AppSection title="快捷进入" description="把高频动作保持在一屏内，减少从账户页再做多层跳转。">
+      <AppSection title="现在处理">
         <view class="petpal-shortcut-grid">
-          <view class="petpal-shortcut-card" @click="openServiceBoard">
-            <text class="petpal-shortcut-card__title">服务台</text>
-            <text class="petpal-shortcut-card__text">继续宠物建档、发布需求和跟进订单。</text>
-          </view>
-          <view class="petpal-shortcut-card petpal-shortcut-card--alert" @click="openRemindersCenter">
-            <text class="petpal-shortcut-card__title">提醒中心</text>
-            <text class="petpal-shortcut-card__text">优先处理主人端、照料者端和售后待办。</text>
-          </view>
-          <view class="petpal-shortcut-card petpal-shortcut-card--alert" @click="openNotificationsCenter">
-            <text class="petpal-shortcut-card__title">通知中心</text>
-            <text class="petpal-shortcut-card__text">{{ notificationShortcutText }}</text>
-          </view>
-          <view class="petpal-shortcut-card" @click="openGettingStartedGuide">
-            <text class="petpal-shortcut-card__title">起步向导</text>
-            <text class="petpal-shortcut-card__text">按主人路径和照料者路径查看当前最值得优先完成的步骤。</text>
-          </view>
-          <view class="petpal-shortcut-card" @click="openProfile">
-            <text class="petpal-shortcut-card__title">个人资料</text>
-            <text class="petpal-shortcut-card__text">更新昵称、头像和联系方式。</text>
-          </view>
-          <view class="petpal-shortcut-card" @click="openSettings">
-            <text class="petpal-shortcut-card__title">体验设置</text>
-            <text class="petpal-shortcut-card__text">调整首页布局、主题和底栏样式。</text>
-          </view>
-          <view class="petpal-shortcut-card" @click="openAccountSupport">
-            <text class="petpal-shortcut-card__title">账户支持</text>
-            <text class="petpal-shortcut-card__text">查看账号状态、推荐动作和同步情况。</text>
-          </view>
-          <view class="petpal-shortcut-card" @click="openHelpCenter">
-            <text class="petpal-shortcut-card__title">帮助中心</text>
-            <text class="petpal-shortcut-card__text">按主人、照料者、售后和账户场景查看说明。</text>
+          <view
+            v-for="item in taskCards"
+            :key="item.title"
+            class="petpal-shortcut-card"
+            :class="item.tone === 'alert' ? 'petpal-shortcut-card--alert' : ''"
+            @click="item.action"
+          >
+            <text class="petpal-shortcut-card__title">{{ item.title }}</text>
+            <text class="petpal-shortcut-card__value">{{ item.value }}</text>
+            <text class="petpal-shortcut-card__text">{{ item.hint }}</text>
           </view>
         </view>
       </AppSection>
 
-      <AppSection title="常用入口">
+      <AppSection title="账户工具">
         <AppList>
-          <AppListItem title="进入服务台" label="继续发布需求、维护宠物档案和查看匹配。" is-link clickable @click="openServiceBoard" />
-          <AppListItem title="起步向导" label="按主人路径和照料者路径查看当前最值得优先完成的步骤。" is-link clickable @click="openGettingStartedGuide" />
-          <AppListItem title="通知中心" :label="notificationShortcutText" is-link clickable @click="openNotificationsCenter" />
-          <AppListItem title="提醒中心" label="集中查看主人端、照料者端和售后相关待办。" is-link clickable @click="openRemindersCenter" />
-          <AppListItem title="售后中心" label="集中查看退款、投诉和争议处理，不再只依赖订单详情入口。" is-link clickable @click="openAftersalesCenter" />
-          <AppListItem title="照料者收益表现" label="若你已申请照料者，可查看收入、完成率和售后风险。" is-link clickable @click="openCaregiverEarnings" />
-          <AppListItem title="个人资料" label="更新昵称、头像和联系方式。" is-link clickable @click="openProfile" />
-          <AppListItem title="PetPal 设置" label="调整首页布局、主题和底栏样式。" is-link clickable @click="openSettings" />
-          <AppListItem title="账户支持" label="查看账号状态、推荐动作和同步情况。" is-link clickable @click="openAccountSupport" />
-          <AppListItem title="帮助中心" label="按主人、照料者、售后和账户场景查看说明。" is-link clickable @click="openHelpCenter" />
-          <AppListItem title="返回首页" label="回到首页继续查看订单和推荐照料者。" is-link clickable @click="openHome" />
+          <AppListItem title="个人资料" label="更新头像、昵称和联系方式" is-link clickable @click="openProfile" />
+          <AppListItem title="提醒中心" label="查看待办、售后和跨页面提醒" is-link clickable @click="openRemindersCenter" />
+          <AppListItem title="售后中心" label="集中处理退款、投诉和争议" is-link clickable @click="openAftersalesCenter" />
+          <AppListItem title="账户支持" label="查看账号状态和同步情况" is-link clickable @click="openAccountSupport" />
+          <AppListItem title="帮助中心" label="查看使用帮助和常见问题" is-link clickable @click="openHelpCenter" />
+          <AppListItem title="设置" label="调整界面和使用偏好" is-link clickable @click="openSettings" />
         </AppList>
       </AppSection>
 
-      <AppSection title="近期订单提醒">
+      <AppSection title="近期订单">
         <AppList v-if="latestOrders.length">
           <AppListItem
             v-for="order in latestOrders"
@@ -382,17 +355,6 @@ onShow(() => {
         </view>
       </AppSection>
 
-      <AppSection title="账户能力">
-        <AppList>
-          <AppListItem title="账号状态" :value="userInfo.status === 'ACTIVE' ? '正常' : '停用'" value-emphasis />
-          <AppListItem title="账号定位" :value="petpalTierSummary" />
-          <AppListItem title="可用工作区" :value="workspaceSummary" />
-          <AppListItem title="资料上传" :value="canUploadAvatar ? '可用' : '受限'" />
-          <AppListItem title="已开通能力" :label="capabilitySummary" />
-          <AppListItem title="当前体验设置" :label="appPreferenceSummary" />
-        </AppList>
-      </AppSection>
-
       <view class="petpal-action-block">
         <AppButton block size="large" type="info" @click="handleLogout">
           退出登录
@@ -401,7 +363,7 @@ onShow(() => {
     </template>
 
     <template v-else>
-      <AppSection title="账户提示">
+      <AppSection title="登录后继续">
         <view class="app-status-wrap app-status-wrap--spacious">
           <AppStatus text="登录后可查看 PetPal 资料、宠物资产和服务进展。" />
         </view>
@@ -420,6 +382,13 @@ onShow(() => {
 </template>
 
 <style scoped lang="scss">
+.account-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
 .petpal-me-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -483,6 +452,13 @@ onShow(() => {
 .petpal-shortcut-card__title {
   font-size: 28rpx;
   line-height: 1.4;
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.petpal-shortcut-card__value {
+  font-size: 40rpx;
+  line-height: 1.05;
   color: var(--app-text);
   font-weight: 700;
 }

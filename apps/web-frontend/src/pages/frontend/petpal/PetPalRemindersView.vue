@@ -567,8 +567,7 @@ const totalUnreadCount = computed(() => ownerUnreadCount.value + caregiverUnread
 
 const pendingOwnerRequests = computed(() => requests.value.filter(item => (
   item.status === 'OPEN'
-  || item.status === 'MATCHING'
-  || item.status === 'CONFIRMED'
+  || item.status === 'MATCHED'
 )));
 
 const ownerUpcomingOrders = computed(() => [...ownerOrders.value]

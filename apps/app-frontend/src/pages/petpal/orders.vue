@@ -29,6 +29,7 @@ import {
   getOrderTone,
   isOrderAftersalesTracked,
   PETPAL_AFTERSALES_PAGE,
+  PETPAL_CHECKOUT_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDERS_PAGE,
   PETPAL_REQUEST_PAGE,
@@ -98,16 +99,28 @@ function getOrderTagType(status: OrderRecord['orderStatus']) {
 }
 
 function getPrimaryAction(order: OrderRecord) {
+  const outstandingAmount = Math.max(
+    0,
+    Number(order.amountTotal) + Number(order.amountAdjusted) - Number(order.amountPaid),
+  )
+
+  if (order.orderStatus === 'PENDING_ACCEPT' && outstandingAmount > 0) {
+    return {
+      label: `去支付 ¥${formatAmount(outstandingAmount)}`,
+      mode: 'checkout' as const,
+      type: 'primary' as const,
+    }
+  }
   if (isOrderAftersalesTracked(order)) {
-    return { label: '处理售后', tab: 'aftersales' as const, type: 'danger' as const }
+    return { label: '处理售后', mode: 'detail' as const, tab: 'aftersales' as const, type: 'danger' as const }
   }
   if (order.orderStatus === 'SERVING' || order.orderStatus === 'ACCEPTED') {
-    return { label: '看服务', tab: 'service' as const, type: 'primary' as const }
+    return { label: '看服务', mode: 'detail' as const, tab: 'service' as const, type: 'primary' as const }
   }
   if (order.orderStatus === 'COMPLETED') {
-    return { label: '看详情', tab: 'overview' as const, type: 'primary' as const }
+    return { label: '看详情', mode: 'detail' as const, tab: 'overview' as const, type: 'primary' as const }
   }
-  return { label: '查看详情', tab: 'overview' as const, type: 'primary' as const }
+  return { label: '查看详情', mode: 'detail' as const, tab: 'overview' as const, type: 'primary' as const }
 }
 
 function goToLogin() {
@@ -124,6 +137,15 @@ function openAftersalesCenter() {
 
 function openOrderDetail(orderId: string, tab: 'overview' | 'chat' | 'service' | 'aftersales') {
   uni.navigateTo({ url: `${PETPAL_ORDER_DETAIL_PAGE}?id=${orderId}&tab=${tab}` })
+}
+
+function handlePrimaryAction(order: OrderRecord) {
+  const action = getPrimaryAction(order)
+  if (action.mode === 'checkout') {
+    uni.navigateTo({ url: `${PETPAL_CHECKOUT_PAGE}?orderId=${order.id}` })
+    return
+  }
+  openOrderDetail(order.id, action.tab)
 }
 
 async function loadPage(showError = false) {
@@ -211,6 +233,13 @@ onPullDownRefresh(() => {
                 <text class="order-row__meta">
                   总额 ¥{{ formatAmount(order.amountTotal) }} · 实付 ¥{{ formatAmount(order.amountPaid) }} · 已退 ¥{{ formatAmount(order.amountRefunded) }}
                 </text>
+                <text v-if="order.orderStatus === 'PENDING_ACCEPT'" class="order-row__meta order-row__meta--accent">
+                  {{
+                    Number(order.amountTotal) + Number(order.amountAdjusted) - Number(order.amountPaid) > 0
+                      ? `待支付 ¥${formatAmount(Number(order.amountTotal) + Number(order.amountAdjusted) - Number(order.amountPaid))}`
+                      : '已支付，等待照料者接单'
+                  }}
+                </text>
               </view>
               <view class="order-row__tags">
                 <AppTag :type="getOrderTagType(order.orderStatus)">
@@ -227,7 +256,7 @@ onPullDownRefresh(() => {
               <AppButton
                 size="medium"
                 :type="getPrimaryAction(order).type"
-                @click="openOrderDetail(order.id, getPrimaryAction(order).tab)"
+                @click="handlePrimaryAction(order)"
               >
                 {{ getPrimaryAction(order).label }}
               </AppButton>
@@ -277,6 +306,11 @@ onPullDownRefresh(() => {
   color: var(--app-text-secondary);
   font-size: 22rpx;
   line-height: 1.6;
+}
+
+.order-row__meta--accent {
+  color: #0f766e;
+  font-weight: 600;
 }
 
 .order-summary__value {

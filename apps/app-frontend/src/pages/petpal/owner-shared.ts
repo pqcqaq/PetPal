@@ -22,6 +22,7 @@ export const PETPAL_GETTING_STARTED_PAGE = '/pages/petpal/getting-started'
 export const PETPAL_OWNER_HOME_PAGE = '/pages/petpal/owner-home'
 export const PETPAL_PETS_PAGE = '/pages/petpal/pets'
 export const PETPAL_REQUEST_PAGE = '/pages/petpal/request'
+export const PETPAL_CHECKOUT_PAGE = '/pages/petpal/checkout'
 export const PETPAL_ORDERS_PAGE = '/pages/petpal/orders'
 export const PETPAL_AFTERSALES_PAGE = '/pages/petpal/aftersales'
 export const PETPAL_REMINDERS_PAGE = '/pages/petpal/reminders'
@@ -79,6 +80,8 @@ export const caregiverAuditLabels: Record<CaregiverAuditStatus, string> = {
 
 export const serviceRequestStatusLabels: Record<ServiceRequestStatus, string> = {
   OPEN: '待匹配',
+  MATCHED: '已匹配',
+  CLOSED: '已关闭',
   MATCHING: '匹配中',
   CONFIRMED: '已确认',
   CANCELLED: '已取消',
@@ -143,6 +146,7 @@ export const ownerFlowOptions = [
   { label: '主人首页', value: PETPAL_OWNER_HOME_PAGE, description: '查看办事概览与快捷入口' },
   { label: '宠物档案', value: PETPAL_PETS_PAGE, description: '维护宠物资料与照料偏好' },
   { label: '发布需求', value: PETPAL_REQUEST_PAGE, description: '创建临时照料需求并筛选照料者' },
+  { label: '确认支付', value: PETPAL_CHECKOUT_PAGE, description: '确认照料者、金额与支付方式' },
   { label: '订单跟进', value: PETPAL_ORDERS_PAGE, description: '按沟通、履约和售后持续跟进' },
   { label: '售后中心', value: PETPAL_AFTERSALES_PAGE, description: '集中处理退款、投诉和争议事项' },
 ]

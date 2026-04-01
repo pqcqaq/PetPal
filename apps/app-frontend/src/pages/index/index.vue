@@ -59,7 +59,7 @@ const notificationHint = computed(() => unreadNotificationCount.value
   : '统一查看提醒、未读沟通和账户提示。')
 
 const activeRequestCount = computed(() => requests.value.filter(item => (
-  item.status === 'OPEN' || item.status === 'MATCHING' || item.status === 'CONFIRMED'
+  item.status === 'OPEN' || item.status === 'MATCHED'
 )).length)
 
 const activeOrderCount = computed(() => orders.value.filter(item => (
@@ -138,6 +138,8 @@ const getOrderStatusLabel = (status: OrderStatus) => ({
 
 const getRequestStatusLabel = (status: ServiceRequestStatus) => ({
   OPEN: '待匹配',
+  MATCHED: '已匹配',
+  CLOSED: '已关闭',
   MATCHING: '匹配中',
   CONFIRMED: '已确认',
   CANCELLED: '已取消',

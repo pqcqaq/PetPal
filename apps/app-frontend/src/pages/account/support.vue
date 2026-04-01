@@ -61,8 +61,7 @@ const activeOrderCount = computed(() => orders.value.filter(item => (
 )).length)
 const activeRequestCount = computed(() => requests.value.filter(item => (
   item.status === 'OPEN'
-  || item.status === 'MATCHING'
-  || item.status === 'CONFIRMED'
+  || item.status === 'MATCHED'
 )).length)
 const workspaceSummary = computed(() => {
   const permissions = userStore.userInfo.permissions || []

@@ -96,8 +96,7 @@ function buildNotificationItems(payload: {
 
   const activeOwnerRequests = requests.filter(item => (
     item.status === 'OPEN'
-    || item.status === 'MATCHING'
-    || item.status === 'CONFIRMED'
+    || item.status === 'MATCHED'
   ))
   const ownerUnreadCount = ownerOrders.reduce((total, item) => (
     total + getConversationUnreadCount(item.conversation, 'owner')

@@ -73,15 +73,18 @@ const assertOrderAmountInvariant = (order: {
   amountAdjusted: Prisma.Decimal | number;
   amountPaid: Prisma.Decimal | number;
   amountRefunded: Prisma.Decimal | number;
+  orderStatus?: 'PENDING_ACCEPT' | 'ACCEPTED' | 'SERVING' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'PARTIAL_REFUNDED' | 'REFUNDED';
 }) => {
   const amountTotal = toNumber(order.amountTotal);
   const amountAdjusted = toNumber(order.amountAdjusted);
   const amountPaid = toNumber(order.amountPaid);
   const amountRefunded = toNumber(order.amountRefunded);
+  const required = amountTotal + amountAdjusted - amountRefunded;
+  const isPendingAccept = order.orderStatus === 'PENDING_ACCEPT';
   if (amountPaid - amountRefunded < 0) {
     throw badRequest('Invalid order amount invariant: paid must be greater than refunded');
   }
-  if (amountPaid < amountTotal + amountAdjusted - amountRefunded) {
+  if (!isPendingAccept && amountPaid < required) {
     throw badRequest('Invalid order amount invariant: paid amount is not enough');
   }
 };
@@ -842,6 +845,52 @@ const toQualificationMaterials = (value: Prisma.JsonValue | null | undefined) =>
       uploadedAt,
     }];
   });
+};
+
+const createPetPalBizNo = (prefix: string, now = new Date()) => {
+  const parts = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+    String(now.getSeconds()).padStart(2, '0'),
+    String(now.getMilliseconds()).padStart(3, '0'),
+    String(Math.floor(Math.random() * 1000)).padStart(3, '0'),
+  ];
+  return `${prefix}${parts.join('')}`;
+};
+
+const toRoundedAmount = (value: number) => Number(value.toFixed(2));
+
+const estimateServiceUnits = (payload: {
+  serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+  unitType: string;
+  startTime: Date;
+  endTime: Date;
+}) => {
+  const durationHours = Math.max(
+    1,
+    (payload.endTime.getTime() - payload.startTime.getTime()) / (60 * 60 * 1000),
+  );
+  const normalizedUnitType = payload.unitType.trim().toUpperCase();
+
+  if (normalizedUnitType.includes('DAY')) {
+    return Math.max(1, Math.ceil(durationHours / 24));
+  }
+  if (normalizedUnitType.includes('HOUR')) {
+    return Math.max(1, Math.ceil(durationHours));
+  }
+  if (normalizedUnitType.includes('HALF')) {
+    return Math.max(1, Math.ceil(durationHours / 12));
+  }
+  if (normalizedUnitType.includes('VISIT') || normalizedUnitType.includes('TIME') || normalizedUnitType.includes('TRIP')) {
+    return 1;
+  }
+  if (payload.serviceType === 'BOARDING') {
+    return Math.max(1, Math.ceil(durationHours / 24));
+  }
+  return 1;
 };
 
 const toPetProfileRecord = (pet: PetProfile) => ({
@@ -1835,6 +1884,167 @@ export const petpalService = {
     });
   },
 
+  async createOwnerOrder(ownerId: string, payload: {
+    requestId: string;
+    caregiverServiceId: string;
+  }) {
+    return runSerializableTransaction(async (tx) => {
+      const requestRecord = await tx.serviceRequest.findFirst({
+        where: {
+          id: payload.requestId,
+          ownerId,
+          deleteAt: null,
+        },
+        select: {
+          id: true,
+          petId: true,
+          serviceType: true,
+          startTime: true,
+          endTime: true,
+          status: true,
+          pet: {
+            select: {
+              species: true,
+            },
+          },
+        },
+      });
+
+      if (!requestRecord) {
+        throw notFound('Service request not found');
+      }
+
+      if (requestRecord.status === 'CLOSED') {
+        throw badRequest('Closed request cannot create order');
+      }
+
+      const caregiverService = await tx.caregiverService.findFirst({
+        where: {
+          id: payload.caregiverServiceId,
+          deleteAt: null,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          caregiverId: true,
+          serviceType: true,
+          petSpecies: true,
+          pricePerUnit: true,
+          unitType: true,
+          caregiver: {
+            select: {
+              auditStatus: true,
+            },
+          },
+        },
+      });
+
+      if (!caregiverService) {
+        throw notFound('Caregiver service not found');
+      }
+
+      if (caregiverService.caregiver.auditStatus !== 'APPROVED') {
+        throw forbidden('Caregiver profile is not approved');
+      }
+
+      if (caregiverService.serviceType !== requestRecord.serviceType) {
+        throw badRequest('Caregiver service type does not match request');
+      }
+
+      if (caregiverService.petSpecies !== requestRecord.pet.species) {
+        throw badRequest('Caregiver service species does not match request pet');
+      }
+
+      const existingOrder = await tx.orderMain.findFirst({
+        where: {
+          serviceRequestId: requestRecord.id,
+          deleteAt: null,
+          orderStatus: {
+            not: 'CANCELLED',
+          },
+        },
+        select: {
+          id: true,
+          caregiverId: true,
+        },
+      });
+
+      if (existingOrder) {
+        if (existingOrder.caregiverId === caregiverService.caregiverId) {
+          return loadOrderDetailById(tx, existingOrder.id);
+        }
+        throw badRequest('Current request already has an active order');
+      }
+
+      const estimatedUnits = estimateServiceUnits({
+        serviceType: requestRecord.serviceType,
+        unitType: caregiverService.unitType,
+        startTime: requestRecord.startTime,
+        endTime: requestRecord.endTime,
+      });
+      const amountTotal = toRoundedAmount(toNumber(caregiverService.pricePerUnit) * estimatedUnits);
+
+      const order = await tx.orderMain.create({
+        data: withSnowflakeId({
+          orderNo: createPetPalBizNo('PP'),
+          ownerId,
+          caregiverId: caregiverService.caregiverId,
+          serviceRequestId: requestRecord.id,
+          serviceType: requestRecord.serviceType,
+          appointmentStart: requestRecord.startTime,
+          appointmentEnd: requestRecord.endTime,
+          amountTotal,
+          amountAdjusted: 0,
+          amountPaid: 0,
+          amountRefunded: 0,
+          orderStatus: 'PENDING_ACCEPT',
+        }),
+        select: {
+          id: true,
+        },
+      });
+
+      await tx.paymentRecord.create({
+        data: withSnowflakeId({
+          orderId: order.id,
+          payNo: createPetPalBizNo('PAY'),
+          bizType: 'BALANCE',
+          payChannel: 'UNPAID',
+          payStatus: 'PENDING',
+          payAmount: amountTotal,
+        }),
+      });
+
+      await tx.serviceRequest.update({
+        where: {
+          id: requestRecord.id,
+        },
+        data: {
+          status: 'MATCHED',
+          matchedCaregiverId: caregiverService.caregiverId,
+        },
+      });
+
+      await ensureOrderConversation(tx, order.id);
+      await appendOrderTimeline(tx, {
+        orderId: order.id,
+        eventType: 'CREATED',
+        operatorRole: 'OWNER',
+        operatorId: ownerId,
+        eventPayload: {
+          requestId: requestRecord.id,
+          caregiverServiceId: caregiverService.id,
+          estimatedUnits,
+          unitType: caregiverService.unitType,
+          pricePerUnit: toNumber(caregiverService.pricePerUnit),
+          amountTotal,
+        } as Prisma.InputJsonValue,
+      });
+
+      return loadOrderDetailById(tx, order.id);
+    });
+  },
+
   async listOwnerOrders(ownerId: string) {
     const orders = await prisma.orderMain.findMany({
       where: {
@@ -2151,6 +2361,92 @@ export const petpalService = {
 
     assertOrderAmountInvariant(order);
     return toOrderDetailRecord(order);
+  },
+
+  async payOwnerOrder(ownerId: string, orderId: string, payload: {
+    payChannel: 'WECHAT_PAY' | 'ALIPAY' | 'BALANCE';
+  }) {
+    return runSerializableTransaction(async (tx) => {
+      const order = await tx.orderMain.findFirst({
+        where: {
+          id: orderId,
+          ownerId,
+          deleteAt: null,
+        },
+        include: {
+          payments: {
+            where: {
+              deleteAt: null,
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw notFound('Order not found');
+      }
+
+      if (order.orderStatus !== 'PENDING_ACCEPT') {
+        throw badRequest('Only pending orders can be paid');
+      }
+
+      const grossAmount = toRoundedAmount(toNumber(order.amountTotal) + toNumber(order.amountAdjusted));
+      const outstandingAmount = toRoundedAmount(Math.max(0, grossAmount - toNumber(order.amountPaid)));
+
+      if (outstandingAmount <= 0) {
+        return loadOrderDetailById(tx, order.id);
+      }
+
+      const reusablePayment = order.payments.find(item => item.payStatus === 'PENDING')
+        ?? order.payments.find(item => item.payStatus === 'FAILED' || item.payStatus === 'CLOSED');
+
+      const paymentId = reusablePayment
+        ? reusablePayment.id
+        : (await tx.paymentRecord.create({
+            data: withSnowflakeId({
+              orderId: order.id,
+              payNo: createPetPalBizNo('PAY'),
+              bizType: 'BALANCE',
+              payChannel: payload.payChannel,
+              payStatus: 'PENDING',
+              payAmount: outstandingAmount,
+            }),
+            select: {
+              id: true,
+            },
+          })).id;
+
+      await tx.paymentRecord.update({
+        where: {
+          id: paymentId,
+        },
+        data: {
+          payChannel: payload.payChannel,
+          payStatus: 'PAID',
+          payAmount: outstandingAmount,
+          channelTxnId: createPetPalBizNo('TXN'),
+          paidAt: new Date(),
+          channelPayload: {
+            source: 'OWNER_CHECKOUT',
+            payChannel: payload.payChannel,
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      await tx.orderMain.update({
+        where: {
+          id: order.id,
+        },
+        data: {
+          amountPaid: toRoundedAmount(toNumber(order.amountPaid) + outstandingAmount),
+        },
+      });
+
+      return loadOrderDetailById(tx, order.id);
+    });
   },
 
   async listOrderMessages(userId: string, orderId: string) {

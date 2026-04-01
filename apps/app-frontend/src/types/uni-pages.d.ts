@@ -17,10 +17,12 @@ type _LocationUrl =
   "/pages/order-review/index" |
   "/pages/petpal/aftersales" |
   "/pages/petpal/caregiver-earnings" |
+  "/pages/petpal/checkout" |
   "/pages/petpal/caregiver-home" |
   "/pages/petpal/caregiver-orders" |
   "/pages/petpal/caregiver-profile" |
   "/pages/petpal/caregiver-services" |
+  "/pages/petpal/checkout" |
   "/pages/petpal/getting-started" |
   "/pages/petpal/index" |
   "/pages/petpal/messages" |
