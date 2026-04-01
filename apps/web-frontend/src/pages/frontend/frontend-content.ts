@@ -19,13 +19,13 @@ export const capabilityCards = [
     title: '主人服务台',
     eyebrow: 'Owner Flow',
     description: '主人页只承接宠物档案、需求发布、订单跟进和照料者匹配。',
-    bullets: ['覆盖宠物、需求、订单、售后主链路', '更重的兼容与导出功能暂时保留在 legacy 路由'],
+    bullets: ['覆盖宠物、需求、订单、售后主链路', '导出与确认完成已经迁回主人页，legacy 仅保留旧链接兼容'],
   },
   {
     title: '照料者工作台',
     eyebrow: 'Caregiver Flow',
     description: '照料者页独立承接入驻资料、服务配置和履约订单，不再混在主人页面里。',
-    bullets: ['独立承接档案、服务和接单动作', '更细的资质上传和高级履约先通过 legacy 路由保留'],
+    bullets: ['独立承接档案、服务和履约动作', '资质材料、服务记录和签退已迁回照料者页，legacy 仅保留兼容入口'],
   },
   {
     title: '跨订单消息中心',
@@ -76,7 +76,7 @@ export const architectureLayers = [
   {
     title: '照料者工作台',
     summary: '承载照料者档案、服务设置和履约订单基础动作。',
-    details: ['独立路由 `/petpal/caregiver` 用于承接照料者工作流', '高级兼容操作暂时保留在 `/petpal/legacy`'],
+    details: ['独立路由 `/petpal/caregiver` 用于承接照料者工作流', '`/petpal/legacy` 已收缩为旧链接兼容与跨路由概览入口'],
   },
   {
     title: '跨订单消息中心',

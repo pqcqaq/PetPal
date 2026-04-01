@@ -13,7 +13,7 @@
           进入照料者工作台
         </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-legacy' }">
-          打开兼容工作台
+          打开兼容入口
         </RouterLink>
       </div>
     </section>
@@ -28,7 +28,7 @@
           </div>
           <div class="petpal-switch-links">
             <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">照料者页</RouterLink>
-            <RouterLink :to="{ name: 'frontend-petpal-legacy' }">兼容工作台</RouterLink>
+            <RouterLink :to="{ name: 'frontend-petpal-legacy' }">兼容入口</RouterLink>
           </div>
         </div>
 
@@ -67,7 +67,7 @@
             跨订单消息中心
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-legacy' }">
-            兼容混合工作台
+            旧链接兼容入口
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" to="/petpal-admin">
             后台直达工作区
@@ -236,7 +236,7 @@
         <div class="petpal-section-heading">
           <div class="petpal-section-heading__meta">
             <h3>需求与订单</h3>
-            <p>主人页已经直接承接订单导出、退款导出和确认完成动作；兼容工作台只保留少量混合兼容流程。</p>
+            <p>主人页已经直接承接订单导出、退款导出和确认完成动作；`legacy` 只保留旧书签兼容与任务分发。</p>
             <p v-if="auth.isAuthenticated" class="petpal-section-heading__hint">
               退款导出默认覆盖最近一年，可按退款日期、退款状态、投诉状态、投诉类型与投诉对象等收窄范围。
             </p>

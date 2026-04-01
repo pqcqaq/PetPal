@@ -13,7 +13,7 @@
           返回主人工作台
         </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-legacy' }">
-          打开兼容工作台
+          打开兼容入口
         </RouterLink>
       </div>
     </section>
@@ -24,11 +24,11 @@
         <div class="petpal-section-heading">
           <div class="petpal-section-heading__meta">
             <h3>照料者主流程</h3>
-            <p>先完成档案，再上架服务，最后集中处理接单和履约。资质材料上传、服务记录和签退动作已经收回当前页面，兼容页只保留少量混合操作。</p>
+            <p>先完成档案，再上架服务，最后集中处理接单和履约。资质材料上传、服务记录和签退动作已经收回当前页面，兼容页只保留旧链接兼容与分发概览。</p>
           </div>
           <div class="petpal-switch-links">
             <RouterLink :to="{ name: 'frontend-petpal' }">主人页</RouterLink>
-            <RouterLink :to="{ name: 'frontend-petpal-legacy' }">兼容工作台</RouterLink>
+            <RouterLink :to="{ name: 'frontend-petpal-legacy' }">兼容入口</RouterLink>
           </div>
         </div>
 
@@ -64,7 +64,7 @@
             跨订单消息中心
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-legacy' }">
-            打开兼容混合工作台
+            打开旧链接兼容入口
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" to="/petpal-admin/caregiver-audits">
             后台审核台
