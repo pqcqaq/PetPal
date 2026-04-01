@@ -2,6 +2,7 @@ export const frontendNavItems = [
   { label: 'PetPal 首页', to: '/', eyebrow: '概览' },
   { label: '主人服务台', to: '/petpal', eyebrow: '业务' },
   { label: '照料者工作台', to: '/petpal/caregiver', eyebrow: '履约' },
+  { label: '消息中心', to: '/petpal/messages', eyebrow: '沟通' },
   { label: '产品结构', to: '/architecture', eyebrow: '结构' },
   { label: '登录方式', to: '/authentication', eyebrow: '认证' },
 ] as const;
@@ -25,6 +26,12 @@ export const capabilityCards = [
     eyebrow: 'Caregiver Flow',
     description: '照料者页独立承接入驻资料、服务配置和履约订单，不再混在主人页面里。',
     bullets: ['独立承接档案、服务和接单动作', '更细的资质上传和高级履约先通过 legacy 路由保留'],
+  },
+  {
+    title: '跨订单消息中心',
+    eyebrow: 'Message Flow',
+    description: '跨订单沟通被提升为独立页面，不必只能进入订单详情后逐条查看。',
+    bullets: ['支持按主人/照料者视角聚合会话', '可集中筛选未读并直接跳转订单详情'],
   },
   {
     title: '后台直达治理',
@@ -70,6 +77,11 @@ export const architectureLayers = [
     title: '照料者工作台',
     summary: '承载照料者档案、服务设置和履约订单基础动作。',
     details: ['独立路由 `/petpal/caregiver` 用于承接照料者工作流', '高级兼容操作暂时保留在 `/petpal/legacy`'],
+  },
+  {
+    title: '跨订单消息中心',
+    summary: '承载主人与照料者跨订单消息聚合、未读处理与快捷跳转。',
+    details: ['独立路由 `/petpal/messages` 用于集中查看订单会话', '继续复用订单详情页里的沟通发送与上下文信息'],
   },
   {
     title: 'PetPal 后台',

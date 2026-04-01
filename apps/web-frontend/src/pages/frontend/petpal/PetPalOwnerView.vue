@@ -6,6 +6,9 @@
       <p>把宠物建档、需求发布、照料者匹配和订单跟进收回到主人语义，不再把照料者工作流混在同一页里。</p>
       <div class="frontend-page__hero-actions">
         <el-button type="primary" :loading="pageLoading" @click="reloadAll">刷新主人数据</el-button>
+        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-messages' }">
+          打开消息中心
+        </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-caregiver' }">
           进入照料者工作台
         </RouterLink>
@@ -59,6 +62,9 @@
         <div class="petpal-side-actions">
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-caregiver' }">
             照料者档案 / 服务 / 履约
+          </RouterLink>
+          <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-messages' }">
+            跨订单消息中心
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-legacy' }">
             兼容混合工作台

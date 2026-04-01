@@ -35,6 +35,12 @@ const routes = [
         meta: { publicPage: true, title: '宠托帮照料者工作台' },
       },
       {
+        path: 'petpal/messages',
+        name: 'frontend-petpal-messages',
+        component: () => import('@/pages/frontend/petpal/PetPalMessagesView.vue'),
+        meta: { publicPage: true, title: '宠托帮消息中心' },
+      },
+      {
         path: 'petpal/legacy',
         name: 'frontend-petpal-legacy',
         component: () => import('@/pages/frontend/petpal/PetPalLegacyWorkbenchView.vue'),

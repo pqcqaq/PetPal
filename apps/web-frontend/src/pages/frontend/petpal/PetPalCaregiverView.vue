@@ -6,6 +6,9 @@
       <p>把照料者入驻、服务配置和履约订单从主人工作台里拆出，直接面向照料者的真实工作场景。</p>
       <div class="frontend-page__hero-actions">
         <el-button type="primary" :loading="pageLoading" @click="reloadAll">刷新照料者数据</el-button>
+        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-messages' }">
+          打开消息中心
+        </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal' }">
           返回主人工作台
         </RouterLink>
@@ -57,6 +60,9 @@
         <span class="frontend-card__eyebrow">兼容入口</span>
         <h3>高级操作</h3>
         <div class="petpal-side-actions">
+          <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-messages' }">
+            跨订单消息中心
+          </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-legacy' }">
             打开兼容混合工作台
           </RouterLink>
