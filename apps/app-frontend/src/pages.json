@@ -125,6 +125,14 @@
       }
     },
     {
+      "path": "pages/petpal/refund-result",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "退款结果",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/petpal/checkout",
       "type": "page",
       "style": {

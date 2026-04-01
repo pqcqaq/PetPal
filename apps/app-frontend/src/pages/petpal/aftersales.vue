@@ -44,6 +44,7 @@ import {
   PETPAL_AFTERSALES_PAGE,
   PETPAL_MESSAGES_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
+  PETPAL_REFUND_RESULT_PAGE,
   PETPAL_ORDERS_PAGE,
   serviceTypeLabels,
 } from './owner-shared'
@@ -533,6 +534,24 @@ function openOrderDetail(orderId: string, tab: 'chat' | 'aftersales') {
   uni.navigateTo({ url: `${PETPAL_ORDER_DETAIL_PAGE}?id=${orderId}&tab=${tab}` })
 }
 
+function openRefundResult(orderId: string) {
+  uni.navigateTo({ url: `${PETPAL_REFUND_RESULT_PAGE}?orderId=${orderId}` })
+}
+
+function openPrimaryAction(entry: AftersalesOrderView) {
+  if (entry.activeComplaintCount > 0) {
+    openOrderDetail(entry.order.id, 'aftersales')
+    return
+  }
+
+  if (getRefundStage(entry) !== 'NONE') {
+    openRefundResult(entry.order.id)
+    return
+  }
+
+  openOrderDetail(entry.order.id, 'aftersales')
+}
+
 function openOrders() {
   uni.redirectTo({ url: PETPAL_ORDERS_PAGE })
 }
@@ -662,7 +681,7 @@ onPullDownRefresh(() => {
               <AppButton
                 size="medium"
                 :type="focusCard.priority === 'HIGH' ? 'danger' : 'primary'"
-                @click="openOrderDetail(focusCard.order.id, 'aftersales')"
+                @click="openPrimaryAction(focusCard)"
               >
                 {{ getPrimaryActionLabel(focusCard) }}
               </AppButton>
@@ -699,7 +718,7 @@ onPullDownRefresh(() => {
             v-if="focusCard"
             size="medium"
             :type="focusCard.priority === 'HIGH' ? 'danger' : 'primary'"
-            @click="openOrderDetail(focusCard.order.id, 'aftersales')"
+            @click="openPrimaryAction(focusCard)"
           >
             继续当前最急
           </AppButton>
@@ -794,7 +813,7 @@ onPullDownRefresh(() => {
                   <AppButton
                     size="medium"
                     :type="entry.priority === 'HIGH' ? 'danger' : 'primary'"
-                    @click="openOrderDetail(entry.order.id, 'aftersales')"
+                    @click="openPrimaryAction(entry)"
                   >
                     {{ getPrimaryActionLabel(entry) }}
                   </AppButton>

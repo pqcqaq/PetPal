@@ -54,6 +54,7 @@ import {
   PETPAL_CHECKOUT_PAGE,
   PETPAL_ORDER_COMPLAINT_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
+  PETPAL_REFUND_RESULT_PAGE,
   getConversationHint,
   getConversationPreview,
   getOrderTone,
@@ -1109,6 +1110,13 @@ function openComplaintPage() {
   uni.navigateTo({ url: `${PETPAL_ORDER_COMPLAINT_PAGE}?id=${order.value.id}` })
 }
 
+function openRefundResultPage() {
+  if (!order.value) {
+    return
+  }
+  uni.navigateTo({ url: `${PETPAL_REFUND_RESULT_PAGE}?orderId=${order.value.id}` })
+}
+
 async function handleConfirmComplete() {
   if (!order.value || confirmingCompletion.value) {
     return
@@ -1442,6 +1450,16 @@ onLoad((options: Record<string, string | undefined>) => {
               <view v-if="refundProgress.latestRefundReason" class="petpal-note-card">
                 <text>退款原因：{{ refundProgress.latestRefundReason }}</text>
               </view>
+            </view>
+
+            <view v-if="refundProgress.stage !== 'NONE'" class="petpal-refund-progress__actions">
+              <AppButton
+                size="medium"
+                :type="['REJECTED', 'FAILED'].includes(refundProgress.stage) ? 'danger' : 'primary'"
+                @click="openRefundResultPage"
+              >
+                {{ ['PENDING_REVIEW', 'APPROVED_WAITING'].includes(refundProgress.stage) ? '看退款进度' : '查看退款结果' }}
+              </AppButton>
             </view>
           </view>
         </AppSection>
@@ -2165,6 +2183,11 @@ onLoad((options: Record<string, string | undefined>) => {
   border-radius: 12px;
   background: #f8fbff;
   border: 1px solid #dbe7ff;
+}
+
+.petpal-refund-progress__actions {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .petpal-refund-progress__latest-header {

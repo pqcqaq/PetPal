@@ -25,6 +25,7 @@ export const PETPAL_REQUEST_PAGE = '/pages/petpal/request'
 export const PETPAL_REQUEST_DETAIL_PAGE = '/pages/petpal/request-detail'
 export const PETPAL_CHECKOUT_PAGE = '/pages/petpal/checkout'
 export const PETPAL_PAYMENT_RESULT_PAGE = '/pages/petpal/payment-result'
+export const PETPAL_REFUND_RESULT_PAGE = '/pages/petpal/refund-result'
 export const PETPAL_ORDERS_PAGE = '/pages/petpal/orders'
 export const PETPAL_AFTERSALES_PAGE = '/pages/petpal/aftersales'
 export const PETPAL_REMINDERS_PAGE = '/pages/petpal/reminders'
@@ -310,6 +311,19 @@ export function getRequestTagType(status: ServiceRequestStatus) {
 
 export function getRefundProgressStageLabel(stage: RefundProgressStage) {
   return refundProgressStageLabels[stage] || stage
+}
+
+export function getRefundProgressStageHint(stage: RefundProgressStage) {
+  const hints: Record<RefundProgressStage, string> = {
+    NONE: '当前暂无退款申请，后续售后进度会在这里同步展示。',
+    PENDING_REVIEW: '退款申请已提交，等待平台审核处理。',
+    APPROVED_WAITING: '退款申请已审核通过，等待退款渠道回调。',
+    PARTIAL_SUCCESS: '订单已完成部分退款，可继续查看剩余可退余额。',
+    FULL_SUCCESS: '退款已完成，订单售后金额已经结清。',
+    REJECTED: '最近一笔退款申请已被驳回，可根据原因补充说明后再次联系平台。',
+    FAILED: '退款处理失败，建议尽快联系平台核查渠道回执。',
+  }
+  return hints[stage] || stage
 }
 
 export function getComplaintStatusLabel(status: ComplaintStatus) {

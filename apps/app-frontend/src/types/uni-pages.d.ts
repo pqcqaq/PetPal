@@ -18,6 +18,7 @@ type _LocationUrl =
   "/pages/petpal/aftersales" |
   "/pages/petpal/caregiver-earnings" |
   "/pages/petpal/payment-result" |
+  "/pages/petpal/refund-result" |
   "/pages/petpal/checkout" |
   "/pages/petpal/caregiver-home" |
   "/pages/petpal/caregiver-orders" |
