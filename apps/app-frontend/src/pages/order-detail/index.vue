@@ -15,9 +15,7 @@ import type {
   ComplaintStatus,
   ComplaintTargetRole,
   ComplaintType,
-  CreateComplaintPayload,
   CreateOrderMessagePayload,
-  CreateOrderReviewPayload,
   OrderDetailRecord,
   OrderConversationDetailRecord,
   OrderMessageRecord,
@@ -33,23 +31,24 @@ import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
 import { computed, reactive, ref, watch } from 'vue'
 import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
-import AppInput from '@/components/app-input/app-input.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
 import AppSection from '@/components/app-section/app-section.vue'
 import AppButton from '@/components/app-button/app-button.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import {
   confirmOrderComplete,
-  createOrderComplaint,
   getOrderComplaints,
   getOrderDetail,
   getOrderMessages,
   getOrderRefundProgress,
   markOrderMessagesRead,
-  reviewOrder,
   sendOrderMessage,
 } from '@/api/petpal'
 import { useManagedAttachmentUpload } from '@/composables/useManagedAttachmentUpload'
+import {
+  PETPAL_ORDER_COMPLAINT_PAGE,
+  PETPAL_ORDER_REVIEW_PAGE,
+} from '@/pages/petpal/owner-shared'
 import { useUserStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
 
@@ -191,13 +190,7 @@ interface AftersalesTimelineItem {
   details: string[]
 }
 
-type YesNoChoice = 'YES' | 'NO'
-
-const reviewSubmitting = ref(false)
-const complaintSubmitting = ref(false)
 const confirmingCompletion = ref(false)
-const reviewExpanded = ref(false)
-const complaintExpanded = ref(false)
 const messageSubmitting = ref(false)
 const detailTab = ref<OrderDetailTab>('overview')
 
@@ -209,52 +202,12 @@ const {
   maxSizeMb: 10,
 })
 
-const reviewRatingOptions = [
-  { label: '1 分', value: '1', description: '明显不满意' },
-  { label: '2 分', value: '2', description: '仍有较多问题' },
-  { label: '3 分', value: '3', description: '整体合格' },
-  { label: '4 分', value: '4', description: '体验良好' },
-  { label: '5 分', value: '5', description: '愿意继续复购' },
-]
-
-const complaintTargetOptions = [
-  { label: '照料者', value: 'CAREGIVER', description: '针对履约过程和服务质量' },
-  { label: '平台', value: 'PLATFORM', description: '针对平台处理和售后响应' },
-]
-
-const complaintTypeOptions = [
-  { label: '服务质量', value: 'SERVICE', description: '反馈履约质量问题' },
-  { label: '安全问题', value: 'SAFETY', description: '涉及宠物安全和照料风险' },
-  { label: '费用争议', value: 'FEE', description: '针对收费和退款争议' },
-  { label: '欺诈风险', value: 'FRAUD', description: '涉嫌虚假服务或异常收费' },
-  { label: '其他问题', value: 'OTHER', description: '其他需要平台介入的情况' },
-]
-
-const reviewVisibilityOptions = [
-  { label: '实名评价', value: 'NO', description: '展示当前账号昵称' },
-  { label: '匿名评价', value: 'YES', description: '隐藏你的昵称' },
-]
-
 const detailTabOptions = [
   { label: '总览', value: 'overview', description: '订单信息、金额和主人动作' },
   { label: '沟通', value: 'chat', description: '查看消息、附件与未读状态' },
   { label: '履约', value: 'service', description: '查看时间线和服务记录' },
   { label: '售后', value: 'aftersales', description: '查看退款、投诉和处理进度' },
 ]
-
-const reviewForm = reactive({
-  rating: '5',
-  tagsText: '准时签到, 沟通顺畅',
-  content: '',
-  isAnonymous: 'NO' as YesNoChoice,
-})
-
-const complaintForm = reactive({
-  targetRole: 'CAREGIVER' as ComplaintTargetRole,
-  complaintType: 'SERVICE' as ComplaintType,
-  description: '',
-  evidenceUrlsText: '',
-})
 const messageForm = reactive({
   content: '',
   attachments: [] as CaregiverQualificationMaterialRecord[],
@@ -840,18 +793,18 @@ const openComplaintEvidence = (evidenceUrls: string[], url: string) => {
   openMediaUrl(evidenceUrls, url)
 }
 
-function resetReviewForm() {
-  reviewForm.rating = '5'
-  reviewForm.tagsText = '准时签到, 沟通顺畅'
-  reviewForm.content = ''
-  reviewForm.isAnonymous = 'NO'
+function openReviewPage() {
+  if (!order.value) {
+    return
+  }
+  uni.navigateTo({ url: `${PETPAL_ORDER_REVIEW_PAGE}?id=${order.value.id}` })
 }
 
-function resetComplaintForm() {
-  complaintForm.targetRole = 'CAREGIVER'
-  complaintForm.complaintType = 'SERVICE'
-  complaintForm.description = ''
-  complaintForm.evidenceUrlsText = ''
+function openComplaintPage() {
+  if (!order.value) {
+    return
+  }
+  uni.navigateTo({ url: `${PETPAL_ORDER_COMPLAINT_PAGE}?id=${order.value.id}` })
 }
 
 async function handleConfirmComplete() {
@@ -886,77 +839,6 @@ async function handleConfirmComplete() {
   }
 }
 
-async function submitReview() {
-  if (!order.value) {
-    return
-  }
-
-  const rating = Number(reviewForm.rating)
-  if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
-    uni.showToast({ title: '请选择有效评分', icon: 'none' })
-    return
-  }
-
-  reviewSubmitting.value = true
-  try {
-    const payload: CreateOrderReviewPayload = {
-      rating,
-      tags: reviewForm.tagsText
-        .split(/[\n,，]/)
-        .map(item => item.trim())
-        .filter(Boolean),
-      content: reviewForm.content.trim() || undefined,
-      isAnonymous: reviewForm.isAnonymous === 'YES',
-    }
-    order.value = await reviewOrder(order.value.id, payload)
-    reviewExpanded.value = false
-    resetReviewForm()
-    uni.showToast({ title: '评价已提交', icon: 'none' })
-  }
-  catch (err) {
-    uni.showToast({ title: getErrorMessage(err, '提交评价失败'), icon: 'none' })
-  }
-  finally {
-    reviewSubmitting.value = false
-  }
-}
-
-async function submitComplaint() {
-  if (!order.value) {
-    return
-  }
-
-  const description = complaintForm.description.trim()
-  if (description.length < 5) {
-    uni.showToast({ title: '请填写至少 5 个字的投诉说明', icon: 'none' })
-    return
-  }
-
-  complaintSubmitting.value = true
-  try {
-    const payload: CreateComplaintPayload = {
-      targetRole: complaintForm.targetRole,
-      complaintType: complaintForm.complaintType,
-      description,
-      evidenceUrls: complaintForm.evidenceUrlsText
-        .split(/[\n,，]/)
-        .map(item => item.trim())
-        .filter(Boolean),
-    }
-    await createOrderComplaint(order.value.id, payload)
-    complaintExpanded.value = false
-    resetComplaintForm()
-    await loadOrderDetail()
-    uni.showToast({ title: '投诉已提交', icon: 'none' })
-  }
-  catch (err) {
-    uni.showToast({ title: getErrorMessage(err, '提交投诉失败'), icon: 'none' })
-  }
-  finally {
-    complaintSubmitting.value = false
-  }
-}
-
 async function loadOrderDetail() {
   if (!orderId.value) return
 
@@ -986,12 +868,6 @@ async function loadOrderDetail() {
       ? complaintsResult.value
       : []
     applyConversationDetail(messagesResult.status === 'fulfilled' ? messagesResult.value : null)
-    if (detail.review) {
-      reviewExpanded.value = false
-    }
-    if (complaints.value.some(item => item.status === 'OPEN' || item.status === 'PROCESSING')) {
-      complaintExpanded.value = false
-    }
     await markConversationAsRead()
   } catch (err) {
     refundProgress.value = null
@@ -1089,20 +965,20 @@ onLoad((options: Record<string, string | undefined>) => {
               <AppButton
                 v-if="canCreateReview || order.review"
                 type="info"
-                @click="reviewExpanded = !reviewExpanded"
+                @click="openReviewPage"
               >
-                {{ reviewExpanded ? '收起评价' : (order.review ? '查看评价' : '写评价') }}
+                {{ order.review ? '查看评价' : '写评价' }}
               </AppButton>
               <AppButton
                 v-if="canCreateComplaint || activeComplaint"
                 type="danger"
-                @click="complaintExpanded = !complaintExpanded"
+                @click="openComplaintPage"
               >
-                {{ complaintExpanded ? '收起投诉' : (activeComplaint ? '查看投诉进度' : '发起投诉') }}
+                {{ activeComplaint ? '查看投诉进度' : '发起投诉' }}
               </AppButton>
             </view>
 
-            <view v-if="order.review && reviewExpanded" class="petpal-action-panel">
+            <view v-if="order.review" class="petpal-action-panel">
               <view class="petpal-action-panel__header">
                 <text class="petpal-action-panel__title">已提交评价</text>
                 <text class="petpal-action-panel__meta">{{ formatDateTime(order.review.createdAt) }}</text>
@@ -1119,36 +995,12 @@ onLoad((options: Record<string, string | undefined>) => {
               <view class="petpal-detail-line">
                 <text>{{ order.review.isAnonymous ? '当前为匿名评价' : '当前为实名评价' }}</text>
               </view>
-            </view>
-
-            <view v-else-if="canCreateReview && reviewExpanded" class="petpal-action-panel">
-              <view class="petpal-action-panel__header">
-                <text class="petpal-action-panel__title">提交服务评价</text>
-                <text class="petpal-action-panel__meta">评价会同步影响照料者评分</text>
-              </view>
-              <view class="petpal-form-group">
-                <text class="petpal-form-group__label">服务评分</text>
-                <AppChoiceChips v-model="reviewForm.rating" :options="reviewRatingOptions" />
-              </view>
-              <AppInput v-model="reviewForm.tagsText" label="标签" placeholder="例如：准时签到, 沟通顺畅" />
-              <textarea
-                v-model="reviewForm.content"
-                class="petpal-textarea"
-                :maxlength="240"
-                auto-height
-                placeholder="补充本次照料体验、沟通质量和宠物状态"
-              />
-              <view class="petpal-form-group">
-                <text class="petpal-form-group__label">展示方式</text>
-                <AppChoiceChips v-model="reviewForm.isAnonymous" :options="reviewVisibilityOptions" />
-              </view>
               <view class="petpal-action-grid">
-                <AppButton type="info" size="medium" @click="reviewExpanded = false">取消</AppButton>
-                <AppButton size="medium" :loading="reviewSubmitting" @click="submitReview">提交评价</AppButton>
+                <AppButton size="medium" type="info" @click="openReviewPage">进入评价页</AppButton>
               </view>
             </view>
 
-            <view v-if="activeComplaint && complaintExpanded" class="petpal-action-panel">
+            <view v-if="activeComplaint" class="petpal-action-panel">
               <view class="petpal-action-panel__header">
                 <text class="petpal-action-panel__title">进行中的投诉</text>
                 <text class="petpal-action-panel__meta">{{ getComplaintStatusLabel(activeComplaint.status) }}</text>
@@ -1162,38 +1014,8 @@ onLoad((options: Record<string, string | undefined>) => {
               <view class="petpal-detail-line">
                 <text>投诉类型：{{ getComplaintTypeLabel(activeComplaint.complaintType) }}</text>
               </view>
-            </view>
-
-            <view v-else-if="canCreateComplaint && complaintExpanded" class="petpal-action-panel">
-              <view class="petpal-action-panel__header">
-                <text class="petpal-action-panel__title">提交投诉</text>
-                <text class="petpal-action-panel__meta">平台会结合证据和履约记录介入处理</text>
-              </view>
-              <view class="petpal-form-group">
-                <text class="petpal-form-group__label">投诉对象</text>
-                <AppChoiceChips v-model="complaintForm.targetRole" :options="complaintTargetOptions" />
-              </view>
-              <view class="petpal-form-group">
-                <text class="petpal-form-group__label">投诉类型</text>
-                <AppChoiceChips v-model="complaintForm.complaintType" :options="complaintTypeOptions" />
-              </view>
-              <textarea
-                v-model="complaintForm.description"
-                class="petpal-textarea"
-                :maxlength="400"
-                auto-height
-                placeholder="详细说明发生的问题、时间点和你期待的平台处理方式"
-              />
-              <textarea
-                v-model="complaintForm.evidenceUrlsText"
-                class="petpal-textarea petpal-textarea--compact"
-                :maxlength="400"
-                auto-height
-                placeholder="可补充证据链接，每行一条或使用逗号分隔"
-              />
               <view class="petpal-action-grid">
-                <AppButton type="info" size="medium" @click="complaintExpanded = false">取消</AppButton>
-                <AppButton size="medium" type="danger" :loading="complaintSubmitting" @click="submitComplaint">提交投诉</AppButton>
+                <AppButton size="medium" type="danger" @click="openComplaintPage">进入投诉页</AppButton>
               </view>
             </view>
           </view>

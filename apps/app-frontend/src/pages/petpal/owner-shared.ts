@@ -1,6 +1,7 @@
 import type {
   CaregiverAuditStatus,
   ComplaintStatus,
+  ComplaintTargetRole,
   ComplaintType,
   MatchCaregiverQuery,
   OrderRecord,
@@ -34,6 +35,8 @@ export const PETPAL_CAREGIVER_ORDERS_PAGE = '/pages/petpal/caregiver-orders'
 export const PETPAL_CAREGIVER_EARNINGS_PAGE = '/pages/petpal/caregiver-earnings'
 export const PETPAL_MESSAGES_PAGE = '/pages/petpal/messages'
 export const PETPAL_ORDER_DETAIL_PAGE = '/pages/order-detail/index'
+export const PETPAL_ORDER_REVIEW_PAGE = '/pages/order-review/index'
+export const PETPAL_ORDER_COMPLAINT_PAGE = '/pages/order-complaint/index'
 
 export type ConversationRole = 'owner' | 'caregiver'
 export type CaregiverOrderFilterValue = OrderStatus | 'ALL'
@@ -105,6 +108,11 @@ export const complaintTypeLabels: Record<ComplaintType, string> = {
   SERVICE: '服务质量',
   FRAUD: '欺诈风险',
   OTHER: '其他问题',
+}
+
+export const complaintTargetRoleLabels: Record<ComplaintTargetRole, string> = {
+  CAREGIVER: '照料者',
+  PLATFORM: '平台',
 }
 
 export const serviceTypeOptions = [
@@ -249,6 +257,10 @@ export function getComplaintStatusLabel(status: ComplaintStatus) {
 
 export function getComplaintTypeLabel(type: ComplaintType) {
   return complaintTypeLabels[type] || type
+}
+
+export function getComplaintTargetRoleLabel(role: ComplaintTargetRole) {
+  return complaintTargetRoleLabels[role] || role
 }
 
 export function getCaregiverAuditHint(status: CaregiverAuditStatus | null | undefined) {

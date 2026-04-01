@@ -77,10 +77,26 @@
       }
     },
     {
+      "path": "pages/order-complaint/index",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "投诉处理",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/order-detail/index",
       "type": "page",
       "style": {
         "navigationBarTitleText": "订单详情",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/order-review/index",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "订单评价",
         "enablePullDownRefresh": true
       }
     },

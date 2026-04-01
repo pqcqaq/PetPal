@@ -290,6 +290,10 @@ Web：
   - 履约订单页改为状态筛选 + 任务队列 + 就地服务记录。
   - 服务管理页改为就地编辑 + 快速上下架，不再依赖说明区和跳转盒子。
 - 本轮重构涉及的 App 页面已统一补齐文件头部 `UX Blueprint` 注释，编码前先冻结目标用户、入口场景、首屏目标和主次动作。
+- App 端订单动作链路已继续拆页：
+  - 新增 `pages/order-review/index.vue` 承接评价动作。
+  - 新增 `pages/order-complaint/index.vue` 承接投诉动作。
+  - `pages/order-detail/index.vue` 已移除内嵌评价/投诉表单，只保留动作入口与状态摘要。
 - App 端已新增 `pages/petpal/messages.vue`，把主人与照料者两侧订单沟通收口为跨订单消息中心。
 - App 端已新增 `pages/petpal/aftersales.vue`，把主人端退款、投诉和争议订单收口为独立售后中心。
 - App 端已新增 `pages/petpal/reminders.vue`，把主人端、照料者端和售后相关待办统一聚合到提醒中心。
