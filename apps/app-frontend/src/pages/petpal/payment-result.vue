@@ -36,6 +36,7 @@ import {
   PETPAL_ORDERS_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
+  PETPAL_REVIEW_RESULT_PAGE,
   serviceTypeLabels,
 } from './owner-shared'
 
@@ -226,8 +227,8 @@ const primaryActionLabel = computed(() => {
   if (!isFullyPaid.value) {
     return `继续支付 ¥${formatAmount(outstandingAmount.value)}`
   }
-  if (order.value.orderStatus === 'COMPLETED' && !order.value.review) {
-    return '去写评价'
+  if (order.value.orderStatus === 'COMPLETED') {
+    return order.value.review ? '查看评价结果' : '去写评价'
   }
   return '进入订单'
 })
@@ -268,8 +269,9 @@ function openPrimaryAction() {
     return
   }
 
-  if (order.value.orderStatus === 'COMPLETED' && !order.value.review) {
-    uni.redirectTo({ url: `${PETPAL_ORDER_REVIEW_PAGE}?id=${order.value.id}` })
+  if (order.value.orderStatus === 'COMPLETED') {
+    const targetPage = order.value.review ? PETPAL_REVIEW_RESULT_PAGE : PETPAL_ORDER_REVIEW_PAGE
+    uni.redirectTo({ url: `${targetPage}?id=${order.value.id}` })
     return
   }
 

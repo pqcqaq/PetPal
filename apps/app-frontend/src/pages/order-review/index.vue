@@ -6,7 +6,7 @@
  * Core scenes:
  * 1. 首屏先判断这单现在是否能评、是否已评
  * 2. 在同一屏完成评分、标签和一句话反馈
- * 3. 已评价时先看结果，不再重复出现提交表单
+ * 3. 已评价时直接进入结果页，不再重复出现提交表单
  * Primary action: 提交评价
  * Secondary actions: 快速补标签、切实名/匿名、返回订单详情
  * Feedback: 当前阶段、已退金额、服务记录数量、当前评分与标签数量
@@ -34,6 +34,7 @@ import {
   getOrderStatusLabel,
   joinTagText,
   PETPAL_ORDER_DETAIL_PAGE,
+  PETPAL_REVIEW_RESULT_PAGE,
   serviceTypeLabels,
   splitTagText,
 } from '../petpal/owner-shared'
@@ -68,6 +69,7 @@ const order = ref<OrderDetailRecord | null>(null)
 const loading = ref(false)
 const error = ref('')
 const submitting = ref(false)
+const redirectingToResult = ref(false)
 
 const reviewForm = reactive({
   rating: '5',
@@ -144,10 +146,10 @@ const reviewHeroTags = computed(() => {
 })
 const reviewSummaryHint = computed(() => {
   if (order.value?.review) {
-    return '评价结果已经提交，可直接回看内容。'
+    return '正在进入评价结果。'
   }
   if (canSubmitReview.value) {
-    return '先给整体评分，再补标签和一句话反馈。'
+    return '先给整体评分，再补标签和一句话反馈。提交后会直接进入结果页。'
   }
   return '只有主人在订单完成后才能提交一次评价。'
 })
@@ -208,6 +210,20 @@ function openOrderDetail() {
   uni.redirectTo({ url: `${PETPAL_ORDER_DETAIL_PAGE}?id=${orderId.value}&tab=overview` })
 }
 
+function openReviewResult() {
+  if (!orderId.value) {
+    openOrderDetail()
+    return
+  }
+  redirectingToResult.value = true
+  uni.redirectTo({
+    url: `${PETPAL_REVIEW_RESULT_PAGE}?id=${orderId.value}`,
+    fail: () => {
+      uni.navigateTo({ url: `${PETPAL_REVIEW_RESULT_PAGE}?id=${orderId.value}` })
+    },
+  })
+}
+
 async function loadPage(showError = false) {
   if (!orderId.value || loading.value) {
     uni.stopPullDownRefresh()
@@ -215,12 +231,18 @@ async function loadPage(showError = false) {
   }
 
   loading.value = true
+  redirectingToResult.value = false
   error.value = ''
   try {
     order.value = await getOrderDetail(orderId.value)
+    if (order.value.review) {
+      openReviewResult()
+      return
+    }
   }
   catch (err) {
     order.value = null
+    redirectingToResult.value = false
     error.value = getErrorMessage(err, '加载评价页失败')
     if (showError) {
       uni.showToast({ title: error.value, icon: 'none' })
@@ -252,7 +274,7 @@ async function submitReview() {
       isAnonymous: reviewForm.isAnonymous === 'YES',
     }
     order.value = await reviewOrder(order.value.id, payload)
-    uni.showToast({ title: '评价已提交', icon: 'none' })
+    openReviewResult()
   }
   catch (err) {
     uni.showToast({ title: getErrorMessage(err, '提交评价失败'), icon: 'none' })
@@ -320,26 +342,8 @@ onPullDownRefresh(() => {
         </view>
       </AppSection>
 
-      <AppSection v-if="order.review" title="已提交评价">
-        <view class="order-review-result">
-          <view class="order-review-result__header">
-            <text class="order-review-result__title">{{ order.review.rating }} / 5 分</text>
-            <AppTag :type="order.review.isAnonymous ? 'warning' : 'default'">
-              {{ order.review.isAnonymous ? '匿名评价' : '实名评价' }}
-            </AppTag>
-          </view>
-          <view v-if="order.review.tags.length" class="order-review-chip-row">
-            <view
-              v-for="tag in order.review.tags"
-              :key="tag"
-              class="order-review-chip order-review-chip--selected"
-            >
-              <text>{{ tag }}</text>
-            </view>
-          </view>
-          <text v-if="order.review.content" class="order-review-result__content">{{ order.review.content }}</text>
-          <text class="order-review-result__meta">提交于 {{ formatRange(order.review.createdAt, order.review.createdAt).split(' - ')[0] }}</text>
-        </view>
+      <AppSection v-if="redirectingToResult" title="打开评价结果">
+        <AppStatus mode="loading" text="正在进入评价结果" />
       </AppSection>
 
       <AppSection v-else-if="canSubmitReview" title="写评价">

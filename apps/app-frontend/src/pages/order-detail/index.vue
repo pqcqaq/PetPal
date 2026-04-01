@@ -55,6 +55,7 @@ import {
   PETPAL_COMPLAINT_RESULT_PAGE,
   PETPAL_ORDER_COMPLAINT_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
+  PETPAL_REVIEW_RESULT_PAGE,
   PETPAL_REFUND_RESULT_PAGE,
   getConversationHint,
   getConversationPreview,
@@ -1094,7 +1095,8 @@ function openReviewPage() {
   if (!order.value) {
     return
   }
-  uni.navigateTo({ url: `${PETPAL_ORDER_REVIEW_PAGE}?id=${order.value.id}` })
+  const targetPage = order.value.review ? PETPAL_REVIEW_RESULT_PAGE : PETPAL_ORDER_REVIEW_PAGE
+  uni.navigateTo({ url: `${targetPage}?id=${order.value.id}` })
 }
 
 function openCheckoutPage() {
@@ -1324,7 +1326,9 @@ onLoad((options: Record<string, string | undefined>) => {
                 <text>{{ order.review.isAnonymous ? '当前为匿名评价' : '当前为实名评价' }}</text>
               </view>
               <view class="petpal-action-grid">
-                <AppButton size="medium" type="info" @click="openReviewPage">进入评价页</AppButton>
+                <AppButton size="medium" type="info" @click="openReviewPage">
+                  {{ order.review ? '查看评价结果' : '进入评价页' }}
+                </AppButton>
               </view>
             </view>
 

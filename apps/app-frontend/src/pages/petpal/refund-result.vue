@@ -47,6 +47,7 @@ import {
   PETPAL_ORDER_COMPLAINT_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
+  PETPAL_REVIEW_RESULT_PAGE,
   serviceTypeLabels,
 } from './owner-shared'
 
@@ -333,8 +334,8 @@ const primaryActionLabel = computed(() => {
   if (refundStage.value === 'PARTIAL_SUCCESS') {
     return refundableBalance.value > 0 ? '继续处理售后' : '返回订单'
   }
-  if (refundStage.value === 'FULL_SUCCESS' && order.value.orderStatus === 'COMPLETED' && !order.value.review) {
-    return '去写评价'
+  if (refundStage.value === 'FULL_SUCCESS' && order.value.orderStatus === 'COMPLETED') {
+    return order.value.review ? '查看评价结果' : '去写评价'
   }
   return '返回订单'
 })
@@ -376,7 +377,8 @@ function openReviewPage() {
   if (!order.value) {
     return
   }
-  uni.redirectTo({ url: `${PETPAL_ORDER_REVIEW_PAGE}?id=${order.value.id}` })
+  const targetPage = order.value.review ? PETPAL_REVIEW_RESULT_PAGE : PETPAL_ORDER_REVIEW_PAGE
+  uni.redirectTo({ url: `${targetPage}?id=${order.value.id}` })
 }
 
 function openPrimaryAction() {
@@ -404,7 +406,7 @@ function openPrimaryAction() {
     return
   }
 
-  if (refundStage.value === 'FULL_SUCCESS' && order.value.orderStatus === 'COMPLETED' && !order.value.review) {
+  if (refundStage.value === 'FULL_SUCCESS' && order.value.orderStatus === 'COMPLETED') {
     openReviewPage()
     return
   }

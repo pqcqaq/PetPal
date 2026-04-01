@@ -20,6 +20,7 @@ type _LocationUrl =
   "/pages/petpal/payment-result" |
   "/pages/petpal/refund-result" |
   "/pages/petpal/complaint-result" |
+  "/pages/petpal/review-result" |
   "/pages/petpal/checkout" |
   "/pages/petpal/caregiver-home" |
   "/pages/petpal/caregiver-orders" |

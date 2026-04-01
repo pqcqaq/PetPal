@@ -6965,3 +6965,54 @@ flowchart TD
 1. 继续推进 Web 对应的交易结果 / 售后结果页收口，减少前后端多端体验分裂。
 2. 继续补系统级主动提醒、跨页面主动引导和更细的结果回流。
 3. 在结果页链路基本稳定后，再集中补更多弱网态和最终验收收口。
+
+### 14.124 2026-04-02（P3-M1 Slice 114）
+
+**概述**：继续推进 App 主人端交易后段反馈收口，本轮补齐独立评价结果页，并把订单详情、评价提交回流和其他结果页中的评价入口统一到“表单页 / 结果页”双页结构。
+
+已完成：
+
+- 新增评价结果页：
+  - `apps/app-frontend/src/pages/petpal/review-result.vue`
+    - 新增独立评价结果页，首屏直接展示评分结果、匿名状态、订单阶段和下一步动作。
+    - 已评价内容、标签和一句话反馈已在同页收口，回看评价不再回到表单页确认。
+    - 当订单仍有未读沟通或售后事项时，结果页会直接把用户导回正确处理入口。
+- 接通评价结果入口：
+  - `apps/app-frontend/src/pages/order-review/index.vue`
+    - 评价提交成功后已直接回流到评价结果页，评价页本身进一步收回为“填写评价”任务页。
+    - 如果当前订单已经评价，打开评价页会直接跳评价结果页，不再混排结果卡和表单。
+  - `apps/app-frontend/src/pages/order-detail/index.vue`
+    - 订单详情里的评价入口已按是否已有评价自动切到评价结果页或评价填写页。
+  - `apps/app-frontend/src/pages/petpal/payment-result.vue`
+  - `apps/app-frontend/src/pages/petpal/refund-result.vue`
+  - `apps/app-frontend/src/pages/petpal/complaint-result.vue`
+    - 三类结果页里的“去写评价”动作已统一改为按订单状态自动进入评价填写页或评价结果页。
+- 路由与共享常量同步：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+  - `apps/app-frontend/src/pages.json`
+  - `apps/app-frontend/src/types/uni-pages.d.ts`
+- 文档同步：
+  - `apps/docs/project/PetPal-Frontend-Blueprint.md`
+  - `apps/docs/project/PetPal-UX-Rebuild.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，评价结果页全部基于现有 `OrderDetailRecord.review`、订单状态和售后状态做前端重排。
+- 已确认订单详情、评价提交回流以及支付/退款/投诉结果中的评价动作都已统一到同一套路由决策，不再出现“已评价还回表单页”的分叉。
+- 已确认评价结果页继续沿用当前 Material 3 token 和任务页结构，没有回退到说明式布局。
+
+风险与缓解：
+
+- 风险：App 端结果页链路已经统一，但 Web 对应结果反馈和更主动的系统提醒仍未同步到同样标准。
+- 缓解：下一轮优先继续收口 Web 对应结果页与跨页面主动提醒，避免多端结果反馈再次分叉。
+
+下一步（1-3）：
+
+1. 继续推进 Web 对应的交易结果 / 售后结果页收口，减少前后端多端体验分裂。
+2. 继续补系统级主动提醒、跨页面主动引导和更细的结果回流。
+3. 在结果页链路基本稳定后，再集中补更多弱网态和最终验收收口。

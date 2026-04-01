@@ -39,6 +39,7 @@ import {
   PETPAL_ORDER_COMPLAINT_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
+  PETPAL_REVIEW_RESULT_PAGE,
   serviceTypeLabels,
 } from './owner-shared'
 
@@ -239,8 +240,8 @@ const primaryActionLabel = computed(() => {
   if (targetComplaint.value.status === 'REJECTED' && canCreateComplaint.value) {
     return '重新投诉'
   }
-  if (targetComplaint.value.status === 'RESOLVED' && order.value.orderStatus === 'COMPLETED' && !order.value.review) {
-    return '去写评价'
+  if (targetComplaint.value.status === 'RESOLVED' && order.value.orderStatus === 'COMPLETED') {
+    return order.value.review ? '查看评价结果' : '去写评价'
   }
   return '返回订单'
 })
@@ -277,7 +278,8 @@ function openReviewPage() {
   if (!order.value) {
     return
   }
-  uni.redirectTo({ url: `${PETPAL_ORDER_REVIEW_PAGE}?id=${order.value.id}` })
+  const targetPage = order.value.review ? PETPAL_REVIEW_RESULT_PAGE : PETPAL_ORDER_REVIEW_PAGE
+  uni.redirectTo({ url: `${targetPage}?id=${order.value.id}` })
 }
 
 function openPrimaryAction() {
@@ -296,7 +298,7 @@ function openPrimaryAction() {
     return
   }
 
-  if (targetComplaint.value.status === 'RESOLVED' && order.value.orderStatus === 'COMPLETED' && !order.value.review) {
+  if (targetComplaint.value.status === 'RESOLVED' && order.value.orderStatus === 'COMPLETED') {
     openReviewPage()
     return
   }

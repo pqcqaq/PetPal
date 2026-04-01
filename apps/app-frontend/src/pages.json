@@ -141,6 +141,14 @@
       }
     },
     {
+      "path": "pages/petpal/review-result",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "评价结果",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/petpal/checkout",
       "type": "page",
       "style": {
