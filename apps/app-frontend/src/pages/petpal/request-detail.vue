@@ -52,6 +52,7 @@ definePage({
 
 type RequestDetailPanel = 'MATCHES' | 'PLAN' | 'STATE'
 type MatchSortMode = 'RECOMMENDED' | 'PRICE_LOW' | 'RATING_HIGH' | 'DISTANCE_NEAR'
+type MatchFilterMode = 'ALL' | 'WITHIN_BUDGET' | 'NEARBY' | 'TOP_RATED'
 type RequestFlowStep = 'SCHEDULE' | 'DETAIL' | 'REVIEW'
 
 const tokenStore = useTokenStore()
@@ -66,6 +67,7 @@ const matchItems = ref<MatchedCaregiverRecord[]>([])
 const selectedServiceId = ref('')
 const activePanel = ref<RequestDetailPanel>('MATCHES')
 const matchSortMode = ref<MatchSortMode>('RECOMMENDED')
+const matchFilterMode = ref<MatchFilterMode>('ALL')
 
 const panelOptions = [
   { label: '匹配', value: 'MATCHES' },
@@ -78,6 +80,13 @@ const matchSortOptions = [
   { label: '更省', value: 'PRICE_LOW' },
   { label: '高分', value: 'RATING_HIGH' },
   { label: '更近', value: 'DISTANCE_NEAR' },
+]
+
+const matchFilterOptions = [
+  { label: '全部', value: 'ALL' },
+  { label: '预算内', value: 'WITHIN_BUDGET' },
+  { label: '更近', value: 'NEARBY' },
+  { label: '更稳', value: 'TOP_RATED' },
 ]
 
 function getDistanceValue(item: MatchedCaregiverRecord) {
@@ -141,8 +150,58 @@ function getRequestDurationHours(request: ServiceRequestRecord) {
   )
 }
 
+function getEstimatedUnits(request: ServiceRequestRecord, caregiver: MatchedCaregiverRecord) {
+  const durationHours = getRequestDurationHours(request)
+  const unitType = caregiver.unitType.trim().toUpperCase()
+
+  if (unitType.includes('DAY')) {
+    return Math.max(1, Math.ceil(durationHours / 24))
+  }
+  if (unitType.includes('HOUR')) {
+    return Math.max(1, Math.ceil(durationHours))
+  }
+  if (unitType.includes('HALF')) {
+    return Math.max(1, Math.ceil(durationHours / 12))
+  }
+  if (unitType.includes('VISIT') || unitType.includes('TIME') || unitType.includes('TRIP')) {
+    return 1
+  }
+  if (request.serviceType === 'BOARDING') {
+    return Math.max(1, Math.ceil(durationHours / 24))
+  }
+  return 1
+}
+
+function getEstimatedSpend(request: ServiceRequestRecord, caregiver: MatchedCaregiverRecord) {
+  return Number((Number(caregiver.pricePerUnit) * getEstimatedUnits(request, caregiver)).toFixed(2))
+}
+
+function filterMatches(
+  items: MatchedCaregiverRecord[],
+  mode: MatchFilterMode,
+  request: ServiceRequestRecord | null,
+) {
+  if (!request) {
+    return items
+  }
+
+  const budgetAmount = Number(request.budgetAmount ?? 0)
+  return items.filter((item) => {
+    if (mode === 'WITHIN_BUDGET') {
+      return budgetAmount > 0 ? getEstimatedSpend(request, item) <= budgetAmount : true
+    }
+    if (mode === 'NEARBY') {
+      return item.distanceKm == null || item.distanceKm <= 5
+    }
+    if (mode === 'TOP_RATED') {
+      return Number(item.ratingAvg) >= 4.8 || item.ratingCount >= 20
+    }
+    return true
+  })
+}
+
 const rankedMatchItems = computed(() => sortMatches(
-  matchItems.value,
+  filterMatches(matchItems.value, matchFilterMode.value, requestRecord.value),
   matchSortMode.value,
   requestRecord.value?.matchedCaregiverId,
 ))
@@ -162,12 +221,28 @@ const quickCandidateOptions = computed(() => rankedMatchItems.value
   .map(item => ({
     label: item.caregiverName,
     value: item.serviceId,
-    description: `¥${formatAmount(item.pricePerUnit)} · ${formatDistanceKm(item.distanceKm)}`,
+    description: requestRecord.value
+      ? `预估 ¥${formatAmount(getEstimatedSpend(requestRecord.value, item))} · ${formatDistanceKm(item.distanceKm)}`
+      : `¥${formatAmount(item.pricePerUnit)} · ${formatDistanceKm(item.distanceKm)}`,
   })))
 
 const alternativeCaregivers = computed(() => rankedMatchItems.value
   .filter(item => item.serviceId !== selectedCaregiver.value?.serviceId)
   .slice(0, 3))
+
+const compareCandidates = computed(() => rankedMatchItems.value.slice(0, 3))
+
+const filterSummary = computed(() => {
+  const totalCount = matchItems.value.length
+  const visibleCount = rankedMatchItems.value.length
+  if (totalCount === 0) {
+    return '当前还没有候选照料者'
+  }
+  if (visibleCount === totalCount) {
+    return `当前共 ${totalCount} 位候选`
+  }
+  return `当前筛出 ${visibleCount} / ${totalCount} 位候选`
+})
 
 const selectedCaregiverMetrics = computed(() => {
   const caregiver = selectedCaregiver.value
@@ -178,6 +253,10 @@ const selectedCaregiverMetrics = computed(() => {
     {
       label: '报价',
       value: `¥${formatAmount(caregiver.pricePerUnit)}/${caregiver.unitType}`,
+    },
+    {
+      label: '预估',
+      value: requestRecord.value ? `¥${formatAmount(getEstimatedSpend(requestRecord.value, caregiver))}` : '--',
     },
     {
       label: '评分',
@@ -307,15 +386,14 @@ function syncSelectedCaregiver() {
     return
   }
 
-  if (selectedServiceId.value && matchItems.value.some(item => item.serviceId === selectedServiceId.value)) {
-    return
-  }
-
   const rankedItems = sortMatches(
-    matchItems.value,
+    filterMatches(matchItems.value, matchFilterMode.value, requestRecord.value),
     matchSortMode.value,
     requestRecord.value?.matchedCaregiverId,
   )
+  if (selectedServiceId.value && rankedItems.some(item => item.serviceId === selectedServiceId.value)) {
+    return
+  }
   selectedServiceId.value = rankedItems[0]?.serviceId || ''
 }
 
@@ -466,6 +544,13 @@ watch(matchSortMode, () => {
   syncSelectedCaregiver()
 })
 
+watch(matchFilterMode, () => {
+  if (!matchItems.value.length) {
+    return
+  }
+  syncSelectedCaregiver()
+})
+
 onLoad((options: Record<string, string | undefined>) => {
   requestId.value = options.requestId || ''
 })
@@ -529,9 +614,14 @@ onPullDownRefresh(() => {
           <AppChoiceChips v-model="activePanel" :options="panelOptions" />
         </AppSection>
 
-        <AppSection v-if="activePanel === 'MATCHES'" :title="matchItems.length ? `匹配照料者 (${matchItems.length})` : '匹配照料者'">
+        <AppSection v-if="activePanel === 'MATCHES'" :title="matchItems.length ? `匹配照料者 (${rankedMatchItems.length}/${matchItems.length})` : '匹配照料者'">
           <view class="request-stack">
+            <AppChoiceChips v-model="matchFilterMode" :options="matchFilterOptions" />
             <AppChoiceChips v-model="matchSortMode" :options="matchSortOptions" />
+
+            <view class="request-inline-summary">
+              <text>{{ filterSummary }}</text>
+            </view>
 
             <AppChoiceChips
               v-if="quickCandidateOptions.length"
@@ -578,6 +668,75 @@ onPullDownRefresh(() => {
               </view>
             </view>
 
+            <view v-if="compareCandidates.length" class="compare-board">
+              <view class="compare-board__header">
+                <text class="compare-board__title">快速对比</text>
+                <AppTag type="default">{{ compareCandidates.length }} 位候选</AppTag>
+              </view>
+              <scroll-view scroll-x class="compare-board__scroll">
+                <view class="compare-board__table">
+                  <view class="compare-board__row compare-board__row--header">
+                    <text class="compare-board__metric">维度</text>
+                    <view
+                      v-for="item in compareCandidates"
+                      :key="`header-${item.serviceId}`"
+                      class="compare-board__cell compare-board__cell--candidate"
+                      :class="selectedServiceId === item.serviceId ? 'compare-board__cell--active' : ''"
+                      @click="selectedServiceId = item.serviceId"
+                    >
+                      <text class="compare-board__candidate">{{ item.caregiverName }}</text>
+                    </view>
+                  </view>
+                  <view class="compare-board__row">
+                    <text class="compare-board__metric">预估</text>
+                    <view
+                      v-for="item in compareCandidates"
+                      :key="`spend-${item.serviceId}`"
+                      class="compare-board__cell"
+                    >
+                      <text class="compare-board__value">
+                        {{ requestRecord ? `¥${formatAmount(getEstimatedSpend(requestRecord, item))}` : '--' }}
+                      </text>
+                    </view>
+                  </view>
+                  <view class="compare-board__row">
+                    <text class="compare-board__metric">评分</text>
+                    <view
+                      v-for="item in compareCandidates"
+                      :key="`rating-${item.serviceId}`"
+                      class="compare-board__cell"
+                    >
+                      <text class="compare-board__value">
+                        {{ formatAmount(item.ratingAvg) }} / {{ item.ratingCount }}
+                      </text>
+                    </view>
+                  </view>
+                  <view class="compare-board__row">
+                    <text class="compare-board__metric">距离</text>
+                    <view
+                      v-for="item in compareCandidates"
+                      :key="`distance-${item.serviceId}`"
+                      class="compare-board__cell"
+                    >
+                      <text class="compare-board__value">{{ formatDistanceKm(item.distanceKm) }}</text>
+                    </view>
+                  </view>
+                  <view class="compare-board__row">
+                    <text class="compare-board__metric">计价</text>
+                    <view
+                      v-for="item in compareCandidates"
+                      :key="`unit-${item.serviceId}`"
+                      class="compare-board__cell"
+                    >
+                      <text class="compare-board__value">
+                        ¥{{ formatAmount(item.pricePerUnit) }}/{{ item.unitType }}
+                      </text>
+                    </view>
+                  </view>
+                </view>
+              </scroll-view>
+            </view>
+
             <AppList v-if="alternativeCaregivers.length">
               <AppListItem
                 v-for="item in alternativeCaregivers"
@@ -592,8 +751,15 @@ onPullDownRefresh(() => {
               />
             </AppList>
 
-            <view v-if="!matchItems.length" class="request-empty">
-              <AppStatus :mode="matchesLoading ? 'loading' : 'empty'" :text="matchesLoading ? '正在刷新匹配' : '当前没有可用照料者'" />
+            <view v-if="!rankedMatchItems.length" class="request-empty">
+              <AppStatus
+                :mode="matchesLoading ? 'loading' : 'empty'"
+                :text="matchesLoading ? '正在刷新匹配' : (matchItems.length ? '当前筛选下没有合适照料者' : '当前没有可用照料者')"
+              />
+              <view v-if="!matchesLoading && matchItems.length" class="request-toolbar">
+                <AppButton size="medium" type="info" @click="matchFilterMode = 'ALL'">清空筛选</AppButton>
+                <AppButton size="medium" @click="loadMatches(true, true)">换一批</AppButton>
+              </view>
             </view>
           </view>
         </AppSection>
@@ -722,7 +888,10 @@ onPullDownRefresh(() => {
 .request-stage__metric-label,
 .selected-caregiver__meta,
 .selected-caregiver__metric-label,
-.progress-node__label {
+.progress-node__label,
+.request-inline-summary,
+.compare-board__metric,
+.compare-board__value {
   color: var(--app-text-secondary);
   font-size: 22rpx;
   line-height: 1.6;
@@ -761,11 +930,79 @@ onPullDownRefresh(() => {
   background: linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
 }
 
+.request-inline-summary,
+.compare-board {
+  padding: 20rpx 24rpx;
+  border-radius: 22rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+}
+
 .selected-caregiver__headline {
   display: flex;
   gap: 16rpx;
   align-items: flex-start;
   justify-content: space-between;
+}
+
+.compare-board {
+  display: grid;
+  gap: 16rpx;
+}
+
+.compare-board__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.compare-board__title,
+.compare-board__candidate {
+  color: var(--app-text);
+  font-size: 26rpx;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.compare-board__scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.compare-board__table {
+  display: grid;
+  min-width: 720rpx;
+}
+
+.compare-board__row {
+  display: grid;
+  grid-template-columns: 140rpx repeat(3, minmax(0, 1fr));
+}
+
+.compare-board__row + .compare-board__row {
+  border-top: 1rpx solid var(--app-outline-variant);
+}
+
+.compare-board__metric,
+.compare-board__cell {
+  padding: 20rpx 16rpx;
+}
+
+.compare-board__metric {
+  color: var(--app-text-muted);
+}
+
+.compare-board__cell--candidate {
+  cursor: pointer;
+}
+
+.compare-board__cell--active {
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, rgba(255, 255, 255, 0) 100%);
+}
+
+.compare-board__value {
+  color: var(--app-text);
 }
 
 .progress-rail {
