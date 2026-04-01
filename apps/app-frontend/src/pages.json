@@ -62,6 +62,14 @@
       }
     },
     {
+      "path": "pages/petpal/caregiver-earnings",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "收益表现",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/petpal/caregiver-home",
       "type": "page",
       "style": {

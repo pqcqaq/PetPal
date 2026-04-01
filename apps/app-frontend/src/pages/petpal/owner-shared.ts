@@ -21,6 +21,7 @@ export const PETPAL_CAREGIVER_HOME_PAGE = '/pages/petpal/caregiver-home'
 export const PETPAL_CAREGIVER_PROFILE_PAGE = '/pages/petpal/caregiver-profile'
 export const PETPAL_CAREGIVER_SERVICES_PAGE = '/pages/petpal/caregiver-services'
 export const PETPAL_CAREGIVER_ORDERS_PAGE = '/pages/petpal/caregiver-orders'
+export const PETPAL_CAREGIVER_EARNINGS_PAGE = '/pages/petpal/caregiver-earnings'
 export const PETPAL_MESSAGES_PAGE = '/pages/petpal/messages'
 export const PETPAL_ORDER_DETAIL_PAGE = '/pages/order-detail/index'
 
@@ -107,6 +108,7 @@ export const caregiverFlowOptions = [
   { label: '入驻中心', value: PETPAL_CAREGIVER_PROFILE_PAGE, description: '维护介绍、专长和资质材料' },
   { label: '服务管理', value: PETPAL_CAREGIVER_SERVICES_PAGE, description: '设置报价、范围与上架状态' },
   { label: '履约订单', value: PETPAL_CAREGIVER_ORDERS_PAGE, description: '处理接单、签到和服务记录' },
+  { label: '收益表现', value: PETPAL_CAREGIVER_EARNINGS_PAGE, description: '查看收入、评分和售后风险' },
 ]
 
 export const caregiverOrderFilterOptions = [
@@ -128,6 +130,14 @@ export const serviceLogTypeOptions = [
 export function formatAmount(value: number | string | null | undefined) {
   const amount = Number(value ?? 0)
   return Number.isFinite(amount) ? amount.toFixed(2) : '0.00'
+}
+
+export function formatPercent(value: number | null | undefined) {
+  const numberValue = Number(value ?? 0)
+  if (!Number.isFinite(numberValue)) {
+    return '0%'
+  }
+  return `${(numberValue * 100).toFixed(numberValue >= 0.1 ? 1 : 0)}%`
 }
 
 export function formatDate(value: string | null | undefined) {

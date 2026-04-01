@@ -11,6 +11,7 @@ import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { listOrders, listPets, listServiceRequests } from '@/api/petpal'
+import { PETPAL_CAREGIVER_EARNINGS_PAGE } from '@/pages/petpal/owner-shared'
 import { LOGIN_PAGE, REGISTER_PAGE } from '@/router/config'
 import { useUiStore, useUserStore } from '@/store'
 import { useTokenStore } from '@/store/token'
@@ -150,6 +151,14 @@ function openServiceBoard() {
   uni.navigateTo({ url: '/pages/petpal/owner-home' })
 }
 
+function openCaregiverEarnings() {
+  if (!tokenStore.hasLogin) {
+    handleLogin()
+    return
+  }
+  uni.navigateTo({ url: PETPAL_CAREGIVER_EARNINGS_PAGE })
+}
+
 function openHome() {
   uni.switchTab({ url: '/pages/index/index' })
 }
@@ -245,6 +254,7 @@ onShow(() => {
       <AppSection title="常用入口">
         <AppList>
           <AppListItem title="进入服务台" label="继续发布需求、维护宠物档案和查看匹配。" is-link clickable @click="openServiceBoard" />
+          <AppListItem title="照料者收益表现" label="若你已申请照料者，可查看收入、完成率和售后风险。" is-link clickable @click="openCaregiverEarnings" />
           <AppListItem title="个人资料" label="更新昵称、头像和联系方式。" is-link clickable @click="openProfile" />
           <AppListItem title="PetPal 设置" label="调整首页布局、主题和底栏样式。" is-link clickable @click="openSettings" />
           <AppListItem title="返回首页" label="回到首页继续查看订单和推荐照料者。" is-link clickable @click="openHome" />

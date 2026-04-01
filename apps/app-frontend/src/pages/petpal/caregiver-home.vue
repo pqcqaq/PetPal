@@ -29,6 +29,7 @@ import {
   getConversationPreview,
   getConversationUnreadCount,
   getOrderStatusLabel,
+  PETPAL_CAREGIVER_EARNINGS_PAGE,
   PETPAL_CAREGIVER_HOME_PAGE,
   PETPAL_CAREGIVER_ORDERS_PAGE,
   PETPAL_CAREGIVER_PROFILE_PAGE,
@@ -129,6 +130,10 @@ function openOrders() {
   uni.redirectTo({ url: PETPAL_CAREGIVER_ORDERS_PAGE })
 }
 
+function openEarnings() {
+  uni.redirectTo({ url: PETPAL_CAREGIVER_EARNINGS_PAGE })
+}
+
 function openMessages() {
   uni.redirectTo({ url: PETPAL_MESSAGES_PAGE })
 }
@@ -209,6 +214,7 @@ onPullDownRefresh(() => {
             </view>
             <view class="caregiver-hero__actions">
               <AppButton size="medium" @click="openOrders">处理订单</AppButton>
+              <AppButton size="medium" type="info" @click="openEarnings">收益表现</AppButton>
               <AppButton size="medium" type="info" @click="openMessages">查看消息</AppButton>
             </view>
           </view>
@@ -236,6 +242,10 @@ onPullDownRefresh(() => {
           <view class="caregiver-quick-card" @click="openOrders">
             <text class="caregiver-quick-card__title">处理履约订单</text>
             <text class="caregiver-quick-card__text">完成接单、签到、服务记录和签退动作。</text>
+          </view>
+          <view class="caregiver-quick-card" @click="openEarnings">
+            <text class="caregiver-quick-card__title">查看收益表现</text>
+            <text class="caregiver-quick-card__text">汇总收入、评分、完成率和售后风险。</text>
           </view>
         </view>
       </AppSection>

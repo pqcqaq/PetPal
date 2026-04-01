@@ -271,6 +271,7 @@ Web：
   - `pages/petpal/orders.vue`
 - App 端已新增照料者主流程页面：
   - `pages/petpal/caregiver-home.vue`
+  - `pages/petpal/caregiver-earnings.vue`
   - `pages/petpal/caregiver-profile.vue`
   - `pages/petpal/caregiver-services.vue`
   - `pages/petpal/caregiver-orders.vue`
@@ -282,13 +283,13 @@ Web：
 
 ### 10.2 仍未完成
 
-- 旧的 `pages/petpal/workbench.vue` 仍保留为兼容入口，照料者收益中心、规则与帮助等页面还未拆出独立体系。
-- App 端主动提醒、统一通知流和更多账户辅助页仍未形成独立页面体系。
+- 旧的 `pages/petpal/workbench.vue` 仍保留为兼容入口，规则、帮助和更多账户辅助页还未拆出独立体系。
+- App 端主动提醒、统一通知流和更完整的售后独立页仍未形成独立页面体系。
 - Web 前台超级页面拆分尚未真正开始落地，仍处于高优先级待开发状态。
 
 ### 10.3 下一步
 
-- 先继续完成照料者收益、售后、账户辅助页与主动提醒能力收口。
+- 先继续完成售后独立页、账户辅助页与主动提醒能力收口。
 - 再进入 Web 前台路由拆分，把主人 / 照料者超级页面拆开。
 - 最后集中做多端交互修复、定向测试、审计补充与答辩材料收口。
 
