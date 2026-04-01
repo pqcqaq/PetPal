@@ -3461,6 +3461,11 @@ export const petpalService = {
         caregiver: {
           select: {
             id: true,
+            intro: true,
+            experienceYears: true,
+            serviceRadiusKm: true,
+            specialtyTags: true,
+            serviceCommitment: true,
             ratingAvg: true,
             ratingCount: true,
             user: {
@@ -3496,6 +3501,12 @@ export const petpalService = {
         distanceKm,
         ratingAvg: service.caregiver.ratingAvg,
         ratingCount: service.caregiver.ratingCount,
+        intro: service.caregiver.intro,
+        experienceYears: service.caregiver.experienceYears ?? 0,
+        serviceRadiusKm: service.caregiver.serviceRadiusKm ?? 0,
+        specialtyTags: toStringArray(service.caregiver.specialtyTags),
+        serviceCommitment: service.caregiver.serviceCommitment,
+        minNoticeHours: service.minNoticeHours ?? 0,
       };
     });
 

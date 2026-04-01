@@ -1,11 +1,15 @@
 <script lang="ts" setup>
 /**
  * UX Blueprint
- * User: 已发布需求、准备选择照料者并支付的主人
- * Entry: 从发布需求页选人进入、从活跃需求继续结算进入，或从订单详情补支付进入
- * First screen: 先看到当前订单阶段、照料者、服务时间和应付金额
- * Primary action: 提交订单并支付，或对已有待支付订单直接完成支付
- * Secondary actions: 更换支付方式、返回需求页、进入订单详情
+ * User: 已选好照料者、此刻只想尽快完成下单和支付的主人
+ * Entry: 需求详情页继续下单、活跃需求恢复结算、订单待支付回流
+ * Core scenes:
+ * 1. 一屏确认服务时间、金额和照料者是否靠谱
+ * 2. 已有订单时优先继续支付，不重复创建
+ * 3. 支付后立即回到订单跟进，不再要求用户重新找入口
+ * Primary action: 提交订单并支付，或继续支付当前订单
+ * Secondary actions: 切换支付方式、返回需求详情、查看订单详情
+ * Feedback: 当前阶段、应付金额、照料者可信信息、支付记录
  * States: 未登录、参数缺失、订单创建中、待支付、支付完成、加载失败
  */
 import type {
@@ -37,6 +41,10 @@ import { getErrorMessage } from '@/utils/error'
 import {
   buildOwnerMatchQuery,
   formatAmount,
+  formatCaregiverExperience,
+  formatCaregiverNoticeHours,
+  formatCaregiverRadius,
+  formatDistanceKm,
   formatRange,
   getRequestStatusLabel,
   PETPAL_ORDER_DETAIL_PAGE,
@@ -156,6 +164,43 @@ const primaryButtonLabel = computed(() => {
     return `立即支付 ¥${formatAmount(outstandingAmount.value)}`
   }
   return '提交订单'
+})
+
+const caregiverTrustPills = computed(() => {
+  if (!caregiver.value) {
+    return []
+  }
+  return [
+    caregiver.value.city || '城市待补充',
+    formatCaregiverExperience(caregiver.value.experienceYears),
+    formatCaregiverNoticeHours(caregiver.value.minNoticeHours),
+    formatCaregiverRadius(caregiver.value.serviceRadiusKm),
+    ...caregiver.value.specialtyTags.slice(0, 3),
+  ]
+})
+
+const caregiverMetrics = computed(() => {
+  if (!caregiver.value) {
+    return []
+  }
+  return [
+    {
+      label: '评分',
+      value: `${formatAmount(caregiver.value.ratingAvg)} / ${caregiver.value.ratingCount}`,
+    },
+    {
+      label: '距离',
+      value: formatDistanceKm(caregiver.value.distanceKm),
+    },
+    {
+      label: '接单前',
+      value: formatCaregiverNoticeHours(caregiver.value.minNoticeHours),
+    },
+    {
+      label: '服务圈',
+      value: formatCaregiverRadius(caregiver.value.serviceRadiusKm),
+    },
+  ]
 })
 
 async function resolveRequestContext() {
@@ -381,13 +426,39 @@ onPullDownRefresh(() => {
 
         <AppSection v-if="caregiver" title="照料者">
           <view class="checkout-caregiver">
+            <view class="checkout-caregiver__tags">
+              <AppTag
+                v-for="pill in caregiverTrustPills"
+                :key="pill"
+                type="default"
+              >
+                {{ pill }}
+              </AppTag>
+            </view>
             <view class="checkout-caregiver__copy">
               <text class="checkout-caregiver__title">{{ caregiver.caregiverName }}</text>
               <text class="checkout-caregiver__meta">
                 {{ caregiver.city || '城市待补充' }} · 评分 {{ formatAmount(caregiver.ratingAvg) }} · {{ caregiver.ratingCount }} 条评价
               </text>
+              <text v-if="caregiver.intro" class="checkout-caregiver__intro">{{ caregiver.intro }}</text>
             </view>
             <AppTag type="success">¥{{ formatAmount(caregiver.pricePerUnit) }}/{{ caregiver.unitType }}</AppTag>
+
+            <view class="checkout-caregiver__metrics">
+              <view
+                v-for="metric in caregiverMetrics"
+                :key="metric.label"
+                class="checkout-caregiver__metric"
+              >
+                <text class="checkout-caregiver__metric-label">{{ metric.label }}</text>
+                <text class="checkout-caregiver__metric-value">{{ metric.value }}</text>
+              </view>
+            </view>
+
+            <view v-if="caregiver.serviceCommitment" class="checkout-caregiver__promise">
+              <text class="checkout-caregiver__promise-label">承诺</text>
+              <text class="checkout-caregiver__promise-text">{{ caregiver.serviceCommitment }}</text>
+            </view>
           </view>
         </AppSection>
 
@@ -460,7 +531,8 @@ onPullDownRefresh(() => {
 <style scoped lang="scss">
 .checkout-stage,
 .checkout-caregiver,
-.checkout-metric-card {
+.checkout-metric-card,
+.checkout-caregiver__metric {
   display: grid;
   gap: 14rpx;
 }
@@ -476,7 +548,8 @@ onPullDownRefresh(() => {
 }
 
 .checkout-stage__copy,
-.checkout-stage__tags {
+.checkout-stage__tags,
+.checkout-caregiver__tags {
   display: flex;
   gap: 12rpx;
   flex-wrap: wrap;
@@ -495,6 +568,8 @@ onPullDownRefresh(() => {
 
 .checkout-stage__meta,
 .checkout-caregiver__meta,
+.checkout-caregiver__intro,
+.checkout-caregiver__metric-label,
 .checkout-metric-card__label {
   color: var(--app-text-secondary);
   font-size: 22rpx;
@@ -535,11 +610,54 @@ onPullDownRefresh(() => {
   gap: 10rpx;
 }
 
+.checkout-caregiver__intro {
+  color: var(--app-text);
+}
+
 .checkout-caregiver__title {
   color: var(--app-text);
   font-size: 30rpx;
   line-height: 1.3;
   font-weight: 700;
+}
+
+.checkout-caregiver__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+}
+
+.checkout-caregiver__metric {
+  padding: 18rpx 20rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(180deg, var(--app-surface-container-high) 0%, var(--app-surface) 100%);
+}
+
+.checkout-caregiver__metric-value {
+  color: var(--app-text);
+  font-size: 28rpx;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.checkout-caregiver__promise {
+  display: grid;
+  gap: 8rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 20rpx;
+  background: var(--app-success-soft);
+}
+
+.checkout-caregiver__promise-label {
+  color: var(--app-text-muted);
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+
+.checkout-caregiver__promise-text {
+  color: var(--app-text);
+  font-size: 24rpx;
+  line-height: 1.6;
 }
 
 .checkout-grid {
@@ -569,6 +687,7 @@ onPullDownRefresh(() => {
 }
 
 @media (max-width: 680px) {
+  .checkout-caregiver__metrics,
   .checkout-grid {
     grid-template-columns: 1fr;
   }

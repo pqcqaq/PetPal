@@ -1,12 +1,16 @@
 <script lang="ts" setup>
 /**
  * UX Blueprint
- * User: 已经发布过需求、现在要继续推进匹配或下单的主人
- * Entry: 从主人首页的最近需求、发布成功后的回流、提醒中心中的活跃需求进入
- * First screen: 先看到当前需求状态，再直接切换匹配视角、照料者和下一步动作
- * Primary action: 排序候选、选中一位照料者并继续结算
- * Secondary actions: 改时间地点、改预算要求、复制当前条件重建
- * States: 未登录、参数缺失、需求不存在、匹配为空、已匹配可下单、需求已关闭
+ * User: 已发布需求、现在要迅速判断“选谁下单最稳”的主人
+ * Entry: 主人首页最近需求、发布成功后的回流、提醒中心中的活跃需求、订单支付回跳
+ * Core scenes:
+ * 1. 先确认这条需求现在是否还有效，是否已有人可选
+ * 2. 在同一屏里用排序、筛选、候选切换和对比板完成判断
+ * 3. 选中后直接进入下单，不要求用户再读说明文字
+ * Primary action: 切候选、看可信信息、继续下单
+ * Secondary actions: 刷新一批、改时间地点、改预算要求、复制条件重建
+ * Feedback: 选中状态、预算预估、评分距离、预约提前量、服务范围、照料专长
+ * States: 未登录、参数缺失、需求不存在、匹配为空、筛选后为空、需求关闭
  */
 import type { MatchedCaregiverRecord, ServiceRequestRecord } from '@rbac/api-common'
 import { computed, ref, watch } from 'vue'
@@ -27,7 +31,11 @@ import {
   buildOwnerMatchQuery,
   canRequestCheckout,
   formatAmount,
+  formatCaregiverExperience,
+  formatCaregiverNoticeHours,
+  formatCaregiverRadius,
   formatDateTime,
+  formatDistanceKm,
   formatRange,
   getRequestStatusLabel,
   getRequestTagType,
@@ -133,16 +141,6 @@ function sortMatches(
   })
 }
 
-function formatDistanceKm(distanceKm: number | null | undefined) {
-  if (distanceKm == null || !Number.isFinite(distanceKm)) {
-    return '距离待确认'
-  }
-  if (distanceKm < 1) {
-    return `${Math.round(distanceKm * 1000)}m`
-  }
-  return `${distanceKm >= 10 ? distanceKm.toFixed(0) : distanceKm.toFixed(1)}km`
-}
-
 function getRequestDurationHours(request: ServiceRequestRecord) {
   return Math.max(
     1,
@@ -222,8 +220,8 @@ const quickCandidateOptions = computed(() => rankedMatchItems.value
     label: item.caregiverName,
     value: item.serviceId,
     description: requestRecord.value
-      ? `预估 ¥${formatAmount(getEstimatedSpend(requestRecord.value, item))} · ${formatDistanceKm(item.distanceKm)}`
-      : `¥${formatAmount(item.pricePerUnit)} · ${formatDistanceKm(item.distanceKm)}`,
+      ? `预估 ¥${formatAmount(getEstimatedSpend(requestRecord.value, item))} · ${formatDistanceKm(item.distanceKm)} · ${formatCaregiverNoticeHours(item.minNoticeHours)}`
+      : `¥${formatAmount(item.pricePerUnit)} · ${formatCaregiverExperience(item.experienceYears)}`,
   })))
 
 const alternativeCaregivers = computed(() => rankedMatchItems.value
@@ -266,6 +264,27 @@ const selectedCaregiverMetrics = computed(() => {
       label: '距离',
       value: formatDistanceKm(caregiver.distanceKm),
     },
+    {
+      label: '接单前',
+      value: formatCaregiverNoticeHours(caregiver.minNoticeHours),
+    },
+    {
+      label: '服务圈',
+      value: formatCaregiverRadius(caregiver.serviceRadiusKm),
+    },
+  ]
+})
+
+const selectedCaregiverPills = computed(() => {
+  const caregiver = selectedCaregiver.value
+  if (!caregiver) {
+    return []
+  }
+  return [
+    formatCaregiverExperience(caregiver.experienceYears),
+    formatCaregiverNoticeHours(caregiver.minNoticeHours),
+    formatCaregiverRadius(caregiver.serviceRadiusKm),
+    ...caregiver.specialtyTags.slice(0, 3),
   ]
 })
 
@@ -642,11 +661,19 @@ onPullDownRefresh(() => {
                   <view class="selected-caregiver__tags">
                     <AppTag type="success">当前选中</AppTag>
                     <AppTag type="default">{{ selectedCaregiver.city || '城市待补充' }}</AppTag>
+                    <AppTag
+                      v-for="pill in selectedCaregiverPills"
+                      :key="pill"
+                      type="default"
+                    >
+                      {{ pill }}
+                    </AppTag>
                   </view>
                   <text class="selected-caregiver__title">{{ selectedCaregiver.caregiverName }}</text>
                   <text class="selected-caregiver__meta">
                     {{ formatDistanceKm(selectedCaregiver.distanceKm) }} · 评分 {{ formatAmount(selectedCaregiver.ratingAvg) }} · {{ selectedCaregiver.ratingCount }} 条评价
                   </text>
+                  <text v-if="selectedCaregiver.intro" class="selected-caregiver__intro">{{ selectedCaregiver.intro }}</text>
                 </view>
                 <AppTag type="primary">¥{{ formatAmount(selectedCaregiver.pricePerUnit) }}/{{ selectedCaregiver.unitType }}</AppTag>
               </view>
@@ -660,6 +687,11 @@ onPullDownRefresh(() => {
                   <text class="selected-caregiver__metric-label">{{ metric.label }}</text>
                   <text class="selected-caregiver__metric-value">{{ metric.value }}</text>
                 </view>
+              </view>
+
+              <view v-if="selectedCaregiver.serviceCommitment" class="selected-caregiver__promise">
+                <text class="selected-caregiver__promise-label">承诺</text>
+                <text class="selected-caregiver__promise-text">{{ selectedCaregiver.serviceCommitment }}</text>
               </view>
 
               <view class="request-toolbar">
@@ -722,6 +754,38 @@ onPullDownRefresh(() => {
                     </view>
                   </view>
                   <view class="compare-board__row">
+                    <text class="compare-board__metric">经验</text>
+                    <view
+                      v-for="item in compareCandidates"
+                      :key="`experience-${item.serviceId}`"
+                      class="compare-board__cell"
+                    >
+                      <text class="compare-board__value">{{ formatCaregiverExperience(item.experienceYears) }}</text>
+                    </view>
+                  </view>
+                  <view class="compare-board__row">
+                    <text class="compare-board__metric">接单前</text>
+                    <view
+                      v-for="item in compareCandidates"
+                      :key="`notice-${item.serviceId}`"
+                      class="compare-board__cell"
+                    >
+                      <text class="compare-board__value">{{ formatCaregiverNoticeHours(item.minNoticeHours) }}</text>
+                    </view>
+                  </view>
+                  <view class="compare-board__row">
+                    <text class="compare-board__metric">专长</text>
+                    <view
+                      v-for="item in compareCandidates"
+                      :key="`specialty-${item.serviceId}`"
+                      class="compare-board__cell"
+                    >
+                      <text class="compare-board__value compare-board__value--wrap">
+                        {{ joinTagText(item.specialtyTags.slice(0, 2)) || '常规照料' }}
+                      </text>
+                    </view>
+                  </view>
+                  <view class="compare-board__row">
                     <text class="compare-board__metric">计价</text>
                     <view
                       v-for="item in compareCandidates"
@@ -742,7 +806,7 @@ onPullDownRefresh(() => {
                 v-for="item in alternativeCaregivers"
                 :key="item.serviceId"
                 :title="item.caregiverName"
-                :label="`${formatDistanceKm(item.distanceKm)} · 评分 ${formatAmount(item.ratingAvg)}`"
+                :label="`${formatDistanceKm(item.distanceKm)} · ${formatCaregiverExperience(item.experienceYears)}`"
                 :value="`¥${formatAmount(item.pricePerUnit)}/${item.unitType}`"
                 value-emphasis
                 clickable
@@ -887,6 +951,7 @@ onPullDownRefresh(() => {
 .request-stage__meta,
 .request-stage__metric-label,
 .selected-caregiver__meta,
+.selected-caregiver__intro,
 .selected-caregiver__metric-label,
 .progress-node__label,
 .request-inline-summary,
@@ -930,6 +995,10 @@ onPullDownRefresh(() => {
   background: linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
 }
 
+.selected-caregiver__intro {
+  color: var(--app-text);
+}
+
 .request-inline-summary,
 .compare-board {
   padding: 20rpx 24rpx;
@@ -943,6 +1012,26 @@ onPullDownRefresh(() => {
   gap: 16rpx;
   align-items: flex-start;
   justify-content: space-between;
+}
+
+.selected-caregiver__promise {
+  display: grid;
+  gap: 8rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 20rpx;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.selected-caregiver__promise-label {
+  color: var(--app-text-muted);
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+
+.selected-caregiver__promise-text {
+  color: var(--app-text);
+  font-size: 24rpx;
+  line-height: 1.6;
 }
 
 .compare-board {
@@ -1003,6 +1092,10 @@ onPullDownRefresh(() => {
 
 .compare-board__value {
   color: var(--app-text);
+}
+
+.compare-board__value--wrap {
+  white-space: normal;
 }
 
 .progress-rail {

@@ -494,6 +494,12 @@ export interface MatchedCaregiverRecord {
   distanceKm: number | null;
   ratingAvg: AmountValue;
   ratingCount: number;
+  intro: string | null;
+  experienceYears: number;
+  serviceRadiusKm: number;
+  specialtyTags: string[];
+  serviceCommitment: string | null;
+  minNoticeHours: number;
 }
 
 export type MatchedCaregiverPage = PaginatedResult<MatchedCaregiverRecord>;

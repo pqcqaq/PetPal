@@ -6696,3 +6696,53 @@ flowchart TD
 1. 继续补需求详情页里的照料者详情、服务说明和更细的筛选维度。
 2. 继续清理 App / Web 页面中的残余说明式文案和低效回退链路。
 3. 在主人需求流稳定后，再继续推进更深的系统提醒、推送和验收材料收口。
+
+### 14.118 2026-04-02（P3-M1 Slice 107）
+
+**概述**：继续推进 App 主人需求详情页真实决策能力，本轮把照料者可信信息快照从种子数据正式打通到匹配接口、需求详情页和结算页，减少用户只看价格做判断。
+
+已完成：
+
+- 匹配接口补齐照料者可信信息：
+  - `packages/api-common/src/types/petpal.ts`
+    - 为 `MatchedCaregiverRecord` 新增 `intro`、`experienceYears`、`serviceRadiusKm`、`specialtyTags`、`serviceCommitment`、`minNoticeHours` 字段。
+  - `apps/backend/src/services/petpal-service.ts`
+    - `listMatchedCaregivers(...)` 已把照料者介绍、经验、服务范围、专长、服务承诺和提前预约时长纳入返回结果。
+- 主人需求详情页增强：
+  - `apps/app-frontend/src/pages/petpal/request-detail.vue`
+    - 选中照料者区域新增可信信息 tags、介绍、服务承诺。
+    - 对比板新增经验、接单前时长和专长维度。
+    - 候选 chips 描述与候补列表同步转向“预估金额 + 距离/经验/预约限制”的直接决策信息。
+- 结算页增强：
+  - `apps/app-frontend/src/pages/petpal/checkout.vue`
+    - 支付前新增照料者可信信息区，可直接看到介绍、标签、评分、距离、服务圈和服务承诺。
+- 测试补强：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 已为 `/api/petpal/match/caregivers` 补充新增字段断言。
+- 文档同步：
+  - `apps/docs/project/PetPal-Frontend-Blueprint.md`
+  - `apps/docs/project/PetPal-UX-Rebuild.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm --filter @rbac/backend exec node --import tsx --test --test-concurrency=1 test/integration/petpal-api.test.ts` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增新的匹配入口或额外查询协议，只是把现有种子和照料者档案里已有的信息补入匹配返回，协议扩张可控。
+- 已确认需求详情和结算页均沿用现有页面壳层与操作路径，没有把说明性文案重新堆回首屏。
+- 已确认新增可信信息优先以 chips、指标块和短承诺文本承载，避免又退回“多张说明卡 + 手动跳详情页”的低效结构。
+
+风险与缓解：
+
+- 风险：当前照料者可信信息仍然是静态档案快照，尚未结合服务日志质量、最近响应时效和售后风险做更深评分。
+- 缓解：下一轮优先继续补订单页、售后页和评价页的状态化重构，同时评估是否引入更细的照料者履约可信指标。
+
+下一步（1-3）：
+
+1. 继续按同一标准重构订单详情、售后和评价相关页面，减少说明文字，强化状态和动作。
+2. 继续补主人需求流中的更深筛选与原地改期能力，但不再回退到卡片堆和新页面跳转优先的旧结构。
+3. 在 App 主人主链路稳定后，再继续推进 Web 对应页面的相同收口策略。

@@ -410,6 +410,15 @@ describe('PetPal API integration', () => {
 
     assert.ok(matchResponse.body.data.meta.total >= 1);
     assert.ok(matchResponse.body.data.items[0].distanceKm !== null);
+    assert.equal(matchResponse.body.data.items[0].intro, '5 年宠物照料经验，擅长犬猫日常照料。');
+    assert.equal(matchResponse.body.data.items[0].experienceYears, 5);
+    assert.equal(matchResponse.body.data.items[0].serviceRadiusKm, 8);
+    assert.deepEqual(matchResponse.body.data.items[0].specialtyTags, ['犬类社交', '幼宠适应', '上门喂养']);
+    assert.equal(
+      matchResponse.body.data.items[0].serviceCommitment,
+      '支持每日图文反馈，紧急情况 10 分钟内联系主人。',
+    );
+    assert.equal(matchResponse.body.data.items[0].minNoticeHours, 2);
 
     const ordersResponse = await request(app)
       .get('/api/petpal/orders')

@@ -223,6 +223,40 @@ export function formatRange(start: string | null | undefined, end: string | null
   return `${formatDateTime(start)} - ${formatDateTime(end)}`
 }
 
+export function formatDistanceKm(distanceKm: number | null | undefined) {
+  if (distanceKm == null || !Number.isFinite(distanceKm)) {
+    return '距离待确认'
+  }
+  if (distanceKm < 1) {
+    return `${Math.round(distanceKm * 1000)}m`
+  }
+  return `${distanceKm >= 10 ? distanceKm.toFixed(0) : distanceKm.toFixed(1)}km`
+}
+
+export function formatCaregiverExperience(years: number | null | undefined) {
+  const normalizedYears = Number(years ?? 0)
+  if (!Number.isFinite(normalizedYears) || normalizedYears <= 0) {
+    return '新入驻'
+  }
+  return `${normalizedYears} 年经验`
+}
+
+export function formatCaregiverRadius(radiusKm: number | null | undefined) {
+  const normalizedRadius = Number(radiusKm ?? 0)
+  if (!Number.isFinite(normalizedRadius) || normalizedRadius <= 0) {
+    return '范围待确认'
+  }
+  return `${normalizedRadius}km 服务圈`
+}
+
+export function formatCaregiverNoticeHours(hours: number | null | undefined) {
+  const normalizedHours = Number(hours ?? 0)
+  if (!Number.isFinite(normalizedHours) || normalizedHours <= 0) {
+    return '即时可约'
+  }
+  return `${normalizedHours} 小时前预约`
+}
+
 export function splitTagText(value: string) {
   return [...new Set(
     value
