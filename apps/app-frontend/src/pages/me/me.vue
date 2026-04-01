@@ -11,7 +11,11 @@ import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { listOrders, listPets, listServiceRequests } from '@/api/petpal'
-import { PETPAL_CAREGIVER_EARNINGS_PAGE } from '@/pages/petpal/owner-shared'
+import {
+  isOrderAftersalesTracked,
+  PETPAL_AFTERSALES_PAGE,
+  PETPAL_CAREGIVER_EARNINGS_PAGE,
+} from '@/pages/petpal/owner-shared'
 import { LOGIN_PAGE, REGISTER_PAGE } from '@/router/config'
 import { useUiStore, useUserStore } from '@/store'
 import { useTokenStore } from '@/store/token'
@@ -88,11 +92,7 @@ const activeOrderCount = computed(() => orders.value.filter(item => (
   || item.orderStatus === 'SERVING'
 )).length)
 
-const aftersaleCount = computed(() => orders.value.filter(item => (
-  item.orderStatus === 'DISPUTED'
-  || item.orderStatus === 'PARTIAL_REFUNDED'
-  || item.orderStatus === 'REFUNDED'
-)).length)
+const aftersaleCount = computed(() => orders.value.filter(item => isOrderAftersalesTracked(item)).length)
 
 const latestOrders = computed(() => orders.value.slice(0, 3))
 
@@ -157,6 +157,14 @@ function openCaregiverEarnings() {
     return
   }
   uni.navigateTo({ url: PETPAL_CAREGIVER_EARNINGS_PAGE })
+}
+
+function openAftersalesCenter() {
+  if (!tokenStore.hasLogin) {
+    handleLogin()
+    return
+  }
+  uni.navigateTo({ url: PETPAL_AFTERSALES_PAGE })
 }
 
 function openHome() {
@@ -254,6 +262,7 @@ onShow(() => {
       <AppSection title="常用入口">
         <AppList>
           <AppListItem title="进入服务台" label="继续发布需求、维护宠物档案和查看匹配。" is-link clickable @click="openServiceBoard" />
+          <AppListItem title="售后中心" label="集中查看退款、投诉和争议处理，不再只依赖订单详情入口。" is-link clickable @click="openAftersalesCenter" />
           <AppListItem title="照料者收益表现" label="若你已申请照料者，可查看收入、完成率和售后风险。" is-link clickable @click="openCaregiverEarnings" />
           <AppListItem title="个人资料" label="更新昵称、头像和联系方式。" is-link clickable @click="openProfile" />
           <AppListItem title="PetPal 设置" label="调整首页布局、主题和底栏样式。" is-link clickable @click="openSettings" />

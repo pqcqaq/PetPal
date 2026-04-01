@@ -20,6 +20,8 @@ import {
   getConversationUnreadCount,
   getOrderStatusLabel,
   getOrderTone,
+  isOrderAftersalesTracked,
+  PETPAL_AFTERSALES_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDERS_PAGE,
   PETPAL_REQUEST_PAGE,
@@ -65,9 +67,7 @@ const filteredOrders = computed(() => orders.value.filter((item) => {
     return item.orderStatus === 'COMPLETED'
   }
   if (activeFilter.value === 'AFTERSALES') {
-    return item.orderStatus === 'DISPUTED'
-      || item.orderStatus === 'PARTIAL_REFUNDED'
-      || item.orderStatus === 'REFUNDED'
+    return isOrderAftersalesTracked(item)
   }
   return item.orderStatus === 'PENDING_ACCEPT'
     || item.orderStatus === 'ACCEPTED'
@@ -82,7 +82,7 @@ const summaryCards = computed(() => [
   },
   {
     label: '售后中',
-    value: String(orders.value.filter(item => item.orderStatus === 'DISPUTED' || item.orderStatus === 'PARTIAL_REFUNDED' || item.orderStatus === 'REFUNDED').length),
+    value: String(orders.value.filter(item => isOrderAftersalesTracked(item)).length),
     hint: '需要持续关注退款、投诉和争议进展。',
   },
   {
@@ -108,6 +108,10 @@ function goToLogin() {
 
 function openRequestFlow() {
   uni.redirectTo({ url: PETPAL_REQUEST_PAGE })
+}
+
+function openAftersalesCenter() {
+  uni.redirectTo({ url: PETPAL_AFTERSALES_PAGE })
 }
 
 function openOrderDetail(orderId: string, tab: 'overview' | 'chat' | 'service' | 'aftersales') {
@@ -171,6 +175,9 @@ onPullDownRefresh(() => {
 
       <AppSection title="筛选视图" description="根据当前任务快速聚焦进行中订单、已完成订单或售后订单。">
         <AppChoiceChips v-model="activeFilter" :options="orderFilterOptions" />
+        <view class="order-filter-actions">
+          <AppButton size="medium" type="danger" @click="openAftersalesCenter">进入售后中心</AppButton>
+        </view>
       </AppSection>
 
       <AppSection :title="filteredOrders.length ? `订单列表 (${filteredOrders.length})` : '订单列表'">
@@ -282,6 +289,14 @@ onPullDownRefresh(() => {
   gap: 16rpx;
 }
 
+.order-filter-actions,
+.order-card__actions,
+.order-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
 .order-card__header,
 .order-card__footer {
   display: flex;
@@ -326,13 +341,6 @@ onPullDownRefresh(() => {
   color: var(--app-text);
   font-size: 24rpx;
   line-height: 1.6;
-}
-
-.order-card__actions,
-.order-empty__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
 }
 
 .order-empty {

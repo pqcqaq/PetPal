@@ -10,6 +10,7 @@ type _LocationUrl =
   "/pages/me/me" |
   "/pages/me/profile" |
   "/pages/order-detail/index" |
+  "/pages/petpal/aftersales" |
   "/pages/petpal/caregiver-earnings" |
   "/pages/petpal/caregiver-home" |
   "/pages/petpal/caregiver-orders" |

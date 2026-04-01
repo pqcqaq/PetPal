@@ -62,6 +62,14 @@
       }
     },
     {
+      "path": "pages/petpal/aftersales",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "售后中心",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/petpal/caregiver-earnings",
       "type": "page",
       "style": {

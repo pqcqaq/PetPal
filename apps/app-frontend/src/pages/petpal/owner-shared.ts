@@ -1,11 +1,15 @@
 import type {
   CaregiverAuditStatus,
+  ComplaintStatus,
+  ComplaintType,
   MatchCaregiverQuery,
+  OrderRecord,
   OrderConversationRecord,
   OrderStatus,
   PetGender,
   PetServiceType,
   PetSpecies,
+  RefundProgressStage,
   ServiceLogType,
   ServiceRequestStatus,
 } from '@rbac/api-common'
@@ -17,6 +21,7 @@ export const PETPAL_OWNER_HOME_PAGE = '/pages/petpal/owner-home'
 export const PETPAL_PETS_PAGE = '/pages/petpal/pets'
 export const PETPAL_REQUEST_PAGE = '/pages/petpal/request'
 export const PETPAL_ORDERS_PAGE = '/pages/petpal/orders'
+export const PETPAL_AFTERSALES_PAGE = '/pages/petpal/aftersales'
 export const PETPAL_CAREGIVER_HOME_PAGE = '/pages/petpal/caregiver-home'
 export const PETPAL_CAREGIVER_PROFILE_PAGE = '/pages/petpal/caregiver-profile'
 export const PETPAL_CAREGIVER_SERVICES_PAGE = '/pages/petpal/caregiver-services'
@@ -72,6 +77,31 @@ export const serviceRequestStatusLabels: Record<ServiceRequestStatus, string> = 
   COMPLETED: '已完成',
 }
 
+export const refundProgressStageLabels: Record<RefundProgressStage, string> = {
+  NONE: '暂无退款',
+  PENDING_REVIEW: '待审核',
+  APPROVED_WAITING: '待退款',
+  PARTIAL_SUCCESS: '部分退款成功',
+  FULL_SUCCESS: '退款完成',
+  REJECTED: '已驳回',
+  FAILED: '退款失败',
+}
+
+export const complaintStatusLabels: Record<ComplaintStatus, string> = {
+  OPEN: '待受理',
+  PROCESSING: '处理中',
+  RESOLVED: '已解决',
+  REJECTED: '已驳回',
+}
+
+export const complaintTypeLabels: Record<ComplaintType, string> = {
+  SAFETY: '安全问题',
+  FEE: '费用争议',
+  SERVICE: '服务质量',
+  FRAUD: '欺诈风险',
+  OTHER: '其他问题',
+}
+
 export const serviceTypeOptions = [
   { label: '寄养', value: 'BOARDING', description: '短住照料与过夜陪护' },
   { label: '遛宠', value: 'WALKING', description: '固定时段外出活动' },
@@ -101,6 +131,7 @@ export const ownerFlowOptions = [
   { label: '宠物档案', value: PETPAL_PETS_PAGE, description: '维护宠物资料与照料偏好' },
   { label: '发布需求', value: PETPAL_REQUEST_PAGE, description: '创建临时照料需求并筛选照料者' },
   { label: '订单跟进', value: PETPAL_ORDERS_PAGE, description: '按沟通、履约和售后持续跟进' },
+  { label: '售后中心', value: PETPAL_AFTERSALES_PAGE, description: '集中处理退款、投诉和争议事项' },
 ]
 
 export const caregiverFlowOptions = [
@@ -187,6 +218,18 @@ export function getRequestStatusLabel(status: ServiceRequestStatus) {
   return serviceRequestStatusLabels[status] || status
 }
 
+export function getRefundProgressStageLabel(stage: RefundProgressStage) {
+  return refundProgressStageLabels[stage] || stage
+}
+
+export function getComplaintStatusLabel(status: ComplaintStatus) {
+  return complaintStatusLabels[status] || status
+}
+
+export function getComplaintTypeLabel(type: ComplaintType) {
+  return complaintTypeLabels[type] || type
+}
+
 export function getCaregiverAuditHint(status: CaregiverAuditStatus | null | undefined) {
   if (!status || status === 'PENDING') {
     return '平台会结合资料完整度、资质材料和服务说明进行审核。'
@@ -248,6 +291,18 @@ export function getServiceLogTypeLabel(logType: ServiceLogType) {
     NOTE: '服务备注',
   }
   return labels[logType] || logType
+}
+
+export function isOrderAftersalesTracked(
+  order: Pick<OrderRecord, 'orderStatus' | 'refunds' | 'amountRefunded'>,
+) {
+  return (
+    order.orderStatus === 'DISPUTED'
+    || order.orderStatus === 'PARTIAL_REFUNDED'
+    || order.orderStatus === 'REFUNDED'
+    || (order.refunds?.length ?? 0) > 0
+    || Number(order.amountRefunded ?? 0) > 0
+  )
 }
 
 export function buildOwnerMatchQuery(params: {

@@ -26,6 +26,8 @@ import {
   getConversationUnreadCount,
   getOrderStatusLabel,
   getRequestStatusLabel,
+  isOrderAftersalesTracked,
+  PETPAL_AFTERSALES_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDERS_PAGE,
   PETPAL_OWNER_HOME_PAGE,
@@ -61,11 +63,7 @@ const activeOrderCount = computed(() => orders.value.filter(item => (
   || item.orderStatus === 'ACCEPTED'
   || item.orderStatus === 'SERVING'
 )).length)
-const aftersaleCount = computed(() => orders.value.filter(item => (
-  item.orderStatus === 'DISPUTED'
-  || item.orderStatus === 'PARTIAL_REFUNDED'
-  || item.orderStatus === 'REFUNDED'
-)).length)
+const aftersaleCount = computed(() => orders.value.filter(item => isOrderAftersalesTracked(item)).length)
 const activeRequestCount = computed(() => requests.value.filter(item => (
   item.status === 'OPEN'
   || item.status === 'MATCHING'
@@ -112,6 +110,10 @@ function openRequests() {
 
 function openOrders() {
   uni.redirectTo({ url: PETPAL_ORDERS_PAGE })
+}
+
+function openAftersales() {
+  uni.redirectTo({ url: PETPAL_AFTERSALES_PAGE })
 }
 
 function openOrderDetail(orderId: string, tab: 'overview' | 'chat' = 'overview') {
@@ -202,6 +204,7 @@ onPullDownRefresh(() => {
             <view class="owner-hero__actions">
               <AppButton size="medium" @click="openRequests">发布新需求</AppButton>
               <AppButton size="medium" type="info" @click="openOrders">处理订单</AppButton>
+              <AppButton size="medium" type="danger" @click="openAftersales">售后中心</AppButton>
             </view>
           </view>
         </AppCard>
@@ -228,6 +231,10 @@ onPullDownRefresh(() => {
           <view class="owner-quick-card" @click="openOrders">
             <text class="owner-quick-card__title">跟进订单履约</text>
             <text class="owner-quick-card__text">从沟通、服务记录到售后进展统一跟踪。</text>
+          </view>
+          <view class="owner-quick-card owner-quick-card--alert" @click="openAftersales">
+            <text class="owner-quick-card__title">进入售后中心</text>
+            <text class="owner-quick-card__text">把退款、投诉和争议订单独立收口，优先处理风险事项。</text>
           </view>
         </view>
       </AppSection>
@@ -411,6 +418,12 @@ onPullDownRefresh(() => {
   background:
     radial-gradient(circle at top right, rgba(20, 184, 166, 0.12), transparent 34%),
     linear-gradient(180deg, #ffffff 0%, #f7fbfb 100%);
+}
+
+.owner-quick-card--alert {
+  background:
+    radial-gradient(circle at top right, rgba(239, 68, 68, 0.14), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #fff8f7 100%);
 }
 
 .owner-quick-card__title,
