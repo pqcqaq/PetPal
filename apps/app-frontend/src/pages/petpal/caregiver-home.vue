@@ -1,4 +1,13 @@
 <script lang="ts" setup>
+/**
+ * UX Blueprint
+ * User: 已登录照料者
+ * Entry: 从角色入口进入、履约后回到首页、登录后继续当天工作
+ * First screen: 先看到今天最该处理的事项，再进入订单、服务或审核动作
+ * Primary action: 根据当前状态直接去入驻、上架、接单或履约
+ * Secondary actions: 消息、提醒、收益
+ * States: 未登录、未建档、待审核、审核驳回、无服务、待接单、服务中
+ */
 import type {
   CaregiverOrderRecord,
   CaregiverProfileRecord,
@@ -6,7 +15,8 @@ import type {
 } from '@rbac/api-common'
 import { computed, ref } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
-import AppCard from '@/components/app-card/app-card.vue'
+import AppList from '@/components/app-list/app-list.vue'
+import AppListItem from '@/components/app-list-item/app-list-item.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
 import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
@@ -24,10 +34,7 @@ import CaregiverFlowNav from './components/caregiver-flow-nav.vue'
 import {
   formatAmount,
   formatRange,
-  getCaregiverAuditHint,
   getCaregiverAuditLabel,
-  getConversationHint,
-  getConversationPreview,
   getConversationUnreadCount,
   getOrderStatusLabel,
   PETPAL_CAREGIVER_EARNINGS_PAGE,
@@ -64,45 +71,112 @@ const caregiverOrders = ref<CaregiverOrderRecord[]>([])
 
 const displayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || '照料者')
 const pendingOrderCount = computed(() => caregiverOrders.value.filter(item => item.orderStatus === 'PENDING_ACCEPT').length)
+const acceptedOrderCount = computed(() => caregiverOrders.value.filter(item => item.orderStatus === 'ACCEPTED').length)
 const servingOrderCount = computed(() => caregiverOrders.value.filter(item => item.orderStatus === 'SERVING').length)
 const unreadConversationCount = computed(() => caregiverOrders.value.reduce((total, item) => (
   total + getConversationUnreadCount(item.conversation, 'caregiver')
 ), 0))
 const activeServiceCount = computed(() => caregiverServices.value.filter(item => item.isActive).length)
 
-const pageDescription = computed(() => (
-  tokenStore.hasLogin
-    ? '围绕照料者审核、服务配置、履约订单和消息协同重新组织移动端主流程。'
-    : '登录后进入照料者任务流。'
-))
+const focusAction = computed(() => {
+  if (!caregiverProfile.value) {
+    return {
+      label: '先完成入驻',
+      hint: '先把城市、经验和资质补齐，后续才能稳定接单。',
+      action: openProfile,
+    }
+  }
+  if (caregiverProfile.value.auditStatus === 'REJECTED') {
+    return {
+      label: '重新提交审核',
+      hint: '资料被驳回后，优先修正入驻信息和资质。',
+      action: openProfile,
+    }
+  }
+  if (!activeServiceCount.value) {
+    return {
+      label: '先上架服务',
+      hint: '还没有可售服务，主人无法直接筛到你。',
+      action: openServices,
+    }
+  }
+  if (pendingOrderCount.value > 0) {
+    return {
+      label: '去处理待接单',
+      hint: `${pendingOrderCount.value} 笔订单等待响应，先处理转化风险最高的任务。`,
+      action: openOrders,
+    }
+  }
+  if (acceptedOrderCount.value + servingOrderCount.value > 0) {
+    return {
+      label: '继续履约',
+      hint: `${acceptedOrderCount.value} 笔待签到，${servingOrderCount.value} 笔服务中。`,
+      action: openOrders,
+    }
+  }
+  if (unreadConversationCount.value > 0) {
+    return {
+      label: '先看消息',
+      hint: `${unreadConversationCount.value} 条未读沟通需要确认。`,
+      action: openMessages,
+    }
+  }
+  return {
+    label: '查看收益表现',
+    hint: '今天的接单和履约较平稳，可以回看评分、收益和服务结构。',
+    action: openEarnings,
+  }
+})
 
-const summaryCards = computed(() => [
+const taskRows = computed(() => [
   {
-    label: '审核状态',
-    value: caregiverProfile.value ? getCaregiverAuditLabel(caregiverProfile.value.auditStatus) : '待创建',
-    hint: caregiverProfile.value ? getCaregiverAuditHint(caregiverProfile.value.auditStatus) : '先完善入驻资料与资质材料。',
+    title: '入驻审核',
+    label: caregiverProfile.value
+      ? `${getCaregiverAuditLabel(caregiverProfile.value.auditStatus)} · ${caregiverProfile.value.serviceCity || '城市待补充'}`
+      : '还没有入驻档案',
+    value: caregiverProfile.value ? '维护' : '创建',
+    action: openProfile,
   },
   {
-    label: '上架服务',
-    value: String(activeServiceCount.value),
-    hint: activeServiceCount.value ? '保持价格、城市和时效信息最新。' : '至少配置一个可售服务。',
+    title: '服务配置',
+    label: activeServiceCount.value
+      ? `${activeServiceCount.value} 个服务正在上架`
+      : '先补一个可售服务',
+    value: activeServiceCount.value ? '调整' : '上架',
+    action: openServices,
   },
   {
-    label: '待接单',
-    value: String(pendingOrderCount.value),
-    hint: pendingOrderCount.value ? '及时接单，避免订单流失。' : '当前没有新的待接单。',
+    title: '履约订单',
+    label: pendingOrderCount.value || acceptedOrderCount.value || servingOrderCount.value
+      ? `待接单 ${pendingOrderCount.value} · 待签到 ${acceptedOrderCount.value} · 服务中 ${servingOrderCount.value}`
+      : '当前没有待处理订单',
+    value: pendingOrderCount.value + acceptedOrderCount.value + servingOrderCount.value ? '处理' : '查看',
+    action: openOrders,
   },
   {
-    label: '消息未读',
-    value: String(unreadConversationCount.value),
-    hint: unreadConversationCount.value ? '优先确认交接、异常和附件回传。' : '当前沟通都已读。',
+    title: '收益表现',
+    label: caregiverProfile.value
+      ? `评分 ${formatAmount(caregiverProfile.value.ratingAvg)} · ${caregiverProfile.value.ratingCount} 条评价`
+      : '入驻后可查看评分和收益',
+    value: caregiverProfile.value ? '查看' : '稍后',
+    action: openEarnings,
   },
 ])
 
-const latestOrders = computed(() => [...caregiverOrders.value]
-  .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
+const recentOrders = computed(() => [...caregiverOrders.value]
+  .sort((left, right) => {
+    const priority = getOrderPriority(left.orderStatus) - getOrderPriority(right.orderStatus)
+    if (priority !== 0) {
+      return priority
+    }
+    return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+  })
+  .slice(0, 4))
+
+const serviceRows = computed(() => caregiverServices.value
+  .slice()
+  .sort((left, right) => Number(right.isActive) - Number(left.isActive))
   .slice(0, 3))
-const latestServices = computed(() => caregiverServices.value.slice(0, 3))
 
 function getAuditTagType() {
   if (!caregiverProfile.value) {
@@ -115,6 +189,26 @@ function getAuditTagType() {
     return 'danger'
   }
   return 'warning'
+}
+
+function getOrderPriority(status: CaregiverOrderRecord['orderStatus']) {
+  if (status === 'PENDING_ACCEPT') return 0
+  if (status === 'ACCEPTED') return 1
+  if (status === 'SERVING') return 2
+  return 3
+}
+
+function getOrderPrimaryAction(order: CaregiverOrderRecord) {
+  if (order.orderStatus === 'PENDING_ACCEPT') {
+    return { label: '去接单', tab: 'service' as const }
+  }
+  if (order.orderStatus === 'ACCEPTED') {
+    return { label: '去签到', tab: 'service' as const }
+  }
+  if (order.orderStatus === 'SERVING') {
+    return { label: '记录服务', tab: 'service' as const }
+  }
+  return { label: '看详情', tab: 'overview' as const }
 }
 
 function goToLogin() {
@@ -165,7 +259,7 @@ async function loadPage(showError = false) {
     const [profileResult, servicesResult, ordersResult] = await Promise.allSettled([
       getCaregiverProfile(),
       listCaregiverServices(),
-      listCaregiverOrders({ page: 1, pageSize: 8 }),
+      listCaregiverOrders({ page: 1, pageSize: 10 }),
     ])
 
     caregiverProfile.value = profileResult.status === 'fulfilled' ? profileResult.value : null
@@ -200,181 +294,129 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <AppPageShell title="照料者首页" :description="pageDescription">
+  <AppPageShell title="照料者首页">
     <template v-if="tokenStore.hasLogin">
       <CaregiverFlowNav
         :current-path="PETPAL_CAREGIVER_HOME_PAGE"
-        title="照料者日常工作流"
-        description="从审核状态、服务上架到接单履约，照料者侧流程已开始拆成独立页面，而不是继续塞进兼容工作台。"
+        title="照料者首页"
       />
 
-      <AppSection title="主动催办" description="把照料者路径里最容易阻塞接单和履约的事项直接抬到第一屏。">
-        <view class="caregiver-signal-wrap">
-          <ActionSignalCard
-            title="当前照料者路径优先事项"
-            description="优先展示入驻、审核、服务、接单、履约和沟通相关信号。"
-            scope="CAREGIVER"
-            empty-text="当前照料者路径没有新的高优先事项，可以继续维护服务、订单和收益表现。"
+      <AppSection title="今天先做这个">
+        <view class="caregiver-focus">
+          <view class="caregiver-focus__copy">
+            <view class="caregiver-focus__headline">
+              <text class="caregiver-focus__title">{{ displayName }}</text>
+              <view class="caregiver-focus__tags">
+                <AppTag :type="getAuditTagType()">
+                  {{ caregiverProfile ? getCaregiverAuditLabel(caregiverProfile.auditStatus) : '未入驻' }}
+                </AppTag>
+                <AppTag :type="activeServiceCount > 0 ? 'success' : 'default'">
+                  {{ activeServiceCount }} 个上架服务
+                </AppTag>
+                <AppTag :type="pendingOrderCount + acceptedOrderCount + servingOrderCount > 0 ? 'warning' : 'default'">
+                  {{ pendingOrderCount + acceptedOrderCount + servingOrderCount }} 笔待办订单
+                </AppTag>
+              </view>
+            </view>
+            <text class="caregiver-focus__hint">{{ focusAction.hint }}</text>
+          </view>
+          <view class="caregiver-focus__actions">
+            <AppButton size="medium" @click="focusAction.action">{{ focusAction.label }}</AppButton>
+            <AppButton size="medium" type="info" @click="openMessages">消息</AppButton>
+            <AppButton size="medium" type="danger" @click="openReminders">提醒</AppButton>
+          </view>
+        </view>
+      </AppSection>
+
+      <AppSection title="当前优先">
+        <ActionSignalCard
+          title="待处理事项"
+          scope="CAREGIVER"
+          empty-text="当前没有新的高优先事项，可以继续接单、维护服务或查看收益。"
+        />
+      </AppSection>
+
+      <AppSection title="继续处理">
+        <AppList>
+          <AppListItem
+            v-for="item in taskRows"
+            :key="item.title"
+            :title="item.title"
+            :label="item.label"
+            :value="item.value"
+            value-emphasis
+            clickable
+            is-link
+            @click="item.action"
           />
-        </view>
+        </AppList>
       </AppSection>
 
-      <AppSection title="当前态势" description="把今天需要优先处理的审核、订单与沟通放到第一屏。">
-        <AppCard>
-          <view class="caregiver-hero">
-            <view class="caregiver-hero__copy">
-              <AppTag :type="getAuditTagType()">
-                {{ caregiverProfile ? getCaregiverAuditLabel(caregiverProfile.auditStatus) : '待创建档案' }}
-              </AppTag>
-              <text class="caregiver-hero__title">{{ displayName }}</text>
-              <text class="caregiver-hero__summary">
-                当前有 {{ pendingOrderCount }} 笔待接单、{{ servingOrderCount }} 笔服务中订单和 {{ unreadConversationCount }} 条未读沟通。
-              </text>
-            </view>
-            <view class="caregiver-hero__actions">
-              <AppButton size="medium" @click="openOrders">处理订单</AppButton>
-              <AppButton size="medium" type="info" @click="openEarnings">收益表现</AppButton>
-              <AppButton size="medium" type="info" @click="openMessages">查看消息</AppButton>
-              <AppButton size="medium" type="danger" @click="openReminders">提醒中心</AppButton>
-            </view>
-          </view>
-        </AppCard>
-
-        <view class="caregiver-metric-grid">
-          <view v-for="item in summaryCards" :key="item.label" class="caregiver-metric-card">
-            <text class="caregiver-metric-card__label">{{ item.label }}</text>
-            <text class="caregiver-metric-card__value">{{ item.value }}</text>
-            <text class="caregiver-metric-card__hint">{{ item.hint }}</text>
-          </view>
-        </view>
-      </AppSection>
-
-      <AppSection title="快捷推进" description="围绕照料者的真实动作拆开入口。">
-        <view class="caregiver-quick-grid">
-          <view class="caregiver-quick-card" @click="openProfile">
-            <text class="caregiver-quick-card__title">完善入驻资料</text>
-            <text class="caregiver-quick-card__text">维护介绍、经验、服务城市和资质材料。</text>
-          </view>
-          <view class="caregiver-quick-card" @click="openServices">
-            <text class="caregiver-quick-card__title">管理服务配置</text>
-            <text class="caregiver-quick-card__text">调整报价、适配宠物、服务半径和上架状态。</text>
-          </view>
-          <view class="caregiver-quick-card" @click="openOrders">
-            <text class="caregiver-quick-card__title">处理履约订单</text>
-            <text class="caregiver-quick-card__text">完成接单、签到、服务记录和签退动作。</text>
-          </view>
-          <view class="caregiver-quick-card" @click="openEarnings">
-            <text class="caregiver-quick-card__title">查看收益表现</text>
-            <text class="caregiver-quick-card__text">汇总收入、评分、完成率和售后风险。</text>
-          </view>
-          <view class="caregiver-quick-card caregiver-quick-card--alert" @click="openReminders">
-            <text class="caregiver-quick-card__title">进入提醒中心</text>
-            <text class="caregiver-quick-card__text">把接单、履约、沟通和风险事项集中拉平，先看最紧急的动作。</text>
-          </view>
-        </view>
-      </AppSection>
-
-      <AppSection title="档案与服务概览">
-        <view class="caregiver-panels">
-          <view class="caregiver-panel">
-            <view class="caregiver-panel__header">
-              <text class="caregiver-panel__title">入驻资料</text>
-              <AppButton size="medium" type="info" @click="openProfile">维护</AppButton>
-            </view>
-            <template v-if="caregiverProfile">
-              <text class="caregiver-panel__meta">
-                {{ caregiverProfile.serviceCity || '城市待完善' }} · {{ caregiverProfile.experienceYears }} 年经验 · {{ caregiverProfile.serviceRadiusKm }}km 半径
-              </text>
-              <text class="caregiver-panel__note">{{ caregiverProfile.intro || '还没有填写服务介绍。' }}</text>
-              <text class="caregiver-panel__meta">
-                资质材料 {{ caregiverProfile.qualificationMaterials.length }} 份 · 评分 {{ formatAmount(caregiverProfile.ratingAvg) }}
-              </text>
-            </template>
-            <AppStatus v-else text="还没有照料者档案，先去补齐入驻资料。" />
-          </view>
-
-          <view class="caregiver-panel">
-            <view class="caregiver-panel__header">
-              <text class="caregiver-panel__title">当前服务</text>
-              <AppButton size="medium" type="info" @click="openServices">查看</AppButton>
-            </view>
-            <view v-if="latestServices.length" class="caregiver-mini-list">
-              <view v-for="service in latestServices" :key="service.id" class="caregiver-mini-list__item">
-                <text class="caregiver-mini-list__title">{{ serviceTypeLabels[service.serviceType] }} · {{ speciesLabels[service.petSpecies] }}</text>
-                <text class="caregiver-mini-list__meta">
-                  {{ service.serviceCity || '城市待完善' }} · ¥{{ formatAmount(service.pricePerUnit) }}/{{ service.unitType }}
-                </text>
-                <text class="caregiver-mini-list__meta">
-                  提前 {{ service.minNoticeHours }} 小时 · {{ service.isActive ? '已上架' : '已停用' }}
-                </text>
+      <AppSection title="今日订单">
+        <view v-if="recentOrders.length" class="caregiver-order-list">
+          <view v-for="order in recentOrders" :key="order.id" class="caregiver-order-row">
+            <view class="caregiver-order-row__headline">
+              <view class="caregiver-order-row__copy">
+                <text class="caregiver-order-row__title">{{ order.petName || '宠物待补充' }} · {{ order.ownerNickname }}</text>
+                <text class="caregiver-order-row__meta">{{ getOrderStatusLabel(order.orderStatus) }} · {{ formatRange(order.appointmentStart, order.appointmentEnd) }}</text>
+                <text class="caregiver-order-row__meta">{{ order.locationText || '地点待补充' }} · 实收 ¥{{ formatAmount(order.amountPaid) }}</text>
+              </view>
+              <view class="caregiver-order-row__tags">
+                <AppTag type="warning">
+                  {{ getOrderPrimaryAction(order).label }}
+                </AppTag>
+                <AppTag :type="getConversationUnreadCount(order.conversation, 'caregiver') > 0 ? 'warning' : 'default'">
+                  {{ getConversationUnreadCount(order.conversation, 'caregiver') > 0 ? `待读 ${getConversationUnreadCount(order.conversation, 'caregiver')}` : '已读' }}
+                </AppTag>
               </view>
             </view>
-            <AppStatus v-else text="还没有服务配置，先新增一个可售服务。" />
-          </view>
-        </view>
-      </AppSection>
-
-      <AppSection title="履约订单" description="优先显示需要立即接单或继续服务反馈的订单。">
-        <view v-if="latestOrders.length" class="caregiver-order-list">
-          <view v-for="order in latestOrders" :key="order.id" class="caregiver-order-card">
-            <view class="caregiver-order-card__header">
-              <view class="caregiver-order-card__headline">
-                <text class="caregiver-order-card__title">{{ order.orderNo }}</text>
-                <text class="caregiver-order-card__meta">
-                  {{ getOrderStatusLabel(order.orderStatus) }} · {{ formatRange(order.appointmentStart, order.appointmentEnd) }}
-                </text>
-              </view>
-              <AppTag :type="getConversationUnreadCount(order.conversation, 'caregiver') > 0 ? 'warning' : 'default'">
-                {{ getConversationUnreadCount(order.conversation, 'caregiver') > 0 ? `待读 ${getConversationUnreadCount(order.conversation, 'caregiver')}` : '沟通已读' }}
-              </AppTag>
-            </view>
-
-            <text class="caregiver-order-card__meta">
-              {{ order.petName || '宠物待补充' }} · {{ order.ownerNickname }} · {{ order.locationText || '地点待补充' }}
-            </text>
-
-            <view class="caregiver-order-card__conversation">
-              <text class="caregiver-order-card__conversation-title">订单沟通</text>
-              <text class="caregiver-order-card__conversation-text">{{ getConversationPreview(order.conversation) }}</text>
-              <text class="caregiver-order-card__conversation-meta">{{ getConversationHint(order.conversation, 'caregiver') }}</text>
-            </view>
-
-            <view class="caregiver-order-card__footer">
-              <text class="caregiver-order-card__amount">实收 ¥{{ formatAmount(order.amountPaid) }}</text>
-              <view class="caregiver-order-card__actions">
-                <AppButton size="medium" type="info" @click="openOrderDetail(order.id, 'chat')">沟通</AppButton>
-                <AppButton size="medium" @click="openOrderDetail(order.id, 'service')">履约</AppButton>
-              </view>
+            <view class="caregiver-order-row__actions">
+              <AppButton size="medium" type="info" @click="openOrderDetail(order.id, 'chat')">沟通</AppButton>
+              <AppButton size="medium" @click="openOrderDetail(order.id, getOrderPrimaryAction(order).tab)">
+                {{ getOrderPrimaryAction(order).label }}
+              </AppButton>
             </view>
           </view>
         </view>
         <view v-else class="caregiver-empty">
-          <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步履约订单' : '当前没有需要处理的照料订单'" />
+          <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步订单' : '当前没有待处理订单'" />
         </view>
       </AppSection>
 
-      <AppSection title="工作提示" description="帮助照料者优先处理高风险动作。">
-        <view class="caregiver-tip-list">
-          <view class="caregiver-tip-card">
-            <text class="caregiver-tip-card__title">审核与上架</text>
-            <text class="caregiver-tip-card__text">档案未完善或审核未通过时，优先补齐资质材料与服务承诺。</text>
-          </view>
-          <view class="caregiver-tip-card">
-            <text class="caregiver-tip-card__title">订单响应</text>
-            <text class="caregiver-tip-card__text">待接单和未读沟通决定了订单流失风险，建议优先处理。</text>
-          </view>
-          <view class="caregiver-tip-card">
-            <text class="caregiver-tip-card__title">服务记录</text>
-            <text class="caregiver-tip-card__text">签到后及时上传服务日志，会直接提升主人信任和售后透明度。</text>
-          </view>
+      <AppSection title="服务与收益">
+        <AppList v-if="serviceRows.length || caregiverProfile">
+          <AppListItem
+            v-if="caregiverProfile"
+            title="我的表现"
+            :label="`${caregiverProfile.serviceCity || '城市待补充'} · ${caregiverProfile.experienceYears} 年经验`"
+            :value="`评分 ${formatAmount(caregiverProfile.ratingAvg)}`"
+            value-emphasis
+            clickable
+            is-link
+            @click="openEarnings"
+          />
+          <AppListItem
+            v-for="service in serviceRows"
+            :key="service.id"
+            :title="`${serviceTypeLabels[service.serviceType]} · ${speciesLabels[service.petSpecies]}`"
+            :label="`${service.serviceCity || '城市待补充'} · 提前 ${service.minNoticeHours} 小时`"
+            :value="`¥${formatAmount(service.pricePerUnit)}/${service.unitType}`"
+            value-emphasis
+            clickable
+            is-link
+            @click="openServices"
+          />
+        </AppList>
+        <view v-else class="caregiver-empty">
+          <AppStatus text="还没有服务配置，先上架一个服务。" />
         </view>
       </AppSection>
     </template>
 
     <template v-else>
-      <AppSection title="开始进入照料者任务流">
+      <AppSection title="登录后开始工作">
         <view class="caregiver-empty caregiver-empty--login">
-          <AppStatus text="登录后即可进入照料者工作流。" />
+          <AppStatus text="登录后即可查看审核、订单、服务和收益。" />
         </view>
         <AppButton block @click="goToLogin">去登录</AppButton>
       </AppSection>
@@ -383,175 +425,85 @@ onPullDownRefresh(() => {
 </template>
 
 <style scoped lang="scss">
-.caregiver-hero {
+.caregiver-focus {
   display: grid;
-  gap: 20rpx;
-  padding: 6rpx 4rpx 2rpx;
-}
-
-.caregiver-signal-wrap {
-  padding: 0 24rpx;
-}
-
-.caregiver-hero__copy {
-  display: grid;
-  gap: 12rpx;
-}
-
-.caregiver-hero__title {
-  color: var(--app-text);
-  font-size: 40rpx;
-  line-height: 1.15;
-  font-weight: 700;
-}
-
-.caregiver-hero__summary {
-  color: var(--app-text-secondary);
-  font-size: 24rpx;
-  line-height: 1.7;
-}
-
-.caregiver-hero__actions,
-.caregiver-order-card__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-}
-
-.caregiver-metric-grid,
-.caregiver-quick-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16rpx;
-  margin-top: 18rpx;
-}
-
-.caregiver-metric-card,
-.caregiver-quick-card,
-.caregiver-panel,
-.caregiver-order-card,
-.caregiver-tip-card {
-  display: grid;
-  gap: 12rpx;
-  padding: 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  padding: 26rpx 28rpx;
   border-radius: var(--app-shape-xl);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
-  box-shadow: var(--app-elevation-1);
-  transition:
-    transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
-    box-shadow var(--app-motion-duration-medium) var(--app-motion-easing-standard);
-}
-
-.caregiver-metric-card__label {
-  color: var(--app-text-muted);
-  font-size: 22rpx;
-}
-
-.caregiver-metric-card__value {
-  color: var(--app-text);
-  font-size: 40rpx;
-  line-height: 1.05;
-  font-weight: 700;
-}
-
-.caregiver-metric-card__hint,
-.caregiver-quick-card__text,
-.caregiver-panel__meta,
-.caregiver-mini-list__meta,
-.caregiver-order-card__meta,
-.caregiver-order-card__conversation-meta,
-.caregiver-tip-card__text {
-  color: var(--app-text-secondary);
-  font-size: 22rpx;
-  line-height: 1.7;
-}
-
-.caregiver-quick-card {
-  cursor: pointer;
+  border: 1rpx solid var(--app-outline-variant);
   background:
-    radial-gradient(circle at top right, rgba(181, 106, 0, 0.12), transparent 34%),
+    radial-gradient(circle at top right, rgba(181, 106, 0, 0.16), transparent 34%),
     linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
+  box-shadow: var(--app-elevation-1);
 }
 
-.caregiver-quick-card--alert {
-  background:
-    radial-gradient(circle at top right, rgba(186, 26, 26, 0.14), transparent 34%),
-    linear-gradient(180deg, var(--app-danger-soft) 0%, var(--app-surface) 100%);
+.caregiver-focus__copy,
+.caregiver-focus__headline {
+  display: grid;
+  gap: 10rpx;
 }
 
-.caregiver-quick-card__title,
-.caregiver-panel__title,
-.caregiver-order-card__title,
-.caregiver-tip-card__title,
-.caregiver-mini-list__title {
+.caregiver-focus__title {
   color: var(--app-text);
-  font-size: 28rpx;
-  line-height: 1.45;
+  font-size: 38rpx;
+  line-height: 1.2;
   font-weight: 700;
 }
 
-.caregiver-panels,
-.caregiver-order-list,
-.caregiver-tip-list,
-.caregiver-mini-list {
-  display: grid;
-  gap: 16rpx;
-}
-
-.caregiver-panel__header,
-.caregiver-order-card__header,
-.caregiver-order-card__footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 16rpx;
-  align-items: flex-start;
-}
-
-.caregiver-panel__note {
-  color: var(--app-text);
-  font-size: 24rpx;
-  line-height: 1.7;
-}
-
-.caregiver-mini-list__item {
-  display: grid;
-  gap: 6rpx;
-  padding: 16rpx 18rpx;
-  border-radius: 18rpx;
-  background: var(--app-surface-soft);
-}
-
-.caregiver-order-card__headline {
-  display: grid;
-  gap: 6rpx;
-}
-
-.caregiver-order-card__conversation {
-  display: grid;
-  gap: 8rpx;
-  padding: 18rpx;
-  border-radius: var(--app-shape-lg);
-  background: linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
-}
-
-.caregiver-order-card__conversation-title {
-  color: var(--app-warning);
-  font-size: 20rpx;
-  font-weight: 700;
-}
-
-.caregiver-order-card__conversation-text {
-  color: var(--app-text);
+.caregiver-focus__hint {
+  color: var(--app-text-secondary);
   font-size: 24rpx;
   line-height: 1.6;
 }
 
-.caregiver-order-card__amount {
-  color: var(--app-warning);
-  font-size: 24rpx;
-  line-height: 1.5;
+.caregiver-focus__tags,
+.caregiver-focus__actions,
+.caregiver-order-row__tags,
+.caregiver-order-row__actions {
+  display: flex;
+  gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.caregiver-order-list {
+  display: grid;
+  gap: 16rpx;
+}
+
+.caregiver-order-row {
+  display: grid;
+  gap: 14rpx;
+  padding: 24rpx;
+  border-radius: var(--app-shape-xl);
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
+}
+
+.caregiver-order-row__headline {
+  display: flex;
+  gap: 16rpx;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.caregiver-order-row__copy {
+  display: grid;
+  gap: 6rpx;
+  min-width: 0;
+}
+
+.caregiver-order-row__title {
+  color: var(--app-text);
+  font-size: 30rpx;
+  line-height: 1.3;
   font-weight: 700;
+}
+
+.caregiver-order-row__meta {
+  color: var(--app-text-secondary);
+  font-size: 22rpx;
+  line-height: 1.6;
 }
 
 .caregiver-empty {
@@ -563,14 +515,7 @@ onPullDownRefresh(() => {
 }
 
 @media (max-width: 680px) {
-  .caregiver-metric-grid,
-  .caregiver-quick-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .caregiver-panel__header,
-  .caregiver-order-card__header,
-  .caregiver-order-card__footer {
+  .caregiver-order-row__headline {
     flex-direction: column;
   }
 }

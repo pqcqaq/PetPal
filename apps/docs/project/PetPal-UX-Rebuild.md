@@ -285,6 +285,11 @@ Web：
   - `pages/petpal/caregiver-profile.vue`
   - `pages/petpal/caregiver-services.vue`
   - `pages/petpal/caregiver-orders.vue`
+- App 端已继续把照料者首页、履约订单、服务管理三页切成动作优先首屏：
+  - 照料者首页改为“今天先做这个 + 当前优先 + 今日订单 + 服务与收益”。
+  - 履约订单页改为状态筛选 + 任务队列 + 就地服务记录。
+  - 服务管理页改为就地编辑 + 快速上下架，不再依赖说明区和跳转盒子。
+- 本轮重构涉及的 App 页面已统一补齐文件头部 `UX Blueprint` 注释，编码前先冻结目标用户、入口场景、首屏目标和主次动作。
 - App 端已新增 `pages/petpal/messages.vue`，把主人与照料者两侧订单沟通收口为跨订单消息中心。
 - App 端已新增 `pages/petpal/aftersales.vue`，把主人端退款、投诉和争议订单收口为独立售后中心。
 - App 端已新增 `pages/petpal/reminders.vue`，把主人端、照料者端和售后相关待办统一聚合到提醒中心。

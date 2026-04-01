@@ -1,4 +1,13 @@
 <script lang="ts" setup>
+/**
+ * UX Blueprint
+ * User: 已登录照料者，需要连续处理接单、签到、服务记录和签退
+ * Entry: 首页点击待办、提醒跳转、订单详情返回
+ * First screen: 先按状态看任务队列，再直接执行下一步动作
+ * Primary action: 接单、签到、记录服务、签退
+ * Secondary actions: 沟通、查看详情、切换筛选
+ * States: 未登录、空队列、待接单、待签到、服务中、已完成
+ */
 import type { CaregiverOrderRecord, ServiceLogType } from '@rbac/api-common'
 import { computed, reactive, ref, watch } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
@@ -59,26 +68,54 @@ const serviceLogForm = reactive({
   textNote: '',
 })
 
-const pageDescription = computed(() => (
-  tokenStore.hasLogin
-    ? '接单、签到、服务记录和签退全部集中在履约订单页处理。'
-    : '登录后即可处理履约订单。'
-))
-
 const pendingCount = computed(() => caregiverOrders.value.filter(item => item.orderStatus === 'PENDING_ACCEPT').length)
+const acceptedCount = computed(() => caregiverOrders.value.filter(item => item.orderStatus === 'ACCEPTED').length)
 const servingCount = computed(() => caregiverOrders.value.filter(item => item.orderStatus === 'SERVING').length)
 const completedCount = computed(() => caregiverOrders.value.filter(item => item.orderStatus === 'COMPLETED').length)
 const unreadCount = computed(() => caregiverOrders.value.reduce((total, item) => (
   total + getConversationUnreadCount(item.conversation, 'caregiver')
 ), 0))
 const currentServiceLogOrder = computed(() => caregiverOrders.value.find(item => item.id === activeServiceLogOrderId.value) ?? null)
+const sortedOrders = computed(() => [...caregiverOrders.value].sort((left, right) => {
+  const priority = getOrderPriority(left.orderStatus) - getOrderPriority(right.orderStatus)
+  if (priority !== 0) {
+    return priority
+  }
+  return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+}))
 
-const summaryCards = computed(() => [
-  { label: '待接单', value: String(pendingCount.value), hint: '及时接单有助于提高转化。' },
-  { label: '服务中', value: String(servingCount.value), hint: '别忘记补充服务记录和反馈。' },
-  { label: '已完成', value: String(completedCount.value), hint: '完成后仍可继续查看沟通和评价。' },
-  { label: '未读沟通', value: String(unreadCount.value), hint: '优先确认交接与异常消息。' },
-])
+function getOrderPriority(status: CaregiverOrderRecord['orderStatus']) {
+  if (status === 'PENDING_ACCEPT') return 0
+  if (status === 'ACCEPTED') return 1
+  if (status === 'SERVING') return 2
+  return 3
+}
+
+function getPrimaryAction(order: CaregiverOrderRecord) {
+  if (order.orderStatus === 'PENDING_ACCEPT') {
+    return { label: '接单', type: 'primary' as const, key: `accept:${order.id}` }
+  }
+  if (order.orderStatus === 'ACCEPTED') {
+    return { label: '签到', type: 'primary' as const, key: `checkin:${order.id}` }
+  }
+  if (order.orderStatus === 'SERVING') {
+    return { label: '记录服务', type: 'primary' as const, key: `log:${order.id}` }
+  }
+  return { label: '查看详情', type: 'info' as const, key: '' }
+}
+
+function getNextStepText(order: CaregiverOrderRecord) {
+  if (order.orderStatus === 'PENDING_ACCEPT') {
+    return '先确认能否接单'
+  }
+  if (order.orderStatus === 'ACCEPTED') {
+    return '预约开始后立即签到'
+  }
+  if (order.orderStatus === 'SERVING') {
+    return '补充服务记录后再签退'
+  }
+  return '回看履约结果和沟通记录'
+}
 
 function goToLogin() {
   uni.navigateTo({ url: LOGIN_PAGE })
@@ -159,6 +196,22 @@ async function handleCheckOutOrder(orderId: string) {
   })
 }
 
+function handlePrimaryAction(order: CaregiverOrderRecord) {
+  if (order.orderStatus === 'PENDING_ACCEPT') {
+    void handleAcceptOrder(order.id)
+    return
+  }
+  if (order.orderStatus === 'ACCEPTED') {
+    void handleCheckInOrder(order.id)
+    return
+  }
+  if (order.orderStatus === 'SERVING') {
+    openServiceLogComposer(order.id)
+    return
+  }
+  openOrderDetail(order.id, 'overview')
+}
+
 function openServiceLogComposer(orderId: string) {
   activeServiceLogOrderId.value = orderId
   serviceLogForm.logType = 'NOTE'
@@ -203,6 +256,7 @@ async function submitServiceLog() {
 }
 
 watch(caregiverOrderFilter, () => {
+  closeServiceLogComposer()
   if (tokenStore.hasLogin) {
     void loadPage(false)
   }
@@ -221,108 +275,97 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <AppPageShell title="履约订单" :description="pageDescription">
+  <AppPageShell title="履约订单">
     <template v-if="tokenStore.hasLogin">
       <CaregiverFlowNav
         :current-path="PETPAL_CAREGIVER_ORDERS_PAGE"
-        title="照料者履约订单"
-        description="待接单、签到、记录服务和签退都集中在这里，不再要求照料者在一个超级工作台里滚动查找操作。"
+        title="履约订单"
       />
 
-      <AppSection title="履约概览">
-        <view class="caregiver-order-metric-grid">
-          <view v-for="item in summaryCards" :key="item.label" class="caregiver-order-metric-card">
-            <text class="caregiver-order-metric-card__label">{{ item.label }}</text>
-            <text class="caregiver-order-metric-card__value">{{ item.value }}</text>
-            <text class="caregiver-order-metric-card__hint">{{ item.hint }}</text>
+      <AppSection title="先处理这些">
+        <view class="caregiver-order-board">
+          <view class="caregiver-order-summary">
+            <view class="caregiver-order-summary__item">
+              <text class="caregiver-order-summary__label">待接单</text>
+              <text class="caregiver-order-summary__value">{{ pendingCount }}</text>
+            </view>
+            <view class="caregiver-order-summary__item">
+              <text class="caregiver-order-summary__label">待签到</text>
+              <text class="caregiver-order-summary__value">{{ acceptedCount }}</text>
+            </view>
+            <view class="caregiver-order-summary__item">
+              <text class="caregiver-order-summary__label">服务中</text>
+              <text class="caregiver-order-summary__value">{{ servingCount }}</text>
+            </view>
+            <view class="caregiver-order-summary__item">
+              <text class="caregiver-order-summary__label">未读消息</text>
+              <text class="caregiver-order-summary__value">{{ unreadCount }}</text>
+            </view>
+          </view>
+          <AppChoiceChips v-model="caregiverOrderFilter" :options="caregiverOrderFilterOptions" />
+          <view class="caregiver-order-toolbar">
+            <AppButton size="medium" type="info" @click="openMessages">消息</AppButton>
+            <AppButton v-if="currentServiceLogOrder" size="medium" type="danger" @click="closeServiceLogComposer">关闭记录面板</AppButton>
           </view>
         </view>
       </AppSection>
 
-      <AppSection title="筛选与协同" description="优先处理待接单和服务中订单，未读消息可直接跳到消息中心。">
-        <AppChoiceChips v-model="caregiverOrderFilter" :options="caregiverOrderFilterOptions" />
-        <view class="caregiver-order-action-row">
-          <AppButton size="medium" type="info" @click="openMessages">打开消息中心</AppButton>
-        </view>
-      </AppSection>
-
-      <AppSection v-if="currentServiceLogOrder" title="记录服务" description="针对当前服务中的订单快速补充服务日志。">
+      <AppSection v-if="currentServiceLogOrder" title="补服务记录">
         <view class="caregiver-order-log-panel">
-          <text class="caregiver-order-log-panel__title">{{ currentServiceLogOrder.orderNo }} · {{ currentServiceLogOrder.petName || '宠物待补充' }}</text>
-          <view class="caregiver-order-log-panel__group">
-            <text class="caregiver-order-log-panel__label">记录类型</text>
-            <AppChoiceChips v-model="serviceLogForm.logType" :options="serviceLogTypeOptions" />
-          </view>
+          <text class="caregiver-order-log-panel__title">{{ currentServiceLogOrder.petName || '宠物待补充' }} · {{ currentServiceLogOrder.ownerNickname }}</text>
+          <text class="caregiver-order-log-panel__meta">{{ currentServiceLogOrder.orderNo }} · {{ formatRange(currentServiceLogOrder.appointmentStart, currentServiceLogOrder.appointmentEnd) }}</text>
+          <AppChoiceChips v-model="serviceLogForm.logType" :options="serviceLogTypeOptions" />
           <textarea
             v-model="serviceLogForm.textNote"
             class="caregiver-order-textarea"
             :maxlength="240"
             auto-height
-            placeholder="记录本次喂养、遛宠、互动或健康观察情况"
+            placeholder="记录喂养、遛宠、互动或健康观察"
           />
-          <view class="caregiver-order-action-row">
+          <view class="caregiver-order-toolbar">
             <AppButton size="medium" type="info" @click="closeServiceLogComposer">取消</AppButton>
-            <AppButton size="medium" :loading="serviceLogSubmitting" @click="submitServiceLog">提交服务记录</AppButton>
+            <AppButton size="medium" :loading="serviceLogSubmitting" @click="submitServiceLog">提交记录</AppButton>
           </view>
         </view>
       </AppSection>
 
-      <AppSection :title="caregiverOrders.length ? `订单列表 (${caregiverOrders.length})` : '订单列表'">
-        <view v-if="caregiverOrders.length" class="caregiver-order-list">
-          <view v-for="order in caregiverOrders" :key="order.id" class="caregiver-order-card">
+      <AppSection :title="sortedOrders.length ? `任务队列 (${sortedOrders.length})` : '任务队列'">
+        <view v-if="sortedOrders.length" class="caregiver-order-list">
+          <view v-for="order in sortedOrders" :key="order.id" class="caregiver-order-card">
             <view class="caregiver-order-card__header">
-              <view class="caregiver-order-card__headline">
-                <text class="caregiver-order-card__title">{{ order.orderNo }}</text>
-                <text class="caregiver-order-card__meta">
-                  {{ order.petName || '宠物待补充' }} · {{ order.ownerNickname }} · {{ order.locationText || '地点待补充' }}
-                </text>
+              <view class="caregiver-order-card__copy">
+                <text class="caregiver-order-card__title">{{ order.petName || '宠物待补充' }} · {{ order.ownerNickname }}</text>
+                <text class="caregiver-order-card__meta">{{ order.locationText || '地点待补充' }} · {{ formatRange(order.appointmentStart, order.appointmentEnd) }}</text>
+                <text class="caregiver-order-card__meta">实收 ¥{{ formatAmount(order.amountPaid) }} · {{ getNextStepText(order) }}</text>
               </view>
-              <AppTag :type="getConversationUnreadCount(order.conversation, 'caregiver') > 0 ? 'warning' : 'default'">
-                {{ getConversationUnreadCount(order.conversation, 'caregiver') > 0 ? `待读 ${getConversationUnreadCount(order.conversation, 'caregiver')}` : '沟通已读' }}
-              </AppTag>
+              <view class="caregiver-order-card__tags">
+                <AppTag type="warning">{{ getOrderStatusLabel(order.orderStatus) }}</AppTag>
+                <AppTag :type="getConversationUnreadCount(order.conversation, 'caregiver') > 0 ? 'warning' : 'default'">
+                  {{ getConversationUnreadCount(order.conversation, 'caregiver') > 0 ? `待读 ${getConversationUnreadCount(order.conversation, 'caregiver')}` : '已读' }}
+                </AppTag>
+              </view>
             </view>
 
-            <text class="caregiver-order-card__meta">
-              {{ getOrderStatusLabel(order.orderStatus) }} · {{ formatRange(order.appointmentStart, order.appointmentEnd) }}
-            </text>
-            <text class="caregiver-order-card__meta">实收 ¥{{ formatAmount(order.amountPaid) }}</text>
-
             <view class="caregiver-order-card__conversation">
-              <text class="caregiver-order-card__conversation-title">订单沟通</text>
               <text class="caregiver-order-card__conversation-text">{{ getConversationPreview(order.conversation) }}</text>
               <text class="caregiver-order-card__conversation-meta">{{ getConversationHint(order.conversation, 'caregiver') }}</text>
             </view>
 
-            <view class="caregiver-order-action-row">
+            <view class="caregiver-order-toolbar">
               <AppButton size="medium" type="info" @click="openOrderDetail(order.id, 'chat')">沟通</AppButton>
               <AppButton size="medium" type="info" @click="openOrderDetail(order.id, 'service')">详情</AppButton>
               <AppButton
-                v-if="order.orderStatus === 'PENDING_ACCEPT'"
                 size="medium"
-                :loading="caregiverActionLoadingKey === `accept:${order.id}`"
-                @click="handleAcceptOrder(order.id)"
+                :type="getPrimaryAction(order).type"
+                :loading="Boolean(getPrimaryAction(order).key) && caregiverActionLoadingKey === getPrimaryAction(order).key"
+                @click="handlePrimaryAction(order)"
               >
-                接单
-              </AppButton>
-              <AppButton
-                v-if="order.orderStatus === 'ACCEPTED'"
-                size="medium"
-                :loading="caregiverActionLoadingKey === `checkin:${order.id}`"
-                @click="handleCheckInOrder(order.id)"
-              >
-                签到
+                {{ getPrimaryAction(order).label }}
               </AppButton>
               <AppButton
                 v-if="order.orderStatus === 'SERVING'"
                 size="medium"
-                type="info"
-                @click="openServiceLogComposer(order.id)"
-              >
-                记录服务
-              </AppButton>
-              <AppButton
-                v-if="order.orderStatus === 'SERVING'"
-                size="medium"
+                type="danger"
                 :loading="caregiverActionLoadingKey === `checkout:${order.id}`"
                 @click="handleCheckOutOrder(order.id)"
               >
@@ -335,12 +378,20 @@ onPullDownRefresh(() => {
           <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步履约订单' : '当前筛选下没有履约订单'" />
         </view>
       </AppSection>
+
+      <AppSection title="已完成">
+        <view class="caregiver-order-completed">
+          <AppTag :type="completedCount > 0 ? 'success' : 'default'">
+            已完成 {{ completedCount }} 笔
+          </AppTag>
+        </view>
+      </AppSection>
     </template>
 
     <template v-else>
-      <AppSection title="开始处理履约订单">
+      <AppSection title="登录后处理订单">
         <view class="caregiver-order-empty caregiver-order-empty--login">
-          <AppStatus text="登录后即可处理照料订单。" />
+          <AppStatus text="登录后即可接单、签到、记录服务和签退。" />
         </view>
         <AppButton block @click="goToLogin">去登录</AppButton>
       </AppSection>
@@ -349,73 +400,85 @@ onPullDownRefresh(() => {
 </template>
 
 <style scoped lang="scss">
-.caregiver-order-metric-grid {
+.caregiver-order-board,
+.caregiver-order-card,
+.caregiver-order-log-panel {
+  display: grid;
+  gap: 16rpx;
+  padding: 24rpx;
+  border-radius: var(--app-shape-xl);
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
+}
+
+.caregiver-order-board {
+  background:
+    radial-gradient(circle at top right, rgba(181, 106, 0, 0.16), transparent 34%),
+    linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
+}
+
+.caregiver-order-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16rpx;
 }
 
-.caregiver-order-metric-card,
-.caregiver-order-card,
-.caregiver-order-log-panel {
+.caregiver-order-summary__item {
   display: grid;
-  gap: 12rpx;
-  padding: 24rpx;
-  border-radius: 26rpx;
-  border: 1rpx solid var(--app-border);
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
-  box-shadow: 0 12rpx 30rpx rgba(15, 23, 42, 0.06);
+  gap: 8rpx;
+  padding: 20rpx;
+  border-radius: var(--app-shape-lg);
+  background: rgba(255, 255, 255, 0.74);
 }
 
-.caregiver-order-metric-card__label {
-  color: var(--app-text-muted);
-  font-size: 22rpx;
-}
-
-.caregiver-order-metric-card__value {
-  color: var(--app-text);
-  font-size: 40rpx;
-  line-height: 1.05;
-  font-weight: 700;
-}
-
-.caregiver-order-metric-card__hint,
+.caregiver-order-summary__label,
 .caregiver-order-card__meta,
-.caregiver-order-card__conversation-meta {
+.caregiver-order-card__conversation-meta,
+.caregiver-order-log-panel__meta {
   color: var(--app-text-secondary);
   font-size: 22rpx;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 
-.caregiver-order-action-row,
-.caregiver-order-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
+.caregiver-order-summary__value {
+  color: var(--app-text);
+  font-size: 38rpx;
+  line-height: 1.1;
+  font-weight: 700;
 }
 
 .caregiver-order-list {
   display: grid;
   gap: 16rpx;
+}
+
+.caregiver-order-toolbar,
+.caregiver-order-card__tags,
+.caregiver-order-completed {
+  display: flex;
+  gap: 12rpx;
+  flex-wrap: wrap;
 }
 
 .caregiver-order-card__header {
   display: flex;
-  justify-content: space-between;
   gap: 16rpx;
   align-items: flex-start;
+  justify-content: space-between;
 }
 
-.caregiver-order-card__headline {
+.caregiver-order-card__copy {
   display: grid;
   gap: 6rpx;
+  min-width: 0;
 }
 
 .caregiver-order-card__title,
 .caregiver-order-log-panel__title {
   color: var(--app-text);
-  font-size: 28rpx;
-  line-height: 1.45;
+  font-size: 30rpx;
+  line-height: 1.3;
   font-weight: 700;
 }
 
@@ -423,31 +486,14 @@ onPullDownRefresh(() => {
   display: grid;
   gap: 8rpx;
   padding: 18rpx;
-  border-radius: 20rpx;
-  background: #fff5eb;
-}
-
-.caregiver-order-card__conversation-title {
-  color: #c2410c;
-  font-size: 20rpx;
-  font-weight: 700;
+  border-radius: var(--app-shape-lg);
+  background: var(--app-surface-soft);
 }
 
 .caregiver-order-card__conversation-text {
   color: var(--app-text);
   font-size: 24rpx;
   line-height: 1.6;
-}
-
-.caregiver-order-log-panel__group {
-  display: grid;
-  gap: 12rpx;
-}
-
-.caregiver-order-log-panel__label {
-  color: var(--app-text-secondary);
-  font-size: 24rpx;
-  line-height: 1.5;
 }
 
 .caregiver-order-textarea {
@@ -471,7 +517,7 @@ onPullDownRefresh(() => {
 }
 
 @media (max-width: 680px) {
-  .caregiver-order-metric-grid {
+  .caregiver-order-summary {
     grid-template-columns: 1fr;
   }
 
