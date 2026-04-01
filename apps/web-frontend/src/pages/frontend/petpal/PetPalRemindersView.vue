@@ -62,8 +62,25 @@
             </article>
           </div>
 
+          <PetPalStatePanel
+            v-else-if="!hasVisibleCapability"
+            eyebrow="可见提醒"
+            title="当前账号还没有可展示的提醒视角"
+            description="你可能还未开通主人或照料者能力。先切到对应工作台完善资料，或登录另一个账号后再回来查看。"
+            tone="warning"
+          >
+            <template #actions>
+              <RouterLink :to="{ name: 'frontend-petpal' }">
+                <el-button size="small" type="primary">去主人服务台</el-button>
+              </RouterLink>
+              <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
+                <el-button size="small">去照料者工作台</el-button>
+              </RouterLink>
+            </template>
+          </PetPalStatePanel>
+
           <p v-else class="petpal-empty-state">
-            当前筛选下没有高优先提醒，说明主人、照料者和售后主链路暂时比较平稳。
+            当前筛选下没有高优先提醒，说明可见的主人、照料者和售后主链路暂时比较平稳。
           </p>
         </article>
 
@@ -131,7 +148,56 @@
           <el-tag type="info">共 {{ filteredOwnerReminderCards.length }} 条</el-tag>
         </div>
 
-        <div v-if="filteredOwnerReminderCards.length" class="petpal-reminder-grid">
+        <PetPalStatePanel
+          v-if="ownerCapabilityState === 'role_unavailable'"
+          eyebrow="主人能力"
+          title="当前账号未开通主人提醒视角"
+          description="主人端的宠物、需求、订单和售后待办不会显示在这里。你可以先去照料者工作台处理当前账号的任务。"
+          tone="warning"
+        >
+          <template #actions>
+            <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
+              <el-button size="small" type="primary">去照料者工作台</el-button>
+            </RouterLink>
+            <RouterLink to="/login">
+              <el-button size="small">切换账号</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+
+        <PetPalStatePanel
+          v-else-if="ownerCapabilityState === 'error'"
+          eyebrow="主人提醒"
+          title="主人侧提醒加载失败"
+          :description="ownerCapabilityErrorMessage"
+          tone="danger"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" :loading="retryingSection === 'owner'" @click="retryOwnerCapability">
+              重试主人提醒
+            </el-button>
+            <RouterLink :to="{ name: 'frontend-petpal' }">
+              <el-button size="small">去主人服务台</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+
+        <template v-else-if="filteredOwnerReminderCards.length">
+          <PetPalStatePanel
+            v-if="ownerCapabilityNotice"
+            eyebrow="主人提醒"
+            title="主人侧提醒未完整加载"
+            :description="ownerCapabilityNotice"
+            tone="warning"
+          >
+            <template #actions>
+              <el-button size="small" type="primary" :loading="retryingSection === 'owner'" @click="retryOwnerCapability">
+                重新加载主人提醒
+              </el-button>
+            </template>
+          </PetPalStatePanel>
+
+        <div class="petpal-reminder-grid">
           <article v-for="item in filteredOwnerReminderCards" :key="item.id" class="petpal-reminder-card">
             <div class="petpal-reminder-card__header">
               <div class="petpal-reminder-card__tags">
@@ -151,10 +217,21 @@
             <p class="petpal-reminder-card__detail">{{ item.detail }}</p>
           </article>
         </div>
+        </template>
 
-        <p v-else class="petpal-empty-state">
-          当前筛选下没有主人提醒，可直接回到主人服务台继续建档、发需求或回看订单。
-        </p>
+        <PetPalStatePanel
+          v-else
+          eyebrow="主人提醒"
+          title="当前筛选下没有主人提醒"
+          description="可以直接回到主人服务台继续建档、发需求或回看订单，也可以去提醒中心首页恢复默认筛选。"
+        >
+          <template #actions>
+            <RouterLink :to="{ name: 'frontend-petpal' }">
+              <el-button size="small" type="primary">去主人服务台</el-button>
+            </RouterLink>
+            <el-button size="small" @click="resetReminderFilters">恢复默认筛选</el-button>
+          </template>
+        </PetPalStatePanel>
       </section>
 
       <section v-if="shouldShowCaregiverSection" class="frontend-card">
@@ -167,7 +244,56 @@
           <el-tag type="warning">共 {{ filteredCaregiverReminderCards.length }} 条</el-tag>
         </div>
 
-        <div v-if="filteredCaregiverReminderCards.length" class="petpal-reminder-grid">
+        <PetPalStatePanel
+          v-if="caregiverCapabilityState === 'role_unavailable'"
+          eyebrow="照料者能力"
+          title="当前账号未开通照料者提醒视角"
+          description="照料者端的审核、服务、接单和履约待办不会显示在这里。你可以先回到主人服务台继续处理当前账号的任务。"
+          tone="warning"
+        >
+          <template #actions>
+            <RouterLink :to="{ name: 'frontend-petpal' }">
+              <el-button size="small" type="primary">去主人服务台</el-button>
+            </RouterLink>
+            <RouterLink to="/login">
+              <el-button size="small">切换账号</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+
+        <PetPalStatePanel
+          v-else-if="caregiverCapabilityState === 'error'"
+          eyebrow="照料者提醒"
+          title="照料者侧提醒加载失败"
+          :description="caregiverCapabilityErrorMessage"
+          tone="danger"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" :loading="retryingSection === 'caregiver'" @click="retryCaregiverCapability">
+              重试照料者提醒
+            </el-button>
+            <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
+              <el-button size="small">去照料者工作台</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+
+        <template v-else-if="filteredCaregiverReminderCards.length">
+          <PetPalStatePanel
+            v-if="caregiverCapabilityNotice"
+            eyebrow="照料者提醒"
+            title="照料者侧提醒未完整加载"
+            :description="caregiverCapabilityNotice"
+            tone="warning"
+          >
+            <template #actions>
+              <el-button size="small" type="primary" :loading="retryingSection === 'caregiver'" @click="retryCaregiverCapability">
+                重新加载照料者提醒
+              </el-button>
+            </template>
+          </PetPalStatePanel>
+
+        <div class="petpal-reminder-grid">
           <article v-for="item in filteredCaregiverReminderCards" :key="item.id" class="petpal-reminder-card">
             <div class="petpal-reminder-card__header">
               <div class="petpal-reminder-card__tags">
@@ -187,27 +313,39 @@
             <p class="petpal-reminder-card__detail">{{ item.detail }}</p>
           </article>
         </div>
+        </template>
 
-        <p v-else class="petpal-empty-state">
-          当前筛选下没有照料者提醒；如果当前账号并未开通照料者能力，也可以直接忽略这部分。
-        </p>
+        <PetPalStatePanel
+          v-else
+          eyebrow="照料者提醒"
+          title="当前筛选下没有照料者提醒"
+          description="可以先回到照料者工作台检查是否有待接单或服务中订单，也可以恢复默认筛选后再查看。"
+        >
+          <template #actions>
+            <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
+              <el-button size="small" type="primary">去照料者工作台</el-button>
+            </RouterLink>
+            <el-button size="small" @click="resetReminderFilters">恢复默认筛选</el-button>
+          </template>
+        </PetPalStatePanel>
       </section>
     </template>
 
     <section v-else class="frontend-card">
-      <span class="frontend-card__eyebrow">开始使用</span>
-      <h3>登录后查看提醒中心</h3>
-      <p class="petpal-empty-state">
-        提醒中心会汇总主人端、照料者端、消息和售后相关待办。未登录时不加载任何业务数据。
-      </p>
-      <div class="frontend-page__hero-actions">
-        <RouterLink class="frontend-page__button is-primary" to="/login">
-          去登录
-        </RouterLink>
-        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal' }">
-          浏览主人服务台
-        </RouterLink>
-      </div>
+      <PetPalStatePanel
+        eyebrow="开始使用"
+        title="登录后查看提醒中心"
+        description="提醒中心会汇总主人端、照料者端、消息和售后相关待办。未登录时不加载任何业务数据。"
+      >
+        <template #actions>
+          <RouterLink to="/login">
+            <el-button size="small" type="primary">去登录</el-button>
+          </RouterLink>
+          <RouterLink :to="{ name: 'frontend-petpal' }">
+            <el-button size="small">浏览主人服务台</el-button>
+          </RouterLink>
+        </template>
+      </PetPalStatePanel>
     </section>
   </div>
 </template>
@@ -229,6 +367,7 @@ import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
+import PetPalStatePanel from './PetPalStatePanel.vue';
 import {
   getPetPalCaregiverAuditLabel,
   getPetPalConversationUnreadCount,
@@ -245,6 +384,7 @@ defineOptions({
 type ReminderPriority = 'HIGH' | 'MEDIUM' | 'LOW';
 type ReminderRole = 'OWNER' | 'CAREGIVER';
 type ReminderScope = 'ALL' | 'OWNER' | 'CAREGIVER';
+type CapabilityLoadState = 'idle' | 'ready' | 'role_unavailable' | 'error';
 
 type ReminderCard = {
   id: string;
@@ -289,6 +429,8 @@ const isRoleUnavailableError = (error: unknown) => (
   && [401, 403, 404].includes(error.status)
 );
 
+const isReadyCapabilityState = (state: CapabilityLoadState) => state === 'ready';
+
 const pets = ref<PetProfileRecord[]>([]);
 const requests = ref<ServiceRequestRecord[]>([]);
 const ownerOrders = ref<OrderRecord[]>([]);
@@ -298,6 +440,13 @@ const caregiverOrders = ref<CaregiverOrderRecord[]>([]);
 const ownerAftersalesSignals = ref<OwnerAftersalesSignal[]>([]);
 
 const loading = ref(false);
+const ownerCapabilityState = ref<CapabilityLoadState>('idle');
+const caregiverCapabilityState = ref<CapabilityLoadState>('idle');
+const ownerCapabilityErrorMessage = ref('');
+const caregiverCapabilityErrorMessage = ref('');
+const ownerCapabilityNotice = ref('');
+const caregiverCapabilityNotice = ref('');
+const retryingSection = ref<'owner' | 'caregiver' | ''>('');
 const scope = ref<ReminderScope>('ALL');
 const highOnly = ref(false);
 const keyword = ref('');
@@ -366,6 +515,19 @@ const matchesKeyword = (input: string, values: Array<string | null | undefined>)
     return true;
   }
   return values.some(value => value?.toLowerCase().includes(normalized));
+};
+
+const mergeCapabilityNotice = (items: string[]) => {
+  const normalized = items
+    .map(item => item.trim().replace(/[。.]$/, ''))
+    .filter(Boolean);
+  return normalized.length ? `${normalized.join('；')}。` : '';
+};
+
+const resetReminderFilters = () => {
+  scope.value = 'ALL';
+  highOnly.value = false;
+  keyword.value = '';
 };
 
 const isUpcomingWindow = (value: string) => {
@@ -439,8 +601,16 @@ const caregiverRiskOrders = computed(() => caregiverOrders.value.filter(item => 
 const activeCaregiverServiceCount = computed(() => caregiverServices.value.filter(item => item.isActive).length);
 
 const totalRiskOrderCount = computed(() => ownerAftersalesSignals.value.length + caregiverRiskOrders.value.length);
+const hasVisibleCapability = computed(() => (
+  ['idle', 'ready'].includes(ownerCapabilityState.value)
+  || ['idle', 'ready'].includes(caregiverCapabilityState.value)
+));
 
 const ownerReminderCards = computed<ReminderCard[]>(() => {
+  if (ownerCapabilityState.value !== 'ready') {
+    return [];
+  }
+
   const cards: ReminderCard[] = [];
 
   if (!pets.value.length) {
@@ -548,6 +718,10 @@ const ownerReminderCards = computed<ReminderCard[]>(() => {
 });
 
 const caregiverReminderCards = computed<ReminderCard[]>(() => {
+  if (caregiverCapabilityState.value !== 'ready') {
+    return [];
+  }
+
   const cards: ReminderCard[] = [];
 
   if (!caregiverProfile.value) {
@@ -706,7 +880,8 @@ const shouldShowOwnerSection = computed(() => scope.value === 'ALL' || scope.val
 const shouldShowCaregiverSection = computed(() => scope.value === 'ALL' || scope.value === 'CAREGIVER');
 
 const scheduleCards = computed<ScheduleCard[]>(() => {
-  const ownerItems = ownerUpcomingOrders.value.slice(0, 3).map<ScheduleCard>(item => ({
+  const ownerItems = ownerCapabilityState.value === 'ready'
+    ? ownerUpcomingOrders.value.slice(0, 3).map<ScheduleCard>(item => ({
     id: `owner-${item.id}`,
     role: 'OWNER',
     title: `${item.orderNo} 即将开始`,
@@ -714,9 +889,11 @@ const scheduleCards = computed<ScheduleCard[]>(() => {
     status: getPetPalOrderStatusLabel(item.orderStatus),
     sortAt: new Date(item.appointmentStart).getTime(),
     actionTo: { name: 'frontend-petpal-order-detail', params: { id: item.id } },
-  }));
+    }))
+    : [];
 
-  const caregiverItems = caregiverUpcomingOrders.value.slice(0, 3).map<ScheduleCard>(item => ({
+  const caregiverItems = caregiverCapabilityState.value === 'ready'
+    ? caregiverUpcomingOrders.value.slice(0, 3).map<ScheduleCard>(item => ({
     id: `caregiver-${item.id}`,
     role: 'CAREGIVER',
     title: `${item.orderNo} 待照料处理`,
@@ -724,7 +901,8 @@ const scheduleCards = computed<ScheduleCard[]>(() => {
     status: getPetPalOrderStatusLabel(item.orderStatus),
     sortAt: new Date(item.appointmentStart).getTime(),
     actionTo: { name: 'frontend-petpal-order-detail', params: { id: item.id } },
-  }));
+    }))
+    : [];
 
   return [...ownerItems, ...caregiverItems]
     .sort((left, right) => left.sortAt - right.sortAt)
@@ -798,7 +976,7 @@ const loadOwnerAftersalesSignals = async (orders: OrderRecord[]) => {
 
   if (!candidates.length) {
     ownerAftersalesSignals.value = [];
-    return;
+    return '';
   }
 
   let refundFailures = 0;
@@ -866,13 +1044,140 @@ const loadOwnerAftersalesSignals = async (orders: OrderRecord[]) => {
       return new Date(right.lastTouchedAt).getTime() - new Date(left.lastTouchedAt).getTime();
     });
 
+  const notices: string[] = [];
   if (refundFailures > 0) {
-    ElMessage.warning(`有 ${refundFailures} 笔订单的退款进度未能加载，可进入订单详情继续查看。`);
+    notices.push(`有 ${refundFailures} 笔订单的退款进度未能完整加载，可进入订单详情继续查看`);
   }
 
   if (complaintFailures > 0) {
-    ElMessage.warning(`有 ${complaintFailures} 笔订单的投诉进度未能加载，可进入售后中心继续查看。`);
+    notices.push(`有 ${complaintFailures} 笔订单的投诉进度未能完整加载，可进入售后中心继续查看`);
   }
+
+  return mergeCapabilityNotice(notices);
+};
+
+const loadOwnerCapability = async () => {
+  pets.value = [];
+  requests.value = [];
+  ownerOrders.value = [];
+  ownerAftersalesSignals.value = [];
+  ownerCapabilityErrorMessage.value = '';
+  ownerCapabilityNotice.value = '';
+
+  const notices: string[] = [];
+  let successCount = 0;
+  let roleUnavailableCount = 0;
+
+  const results = await Promise.allSettled([
+    loadPets(),
+    loadRequests(),
+    loadOwnerOrders(),
+  ]);
+
+  if (results[0].status === 'fulfilled') {
+    successCount += 1;
+  } else if (isRoleUnavailableError(results[0].reason)) {
+    roleUnavailableCount += 1;
+  } else {
+    notices.push(getErrorMessage(results[0].reason, '宠物档案未能加载，当前仅展示其余主人提醒'));
+  }
+
+  if (results[1].status === 'fulfilled') {
+    successCount += 1;
+  } else if (isRoleUnavailableError(results[1].reason)) {
+    roleUnavailableCount += 1;
+  } else {
+    notices.push(getErrorMessage(results[1].reason, '主人需求未能加载，当前仅展示其余主人提醒'));
+  }
+
+  if (results[2].status === 'fulfilled') {
+    successCount += 1;
+  } else if (isRoleUnavailableError(results[2].reason)) {
+    roleUnavailableCount += 1;
+  } else {
+    notices.push(getErrorMessage(results[2].reason, '主人订单未能加载，当前仅展示建档和需求提醒'));
+  }
+
+  if (successCount === 0 && roleUnavailableCount === results.length) {
+    ownerCapabilityState.value = 'role_unavailable';
+    return;
+  }
+
+  if (successCount === 0) {
+    ownerCapabilityState.value = 'error';
+    ownerCapabilityErrorMessage.value = mergeCapabilityNotice(notices) || '主人提醒暂时不可用，请稍后重试。';
+    return;
+  }
+
+  ownerCapabilityState.value = 'ready';
+
+  if (results[2].status === 'fulfilled') {
+    try {
+      const aftersalesNotice = await loadOwnerAftersalesSignals(ownerOrders.value);
+      if (aftersalesNotice) {
+        notices.push(aftersalesNotice);
+      }
+    } catch (error: unknown) {
+      ownerAftersalesSignals.value = [];
+      notices.push(getErrorMessage(error, '售后提醒未能加载，当前仅展示其余主人提醒'));
+    }
+  }
+
+  ownerCapabilityNotice.value = mergeCapabilityNotice(notices);
+};
+
+const loadCaregiverCapability = async () => {
+  caregiverProfile.value = null;
+  caregiverServices.value = [];
+  caregiverOrders.value = [];
+  caregiverCapabilityErrorMessage.value = '';
+  caregiverCapabilityNotice.value = '';
+
+  const notices: string[] = [];
+  let successCount = 0;
+  let roleUnavailableCount = 0;
+
+  const results = await Promise.allSettled([
+    loadCaregiverProfile(),
+    loadCaregiverServices(),
+    loadCaregiverOrders(),
+  ]);
+
+  if (results[0].status === 'fulfilled') {
+    successCount += 1;
+  } else if (isRoleUnavailableError(results[0].reason)) {
+    roleUnavailableCount += 1;
+  } else {
+    notices.push(getErrorMessage(results[0].reason, '照料者档案未能加载，当前仅展示其余照料提醒'));
+  }
+  if (results[1].status === 'fulfilled') {
+    successCount += 1;
+  } else if (isRoleUnavailableError(results[1].reason)) {
+    roleUnavailableCount += 1;
+  } else {
+    notices.push(getErrorMessage(results[1].reason, '照料服务未能加载，当前仅展示其余照料提醒'));
+  }
+  if (results[2].status === 'fulfilled') {
+    successCount += 1;
+  } else if (isRoleUnavailableError(results[2].reason)) {
+    roleUnavailableCount += 1;
+  } else {
+    notices.push(getErrorMessage(results[2].reason, '照料者订单未能加载，当前仅展示入驻与服务提醒'));
+  }
+
+  if (successCount === 0 && roleUnavailableCount === results.length) {
+    caregiverCapabilityState.value = 'role_unavailable';
+    return;
+  }
+
+  if (successCount === 0) {
+    caregiverCapabilityState.value = 'error';
+    caregiverCapabilityErrorMessage.value = mergeCapabilityNotice(notices) || '照料者提醒暂时不可用，请稍后重试。';
+    return;
+  }
+
+  caregiverCapabilityState.value = 'ready';
+  caregiverCapabilityNotice.value = mergeCapabilityNotice(notices);
 };
 
 const reloadAll = async () => {
@@ -882,69 +1187,42 @@ const reloadAll = async () => {
   }
 
   loading.value = true;
-  ownerAftersalesSignals.value = [];
-
-  const results = await Promise.allSettled([
-    loadPets(),
-    loadRequests(),
-    loadOwnerOrders(),
-    loadCaregiverProfile(),
-    loadCaregiverServices(),
-    loadCaregiverOrders(),
-  ]);
-
-  if (results[0].status === 'rejected') {
-    pets.value = [];
-    if (!isRoleUnavailableError(results[0].reason)) {
-      ElMessage.error(getErrorMessage(results[0].reason, '加载宠物失败'));
-    }
+  ownerCapabilityState.value = 'idle';
+  caregiverCapabilityState.value = 'idle';
+  try {
+    await Promise.all([
+      loadOwnerCapability(),
+      loadCaregiverCapability(),
+    ]);
+  } finally {
+    loading.value = false;
   }
+};
 
-  if (results[1].status === 'rejected') {
-    requests.value = [];
-    if (!isRoleUnavailableError(results[1].reason)) {
-      ElMessage.error(getErrorMessage(results[1].reason, '加载需求失败'));
+const retryOwnerCapability = async () => {
+  retryingSection.value = 'owner';
+  ownerCapabilityState.value = 'idle';
+  try {
+    await loadOwnerCapability();
+    if (isReadyCapabilityState(ownerCapabilityState.value)) {
+      ElMessage.success('主人提醒已刷新');
     }
+  } finally {
+    retryingSection.value = '';
   }
+};
 
-  if (results[2].status === 'rejected') {
-    ownerOrders.value = [];
-    if (!isRoleUnavailableError(results[2].reason)) {
-      ElMessage.error(getErrorMessage(results[2].reason, '加载主人订单失败'));
+const retryCaregiverCapability = async () => {
+  retryingSection.value = 'caregiver';
+  caregiverCapabilityState.value = 'idle';
+  try {
+    await loadCaregiverCapability();
+    if (isReadyCapabilityState(caregiverCapabilityState.value)) {
+      ElMessage.success('照料者提醒已刷新');
     }
+  } finally {
+    retryingSection.value = '';
   }
-
-  if (results[3].status === 'rejected') {
-    caregiverProfile.value = null;
-    if (!isRoleUnavailableError(results[3].reason)) {
-      ElMessage.error(getErrorMessage(results[3].reason, '加载照料者档案失败'));
-    }
-  }
-
-  if (results[4].status === 'rejected') {
-    caregiverServices.value = [];
-    if (!isRoleUnavailableError(results[4].reason)) {
-      ElMessage.error(getErrorMessage(results[4].reason, '加载照料服务失败'));
-    }
-  }
-
-  if (results[5].status === 'rejected') {
-    caregiverOrders.value = [];
-    if (!isRoleUnavailableError(results[5].reason)) {
-      ElMessage.error(getErrorMessage(results[5].reason, '加载照料者订单失败'));
-    }
-  }
-
-  if (results[2].status === 'fulfilled') {
-    try {
-      await loadOwnerAftersalesSignals(ownerOrders.value);
-    } catch (error: unknown) {
-      ownerAftersalesSignals.value = [];
-      ElMessage.error(getErrorMessage(error, '加载售后提醒失败'));
-    }
-  }
-
-  loading.value = false;
 };
 
 onMounted(() => {

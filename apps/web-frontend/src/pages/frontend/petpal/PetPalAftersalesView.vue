@@ -21,52 +21,70 @@
       </div>
     </section>
 
-    <section class="frontend-page__section-grid">
-      <article class="frontend-card petpal-grid-span-3">
-        <span class="frontend-card__eyebrow">售后订单</span>
-        <strong class="petpal-summary-value">{{ aftersalesItems.length }}</strong>
-        <p class="petpal-summary-copy">至少存在退款进度、投诉记录或售后状态变化的订单。</p>
-      </article>
-      <article class="frontend-card petpal-grid-span-3">
-        <span class="frontend-card__eyebrow">处理中退款</span>
-        <strong class="petpal-summary-value">{{ refundInFlightCount }}</strong>
-        <p class="petpal-summary-copy">等待审核、等待渠道回调和退款失败都需要优先跟进。</p>
-      </article>
-      <article class="frontend-card petpal-grid-span-3">
-        <span class="frontend-card__eyebrow">处理中投诉</span>
-        <strong class="petpal-summary-value">{{ activeComplaintCount }}</strong>
-        <p class="petpal-summary-copy">待受理或处理中投诉会直接影响售后处理优先级。</p>
-      </article>
-      <article class="frontend-card petpal-grid-span-3">
-        <span class="frontend-card__eyebrow">累计已退</span>
-        <strong class="petpal-summary-value">¥{{ formatAmount(totalSettledRefundAmount) }}</strong>
-        <p class="petpal-summary-copy">按当前可加载订单聚合的已退款金额，用于快速判断售后规模。</p>
-      </article>
-    </section>
+    <template v-if="auth.isAuthenticated">
+      <template v-if="pageLoadState === 'ready'">
+        <section class="frontend-page__section-grid">
+          <article class="frontend-card petpal-grid-span-3">
+            <span class="frontend-card__eyebrow">售后订单</span>
+            <strong class="petpal-summary-value">{{ aftersalesItems.length }}</strong>
+            <p class="petpal-summary-copy">至少存在退款进度、投诉记录或售后状态变化的订单。</p>
+          </article>
+          <article class="frontend-card petpal-grid-span-3">
+            <span class="frontend-card__eyebrow">处理中退款</span>
+            <strong class="petpal-summary-value">{{ refundInFlightCount }}</strong>
+            <p class="petpal-summary-copy">等待审核、等待渠道回调和退款失败都需要优先跟进。</p>
+          </article>
+          <article class="frontend-card petpal-grid-span-3">
+            <span class="frontend-card__eyebrow">处理中投诉</span>
+            <strong class="petpal-summary-value">{{ activeComplaintCount }}</strong>
+            <p class="petpal-summary-copy">待受理或处理中投诉会直接影响售后处理优先级。</p>
+          </article>
+          <article class="frontend-card petpal-grid-span-3">
+            <span class="frontend-card__eyebrow">累计已退</span>
+            <strong class="petpal-summary-value">¥{{ formatAmount(totalSettledRefundAmount) }}</strong>
+            <p class="petpal-summary-copy">按当前可加载订单聚合的已退款金额，用于快速判断售后规模。</p>
+          </article>
+        </section>
 
-    <section class="frontend-card">
-      <span class="frontend-card__eyebrow">筛选售后</span>
-      <div class="petpal-filter-toolbar">
-        <el-radio-group v-model="focus" size="small">
-          <el-radio-button label="ALL">全部</el-radio-button>
-          <el-radio-button label="ACTIVE">处理中</el-radio-button>
-          <el-radio-button label="REFUND">退款</el-radio-button>
-          <el-radio-button label="COMPLAINT">投诉</el-radio-button>
-          <el-radio-button label="RESOLVED">已结案</el-radio-button>
-        </el-radio-group>
-        <el-checkbox v-model="unresolvedOnly">仅看待跟进</el-checkbox>
-        <el-input
-          v-model="keyword"
-          clearable
-          size="small"
-          maxlength="64"
-          placeholder="按订单号、投诉类型或退款状态筛选"
-          style="width: min(100%, 280px)"
-        />
-      </div>
-    </section>
+        <section v-if="partialLoadNotice" class="frontend-card">
+          <PetPalStatePanel
+            eyebrow="加载提示"
+            title="部分售后信号未完整加载"
+            :description="partialLoadNotice"
+            tone="warning"
+          >
+            <template #actions>
+              <el-button size="small" type="primary" :loading="loading" @click="reloadAll">重新加载</el-button>
+              <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: aftersalesItems[0]?.order.id } }">
+                <el-button v-if="aftersalesItems[0]" size="small">打开最近订单</el-button>
+              </RouterLink>
+            </template>
+          </PetPalStatePanel>
+        </section>
 
-    <section class="frontend-card">
+        <section class="frontend-card">
+          <span class="frontend-card__eyebrow">筛选售后</span>
+          <div class="petpal-filter-toolbar">
+            <el-radio-group v-model="focus" size="small">
+              <el-radio-button label="ALL">全部</el-radio-button>
+              <el-radio-button label="ACTIVE">处理中</el-radio-button>
+              <el-radio-button label="REFUND">退款</el-radio-button>
+              <el-radio-button label="COMPLAINT">投诉</el-radio-button>
+              <el-radio-button label="RESOLVED">已结案</el-radio-button>
+            </el-radio-group>
+            <el-checkbox v-model="unresolvedOnly">仅看待跟进</el-checkbox>
+            <el-input
+              v-model="keyword"
+              clearable
+              size="small"
+              maxlength="64"
+              placeholder="按订单号、投诉类型或退款状态筛选"
+              style="width: min(100%, 280px)"
+            />
+          </div>
+        </section>
+
+        <section class="frontend-card">
       <div class="petpal-section-heading">
         <div class="petpal-section-heading__meta">
           <span class="frontend-card__eyebrow">售后队列</span>
@@ -183,9 +201,59 @@
         </article>
       </div>
 
-      <p v-else class="petpal-empty-state">
-        当前筛选下没有售后订单。可先回到主人服务台继续跟进订单，或在消息中心确认是否有需要处理的沟通。
-      </p>
+          <PetPalStatePanel
+            v-else
+            eyebrow="售后队列"
+            title="当前筛选下没有售后订单"
+            description="可以先回到主人服务台继续跟进订单，或在提醒中心确认是否有需要优先处理的售后信号。"
+          >
+            <template #actions>
+              <RouterLink :to="{ name: 'frontend-petpal' }">
+                <el-button size="small" type="primary">去主人服务台</el-button>
+              </RouterLink>
+              <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+                <el-button size="small">去提醒中心</el-button>
+              </RouterLink>
+            </template>
+          </PetPalStatePanel>
+        </section>
+      </template>
+
+      <section v-else-if="pageLoadState === 'error'" class="frontend-card">
+        <PetPalStatePanel
+          eyebrow="售后中心"
+          title="主人售后中心加载失败"
+          :description="pageLoadErrorMessage"
+          tone="danger"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" :loading="loading" @click="reloadAll">重试售后中心</el-button>
+            <RouterLink :to="{ name: 'frontend-petpal' }">
+              <el-button size="small">去主人服务台</el-button>
+            </RouterLink>
+            <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+              <el-button size="small">去提醒中心</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+      </section>
+    </template>
+
+    <section v-else class="frontend-card">
+      <PetPalStatePanel
+        eyebrow="开始使用"
+        title="登录后查看主人售后中心"
+        description="这里会集中展示退款进度、投诉状态、售后优先级和订单退款导出入口。未登录时不加载任何售后数据。"
+      >
+        <template #actions>
+          <RouterLink to="/login">
+            <el-button size="small" type="primary">去登录</el-button>
+          </RouterLink>
+          <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+            <el-button size="small">先看提醒中心</el-button>
+          </RouterLink>
+        </template>
+      </PetPalStatePanel>
     </section>
   </div>
 </template>
@@ -200,11 +268,11 @@ import type {
   PetServiceType,
 } from '@rbac/api-common';
 import { computed, onMounted, ref } from 'vue';
-import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import ListExportButton from '@/components/download/ListExportButton.vue';
 import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
+import PetPalStatePanel from './PetPalStatePanel.vue';
 import {
   getPetPalComplaintStatusLabel,
   getPetPalComplaintStatusType,
@@ -223,6 +291,7 @@ defineOptions({
 
 type AftersalesFocus = 'ALL' | 'ACTIVE' | 'REFUND' | 'COMPLAINT' | 'RESOLVED';
 type AftersalesPriorityLevel = 'HIGH' | 'MEDIUM' | 'LOW';
+type PageLoadState = 'idle' | 'ready' | 'error';
 
 type AftersalesOrderItem = {
   order: OrderRecord;
@@ -240,6 +309,9 @@ type AftersalesOrderItem = {
 const auth = useAuthStore();
 
 const loading = ref(false);
+const pageLoadState = ref<PageLoadState>('idle');
+const pageLoadErrorMessage = ref('');
+const partialLoadNotice = ref('');
 const aftersalesItems = ref<AftersalesOrderItem[]>([]);
 const focus = ref<AftersalesFocus>('ACTIVE');
 const unresolvedOnly = ref(false);
@@ -431,6 +503,7 @@ const getNextActionCopy = (item: AftersalesOrderItem) => {
 };
 
 const loadAftersalesItems = async () => {
+  partialLoadNotice.value = '';
   const orders = await api.petpal.orders.list();
   const sortedOrders = [...orders].sort((left, right) => (
     new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
@@ -507,27 +580,34 @@ const loadAftersalesItems = async () => {
       return new Date(right.lastTouchedAt).getTime() - new Date(left.lastTouchedAt).getTime();
     });
 
+  const notices: string[] = [];
   if (refundFailures > 0) {
-    ElMessage.warning(`有 ${refundFailures} 个订单的退款进度未能加载，可进入订单详情继续查看。`);
+    notices.push(`有 ${refundFailures} 个订单的退款进度未能完整加载`);
   }
-
   if (complaintFailures > 0) {
-    ElMessage.warning(`有 ${complaintFailures} 个订单的投诉进度未能加载，可进入订单详情继续查看。`);
+    notices.push(`有 ${complaintFailures} 个订单的投诉进度未能完整加载`);
   }
+  partialLoadNotice.value = notices.length
+    ? `${notices.join('；')}，可进入订单详情继续核查。`
+    : '';
 };
 
 const reloadAll = async () => {
   if (!auth.isAuthenticated) {
-    ElMessage.info('登录后可查看主人售后中心');
     return;
   }
 
   loading.value = true;
+  pageLoadErrorMessage.value = '';
+  pageLoadState.value = 'idle';
   try {
     await loadAftersalesItems();
+    pageLoadState.value = 'ready';
   } catch (error: unknown) {
     aftersalesItems.value = [];
-    ElMessage.error(getErrorMessage(error, '加载售后中心失败'));
+    partialLoadNotice.value = '';
+    pageLoadState.value = 'error';
+    pageLoadErrorMessage.value = getErrorMessage(error, '加载售后中心失败');
   } finally {
     loading.value = false;
   }
