@@ -69,11 +69,12 @@ function openReminders() {
   gap: 18rpx;
   margin: 0 24rpx 20rpx;
   padding: 26rpx;
-  border-radius: 32rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--app-shape-xl);
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.28), transparent 32%),
-    linear-gradient(145deg, #0f766e 0%, #0f5e74 52%, #153c5a 100%);
-  box-shadow: 0 18rpx 42rpx rgba(15, 23, 42, 0.14);
+    linear-gradient(145deg, var(--app-accent) 0%, var(--app-accent-pressed) 100%);
+  box-shadow: var(--app-elevation-3);
 }
 
 .owner-flow-nav__hero {
@@ -100,8 +101,8 @@ function openReminders() {
 }
 
 .owner-flow-nav :deep(.app-choice-chip--active) {
-  background: #e8fff9;
-  border-color: #99f6e4;
+  background: linear-gradient(180deg, #ffffff 0%, var(--app-accent-soft) 100%);
+  border-color: transparent;
 }
 
 .owner-flow-nav__actions {

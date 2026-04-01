@@ -372,6 +372,7 @@ onPullDownRefresh(() => {
 .caregiver-hero {
   display: grid;
   gap: 20rpx;
+  padding: 6rpx 4rpx 2rpx;
 }
 
 .caregiver-hero__copy {
@@ -415,10 +416,13 @@ onPullDownRefresh(() => {
   display: grid;
   gap: 12rpx;
   padding: 24rpx;
-  border: 1rpx solid var(--app-border);
-  border-radius: 26rpx;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
-  box-shadow: 0 12rpx 30rpx rgba(15, 23, 42, 0.06);
+  border: 1rpx solid var(--app-outline-variant);
+  border-radius: var(--app-shape-xl);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
+  transition:
+    transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
+    box-shadow var(--app-motion-duration-medium) var(--app-motion-easing-standard);
 }
 
 .caregiver-metric-card__label {
@@ -448,14 +452,14 @@ onPullDownRefresh(() => {
 .caregiver-quick-card {
   cursor: pointer;
   background:
-    radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 34%),
-    linear-gradient(180deg, #ffffff 0%, #fffaf3 100%);
+    radial-gradient(circle at top right, rgba(181, 106, 0, 0.12), transparent 34%),
+    linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
 }
 
 .caregiver-quick-card--alert {
   background:
-    radial-gradient(circle at top right, rgba(239, 68, 68, 0.14), transparent 34%),
-    linear-gradient(180deg, #ffffff 0%, #fff8f7 100%);
+    radial-gradient(circle at top right, rgba(186, 26, 26, 0.14), transparent 34%),
+    linear-gradient(180deg, var(--app-danger-soft) 0%, var(--app-surface) 100%);
 }
 
 .caregiver-quick-card__title,
@@ -509,12 +513,12 @@ onPullDownRefresh(() => {
   display: grid;
   gap: 8rpx;
   padding: 18rpx;
-  border-radius: 20rpx;
-  background: #fff5eb;
+  border-radius: var(--app-shape-lg);
+  background: linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
 }
 
 .caregiver-order-card__conversation-title {
-  color: #c2410c;
+  color: var(--app-warning);
   font-size: 20rpx;
   font-weight: 700;
 }
@@ -526,7 +530,7 @@ onPullDownRefresh(() => {
 }
 
 .caregiver-order-card__amount {
-  color: #c2410c;
+  color: var(--app-warning);
   font-size: 24rpx;
   line-height: 1.5;
   font-weight: 700;

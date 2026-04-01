@@ -34,32 +34,36 @@ withDefaults(defineProps<{
 <style scoped lang="scss">
 .app-card {
   margin: 0 24rpx;
-  border: 1rpx solid var(--app-border);
-  border-radius: var(--app-card-radius);
-  background: var(--app-surface);
+  border: 1rpx solid var(--app-outline-variant);
+  border-radius: var(--app-shape-xl);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
   box-shadow: var(--app-card-shadow);
   overflow: hidden;
+  transition:
+    transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
+    box-shadow var(--app-motion-duration-medium) var(--app-motion-easing-standard);
 }
 
 .app-card__header {
-  padding: 24rpx 24rpx 8rpx;
+  padding: 28rpx 28rpx 10rpx;
 }
 
 .app-card__title {
-  font-size: 30rpx;
-  line-height: 1.35;
-  font-weight: 650;
+  font-size: 31rpx;
+  line-height: 1.34;
+  font-weight: 700;
   color: var(--app-text);
+  letter-spacing: -0.01em;
 }
 
 .app-card__description {
   margin-top: 10rpx;
   font-size: 24rpx;
-  line-height: 1.55;
+  line-height: 1.62;
   color: var(--app-text-muted);
 }
 
 .app-card__body {
-  padding: 20rpx 24rpx 24rpx;
+  padding: 22rpx 28rpx 28rpx;
 }
 </style>

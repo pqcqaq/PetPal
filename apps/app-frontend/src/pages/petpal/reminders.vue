@@ -698,11 +698,12 @@ onPullDownRefresh(() => {
   display: grid;
   gap: 20rpx;
   padding: 28rpx;
-  border-radius: 30rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--app-shape-xl);
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 36%),
-    linear-gradient(145deg, #1f2937 0%, #1d4ed8 52%, #0891b2 100%);
-  box-shadow: 0 18rpx 42rpx rgba(15, 23, 42, 0.16);
+    linear-gradient(145deg, var(--app-accent) 0%, var(--app-accent-pressed) 52%, var(--app-warning) 100%);
+  box-shadow: var(--app-elevation-3);
 }
 
 .reminder-hero__copy {
@@ -744,16 +745,19 @@ onPullDownRefresh(() => {
   display: grid;
   gap: 12rpx;
   padding: 24rpx;
-  border-radius: 26rpx;
-  border: 1rpx solid var(--app-border);
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
-  box-shadow: 0 12rpx 30rpx rgba(15, 23, 42, 0.06);
+  border-radius: var(--app-shape-xl);
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
+  transition:
+    transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
+    box-shadow var(--app-motion-duration-medium) var(--app-motion-easing-standard);
 }
 
 .reminder-card--priority {
   background:
-    radial-gradient(circle at top right, rgba(239, 68, 68, 0.08), transparent 36%),
-    linear-gradient(180deg, #ffffff 0%, #fff8f7 100%);
+    radial-gradient(circle at top right, rgba(186, 26, 26, 0.1), transparent 36%),
+    linear-gradient(180deg, var(--app-danger-soft) 0%, var(--app-surface) 100%);
 }
 
 .reminder-summary-card__label {

@@ -14,6 +14,7 @@ import AppButton from '@/components/app-button/app-button.vue'
 import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
 import AppSection from '@/components/app-section/app-section.vue'
+import AppTag from '@/components/app-tag/app-tag.vue'
 import { defaultAppPreferences, useUiStore } from '@/store/ui'
 import { useUserStore } from '@/store/user'
 import { useTokenStore } from '@/store/token'
@@ -87,6 +88,29 @@ const previewSummary = computed(() => {
   return `${draft.themePresetId} · ${draft.themeMode} · ${homeLayout} · ${motionText}`
 })
 
+const appearanceCards = computed(() => [
+  {
+    label: '主题方案',
+    value: resolveOptionLabel(themePresetOptions, draft.themePresetId),
+    hint: '决定主色、强调色和主要氛围。',
+  },
+  {
+    label: '首页布局',
+    value: resolveOptionLabel(portalLayoutOptions, draft.portalLayout),
+    hint: '决定首页优先展示概览还是关键动作。',
+  },
+  {
+    label: '信息密度',
+    value: resolveOptionLabel(densityOptions, draft.density),
+    hint: '决定列表和卡片的一屏承载量。',
+  },
+  {
+    label: '动效反馈',
+    value: draft.motionEnabled ? '已开启' : '已关闭',
+    hint: '控制页面过渡、按钮反馈和卡片进入节奏。',
+  },
+])
+
 function hydrateDraft() {
   const source = userInfo.value.preferences?.app || uiStore.preferences
   Object.assign(draft, {
@@ -102,6 +126,13 @@ function handleMotionToggle(event: { detail?: { value?: boolean } }) {
 
 function resetToDefault() {
   Object.assign(draft, defaultAppPreferences)
+}
+
+function resolveOptionLabel(
+  options: Array<{ label: string, value: string }>,
+  value: string,
+) {
+  return options.find(item => item.value === value)?.label || value
 }
 
 async function savePreferences() {
@@ -173,7 +204,21 @@ onShow(() => {
 
 <template>
   <AppPageShell title="PetPal 设置" description="配置首页布局、主题外观和底栏样式，定制移动端办事体验。">
-    <AppSection title="即时预览" :description="previewSummary">
+    <AppSection title="体验预览" :description="previewSummary">
+      <view class="settings-hero">
+        <view class="settings-hero__copy">
+          <AppTag type="primary">
+            Material 3
+          </AppTag>
+          <view class="settings-hero__title">
+            PetPal 移动体验
+          </view>
+          <view class="settings-hero__summary">
+            主题、布局、密度和动效会一起影响首页卡片层级、导航反馈和任务节奏。
+          </view>
+        </view>
+      </view>
+
       <view class="settings-preview">
         <view class="settings-preview__chip">
           首页：{{ draft.portalLayout === 'focus' ? '聚焦办事' : '概览看板' }}
@@ -181,10 +226,30 @@ onShow(() => {
         <view class="settings-preview__chip">
           底栏：{{ draft.tabbarStyle === 'floating' ? '悬浮底栏' : '贴边底栏' }}
         </view>
+        <view class="settings-preview__chip">
+          主题：{{ resolveOptionLabel(themePresetOptions, draft.themePresetId) }}
+        </view>
+        <view class="settings-preview__chip">
+          模式：{{ resolveOptionLabel(themeModeOptions, draft.themeMode) }}
+        </view>
+      </view>
+
+      <view class="settings-preview-grid">
+        <view v-for="item in appearanceCards" :key="item.label" class="settings-preview-card">
+          <view class="settings-preview-card__label">
+            {{ item.label }}
+          </view>
+          <view class="settings-preview-card__value">
+            {{ item.value }}
+          </view>
+          <view class="settings-preview-card__hint">
+            {{ item.hint }}
+          </view>
+        </view>
       </view>
     </AppSection>
 
-    <AppSection title="主题模式">
+    <AppSection title="主题模式" description="先确定整体深浅色策略，再继续调整色板。">
       <view class="settings-choice-wrap">
         <AppChoiceChips
           :model-value="draft.themeMode"
@@ -194,7 +259,7 @@ onShow(() => {
       </view>
     </AppSection>
 
-    <AppSection title="主题方案">
+    <AppSection title="主题方案" description="色板会影响首页、提醒、按钮和卡片强调色。">
       <view class="settings-choice-wrap">
         <AppChoiceChips
           :model-value="draft.themePresetId"
@@ -204,7 +269,7 @@ onShow(() => {
       </view>
     </AppSection>
 
-    <AppSection title="卡片风格">
+    <AppSection title="卡片风格" description="控制页面层次、内容承载感和浮起程度。">
       <view class="settings-choice-wrap">
         <AppChoiceChips
           :model-value="draft.surfaceStyle"
@@ -214,7 +279,7 @@ onShow(() => {
       </view>
     </AppSection>
 
-    <AppSection title="信息密度">
+    <AppSection title="信息密度" description="移动端默认舒适模式，紧凑模式适合频繁查看订单。">
       <view class="settings-choice-wrap">
         <AppChoiceChips
           :model-value="draft.density"
@@ -224,7 +289,7 @@ onShow(() => {
       </view>
     </AppSection>
 
-    <AppSection title="底栏样式">
+    <AppSection title="底栏样式" description="控制底栏是更轻盈悬浮，还是更稳定贴边。">
       <view class="settings-choice-wrap">
         <AppChoiceChips
           :model-value="draft.tabbarStyle"
@@ -234,7 +299,7 @@ onShow(() => {
       </view>
     </AppSection>
 
-    <AppSection title="首页布局">
+    <AppSection title="首页布局" description="概览看板适合浏览全局，聚焦办事适合高频快速操作。">
       <view class="settings-choice-wrap">
         <AppChoiceChips
           :model-value="draft.portalLayout"
@@ -244,7 +309,7 @@ onShow(() => {
       </view>
     </AppSection>
 
-    <AppSection title="动效">
+    <AppSection title="动效" description="动效用于引导注意力，不应该拖慢主要任务。">
       <view class="settings-toggle-row">
         <view class="settings-toggle-row__meta">
           <view class="settings-toggle-row__title">
@@ -263,6 +328,14 @@ onShow(() => {
     </AppSection>
 
     <view class="settings-actions">
+      <view class="settings-actions__meta">
+        <view class="settings-actions__title">
+          同步当前设置
+        </view>
+        <view class="settings-actions__desc">
+          保存后，主题、首页布局、密度和动效会跟随当前账号生效。
+        </view>
+      </view>
       <AppButton block size="large" type="info" @click="resetToDefault">
         恢复默认
       </AppButton>
@@ -274,6 +347,35 @@ onShow(() => {
 </template>
 
 <style scoped lang="scss">
+.settings-hero {
+  margin: 0 24rpx 18rpx;
+  padding: 28rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--app-shape-xl);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.24), transparent 34%),
+    linear-gradient(145deg, var(--app-accent) 0%, var(--app-accent-pressed) 54%, var(--app-warning) 100%);
+  box-shadow: var(--app-elevation-3);
+}
+
+.settings-hero__copy {
+  display: grid;
+  gap: 12rpx;
+}
+
+.settings-hero__title {
+  color: #eff6ff;
+  font-size: 40rpx;
+  line-height: 1.18;
+  font-weight: 700;
+}
+
+.settings-hero__summary {
+  color: rgba(239, 246, 255, 0.9);
+  font-size: 24rpx;
+  line-height: 1.7;
+}
+
 .settings-preview {
   padding: 0 32rpx;
   display: flex;
@@ -290,6 +392,41 @@ onShow(() => {
   background: var(--app-accent-soft);
   color: var(--app-text-secondary);
   font-size: 22rpx;
+}
+
+.settings-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  padding: 18rpx 24rpx 0;
+}
+
+.settings-preview-card {
+  display: grid;
+  gap: 10rpx;
+  padding: 22rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  border-radius: var(--app-shape-xl);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
+}
+
+.settings-preview-card__label {
+  font-size: 22rpx;
+  color: var(--app-text-muted);
+}
+
+.settings-preview-card__value {
+  font-size: 34rpx;
+  line-height: 1.12;
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.settings-preview-card__hint {
+  font-size: 22rpx;
+  line-height: 1.62;
+  color: var(--app-text-secondary);
 }
 
 .settings-choice-wrap {
@@ -328,10 +465,41 @@ onShow(() => {
 }
 
 .settings-actions {
-  padding: 0 32rpx 12rpx;
+  display: grid;
+  gap: 16rpx;
+  margin: 0 24rpx 12rpx;
+  padding: 24rpx;
+  border-radius: var(--app-shape-xl);
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
+}
+
+.settings-actions__meta {
+  display: grid;
+  gap: 8rpx;
+}
+
+.settings-actions__title {
+  font-size: 28rpx;
+  line-height: 1.4;
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.settings-actions__desc {
+  font-size: 22rpx;
+  line-height: 1.62;
+  color: var(--app-text-muted);
 }
 
 .settings-actions .app-button + .app-button {
   margin-top: 16rpx;
+}
+
+@media (max-width: 680px) {
+  .settings-preview-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

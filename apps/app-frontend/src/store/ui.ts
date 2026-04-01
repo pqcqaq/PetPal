@@ -31,71 +31,71 @@ type ThemePresetPalette = {
 
 const lightPresetPaletteMap: Record<AppThemePresetId, ThemePresetPalette> = {
   graphite: {
-    accent: '#1f2937',
-    accentPressed: '#111827',
-    accentSoft: '#edf2f7',
-    success: '#0f766e',
-    warning: '#b45309',
-    danger: '#dc2626',
+    accent: '#3559e0',
+    accentPressed: '#2141bd',
+    accentSoft: '#e7edff',
+    success: '#0b7a75',
+    warning: '#b56a00',
+    danger: '#ba1a1a',
   },
   ocean: {
-    accent: '#0a6fa9',
-    accentPressed: '#075985',
-    accentSoft: '#e0f2fe',
-    success: '#0d9488',
-    warning: '#c2410c',
-    danger: '#dc2626',
+    accent: '#00639a',
+    accentPressed: '#004d79',
+    accentSoft: '#dff2ff',
+    success: '#00756c',
+    warning: '#b85b00',
+    danger: '#ba1a1a',
   },
   forest: {
-    accent: '#2f6f45',
-    accentPressed: '#25583a',
-    accentSoft: '#e9f6ec',
-    success: '#15803d',
-    warning: '#a16207',
-    danger: '#b91c1c',
+    accent: '#2f6c2f',
+    accentPressed: '#245824',
+    accentSoft: '#e5f4e5',
+    success: '#0b7a75',
+    warning: '#9d6a00',
+    danger: '#ba1a1a',
   },
   sunset: {
-    accent: '#c2410c',
-    accentPressed: '#9a3412',
-    accentSoft: '#fff1e8',
-    success: '#0f766e',
-    warning: '#b45309',
-    danger: '#dc2626',
+    accent: '#b93815',
+    accentPressed: '#922c0d',
+    accentSoft: '#ffeadf',
+    success: '#0b7a75',
+    warning: '#b56a00',
+    danger: '#c62828',
   },
 }
 
 const darkPresetPaletteMap: Record<AppThemePresetId, ThemePresetPalette> = {
   graphite: {
-    accent: '#cbd5e1',
-    accentPressed: '#e2e8f0',
-    accentSoft: '#273244',
-    success: '#34d399',
-    warning: '#fbbf24',
-    danger: '#f87171',
+    accent: '#b8c4ff',
+    accentPressed: '#dce2ff',
+    accentSoft: '#24315d',
+    success: '#70e0d5',
+    warning: '#ffcb7a',
+    danger: '#ffb4ab',
   },
   ocean: {
-    accent: '#7dd3fc',
-    accentPressed: '#bae6fd',
-    accentSoft: '#102b3a',
-    success: '#5eead4',
-    warning: '#fdba74',
-    danger: '#fda4af',
+    accent: '#8dcfff',
+    accentPressed: '#bfe3ff',
+    accentSoft: '#183246',
+    success: '#72e2d7',
+    warning: '#ffcb84',
+    danger: '#ffb4ab',
   },
   forest: {
-    accent: '#86efac',
-    accentPressed: '#bbf7d0',
-    accentSoft: '#1d3225',
-    success: '#4ade80',
-    warning: '#facc15',
-    danger: '#fda4af',
+    accent: '#9ad38f',
+    accentPressed: '#c1e9b8',
+    accentSoft: '#223724',
+    success: '#8ddfb9',
+    warning: '#f0c55a',
+    danger: '#ffb4ab',
   },
   sunset: {
-    accent: '#fdba74',
-    accentPressed: '#fed7aa',
-    accentSoft: '#3c2719',
-    success: '#5eead4',
-    warning: '#facc15',
-    danger: '#fda4af',
+    accent: '#ffb59d',
+    accentPressed: '#ffd3c5',
+    accentSoft: '#452619',
+    success: '#72e2d7',
+    warning: '#ffd166',
+    danger: '#ffb4ab',
   },
 }
 
@@ -145,20 +145,28 @@ export const useUiStore = defineStore(
 
       const densityScale = preferences.value.density === 'compact' ? '0.86' : '1'
       const motionDuration = preferences.value.motionEnabled ? '220ms' : '1ms'
+      const motionDurationShort = preferences.value.motionEnabled ? '160ms' : '1ms'
+      const motionDurationMedium = preferences.value.motionEnabled ? '260ms' : '1ms'
+      const motionDurationLong = preferences.value.motionEnabled ? '420ms' : '1ms'
       const tabbarFloating = preferences.value.tabbarStyle === 'floating'
 
       return {
-        '--app-bg': isDark ? '#0b1220' : '#eef3f8',
-        '--app-bg-gradient-start': isDark ? '#111b2f' : '#f7fafc',
-        '--app-bg-gradient-end': isDark ? '#0b1220' : '#edf3fa',
+        '--app-bg': isDark ? '#0b1220' : '#edf2f8',
+        '--app-bg-gradient-start': isDark ? '#111b2f' : '#fbfcff',
+        '--app-bg-gradient-end': isDark ? '#0b1220' : '#eaf1fb',
         '--app-surface': isDark ? '#111d32' : '#ffffff',
         '--app-surface-soft': isDark
           ? (preferences.value.surfaceStyle === 'glass' ? 'rgba(19, 30, 49, 0.78)' : '#17243b')
-          : (preferences.value.surfaceStyle === 'glass' ? 'rgba(255, 255, 255, 0.85)' : '#f6f9fc'),
-        '--app-surface-strong': isDark ? '#1a2b46' : '#ecf2f8',
-        '--app-border': isDark ? '#253755' : '#d7e0ea',
-        '--app-border-light': isDark ? '#314565' : '#e7edf4',
-        '--app-border-strong': isDark ? '#4b6287' : '#b7c6d8',
+          : (preferences.value.surfaceStyle === 'glass' ? 'rgba(255, 255, 255, 0.88)' : '#f7f9fe'),
+        '--app-surface-strong': isDark ? '#1a2b46' : '#eef3fb',
+        '--app-surface-container': isDark ? '#141f35' : '#f5f7fc',
+        '--app-surface-container-high': isDark ? '#1a2840' : '#eef2fb',
+        '--app-surface-container-highest': isDark ? '#22314b' : '#e6ecf8',
+        '--app-border': isDark ? '#253755' : '#d8e0eb',
+        '--app-border-light': isDark ? '#314565' : '#e7ecf4',
+        '--app-border-strong': isDark ? '#4b6287' : '#bbc7d8',
+        '--app-outline': isDark ? '#536987' : '#c4cfdd',
+        '--app-outline-variant': isDark ? '#314565' : '#dce4f0',
         '--app-text': isDark ? '#f3f6fb' : '#111827',
         '--app-text-secondary': isDark ? '#d4deec' : '#344154',
         '--app-text-muted': isDark ? '#9fb0c8' : '#748399',
@@ -166,17 +174,37 @@ export const useUiStore = defineStore(
         '--app-accent-pressed': palette.accentPressed,
         '--app-accent-soft': palette.accentSoft,
         '--app-success': palette.success,
-        '--app-success-soft': isDark ? 'rgba(20, 184, 166, 0.18)' : '#ecfdf5',
+        '--app-success-soft': isDark ? 'rgba(114, 226, 215, 0.18)' : '#e8f7f5',
         '--app-warning': palette.warning,
-        '--app-warning-soft': isDark ? 'rgba(251, 191, 36, 0.2)' : '#fff7ed',
+        '--app-warning-soft': isDark ? 'rgba(255, 203, 122, 0.2)' : '#fff3e2',
         '--app-danger': palette.danger,
-        '--app-danger-soft': isDark ? 'rgba(248, 113, 113, 0.2)' : '#fef2f2',
+        '--app-danger-soft': isDark ? 'rgba(255, 180, 171, 0.2)' : '#fdecea',
         '--app-density-scale': densityScale,
         '--app-motion-duration': motionDuration,
-        '--app-card-radius': preferences.value.density === 'compact' ? '22rpx' : '28rpx',
+        '--app-motion-duration-short': motionDurationShort,
+        '--app-motion-duration-medium': motionDurationMedium,
+        '--app-motion-duration-long': motionDurationLong,
+        '--app-motion-easing-standard': 'cubic-bezier(0.2, 0, 0, 1)',
+        '--app-motion-easing-emphasis': 'cubic-bezier(0.2, 0, 0, 1.12)',
+        '--app-card-radius': preferences.value.density === 'compact' ? '24rpx' : '28rpx',
+        '--app-shape-xs': preferences.value.density === 'compact' ? '12rpx' : '14rpx',
+        '--app-shape-sm': preferences.value.density === 'compact' ? '16rpx' : '18rpx',
+        '--app-shape-md': preferences.value.density === 'compact' ? '20rpx' : '24rpx',
+        '--app-shape-lg': preferences.value.density === 'compact' ? '26rpx' : '30rpx',
+        '--app-shape-xl': preferences.value.density === 'compact' ? '32rpx' : '38rpx',
+        '--app-shape-full': '9999rpx',
+        '--app-elevation-1': isDark
+          ? '0 12rpx 30rpx rgba(2, 8, 20, 0.34)'
+          : '0 10rpx 28rpx rgba(15, 23, 42, 0.08)',
+        '--app-elevation-2': isDark
+          ? '0 20rpx 48rpx rgba(2, 8, 20, 0.42)'
+          : '0 18rpx 44rpx rgba(15, 23, 42, 0.12)',
+        '--app-elevation-3': isDark
+          ? '0 28rpx 60rpx rgba(2, 8, 20, 0.5)'
+          : '0 26rpx 56rpx rgba(15, 23, 42, 0.16)',
         '--app-card-shadow': isDark
-          ? '0 14rpx 40rpx rgba(2, 8, 20, 0.42)'
-          : '0 14rpx 36rpx rgba(15, 23, 42, 0.08)',
+          ? '0 12rpx 30rpx rgba(2, 8, 20, 0.34)'
+          : '0 10rpx 28rpx rgba(15, 23, 42, 0.08)',
         '--app-tabbar-bg': tabbarFloating
           ? (isDark ? 'rgba(11, 18, 32, 0.82)' : 'rgba(255, 255, 255, 0.9)')
           : (isDark ? '#0f1a2e' : '#ffffff'),
@@ -187,6 +215,7 @@ export const useUiStore = defineStore(
         '--app-tabbar-radius': tabbarFloating ? '34rpx' : '0rpx',
         '--app-tabbar-offset-x': tabbarFloating ? '18rpx' : '0rpx',
         '--app-tabbar-offset-y': tabbarFloating ? '10rpx' : '0rpx',
+        '--app-page-max-width': '1160px',
       }
     })
 
@@ -233,4 +262,3 @@ export const useUiStore = defineStore(
     persist: true,
   },
 )
-

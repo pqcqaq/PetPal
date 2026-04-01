@@ -56,7 +56,7 @@ function handleBack() {
   min-height: var(--app-nav-height);
   display: flex;
   align-items: center;
-  padding: 0 20rpx;
+  padding: 8rpx 20rpx 10rpx;
 }
 
 .app-nav-bar__side {
@@ -71,16 +71,23 @@ function handleBack() {
 }
 
 .app-nav-bar__back {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 18rpx;
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: var(--app-shape-md);
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1rpx solid transparent;
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container-high) 100%);
+  box-shadow: 0 8rpx 18rpx rgba(15, 23, 42, 0.06);
+  transition:
+    transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
+    background-color var(--app-motion-duration-medium) var(--app-motion-easing-standard);
 }
 
 .app-nav-bar__back--hover {
-  background: rgba(18, 26, 39, 0.05);
+  background: var(--app-surface-container-highest);
+  transform: translateY(-1rpx);
 }
 
 .app-nav-bar__back-icon {
@@ -95,12 +102,12 @@ function handleBack() {
 .app-nav-bar__title {
   flex: 1;
   min-width: 0;
-  font-size: 30rpx;
-  line-height: 1.3;
-  font-weight: 650;
+  font-size: 32rpx;
+  line-height: 1.24;
+  font-weight: 700;
   color: var(--app-text);
   text-align: center;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 .app-nav-bar--auth .app-nav-bar__inner {
@@ -113,6 +120,6 @@ function handleBack() {
 
 .app-nav-bar--auth .app-nav-bar__title {
   text-align: left;
-  font-size: 36rpx;
+  font-size: 40rpx;
 }
 </style>

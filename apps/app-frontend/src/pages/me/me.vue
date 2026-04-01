@@ -12,6 +12,8 @@ import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { listOrders, listPets, listServiceRequests } from '@/api/petpal'
 import {
+  formatAmount,
+  getOrderStatusLabel,
   isOrderAftersalesTracked,
   PETPAL_AFTERSALES_PAGE,
   PETPAL_CAREGIVER_EARNINGS_PAGE,
@@ -95,7 +97,9 @@ const activeOrderCount = computed(() => orders.value.filter(item => (
 
 const aftersaleCount = computed(() => orders.value.filter(item => isOrderAftersalesTracked(item)).length)
 
-const latestOrders = computed(() => orders.value.slice(0, 3))
+const latestOrders = computed(() => [...orders.value]
+  .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
+  .slice(0, 3))
 
 const summaryCards = computed(() => [
   {
@@ -268,6 +272,27 @@ onShow(() => {
         </view>
       </AppSection>
 
+      <AppSection title="快捷进入" description="把高频动作保持在一屏内，减少从账户页再做多层跳转。">
+        <view class="petpal-shortcut-grid">
+          <view class="petpal-shortcut-card" @click="openServiceBoard">
+            <text class="petpal-shortcut-card__title">服务台</text>
+            <text class="petpal-shortcut-card__text">继续宠物建档、发布需求和跟进订单。</text>
+          </view>
+          <view class="petpal-shortcut-card petpal-shortcut-card--alert" @click="openRemindersCenter">
+            <text class="petpal-shortcut-card__title">提醒中心</text>
+            <text class="petpal-shortcut-card__text">优先处理主人端、照料者端和售后待办。</text>
+          </view>
+          <view class="petpal-shortcut-card" @click="openProfile">
+            <text class="petpal-shortcut-card__title">个人资料</text>
+            <text class="petpal-shortcut-card__text">更新昵称、头像和联系方式。</text>
+          </view>
+          <view class="petpal-shortcut-card" @click="openSettings">
+            <text class="petpal-shortcut-card__title">体验设置</text>
+            <text class="petpal-shortcut-card__text">调整首页布局、主题和底栏样式。</text>
+          </view>
+        </view>
+      </AppSection>
+
       <AppSection title="常用入口">
         <AppList>
           <AppListItem title="进入服务台" label="继续发布需求、维护宠物档案和查看匹配。" is-link clickable @click="openServiceBoard" />
@@ -286,8 +311,8 @@ onShow(() => {
             v-for="order in latestOrders"
             :key="order.id"
             :title="order.orderNo"
-            :label="`状态：${order.orderStatus}`"
-            :value="`实付 ${order.amountPaid} / 已退 ${order.amountRefunded}`"
+            :label="`状态：${getOrderStatusLabel(order.orderStatus)}`"
+            :value="`实付 ${formatAmount(order.amountPaid)} / 已退 ${formatAmount(order.amountRefunded)}`"
           />
         </AppList>
         <view v-else class="app-status-wrap">
@@ -340,13 +365,21 @@ onShow(() => {
   padding: 0 24rpx;
 }
 
+.petpal-shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  padding: 0 24rpx;
+}
+
 .petpal-me-card {
   display: grid;
   gap: 10rpx;
   padding: 22rpx;
-  border: 1rpx solid var(--app-border);
-  border-radius: 24rpx;
-  background: var(--app-surface);
+  border: 1rpx solid var(--app-outline-variant);
+  border-radius: var(--app-shape-xl);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
 }
 
 .petpal-me-card__label {
@@ -367,6 +400,37 @@ onShow(() => {
   color: var(--app-text-secondary);
 }
 
+.petpal-shortcut-card {
+  display: grid;
+  gap: 10rpx;
+  padding: 22rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  border-radius: var(--app-shape-xl);
+  background:
+    radial-gradient(circle at top right, rgba(53, 89, 224, 0.12), transparent 34%),
+    linear-gradient(180deg, var(--app-surface-container-high) 0%, var(--app-surface) 100%);
+  box-shadow: var(--app-elevation-1);
+}
+
+.petpal-shortcut-card--alert {
+  background:
+    radial-gradient(circle at top right, rgba(186, 26, 26, 0.14), transparent 34%),
+    linear-gradient(180deg, var(--app-danger-soft) 0%, var(--app-surface) 100%);
+}
+
+.petpal-shortcut-card__title {
+  font-size: 28rpx;
+  line-height: 1.4;
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.petpal-shortcut-card__text {
+  font-size: 22rpx;
+  line-height: 1.62;
+  color: var(--app-text-secondary);
+}
+
 .petpal-action-block {
   padding: 0 32rpx 12rpx;
 }
@@ -376,7 +440,8 @@ onShow(() => {
 }
 
 @media (max-width: 680px) {
-  .petpal-me-grid {
+  .petpal-me-grid,
+  .petpal-shortcut-grid {
     grid-template-columns: 1fr;
   }
 }

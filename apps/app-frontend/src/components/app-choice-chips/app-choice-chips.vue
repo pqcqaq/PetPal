@@ -69,33 +69,38 @@ function handleSelect(value: string) {
   min-width: 164rpx;
   margin-left: 10rpx;
   margin-bottom: 10rpx;
-  padding: 16rpx 20rpx;
-  border: 1rpx solid var(--app-border);
-  border-radius: 18rpx;
-  background: var(--app-surface-soft);
+  padding: 18rpx 22rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  border-radius: var(--app-shape-lg);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: 0 6rpx 18rpx rgba(15, 23, 42, 0.04);
   transition:
-    border-color var(--app-motion-duration) ease,
-    transform var(--app-motion-duration) ease,
-    background-color var(--app-motion-duration) ease;
+    border-color var(--app-motion-duration-medium) var(--app-motion-easing-standard),
+    transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
+    background-color var(--app-motion-duration-medium) var(--app-motion-easing-standard),
+    box-shadow var(--app-motion-duration-medium) var(--app-motion-easing-standard);
 }
 
 .app-choice-chip--hover {
-  transform: translateY(-1rpx);
+  transform: translateY(-2rpx);
+  box-shadow: var(--app-elevation-1);
 }
 
 .app-choice-chip--active {
-  border-color: var(--app-accent);
-  background: var(--app-accent-soft);
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+  box-shadow: var(--app-elevation-1);
 }
 
 .app-choice-chip--disabled {
   opacity: 0.56;
+  box-shadow: none;
 }
 
 .app-choice-chip__label {
   font-size: 24rpx;
   line-height: 1.35;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--app-text);
 }
 

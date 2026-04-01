@@ -1417,9 +1417,9 @@ flowchart TD
 | --- | --- | --- |
 | 后端能力 | 约 85% | 主人端、照料者端、售后、回调治理和后台治理核心接口已具备 |
 | Web 端 | 约 80% | 主人服务台、订单详情、退款/投诉、PetPal 后台治理工作区已基本成型 |
-| App 端 | 约 76% | 主人与照料者核心流程页面已拆开，并补上跨订单消息中心、收益表现页、主人售后中心与提醒中心；仍缺帮助体系和真正的主动通知 |
+| App 端 | 约 78% | 主人与照料者核心流程页面已拆开，并完成 Material 3 设计基线、角色入口、资料/设置/提醒等关键入口统一；仍缺帮助体系和真正的主动通知 |
 | 测试与审计 | 约 75% | 后端 PetPal 集成测试较完整，前端仍缺统一收口验证与验收材料 |
-| 整体项目 | 约 79% | 已明显超出最小原型，App 主流程更完整，但仍未达到文档定义的完整交付态 |
+| 整体项目 | 约 80% | 已明显超出最小原型，App 主流程和体验基线更完整，但仍未达到文档定义的完整交付态 |
 
 当前真实状态汇总：
 
@@ -1433,7 +1433,7 @@ flowchart TD
 | 支付与退款 | 基本完成 | 支付/退款记录、回调审计、退款进度、导出能力已具备 |
 | 评价与投诉 | 基本完成 | Web 端已支持评价、投诉、售后时间线；App 端也已具备订单详情提交、独立售后中心和提醒收口能力，但仍缺帮助体系与主动通知 |
 | 管理后台 | 基本完成 | 根级 `/petpal-admin/*` 已承载投诉、照料者审核、回调审计、告警队列；处罚、规则发布、运营看板仍未补齐 |
-| 消息与在线沟通 | 基本完成 | 订单详情会话、附件回传、跨订单消息中心、未读态、提醒中心和 Web/App 摘要已落地；仍缺真正的主动提醒与统一通知流 |
+| 消息与在线沟通 | 基本完成 | 订单详情会话、附件回传、跨订单消息中心、未读态、提醒中心和 Web/App 摘要已落地；真正的主动提醒与统一通知流仍缺 |
 | 收益与数据分析 | 部分完成 | App 已补收益与表现页，可基于订单聚合看净收入、评分和售后风险；后端专门统计接口与平台运营指标仍未完整实现 |
 | 文档与答辩材料 | 部分完成 | 计划、进度日志和实现历史持续更新中，但完整验收脚本、截图、演示素材尚未收齐 |
 
@@ -1446,7 +1446,7 @@ flowchart TD
 
 仍然存在的关键缺口：
 
-1. `app-frontend` 还没有完全重构成真实可用的 PetPal 主应用，当前仍偏“基础服务台 + 详情页”。
+1. `app-frontend` 已形成真实可用的 PetPal 主应用骨架，但帮助页、账户辅助页和更多新手引导仍未收口。
 2. Web 前台仍存在超级页面承载过多逻辑的问题，主人 / 照料者前台尚未按路由充分拆分。
 3. 提醒中心已落地，但真正的主动提醒与统一通知流尚未落地，售后和消息仍需要更主动的到达能力。
 4. 健康记录、资质材料、收益分析、规则发布、违规处罚、运营看板仍缺完整前后端闭环。
@@ -1454,8 +1454,8 @@ flowchart TD
 
 当前工作区进行中但尚未完成交付的内容：
 
-- Web 端正在整理“PetPal 后台默认落点统一逻辑”，目标是让登录完成、路由守卫、实时权限同步和返回总览都统一优先进入 `/petpal-admin`。
-- App 端已开始扩展 PetPal API 封装，准备接入照料者档案、履约动作、评价和投诉提交流程，但页面尚未完成重构，不应记为已完成。
+- App 端下一步准备继续补帮助中心、账户辅助页与真正的主动提醒，不再继续扩大旧兼容工作台。
+- Web 前台下一步准备把主人 / 照料者超级页面按路由拆分，避免新功能继续堆到旧页面。
 
 后续安排：
 
@@ -4943,6 +4943,67 @@ flowchart TD
 1. 继续补 App 账户辅助页、帮助体系和主动提醒，完成 P2 收口。
 2. 继续围绕主动提醒、统一通知流和运营治理能力补齐后续缺口。
 3. 在 Web 前台开始按路由拆分主人 / 照料者超级页面，避免新功能继续堆到旧页面。
+
+### 14.98 2026-04-01（P3-M1 Slice 82）
+
+**概述**：继续推进 App 端体验重构，本轮不新增后端协议，集中把 App 主题 token、通用组件和关键入口页统一到 Material Design 3 设计基线，减少“首页已重构、二级页仍停留旧样式”的割裂感。
+
+已完成：
+
+- 主题与设计 token：
+  - `apps/app-frontend/src/store/ui.ts`
+    - 重整浅色 / 深色预设色板。
+    - 新增 `surface container`、`outline`、形状、分层阴影、动效时长和页面最大宽度等 token。
+  - `apps/app-frontend/src/style/index.scss`
+    - 统一页面背景、容器层级、section 进入动效、卡片轮廓与响应式宽度基线。
+- 通用组件 Material 3 基线：
+  - `apps/app-frontend/src/components/app-button/app-button.vue`
+    - 统一主按钮、次按钮、危险按钮的圆角、阴影和按压反馈。
+  - `apps/app-frontend/src/components/app-card/app-card.vue`
+    - 统一卡片层级、圆角和标题文案节奏。
+  - `apps/app-frontend/src/components/app-choice-chips/app-choice-chips.vue`
+    - 强化 Chip 的选中态、悬浮态和容器层级。
+  - `apps/app-frontend/src/components/app-list/app-list.vue`
+  - `apps/app-frontend/src/components/app-list-item/app-list-item.vue`
+    - 统一列表分组、交互反馈和信息层次。
+  - `apps/app-frontend/src/components/app-nav-bar/app-nav-bar.vue`
+    - 顶栏返回动作改为更贴近 Material 设计的浮起式容器。
+- 关键入口页与账户辅助页统一：
+  - `apps/app-frontend/src/pages/index/index.vue`
+    - 首页概览卡片切到统一层级与配色。
+  - `apps/app-frontend/src/pages/me/me.vue`
+    - 新增快捷进入卡片区，强化“服务台 / 提醒 / 资料 / 设置”高频动作。
+    - 最近订单文案改为复用统一订单状态和金额格式化。
+  - `apps/app-frontend/src/pages/me/profile.vue`
+    - 新增资料总览 hero 和摘要卡片，补齐前往提醒中心 / 设置页的捷径。
+  - `apps/app-frontend/src/pages/settings/index.vue`
+    - 新增 Material 3 预览区、主题摘要卡片和更清晰的保存动作区。
+  - `apps/app-frontend/src/pages/petpal/index.vue`
+    - 角色入口页补齐主人 / 照料者 / 提醒的首屏操作和辅助入口卡片。
+- PetPal 主流程页面统一：
+  - `apps/app-frontend/src/pages/petpal/owner-home.vue`
+  - `apps/app-frontend/src/pages/petpal/caregiver-home.vue`
+  - `apps/app-frontend/src/pages/petpal/reminders.vue`
+  - `apps/app-frontend/src/pages/petpal/components/owner-flow-nav.vue`
+  - `apps/app-frontend/src/pages/petpal/components/caregiver-flow-nav.vue`
+    - 统一主人端、照料者端与提醒中心的 hero、卡片、渐变和动作区层级，让主流程不再混用旧视觉语义。
+
+验证结果：
+
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm --filter @rbac/app-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮只涉及前端主题 token、组件样式和页面交互结构，没有扩张后端协议面或权限面。
+- 已确认角色入口、资料页、设置页和提醒中心全部复用既有路由与数据源，不引入新的越权查询路径。
+- 已确认主题 token 集中在 `ui` store 和全局样式层，避免把颜色、阴影和动效再次散落回单页样式中。
+
+下一步（1-3）：
+
+1. 继续补 App 帮助中心、账户辅助页和真正的主动提醒，把 P2 体验收口做完整。
+2. 在提醒中心基础上继续补统一通知流和更主动的售后 / 沟通催办机制。
+3. 在 Web 前台开始按路由拆分主人 / 照料者超级页面，避免新功能继续落在旧容器内。
 
 ### 14.97 2026-04-01（P3-M1 Slice 81）
 

@@ -67,13 +67,19 @@ function handleClick() {
   align-items: center;
   justify-content: center;
   min-height: 84rpx;
-  padding: 0 28rpx;
-  border: 1rpx solid transparent;
-  border-radius: 20rpx;
+  padding: 0 32rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  border-radius: var(--app-shape-full);
   background: var(--app-accent);
   color: #fff;
+  box-shadow: var(--app-elevation-1);
   box-sizing: border-box;
-  transition: opacity 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
+  transition:
+    opacity var(--app-motion-duration-short) var(--app-motion-easing-standard),
+    transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
+    box-shadow var(--app-motion-duration-medium) var(--app-motion-easing-standard),
+    background-color var(--app-motion-duration-medium) var(--app-motion-easing-standard),
+    border-color var(--app-motion-duration-medium) var(--app-motion-easing-standard);
 }
 
 .app-button--block {
@@ -82,55 +88,67 @@ function handleClick() {
 }
 
 .app-button--large {
-  min-height: 92rpx;
+  min-height: 96rpx;
 }
 
 .app-button--medium {
-  min-height: 76rpx;
+  min-height: 80rpx;
 }
 
 .app-button--primary {
   background: var(--app-accent);
+  border-color: transparent;
   color: #fff;
 }
 
 .app-button--info {
-  background: var(--app-surface);
-  border-color: var(--app-border);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container-high) 100%);
+  border-color: var(--app-outline-variant);
   color: var(--app-text);
+  box-shadow: none;
 }
 
 .app-button--danger {
   background: var(--app-danger);
+  border-color: transparent;
   color: #fff;
+  box-shadow: 0 14rpx 32rpx rgba(186, 26, 26, 0.18);
+}
+
+.app-button--hover {
+  transform: translateY(-2rpx);
 }
 
 .app-button--hover.app-button--primary {
   background: var(--app-accent-pressed);
+  box-shadow: var(--app-elevation-2);
 }
 
 .app-button--hover.app-button--info {
-  background: var(--app-surface-soft);
+  background: var(--app-surface-container-highest);
+  box-shadow: var(--app-elevation-1);
 }
 
 .app-button--hover.app-button--danger {
-  background: #c61f1f;
+  background: #a61111;
+  box-shadow: 0 18rpx 38rpx rgba(186, 26, 26, 0.24);
 }
 
 .app-button.is-disabled {
   opacity: 0.52;
+  box-shadow: none;
 }
 
 .app-button__content {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 12rpx;
 }
 
 .app-button__spinner {
   width: 28rpx;
   height: 28rpx;
-  margin-right: 12rpx;
   border: 3rpx solid rgba(255, 255, 255, 0.36);
   border-top-color: #fff;
   border-radius: 50%;
@@ -146,7 +164,7 @@ function handleClick() {
 .app-button__text {
   font-size: 28rpx;
   line-height: 1;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.01em;
 }
 

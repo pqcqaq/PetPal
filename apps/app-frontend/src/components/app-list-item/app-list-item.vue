@@ -71,13 +71,16 @@ function handleClick() {
 
 <style scoped lang="scss">
 .app-list-item {
-  background: var(--app-surface);
+  background: transparent;
+  transition:
+    transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
+    background-color var(--app-motion-duration-medium) var(--app-motion-easing-standard);
 }
 
 .app-list-item__body {
   display: flex;
   align-items: flex-start;
-  padding: 26rpx 32rpx;
+  padding: 28rpx 32rpx;
 }
 
 .app-list-item__meta {
@@ -94,7 +97,8 @@ function handleClick() {
   flex: 1;
   min-width: 0;
   font-size: 28rpx;
-  line-height: 1.5;
+  line-height: 1.48;
+  font-weight: 600;
   color: var(--app-text);
 }
 
@@ -116,23 +120,24 @@ function handleClick() {
 .app-list-item__label {
   margin-top: 8rpx;
   font-size: 22rpx;
-  line-height: 1.6;
+  line-height: 1.64;
   color: var(--app-text-muted);
   display: block;
 }
 
 .app-list-item__arrow {
-  width: 14rpx;
-  height: 14rpx;
-  margin-top: 10rpx;
+  width: 18rpx;
+  height: 18rpx;
+  margin-top: 8rpx;
   margin-left: 20rpx;
-  border-top: 2rpx solid #9ba5b2;
-  border-right: 2rpx solid #9ba5b2;
+  border-top: 2rpx solid var(--app-text-muted);
+  border-right: 2rpx solid var(--app-text-muted);
   transform: rotate(45deg);
   flex-shrink: 0;
 }
 
 .app-list-item--hover {
-  background: var(--app-surface-soft);
+  background: var(--app-surface-container-high);
+  transform: translateY(-1rpx);
 }
 </style>

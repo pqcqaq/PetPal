@@ -344,9 +344,10 @@ onPullDownRefresh(() => {
   display: grid;
   gap: 10rpx;
   padding: 22rpx;
-  border: 1rpx solid var(--app-border);
-  border-radius: 24rpx;
-  background: var(--app-surface);
+  border: 1rpx solid var(--app-outline-variant);
+  border-radius: var(--app-shape-xl);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
 }
 
 .petpal-metric-card__label {
