@@ -42,6 +42,7 @@ import {
   PETPAL_ORDERS_PAGE,
   PETPAL_PETS_PAGE,
   PETPAL_REMINDERS_PAGE,
+  PETPAL_REQUEST_DETAIL_PAGE,
   PETPAL_REQUEST_PAGE,
 } from './owner-shared'
 
@@ -102,6 +103,9 @@ const ownerHasActiveRequests = computed(() => requests.value.some(item => (
   item.status === 'OPEN'
   || item.status === 'MATCHED'
 )))
+const firstActiveOwnerRequest = computed(() => requests.value
+  .filter(item => item.status === 'OPEN' || item.status === 'MATCHED')
+  .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())[0] ?? null)
 const ownerHasOrders = computed(() => orders.value.length > 0)
 const ownerHasFullLoop = computed(() => orders.value.some(item => (
   item.orderStatus === 'COMPLETED'
@@ -138,7 +142,9 @@ const ownerSteps = computed<GuideStep[]>(() => [
       : '建档完成后先发出一条需求，用户才能真正体验匹配、沟通和下单的完整路径。',
     status: requests.value.length ? 'DONE' : (pets.value.length ? 'CURRENT' : 'UPCOMING'),
     actionLabel: requests.value.length ? '继续管理需求' : '去发布需求',
-    actionUrl: PETPAL_REQUEST_PAGE,
+    actionUrl: requests.value.length && firstActiveOwnerRequest.value
+      ? `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${firstActiveOwnerRequest.value.id}`
+      : PETPAL_REQUEST_PAGE,
   },
   {
     key: 'owner-orders',

@@ -22,7 +22,6 @@ type _LocationUrl =
   "/pages/petpal/caregiver-orders" |
   "/pages/petpal/caregiver-profile" |
   "/pages/petpal/caregiver-services" |
-  "/pages/petpal/checkout" |
   "/pages/petpal/getting-started" |
   "/pages/petpal/index" |
   "/pages/petpal/messages" |
@@ -31,6 +30,7 @@ type _LocationUrl =
   "/pages/petpal/pets" |
   "/pages/petpal/reminders" |
   "/pages/petpal/request" |
+  "/pages/petpal/request-detail" |
   "/pages/petpal/workbench" |
   "/pages/settings/index";
 

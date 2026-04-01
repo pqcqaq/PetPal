@@ -35,6 +35,7 @@ import {
   getConversationUnreadCount,
   getOrderStatusLabel,
   getRequestStatusLabel,
+  isRequestActive,
   isOrderAftersalesTracked,
   PETPAL_AFTERSALES_PAGE,
   PETPAL_MESSAGES_PAGE,
@@ -42,6 +43,7 @@ import {
   PETPAL_ORDERS_PAGE,
   PETPAL_OWNER_HOME_PAGE,
   PETPAL_PETS_PAGE,
+  PETPAL_REQUEST_DETAIL_PAGE,
   PETPAL_REQUEST_PAGE,
   serviceTypeLabels,
   speciesLabels,
@@ -86,6 +88,16 @@ const unreadConversationCount = computed(() => orders.value.reduce((total, item)
 const latestOrders = computed(() => [...orders.value]
   .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
   .slice(0, 3))
+const latestActiveRequest = computed(() => [...requests.value]
+  .filter(item => isRequestActive(item.status))
+  .sort((left, right) => {
+    const leftRank = left.status === 'MATCHED' ? 0 : 1
+    const rightRank = right.status === 'MATCHED' ? 0 : 1
+    if (leftRank !== rightRank) {
+      return leftRank - rightRank
+    }
+    return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+  })[0] ?? null)
 const latestRequests = computed(() => [...requests.value]
   .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
   .slice(0, 2))
@@ -116,9 +128,9 @@ const primaryAction = computed(() => {
   }
   if (activeRequestCount.value > 0) {
     return {
-      label: '继续跟进需求',
-      hint: `${activeRequestCount.value} 条需求还在匹配或等待确认。`,
-      action: openRequests,
+      label: '继续当前需求',
+      hint: `${activeRequestCount.value} 条需求还在推进。`,
+      action: openLatestRequest,
     }
   }
   return {
@@ -143,7 +155,7 @@ const taskRows = computed(() => [
       ? `${activeRequestCount.value} 条需求还在推进`
       : '当前没有活跃需求，可新建一条',
     value: activeRequestCount.value ? '继续' : '创建',
-    action: openRequests,
+    action: activeRequestCount.value ? openLatestRequest : openRequests,
   },
   {
     title: '订单处理',
@@ -175,6 +187,14 @@ function openRequests() {
   uni.redirectTo({ url: PETPAL_REQUEST_PAGE })
 }
 
+function openLatestRequest() {
+  if (latestActiveRequest.value) {
+    uni.redirectTo({ url: `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${latestActiveRequest.value.id}` })
+    return
+  }
+  openRequests()
+}
+
 function openOrders() {
   uni.redirectTo({ url: PETPAL_ORDERS_PAGE })
 }
@@ -189,6 +209,10 @@ function openMessages() {
 
 function openOrderDetail(orderId: string, tab: 'overview' | 'chat' = 'overview') {
   uni.navigateTo({ url: `${PETPAL_ORDER_DETAIL_PAGE}?id=${orderId}&tab=${tab}` })
+}
+
+function openRequestDetail(requestId: string) {
+  uni.navigateTo({ url: `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${requestId}` })
 }
 
 async function loadPage(showError = false) {
@@ -357,6 +381,9 @@ onPullDownRefresh(() => {
               :label="formatRange(item.startTime, item.endTime)"
               :value="getRequestStatusLabel(item.status)"
               value-emphasis
+              clickable
+              is-link
+              @click="openRequestDetail(item.id)"
             />
             <view v-if="!latestRequests.length" class="owner-list-empty">
               <AppStatus text="当前还没有需求" />

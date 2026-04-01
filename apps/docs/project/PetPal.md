@@ -6553,3 +6553,59 @@ flowchart TD
 1. 继续拆主人端“需求详情 / 匹配详情”页，避免活跃需求队列继续承担过多上下文管理职责。
 2. 继续补 App / Web 的弱网反馈、动作后结果引导和跨页面主动引导。
 3. 在主链路继续稳定后，再集中收口系统级提醒、推送和答辩验收材料。
+
+### 14.115 2026-04-02（P3-M1 Slice 104）
+
+**概述**：继续推进 App 主人端真实任务流拆分，本轮把“新建需求”和“跟进已发布需求”彻底拆开，新增独立需求详情页承接匹配、复制条件和继续下单。
+
+已完成：
+
+- 主人需求流拆分：
+  - `apps/app-frontend/src/pages/petpal/request-detail.vue`
+    - 新增独立需求详情页。
+    - 承接活跃需求状态查看、匹配选择、复制条件和继续结算动作。
+    - 页面头部补齐 `UX Blueprint` 注释。
+  - `apps/app-frontend/src/pages/petpal/request.vue`
+    - 收回为纯新建需求向导。
+    - 发布成功后直接回流到需求详情页，不再在新建页里继续管理匹配和支付。
+  - `apps/app-frontend/src/pages/petpal/checkout.vue`
+    - 返回路径改为优先回到需求详情页，而不是新建需求页。
+- 跨页面入口收口：
+  - `apps/app-frontend/src/pages/petpal/owner-home.vue`
+    - 最近需求和“继续当前需求”主动作已直接进入需求详情页。
+  - `apps/app-frontend/src/pages/petpal/reminders.vue`
+    - 活跃需求提醒已优先跳到对应需求详情。
+  - `apps/app-frontend/src/pages/petpal/getting-started.vue`
+    - 已存在活跃需求时，主人路径步骤会优先进入对应需求详情。
+- 路由与共享逻辑：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - 新增 `PETPAL_REQUEST_DETAIL_PAGE` 与请求状态共享判定函数。
+  - `apps/app-frontend/src/pages.json`
+  - `apps/app-frontend/src/types/uni-pages.d.ts`
+    - 注册 `request-detail` 页面并清理重复 `checkout` 路由定义。
+- 文档同步：
+  - `apps/docs/project/PetPal-UX-Rebuild.md`
+    - 补入主人需求推进流 Mermaid 图，并明确 `request / request-detail / checkout` 的职责边界。
+  - `docs/implementation-history.md`
+    - 更新当前总览与下一步重点。
+
+验证结果：
+
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有扩张后端协议面，仍旧复用 `listServiceRequests` 与 `matchCaregivers` 恢复上下文。
+- 已确认“新建需求”和“继续已发布需求”职责已拆开，避免请求流再次堆回单页。
+- 已确认提醒、首页和起步向导中的活跃需求入口已开始统一落到需求详情页，回退链路更连贯。
+
+风险与缓解：
+
+- 风险：需求详情页目前仍以“快速继续下单”为第一优先，照料者对比、请求改期和更细匹配筛选还未补齐。
+- 缓解：下一轮继续在 `request-detail` 内补更细的匹配筛选、候选对比和请求变更动作，不再回退到新建页堆逻辑。
+
+下一步（1-3）：
+
+1. 继续补需求详情页里的匹配筛选、候选对比和请求变更能力。
+2. 继续清理 App / Web 页面中的残余说明式文案和低效回退链路。
+3. 在主人需求流稳定后，再继续推进更深的系统提醒、推送和验收材料收口。

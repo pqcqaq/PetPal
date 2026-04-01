@@ -22,6 +22,7 @@ export const PETPAL_GETTING_STARTED_PAGE = '/pages/petpal/getting-started'
 export const PETPAL_OWNER_HOME_PAGE = '/pages/petpal/owner-home'
 export const PETPAL_PETS_PAGE = '/pages/petpal/pets'
 export const PETPAL_REQUEST_PAGE = '/pages/petpal/request'
+export const PETPAL_REQUEST_DETAIL_PAGE = '/pages/petpal/request-detail'
 export const PETPAL_CHECKOUT_PAGE = '/pages/petpal/checkout'
 export const PETPAL_ORDERS_PAGE = '/pages/petpal/orders'
 export const PETPAL_AFTERSALES_PAGE = '/pages/petpal/aftersales'
@@ -145,7 +146,7 @@ export const yesNoOptions = [
 export const ownerFlowOptions = [
   { label: '主人首页', value: PETPAL_OWNER_HOME_PAGE, description: '查看办事概览与快捷入口' },
   { label: '宠物档案', value: PETPAL_PETS_PAGE, description: '维护宠物资料与照料偏好' },
-  { label: '发布需求', value: PETPAL_REQUEST_PAGE, description: '创建临时照料需求并筛选照料者' },
+  { label: '新建需求', value: PETPAL_REQUEST_PAGE, description: '创建临时照料需求并筛选照料者' },
   { label: '确认支付', value: PETPAL_CHECKOUT_PAGE, description: '确认照料者、金额与支付方式' },
   { label: '订单跟进', value: PETPAL_ORDERS_PAGE, description: '按沟通、履约和售后持续跟进' },
   { label: '售后中心', value: PETPAL_AFTERSALES_PAGE, description: '集中处理退款、投诉和争议事项' },
@@ -249,6 +250,27 @@ export function getCaregiverAuditLabel(status: CaregiverAuditStatus) {
 
 export function getRequestStatusLabel(status: ServiceRequestStatus) {
   return serviceRequestStatusLabels[status] || status
+}
+
+export function isRequestActive(status: ServiceRequestStatus) {
+  return status === 'OPEN' || status === 'MATCHED'
+}
+
+export function canRequestCheckout(request: {
+  status: ServiceRequestStatus
+  matchedCaregiverId?: string | null
+}) {
+  return request.status === 'MATCHED' || Boolean(request.matchedCaregiverId)
+}
+
+export function getRequestTagType(status: ServiceRequestStatus) {
+  if (status === 'MATCHED') {
+    return 'success'
+  }
+  if (status === 'OPEN') {
+    return 'warning'
+  }
+  return 'default'
 }
 
 export function getRefundProgressStageLabel(stage: RefundProgressStage) {

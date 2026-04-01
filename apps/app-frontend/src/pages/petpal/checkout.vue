@@ -40,6 +40,7 @@ import {
   formatRange,
   getRequestStatusLabel,
   PETPAL_ORDER_DETAIL_PAGE,
+  PETPAL_REQUEST_DETAIL_PAGE,
   PETPAL_REQUEST_PAGE,
   serviceTypeLabels,
   speciesLabels,
@@ -300,7 +301,7 @@ function openOrderDetail() {
 function backToRequest() {
   const targetRequestId = requestId.value || order.value?.serviceRequestId || ''
   const url = targetRequestId
-    ? `${PETPAL_REQUEST_PAGE}?requestId=${targetRequestId}`
+    ? `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${targetRequestId}`
     : PETPAL_REQUEST_PAGE
   uni.redirectTo({ url })
 }

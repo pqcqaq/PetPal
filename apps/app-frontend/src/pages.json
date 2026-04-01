@@ -157,14 +157,6 @@
       }
     },
     {
-      "path": "pages/petpal/checkout",
-      "type": "page",
-      "style": {
-        "navigationBarTitleText": "确认支付",
-        "enablePullDownRefresh": true
-      }
-    },
-    {
       "path": "pages/petpal/getting-started",
       "type": "page",
       "style": {
@@ -224,7 +216,15 @@
       "path": "pages/petpal/request",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "发布需求",
+        "navigationBarTitleText": "新建需求",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/petpal/request-detail",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "需求详情",
         "enablePullDownRefresh": true
       }
     },

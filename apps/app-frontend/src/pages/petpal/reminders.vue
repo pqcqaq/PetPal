@@ -41,6 +41,7 @@ import {
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_OWNER_HOME_PAGE,
   PETPAL_PETS_PAGE,
+  PETPAL_REQUEST_DETAIL_PAGE,
   PETPAL_REQUEST_PAGE,
   openPetPalAction,
 } from './owner-shared'
@@ -106,6 +107,9 @@ const ownerAftersalesOrders = computed(() => ownerOrders.value.filter(item => is
 const pendingOwnerRequests = computed(() => requests.value.filter(item => (
   item.status === 'OPEN' || item.status === 'MATCHED'
 )))
+const firstPendingOwnerRequest = computed(() => pendingOwnerRequests.value
+  .slice()
+  .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())[0] ?? null)
 const ownerServingOrders = computed(() => ownerOrders.value.filter(item => item.orderStatus === 'SERVING'))
 const ownerUpcomingOrders = computed(() => ownerOrders.value
   .filter(item => (
@@ -147,7 +151,9 @@ const ownerReminderCards = computed<ReminderCard[]>(() => {
       detail: '建议优先回看时间、预算和地点，避免需求挂起太久导致无法及时成单。',
       actionLabel: '查看需求',
       actionMode: 'redirect',
-      actionUrl: PETPAL_REQUEST_PAGE,
+      actionUrl: firstPendingOwnerRequest.value
+        ? `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${firstPendingOwnerRequest.value.id}`
+        : PETPAL_REQUEST_PAGE,
     })
   }
 
