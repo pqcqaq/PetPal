@@ -41,10 +41,16 @@ const routes = [
         meta: { publicPage: true, title: '宠托帮消息中心' },
       },
       {
+        path: 'petpal/aftersales',
+        name: 'frontend-petpal-aftersales',
+        component: () => import('@/pages/frontend/petpal/PetPalAftersalesView.vue'),
+        meta: { publicPage: true, title: '宠托帮售后中心' },
+      },
+      {
         path: 'petpal/legacy',
         name: 'frontend-petpal-legacy',
         component: () => import('@/pages/frontend/petpal/PetPalLegacyWorkbenchView.vue'),
-        meta: { publicPage: true, title: '宠托帮兼容工作台' },
+        meta: { publicPage: true, title: '宠托帮兼容入口' },
       },
       {
         path: 'petpal/order-detail/:id',

@@ -3,7 +3,7 @@
     <section class="frontend-page__hero">
       <p class="frontend-page__eyebrow">PetPal Legacy</p>
       <h1>宠托帮兼容入口</h1>
-      <p>旧的混合工作台不再承载新功能，这里只保留旧书签兼容与任务分发，真实操作请直接进入主人页、照料者页和消息中心。</p>
+      <p>旧的混合工作台不再承载新功能，这里只保留旧书签兼容与任务分发，真实操作请直接进入主人页、照料者页、消息中心和售后中心。</p>
       <div class="frontend-page__hero-actions">
         <el-button type="primary" :loading="loading" @click="reloadAll">刷新兼容概览</el-button>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal' }">
@@ -14,6 +14,9 @@
         </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-messages' }">
           消息中心
+        </RouterLink>
+        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-aftersales' }">
+          售后中心
         </RouterLink>
       </div>
     </section>
@@ -67,11 +70,11 @@
         </RouterLink>
       </article>
       <article class="frontend-card petpal-grid-span-3">
-        <span class="frontend-card__eyebrow">后台治理</span>
-        <h3>审核 / 投诉 / 告警</h3>
-        <p class="petpal-route-copy">照料者审核、投诉治理、回调审计和告警队列都保留在根级后台入口，避免再通过菜单绕行。</p>
-        <RouterLink class="frontend-page__button is-secondary" to="/petpal-admin">
-          打开 PetPal 后台
+        <span class="frontend-card__eyebrow">售后处理</span>
+        <h3>退款 / 投诉 / 轨迹回看</h3>
+        <p class="petpal-route-copy">主人侧退款进度、投诉处理和售后优先级已经迁到独立售后中心，不必再逐个订单翻找。</p>
+        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-aftersales' }">
+          打开售后中心
         </RouterLink>
       </article>
     </section>

@@ -3,6 +3,7 @@ export const frontendNavItems = [
   { label: '主人服务台', to: '/petpal', eyebrow: '业务' },
   { label: '照料者工作台', to: '/petpal/caregiver', eyebrow: '履约' },
   { label: '消息中心', to: '/petpal/messages', eyebrow: '沟通' },
+  { label: '售后中心', to: '/petpal/aftersales', eyebrow: '售后' },
   { label: '产品结构', to: '/architecture', eyebrow: '结构' },
   { label: '登录方式', to: '/authentication', eyebrow: '认证' },
 ] as const;
@@ -32,6 +33,12 @@ export const capabilityCards = [
     eyebrow: 'Message Flow',
     description: '跨订单沟通被提升为独立页面，不必只能进入订单详情后逐条查看。',
     bullets: ['支持按主人/照料者视角聚合会话', '可集中筛选未读并直接跳转订单详情'],
+  },
+  {
+    title: '主人售后中心',
+    eyebrow: 'Aftersales Flow',
+    description: '退款、投诉和售后协同被提升为独立页面，不必再依赖逐单进入详情页回看。',
+    bullets: ['聚合退款进度、投诉状态和售后优先级', '支持按订单直达详情和导出退款明细'],
   },
   {
     title: '后台直达治理',
@@ -82,6 +89,11 @@ export const architectureLayers = [
     title: '跨订单消息中心',
     summary: '承载主人与照料者跨订单消息聚合、未读处理与快捷跳转。',
     details: ['独立路由 `/petpal/messages` 用于集中查看订单会话', '继续复用订单详情页里的沟通发送与上下文信息'],
+  },
+  {
+    title: '主人售后中心',
+    summary: '承载主人侧退款、投诉、售后优先级和处理轨迹的聚合查看。',
+    details: ['独立路由 `/petpal/aftersales` 用于集中查看主人售后队列', '继续复用订单详情页里的退款、投诉和售后时间线能力'],
   },
   {
     title: 'PetPal 后台',
