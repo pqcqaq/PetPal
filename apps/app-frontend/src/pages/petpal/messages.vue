@@ -21,6 +21,7 @@ import {
   getOrderTone,
   PETPAL_CAREGIVER_HOME_PAGE,
   PETPAL_HUB_PAGE,
+  PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_OWNER_HOME_PAGE,
   serviceTypeLabels,
@@ -226,6 +227,10 @@ function openCaregiverHome() {
   uni.redirectTo({ url: PETPAL_CAREGIVER_HOME_PAGE })
 }
 
+function openNotifications() {
+  uni.navigateTo({ url: PETPAL_NOTIFICATIONS_PAGE })
+}
+
 function openOrderChat(orderId: string) {
   uni.navigateTo({ url: `${PETPAL_ORDER_DETAIL_PAGE}?id=${orderId}&tab=chat` })
 }
@@ -300,6 +305,7 @@ onPullDownRefresh(() => {
           <view class="message-hero__actions">
             <AppButton size="medium" type="info" @click="openRoleHub">角色入口</AppButton>
             <AppButton size="medium" type="info" @click="openOwnerHome">主人首页</AppButton>
+            <AppButton size="medium" type="info" @click="openNotifications">通知中心</AppButton>
             <AppButton size="medium" @click="openCaregiverHome">照料者首页</AppButton>
           </view>
         </view>

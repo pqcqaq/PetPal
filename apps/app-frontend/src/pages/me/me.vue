@@ -17,10 +17,11 @@ import {
   isOrderAftersalesTracked,
   PETPAL_AFTERSALES_PAGE,
   PETPAL_CAREGIVER_EARNINGS_PAGE,
+  PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_REMINDERS_PAGE,
 } from '@/pages/petpal/owner-shared'
 import { LOGIN_PAGE, REGISTER_PAGE } from '@/router/config'
-import { useUiStore, useUserStore } from '@/store'
+import { useNotificationStore, useUiStore, useUserStore } from '@/store'
 import { useTokenStore } from '@/store/token'
 import { getErrorMessage } from '@/utils/error'
 
@@ -33,6 +34,7 @@ definePage({
 const userStore = useUserStore()
 const tokenStore = useTokenStore()
 const uiStore = useUiStore()
+const notificationStore = useNotificationStore()
 const { userInfo } = storeToRefs(userStore)
 
 const petpalLoading = ref(false)
@@ -44,6 +46,10 @@ const HELP_PAGE = '/pages/help/index'
 const ACCOUNT_SUPPORT_PAGE = '/pages/account/support'
 
 const displayName = computed(() => userInfo.value.nickname || userInfo.value.username || '未登录')
+const unreadNotificationCount = computed(() => notificationStore.unreadCount)
+const notificationShortcutText = computed(() => unreadNotificationCount.value
+  ? `当前有 ${unreadNotificationCount.value} 条未读通知。`
+  : '统一查看提醒、未读沟通和账户提示。')
 const pageDescription = computed(() => {
   if (!tokenStore.hasLogin) {
     return '登录后查看你的 PetPal 资料、宠物资产和订单进展。'
@@ -183,6 +189,14 @@ function openRemindersCenter() {
   uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
 }
 
+function openNotificationsCenter() {
+  if (!tokenStore.hasLogin) {
+    handleLogin()
+    return
+  }
+  uni.navigateTo({ url: PETPAL_NOTIFICATIONS_PAGE })
+}
+
 function openHelpCenter() {
   uni.navigateTo({ url: HELP_PAGE })
 }
@@ -245,6 +259,7 @@ onShow(() => {
   }
 
   void loadPetPalAccount(false)
+  void notificationStore.refreshNotifications()
 })
 </script>
 
@@ -272,6 +287,9 @@ onShow(() => {
           <AppTag v-if="tokenStore.hasLogin" type="primary">
             {{ petpalTierSummary }}
           </AppTag>
+          <AppTag v-if="tokenStore.hasLogin" :type="unreadNotificationCount ? 'danger' : 'default'">
+            {{ unreadNotificationCount ? `通知 ${unreadNotificationCount}` : '通知已读' }}
+          </AppTag>
         </view>
       </view>
     </view>
@@ -297,6 +315,10 @@ onShow(() => {
             <text class="petpal-shortcut-card__title">提醒中心</text>
             <text class="petpal-shortcut-card__text">优先处理主人端、照料者端和售后待办。</text>
           </view>
+          <view class="petpal-shortcut-card petpal-shortcut-card--alert" @click="openNotificationsCenter">
+            <text class="petpal-shortcut-card__title">通知中心</text>
+            <text class="petpal-shortcut-card__text">{{ notificationShortcutText }}</text>
+          </view>
           <view class="petpal-shortcut-card" @click="openProfile">
             <text class="petpal-shortcut-card__title">个人资料</text>
             <text class="petpal-shortcut-card__text">更新昵称、头像和联系方式。</text>
@@ -319,6 +341,7 @@ onShow(() => {
       <AppSection title="常用入口">
         <AppList>
           <AppListItem title="进入服务台" label="继续发布需求、维护宠物档案和查看匹配。" is-link clickable @click="openServiceBoard" />
+          <AppListItem title="通知中心" :label="notificationShortcutText" is-link clickable @click="openNotificationsCenter" />
           <AppListItem title="提醒中心" label="集中查看主人端、照料者端和售后相关待办。" is-link clickable @click="openRemindersCenter" />
           <AppListItem title="售后中心" label="集中查看退款、投诉和争议处理，不再只依赖订单详情入口。" is-link clickable @click="openAftersalesCenter" />
           <AppListItem title="照料者收益表现" label="若你已申请照料者，可查看收入、完成率和售后风险。" is-link clickable @click="openCaregiverEarnings" />

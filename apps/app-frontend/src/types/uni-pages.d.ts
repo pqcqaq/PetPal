@@ -11,6 +11,7 @@ type _LocationUrl =
   "/pages/help/index" |
   "/pages/me/me" |
   "/pages/me/profile" |
+  "/pages/notifications/index" |
   "/pages/order-detail/index" |
   "/pages/petpal/aftersales" |
   "/pages/petpal/caregiver-earnings" |

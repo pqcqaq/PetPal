@@ -14,6 +14,7 @@ import { useTokenStore, useUiStore, useUserStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
 import {
   PETPAL_CAREGIVER_PROFILE_PAGE,
+  PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_OWNER_HOME_PAGE,
   PETPAL_REMINDERS_PAGE,
 } from '@/pages/petpal/owner-shared'
@@ -262,6 +263,7 @@ onPullDownRefresh(() => {
             </text>
           </view>
           <view class="account-support-hero__actions">
+            <AppButton size="medium" @click="navigateTo(PETPAL_NOTIFICATIONS_PAGE)">通知中心</AppButton>
             <AppButton size="medium" @click="navigateTo(PETPAL_REMINDERS_PAGE)">提醒中心</AppButton>
             <AppButton size="medium" type="info" @click="navigateTo(HELP_PAGE)">帮助中心</AppButton>
             <AppButton size="medium" type="info" @click="navigateTo(SETTINGS_PAGE)">体验设置</AppButton>
@@ -306,6 +308,7 @@ onPullDownRefresh(() => {
 
       <AppSection title="帮助入口" description="帮助、资料、设置和提醒保持独立页面，但可以在账户支持页里互相跳转。">
         <AppList>
+          <AppListItem title="通知中心" label="统一查看提醒、未读沟通和账户提示，并追踪已读状态。" is-link clickable @click="navigateTo(PETPAL_NOTIFICATIONS_PAGE)" />
           <AppListItem title="帮助中心" label="查看主人、照料者、售后和账户支持场景说明。" is-link clickable @click="navigateTo(HELP_PAGE)" />
           <AppListItem title="个人资料" label="编辑昵称、邮箱和头像。" is-link clickable @click="navigateTo(PROFILE_PAGE)" />
           <AppListItem title="体验设置" label="继续调整主题、首页布局和动效。" is-link clickable @click="navigateTo(SETTINGS_PAGE)" />

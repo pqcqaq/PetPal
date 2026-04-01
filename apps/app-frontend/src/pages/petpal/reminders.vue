@@ -37,6 +37,7 @@ import {
   PETPAL_CAREGIVER_PROFILE_PAGE,
   PETPAL_CAREGIVER_SERVICES_PAGE,
   PETPAL_MESSAGES_PAGE,
+  PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_OWNER_HOME_PAGE,
   PETPAL_PETS_PAGE,
@@ -487,6 +488,10 @@ function refreshPage() {
   void loadPage(true)
 }
 
+function openNotifications() {
+  uni.navigateTo({ url: PETPAL_NOTIFICATIONS_PAGE })
+}
+
 function goToLogin() {
   uni.navigateTo({ url: LOGIN_PAGE })
 }
@@ -568,6 +573,7 @@ onPullDownRefresh(() => {
             </text>
           </view>
           <view class="reminder-hero__actions">
+            <AppButton size="medium" type="info" @click="openNotifications">通知中心</AppButton>
             <AppButton size="medium" type="info" @click="runAction('redirect', PETPAL_MESSAGES_PAGE)">消息中心</AppButton>
             <AppButton size="medium" @click="refreshPage">刷新提醒</AppButton>
           </view>

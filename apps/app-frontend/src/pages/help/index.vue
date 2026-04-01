@@ -12,6 +12,7 @@ import {
   PETPAL_CAREGIVER_HOME_PAGE,
   PETPAL_CAREGIVER_PROFILE_PAGE,
   PETPAL_MESSAGES_PAGE,
+  PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_OWNER_HOME_PAGE,
   PETPAL_REMINDERS_PAGE,
 } from '@/pages/petpal/owner-shared'
@@ -90,8 +91,8 @@ const faqCards = computed<FaqCard[]>(() => [
     answer: 'PetPal 现在按主人、照料者、售后、消息和账户支持拆分页面，用户可以先进入当前场景，再执行具体动作，减少在超长页面里滚动查找。',
   },
   {
-    question: '提醒中心和消息中心有什么区别？',
-    answer: '消息中心处理跨订单沟通内容与未读消息，提醒中心负责把主人、照料者和售后待办聚合成“下一步动作”，两者不再互相混用。',
+    question: '通知中心、提醒中心和消息中心有什么区别？',
+    answer: '通知中心是统一收件箱，负责已读追踪；提醒中心负责把待办整理成下一步动作；消息中心只负责跨订单沟通内容和未读消息。',
   },
   {
     question: '如果我同时是主人和照料者，该从哪里进入？',
@@ -126,6 +127,10 @@ function openRegister() {
 
 function openMessages() {
   openHelpAction(PETPAL_MESSAGES_PAGE)
+}
+
+function openNotifications() {
+  openHelpAction(PETPAL_NOTIFICATIONS_PAGE)
 }
 
 function openAccountSupport() {
@@ -166,6 +171,7 @@ onShow(() => {
         <view class="help-hero__actions">
           <AppButton size="medium" @click="openAccountSupport">账户支持</AppButton>
           <AppButton size="medium" type="info" @click="openSettings">体验设置</AppButton>
+          <AppButton size="medium" type="info" @click="openNotifications">通知中心</AppButton>
           <AppButton size="medium" type="danger" @click="openMessages">消息中心</AppButton>
         </view>
       </view>
@@ -203,6 +209,11 @@ onShow(() => {
           <text class="help-support-card__title">账户支持</text>
           <text class="help-support-card__text">查看当前账号状态、推荐动作和同步情况。</text>
           <AppButton size="medium" type="info" @click="openAccountSupport">进入账户支持</AppButton>
+        </view>
+        <view class="help-support-card">
+          <text class="help-support-card__title">通知中心</text>
+          <text class="help-support-card__text">统一查看提醒、未读沟通和账户提示，并追踪已读状态。</text>
+          <AppButton size="medium" type="info" @click="openNotifications">进入通知中心</AppButton>
         </view>
         <view class="help-support-card">
           <text class="help-support-card__title">个人资料</text>

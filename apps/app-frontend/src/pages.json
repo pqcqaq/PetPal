@@ -69,6 +69,14 @@
       }
     },
     {
+      "path": "pages/notifications/index",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "通知中心",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/order-detail/index",
       "type": "page",
       "style": {

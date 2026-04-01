@@ -65,6 +65,7 @@ export const useTokenStore = defineStore(
         refreshExpiresAt: 0,
       }
       clearAuthStorage()
+      uni.removeStorageSync('notifications')
       useUserStore().clearUserInfo()
     }
 

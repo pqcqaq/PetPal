@@ -17,8 +17,8 @@ import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { listOrders, listPets, listServiceRequests, matchCaregivers } from '@/api/petpal'
-import { isOrderAftersalesTracked, PETPAL_REMINDERS_PAGE } from '@/pages/petpal/owner-shared'
-import { useTokenStore, useUiStore, useUserStore } from '@/store'
+import { isOrderAftersalesTracked, PETPAL_NOTIFICATIONS_PAGE, PETPAL_REMINDERS_PAGE } from '@/pages/petpal/owner-shared'
+import { useNotificationStore, useTokenStore, useUiStore, useUserStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
 
 defineOptions({
@@ -36,6 +36,7 @@ definePage({
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const uiStore = useUiStore()
+const notificationStore = useNotificationStore()
 
 const loading = ref(false)
 const pets = ref<PetProfileRecord[]>([])
@@ -46,6 +47,10 @@ const caregivers = ref<MatchedCaregiverRecord[]>([])
 const isFocusLayout = computed(() => uiStore.preferences.portalLayout === 'focus')
 const displayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || 'PetPal 用户')
 const layoutLabel = computed(() => isFocusLayout.value ? '聚焦办事' : '概览看板')
+const unreadNotificationCount = computed(() => notificationStore.unreadCount)
+const notificationHint = computed(() => unreadNotificationCount.value
+  ? `当前有 ${unreadNotificationCount.value} 条未读通知，优先进入统一通知流查看。`
+  : '统一查看提醒、未读沟通和账户提示。')
 
 const activeRequestCount = computed(() => requests.value.filter(item => (
   item.status === 'OPEN' || item.status === 'MATCHING' || item.status === 'CONFIRMED'
@@ -149,6 +154,10 @@ function openReminders() {
   uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
 }
 
+function openNotifications() {
+  uni.navigateTo({ url: PETPAL_NOTIFICATIONS_PAGE })
+}
+
 function openMine() {
   uni.switchTab({ url: '/pages/me/me' })
 }
@@ -208,6 +217,13 @@ onLoad(() => {
   void loadHome(false)
 })
 
+onShow(() => {
+  if (!tokenStore.hasLogin) {
+    return
+  }
+  void notificationStore.refreshNotifications()
+})
+
 onPullDownRefresh(() => {
   void loadHome(true)
 })
@@ -222,6 +238,9 @@ onPullDownRefresh(() => {
         </AppTag>
         <AppTag :type="accountStatusTag">
           {{ userStore.userInfo.status === 'ACTIVE' ? '账号正常' : '账号受限' }}
+        </AppTag>
+        <AppTag v-if="tokenStore.hasLogin" :type="unreadNotificationCount ? 'danger' : 'default'">
+          {{ unreadNotificationCount ? `通知 ${unreadNotificationCount}` : '通知已读' }}
         </AppTag>
       </view>
     </template>
@@ -248,6 +267,7 @@ onPullDownRefresh(() => {
     <AppSection title="快捷操作" description="把常用 PetPal 动作放到首页第一屏。">
       <AppList>
         <AppListItem title="进入服务台" label="发布需求、维护宠物档案和查看匹配照料者。" is-link clickable @click="openServiceBoard" />
+        <AppListItem title="通知中心" :label="notificationHint" is-link clickable @click="openNotifications" />
         <AppListItem title="提醒中心" label="集中查看主人端、照料者端和售后相关待办。" is-link clickable @click="openReminders" />
         <AppListItem title="查看我的资料" label="更新昵称、头像、联系方式与账号状态。" is-link clickable @click="openProfile" />
         <AppListItem title="PetPal 设置" label="调整首页布局、底栏样式与主题外观。" is-link clickable @click="openSettings" />
