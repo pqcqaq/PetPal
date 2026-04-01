@@ -6826,3 +6826,48 @@ flowchart TD
 1. 继续补主人端支付结果、退款结果和投诉结果的更明确反馈，但不再增加长文案说明区。
 2. 在主人端售后链路基本稳定后，再同步推进 Web 对应页面的同类重构。
 3. 继续压缩跨页面回跳成本，让售后、沟通和订单结果页形成更顺的闭环。
+
+### 14.121 2026-04-02（P3-M1 Slice 111）
+
+**概述**：继续推进 App 主人端交易结果反馈，本轮优先把支付成功后的反馈从结算页里拆出，形成独立的支付结果任务页，并同步把结算页主动作收口为“一次点击创建并支付”。
+
+已完成：
+
+- 新增支付结果页：
+  - `apps/app-frontend/src/pages/petpal/payment-result.vue`
+    - 新增独立支付结果页，首屏直接展示支付结果、当前订单阶段、未读沟通和下一步动作。
+    - 支付记录已在同页收口，不再要求用户回结算页确认是否到账。
+    - 主动作会根据当前订单状态切到“进入订单 / 看服务 / 写评价 / 继续支付”。
+- 继续收口结算页：
+  - `apps/app-frontend/src/pages/petpal/checkout.vue`
+    - 主按钮已改为直接串起“创建订单并支付”，不再要求用户先创建订单再点第二次支付。
+    - 已支付状态不再继续停留在结算页解释，而是直接进入支付结果页。
+- 路由与共享常量同步：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+  - `apps/app-frontend/src/pages.json`
+  - `apps/app-frontend/src/types/uni-pages.d.ts`
+- 文档同步：
+  - `apps/docs/project/PetPal-Frontend-Blueprint.md`
+  - `apps/docs/project/PetPal-UX-Rebuild.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，支付结果页全部基于现有 `OrderDetailRecord` 和支付记录返回做前端重排。
+- 已确认支付成功后的主路径已经变为“checkout -> payment-result -> order-detail / review”，不再要求用户自己回订单页判断是否成功。
+- 已确认 `checkout` 的主按钮已经和页面职责一致，回到“确认并支付”而不是停留在“创建订单后再解释下一步”的旧状态。
+
+风险与缓解：
+
+- 风险：支付结果页已经独立，但退款结果和投诉结果仍未统一到同样的任务页标准。
+- 缓解：下一轮优先补退款结果和投诉结果的明确反馈与回流动作，让交易后段体验继续收口。
+
+下一步（1-3）：
+
+1. 继续补主人端退款结果和投诉结果的独立反馈，不再把结果说明散回订单详情长页里。
+2. 在主人端交易结果链路稳定后，再同步推进 Web 对应页面的同类重构。
+3. 继续压缩支付、售后和评价之间的回跳成本，让结果页都能直接指向正确下一步。

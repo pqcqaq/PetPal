@@ -117,6 +117,14 @@
       }
     },
     {
+      "path": "pages/petpal/payment-result",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "支付结果",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/petpal/checkout",
       "type": "page",
       "style": {

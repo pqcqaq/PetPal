@@ -6,11 +6,11 @@
  * Core scenes:
  * 1. 一屏确认服务时间、金额和照料者是否靠谱
  * 2. 已有订单时优先继续支付，不重复创建
- * 3. 支付后立即回到订单跟进，不再要求用户重新找入口
+ * 3. 支付完成后直接进入结果页，确认到账和下一步
  * Primary action: 提交订单并支付，或继续支付当前订单
- * Secondary actions: 切换支付方式、返回需求详情、查看订单详情
+ * Secondary actions: 切换支付方式、返回需求详情、查看支付结果
  * Feedback: 当前阶段、应付金额、照料者可信信息、支付记录
- * States: 未登录、参数缺失、订单创建中、待支付、支付完成、加载失败
+ * States: 未登录、参数缺失、订单创建中、待支付、已支付待查看结果、加载失败
  */
 import type {
   MatchedCaregiverRecord,
@@ -48,6 +48,7 @@ import {
   formatRange,
   getRequestStatusLabel,
   PETPAL_ORDER_DETAIL_PAGE,
+  PETPAL_PAYMENT_RESULT_PAGE,
   PETPAL_REQUEST_DETAIL_PAGE,
   PETPAL_REQUEST_PAGE,
   serviceTypeLabels,
@@ -140,7 +141,7 @@ const outstandingAmount = computed(() => {
 const isOrderPaid = computed(() => Boolean(order.value && outstandingAmount.value <= 0))
 const currentStageLabel = computed(() => {
   if (isOrderPaid.value) {
-    return '支付完成'
+    return '已支付，待查看结果'
   }
   if (order.value) {
     return '待支付'
@@ -158,12 +159,9 @@ const stageTagType = computed(() => {
 })
 const primaryButtonLabel = computed(() => {
   if (isOrderPaid.value) {
-    return '查看订单'
+    return '查看支付结果'
   }
-  if (order.value) {
-    return `立即支付 ¥${formatAmount(outstandingAmount.value)}`
-  }
-  return '提交订单'
+  return `${order.value ? '立即支付' : '提交并支付'} ¥${formatAmount(outstandingAmount.value)}`
 })
 
 const caregiverTrustPills = computed(() => {
@@ -311,7 +309,7 @@ async function payNow() {
       payChannel: payChannel.value,
     })
     orderId.value = order.value.id
-    uni.showToast({ title: '支付完成', icon: 'none' })
+    uni.redirectTo({ url: `${PETPAL_PAYMENT_RESULT_PAGE}?orderId=${order.value.id}` })
   }
   catch (cause: unknown) {
     uni.showToast({
@@ -324,16 +322,19 @@ async function payNow() {
   }
 }
 
+function openPaymentResult() {
+  if (!order.value) {
+    return
+  }
+  uni.redirectTo({ url: `${PETPAL_PAYMENT_RESULT_PAGE}?orderId=${order.value.id}` })
+}
+
 function handlePrimaryAction() {
   if (isOrderPaid.value && order.value) {
-    uni.redirectTo({ url: `${PETPAL_ORDER_DETAIL_PAGE}?id=${order.value.id}&tab=overview` })
+    openPaymentResult()
     return
   }
-  if (order.value) {
-    void payNow()
-    return
-  }
-  void createOrderAndStay()
+  void payNow()
 }
 
 function openOrderDetail() {
