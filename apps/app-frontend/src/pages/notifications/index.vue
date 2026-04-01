@@ -10,7 +10,7 @@ import AppTag from '@/components/app-tag/app-tag.vue'
 import { LOGIN_PAGE } from '@/router/config'
 import type { AppNotificationItem, AppNotificationPriority, AppNotificationScope } from '@/store'
 import { useNotificationStore, useTokenStore, useUserStore } from '@/store'
-import { formatDateTime, PETPAL_MESSAGES_PAGE, PETPAL_REMINDERS_PAGE } from '@/pages/petpal/owner-shared'
+import { formatDateTime, openPetPalAction, PETPAL_MESSAGES_PAGE, PETPAL_REMINDERS_PAGE } from '@/pages/petpal/owner-shared'
 import { getErrorMessage } from '@/utils/error'
 
 defineOptions({
@@ -123,13 +123,7 @@ function getPriorityTagType(priority: AppNotificationPriority) {
 
 function runAction(item: AppNotificationItem) {
   notificationStore.markAsRead(item)
-
-  if (item.actionMode === 'redirect') {
-    uni.redirectTo({ url: item.actionUrl })
-    return
-  }
-
-  uni.navigateTo({ url: item.actionUrl })
+  openPetPalAction(item.actionMode, item.actionUrl)
 }
 
 function markAsRead(item: AppNotificationItem) {

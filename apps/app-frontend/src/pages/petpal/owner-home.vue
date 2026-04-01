@@ -14,8 +14,9 @@ import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { listOrders, listPets, listServiceRequests, matchCaregivers } from '@/api/petpal'
 import { LOGIN_PAGE } from '@/router/config'
-import { useTokenStore, useUserStore } from '@/store'
+import { useNotificationStore, useTokenStore, useUserStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
+import ActionSignalCard from './components/action-signal-card.vue'
 import OwnerFlowNav from './components/owner-flow-nav.vue'
 import {
   buildOwnerMatchQuery,
@@ -50,6 +51,7 @@ definePage({
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
+const notificationStore = useNotificationStore()
 
 const loading = ref(false)
 const pets = ref<PetProfileRecord[]>([])
@@ -173,6 +175,7 @@ onShow(() => {
     return
   }
   void loadPage(false)
+  void notificationStore.refreshNotifications()
 })
 
 onPullDownRefresh(() => {
@@ -188,6 +191,17 @@ onPullDownRefresh(() => {
         title="PetPal 主人任务流"
         description="按真实办事顺序重建：先确认宠物资料，再发起需求，随后持续跟进履约、沟通与售后。"
       />
+
+      <AppSection title="主动催办" description="把主人路径里最值得先处理的事项直接前置到首页，不用先去翻通知列表。">
+        <view class="owner-signal-wrap">
+          <ActionSignalCard
+            title="当前主人路径优先事项"
+            description="优先展示主人侧的建档、需求、订单、沟通和售后相关信号。"
+            scope="OWNER"
+            empty-text="当前主人路径没有新的高优先事项，可以继续按计划维护宠物、需求和订单。"
+          />
+        </view>
+      </AppSection>
 
       <AppSection title="当前态势" description="把今天最需要处理的事项集中到第一屏。">
         <AppCard>
@@ -342,6 +356,10 @@ onPullDownRefresh(() => {
   display: grid;
   gap: 20rpx;
   padding: 6rpx 4rpx 2rpx;
+}
+
+.owner-signal-wrap {
+  padding: 0 24rpx;
 }
 
 .owner-hero__copy {

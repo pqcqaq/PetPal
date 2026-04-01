@@ -42,6 +42,7 @@ import {
   PETPAL_OWNER_HOME_PAGE,
   PETPAL_PETS_PAGE,
   PETPAL_REQUEST_PAGE,
+  openPetPalAction,
 } from './owner-shared'
 
 defineOptions({
@@ -477,11 +478,7 @@ function getRoleTagType(role: ReminderRole) {
 }
 
 function runAction(mode: 'redirect' | 'navigate', url: string) {
-  if (mode === 'navigate') {
-    uni.navigateTo({ url })
-    return
-  }
-  uni.redirectTo({ url })
+  openPetPalAction(mode, url)
 }
 
 function refreshPage() {

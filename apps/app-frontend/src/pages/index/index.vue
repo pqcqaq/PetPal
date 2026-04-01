@@ -17,6 +17,7 @@ import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { listOrders, listPets, listServiceRequests, matchCaregivers } from '@/api/petpal'
+import ActionSignalCard from '@/pages/petpal/components/action-signal-card.vue'
 import {
   isOrderAftersalesTracked,
   PETPAL_GETTING_STARTED_PAGE,
@@ -273,6 +274,17 @@ onPullDownRefresh(() => {
       </view>
     </AppSection>
 
+    <AppSection title="主动信号" description="把系统判断的优先事项直接前置，不再要求你先进入通知中心自己筛。">
+      <view class="petpal-signal-wrap">
+        <ActionSignalCard
+          title="当前最值得先处理的事项"
+          description="主动信号会优先展示未读且高优先的主人、照料者或账户事项。"
+          scope="ALL"
+          empty-text="当前没有新的高优先事项，可以继续从快捷操作进入你要处理的主流程。"
+        />
+      </view>
+    </AppSection>
+
     <AppSection title="快捷操作" description="把常用 PetPal 动作放到首页第一屏。">
       <AppList>
         <AppListItem title="进入服务台" label="发布需求、维护宠物档案和查看匹配照料者。" is-link clickable @click="openServiceBoard" />
@@ -367,6 +379,10 @@ onPullDownRefresh(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16rpx;
+  padding: 0 24rpx;
+}
+
+.petpal-signal-wrap {
   padding: 0 24rpx;
 }
 

@@ -6,7 +6,8 @@ import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { LOGIN_PAGE } from '@/router/config'
-import { useTokenStore, useUserStore } from '@/store'
+import { useNotificationStore, useTokenStore, useUserStore } from '@/store'
+import ActionSignalCard from './components/action-signal-card.vue'
 import {
   PETPAL_CAREGIVER_HOME_PAGE,
   PETPAL_GETTING_STARTED_PAGE,
@@ -29,6 +30,7 @@ definePage({
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
+const notificationStore = useNotificationStore()
 
 const pageDescription = computed(() => (
   tokenStore.hasLogin
@@ -72,6 +74,7 @@ onShow(() => {
   }
   void tokenStore.bootstrap()
   void userStore.fetchUserInfo().catch(() => undefined)
+  void notificationStore.refreshNotifications()
 })
 </script>
 
@@ -125,6 +128,14 @@ onShow(() => {
       </AppSection>
 
       <AppSection title="辅助入口" description="把提醒、消息和兼容入口保留在角色选择页下方，减少来回跳转。">
+        <view class="hub-signal-wrap">
+          <ActionSignalCard
+            title="角色切换前先看这里"
+            description="如果当前存在高优先事项，先处理它再决定进入主人路径还是照料者路径。"
+            scope="ALL"
+            empty-text="当前没有新的跨角色高优先事项，可以自由选择下一条任务流。"
+          />
+        </view>
         <view class="hub-support-grid">
           <view class="hub-support-card">
             <text class="hub-support-card__title">起步向导</text>
@@ -254,6 +265,10 @@ onShow(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16rpx;
+}
+
+.hub-signal-wrap {
+  margin-bottom: 16rpx;
 }
 
 .hub-support-card__title {

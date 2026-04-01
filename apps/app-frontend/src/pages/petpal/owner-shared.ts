@@ -168,6 +168,22 @@ export function formatAmount(value: number | string | null | undefined) {
   return Number.isFinite(amount) ? amount.toFixed(2) : '0.00'
 }
 
+export function openPetPalAction(mode: 'redirect' | 'navigate', url: string) {
+  const openWithNavigate = () => {
+    uni.navigateTo({ url })
+  }
+
+  if (mode === 'navigate') {
+    openWithNavigate()
+    return
+  }
+
+  uni.redirectTo({
+    url,
+    fail: () => openWithNavigate(),
+  })
+}
+
 export function formatPercent(value: number | null | undefined) {
   const numberValue = Number(value ?? 0)
   if (!Number.isFinite(numberValue)) {

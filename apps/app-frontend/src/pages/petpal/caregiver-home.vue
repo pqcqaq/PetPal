@@ -17,8 +17,9 @@ import {
   listCaregiverServices,
 } from '@/api/petpal'
 import { LOGIN_PAGE } from '@/router/config'
-import { useTokenStore, useUserStore } from '@/store'
+import { useNotificationStore, useTokenStore, useUserStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
+import ActionSignalCard from './components/action-signal-card.vue'
 import CaregiverFlowNav from './components/caregiver-flow-nav.vue'
 import {
   formatAmount,
@@ -54,6 +55,7 @@ definePage({
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
+const notificationStore = useNotificationStore()
 
 const loading = ref(false)
 const caregiverProfile = ref<CaregiverProfileRecord | null>(null)
@@ -189,6 +191,7 @@ onShow(() => {
     return
   }
   void loadPage(false)
+  void notificationStore.refreshNotifications()
 })
 
 onPullDownRefresh(() => {
@@ -204,6 +207,17 @@ onPullDownRefresh(() => {
         title="照料者日常工作流"
         description="从审核状态、服务上架到接单履约，照料者侧流程已开始拆成独立页面，而不是继续塞进兼容工作台。"
       />
+
+      <AppSection title="主动催办" description="把照料者路径里最容易阻塞接单和履约的事项直接抬到第一屏。">
+        <view class="caregiver-signal-wrap">
+          <ActionSignalCard
+            title="当前照料者路径优先事项"
+            description="优先展示入驻、审核、服务、接单、履约和沟通相关信号。"
+            scope="CAREGIVER"
+            empty-text="当前照料者路径没有新的高优先事项，可以继续维护服务、订单和收益表现。"
+          />
+        </view>
+      </AppSection>
 
       <AppSection title="当前态势" description="把今天需要优先处理的审核、订单与沟通放到第一屏。">
         <AppCard>
@@ -373,6 +387,10 @@ onPullDownRefresh(() => {
   display: grid;
   gap: 20rpx;
   padding: 6rpx 4rpx 2rpx;
+}
+
+.caregiver-signal-wrap {
+  padding: 0 24rpx;
 }
 
 .caregiver-hero__copy {
