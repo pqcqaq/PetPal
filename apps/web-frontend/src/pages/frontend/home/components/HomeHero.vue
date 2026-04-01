@@ -9,6 +9,7 @@
     <div class="frontend-page__hero-actions">
       <RouterLink class="frontend-page__button is-primary" :to="adminTarget">{{ adminLabel }}</RouterLink>
       <RouterLink class="frontend-page__button is-secondary" to="/petpal">进入主人服务台</RouterLink>
+      <RouterLink class="frontend-page__button is-secondary" to="/petpal/caregiver">进入照料者工作台</RouterLink>
     </div>
 
     <div class="hero-signal-grid">

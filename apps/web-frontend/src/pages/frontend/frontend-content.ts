@@ -1,6 +1,7 @@
 export const frontendNavItems = [
   { label: 'PetPal 首页', to: '/', eyebrow: '概览' },
   { label: '主人服务台', to: '/petpal', eyebrow: '业务' },
+  { label: '照料者工作台', to: '/petpal/caregiver', eyebrow: '履约' },
   { label: '产品结构', to: '/architecture', eyebrow: '结构' },
   { label: '登录方式', to: '/authentication', eyebrow: '认证' },
 ] as const;
@@ -16,8 +17,14 @@ export const capabilityCards = [
   {
     title: '主人服务台',
     eyebrow: 'Owner Flow',
-    description: '在一个页面完成宠物档案、需求发布、订单跟进和退款导出。',
-    bullets: ['覆盖宠物、需求、订单、售后主链路', '支持交易导出和退款筛选模板复用'],
+    description: '主人页只承接宠物档案、需求发布、订单跟进和照料者匹配。',
+    bullets: ['覆盖宠物、需求、订单、售后主链路', '更重的兼容与导出功能暂时保留在 legacy 路由'],
+  },
+  {
+    title: '照料者工作台',
+    eyebrow: 'Caregiver Flow',
+    description: '照料者页独立承接入驻资料、服务配置和履约订单，不再混在主人页面里。',
+    bullets: ['独立承接档案、服务和接单动作', '更细的资质上传和高级履约先通过 legacy 路由保留'],
   },
   {
     title: '后台直达治理',
@@ -57,7 +64,12 @@ export const architectureLayers = [
   {
     title: '主人服务台',
     summary: '承载宠物档案、需求发布、订单跟进和售后透明度能力。',
-    details: ['主人可在同一页面维护宠物、需求、订单和退款导出', '服务详情页继续沉淀支付、退款、投诉和履约时间线'],
+    details: ['主人页只聚焦主人主流程，不再混入照料者入驻和履约动作', '服务详情页继续沉淀支付、退款、投诉和履约时间线'],
+  },
+  {
+    title: '照料者工作台',
+    summary: '承载照料者档案、服务设置和履约订单基础动作。',
+    details: ['独立路由 `/petpal/caregiver` 用于承接照料者工作流', '高级兼容操作暂时保留在 `/petpal/legacy`'],
   },
   {
     title: 'PetPal 后台',
@@ -73,7 +85,8 @@ export const architectureLayers = [
 
 export const operatingPrinciples = [
   '公开页只承载产品说明、主人端入口和后台直达入口，不再展示通用框架介绍。',
-  '主人服务台聚焦宠物、需求、订单和售后，不混入菜单树、权限配置等后台实现细节。',
+  '主人服务台聚焦宠物、需求、订单和售后，不混入照料者入驻、权限配置等后台实现细节。',
+  '照料者工作台单独承接入驻、服务和履约动作，减少超级页面堆叠。',
   '后台入口聚焦投诉、审核和回调治理，路径直达，不要求先进入菜单树。',
   '关键履约、退款和投诉动作都要有留痕、可导出、可复核。',
 ] as const;

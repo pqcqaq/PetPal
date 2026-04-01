@@ -26,7 +26,19 @@ const routes = [
         path: 'petpal',
         name: 'frontend-petpal',
         component: () => import('@/pages/frontend/petpal/PetPalOwnerView.vue'),
-        meta: { publicPage: true, title: '宠托帮业主工作台' },
+        meta: { publicPage: true, title: '宠托帮主人服务台' },
+      },
+      {
+        path: 'petpal/caregiver',
+        name: 'frontend-petpal-caregiver',
+        component: () => import('@/pages/frontend/petpal/PetPalCaregiverView.vue'),
+        meta: { publicPage: true, title: '宠托帮照料者工作台' },
+      },
+      {
+        path: 'petpal/legacy',
+        name: 'frontend-petpal-legacy',
+        component: () => import('@/pages/frontend/petpal/PetPalLegacyWorkbenchView.vue'),
+        meta: { publicPage: true, title: '宠托帮兼容工作台' },
       },
       {
         path: 'petpal/order-detail/:id',

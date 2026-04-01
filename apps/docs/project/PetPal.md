@@ -4949,6 +4949,51 @@ flowchart TD
 2. 继续围绕更主动的售后 / 消息催办与运营治理能力补齐后续缺口。
 3. 在 Web 前台开始按路由拆分主人 / 照料者超级页面，避免新功能继续堆到旧页面。
 
+### 14.103 2026-04-01（P3-M1 Slice 87）
+
+**概述**：继续推进 P3 Web 前台重构，本轮正式把旧的 `PetPalOwnerView.vue` 超级页面切出角色路由，先落地“主人页 / 照料者页 / 兼容页”三段式结构，避免新功能继续堆回混合工作台。
+
+已完成：
+
+- Web 前台路由拆分：
+  - `apps/web-frontend/src/router/index.ts`
+    - `/petpal` 改为新的主人服务台入口。
+    - 新增 `/petpal/caregiver` 独立照料者工作台入口。
+    - 新增 `/petpal/legacy` 兼容混合工作台入口，用于承接暂未完全拆出的高级导出、资质上传和高级履约操作。
+- 主人前台首批收口：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+    - 重写为主人聚焦页，只保留宠物建档、需求发布、订单跟进和照料者匹配。
+    - 把照料者入驻、服务配置与履约动作从主人页移除，改为跳转到独立照料者页或兼容页。
+- 照料者前台首批落地：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue`
+    - 新增照料者工作台。
+    - 先承接照料者档案、服务配置、待接单/履约订单与基础接单、签到动作。
+- 兼容路由保底：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalLegacyWorkbenchView.vue`
+    - 保留原混合页面能力，作为当前 Web 拆分过渡期的兼容工作台。
+    - 页面文案已明确标记为兼容入口，而不再伪装成默认主入口。
+- 公共前台入口同步：
+  - `apps/web-frontend/src/pages/frontend/frontend-content.ts`
+    - 首页导航、能力说明和架构说明改为显式展示主人页、照料者页和后台直达入口。
+  - `apps/web-frontend/src/pages/frontend/home/components/HomeHero.vue`
+    - 首页 hero 补充照料者工作台快捷入口。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认旧混合能力没有被直接删除，而是迁移到 `/petpal/legacy` 保底，避免本轮路由拆分造成主人导出或照料者高级履约回归不可用。
+- 已确认 `/petpal` 与 `/petpal/caregiver` 的职责边界已经清晰收窄，不再继续把主人与照料者工作流压在同一页面状态树中。
+- 已确认首页导航、能力说明和根路由入口已同步切向新结构，后续新功能可以直接落在拆分后的页面职责上。
+
+下一步（1-3）：
+
+1. 继续把照料者资质材料上传、服务记录媒体上传和签退等高频动作从 `legacy` 迁到独立照料者页。
+2. 继续把剩余高级导出和混合依赖能力按角色拆出，逐步压缩 `legacy` 的职责。
+3. 在 Web 拆分继续推进的同时，保持 App 端 Material Design 3 主流程体验继续收口。
+
 ### 14.102 2026-04-01（P3-M1 Slice 86）
 
 **概述**：继续推进 App 端主动触达能力收口，本轮不新增新的中心页，而是把“主动催办信号卡”直接放到首页、角色入口、主人首页和照料者首页，让用户在进入主流程的第一屏就能看到最值得先处理的事项。
