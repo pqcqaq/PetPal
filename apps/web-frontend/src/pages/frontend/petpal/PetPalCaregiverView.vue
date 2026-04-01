@@ -120,7 +120,19 @@
       <article class="frontend-card petpal-grid-span-5">
         <span class="frontend-card__eyebrow">照料者入驻</span>
         <h3>照料者档案</h3>
-        <el-form :model="caregiverProfileForm" label-position="top" size="small">
+        <PetPalStatePanel
+          v-if="profileLoadState === 'error'"
+          eyebrow="照料者档案"
+          title="照料者档案加载失败"
+          :description="profileLoadErrorMessage"
+          tone="danger"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" :loading="sectionReloadingKey === 'profile'" @click="retryProfileSection">重试档案区</el-button>
+          </template>
+        </PetPalStatePanel>
+
+        <el-form v-else :model="caregiverProfileForm" label-position="top" size="small">
           <el-form-item label="简介">
             <el-input v-model="caregiverProfileForm.intro" type="textarea" :rows="3" placeholder="介绍照料经验与服务风格" />
           </el-form-item>
@@ -210,81 +222,95 @@
       <article class="frontend-card petpal-grid-span-7">
         <span class="frontend-card__eyebrow">服务设置</span>
         <h3>新增照料服务</h3>
-        <el-form :model="caregiverServiceForm" label-position="top" size="small">
-          <el-row :gutter="12">
-            <el-col :span="8">
-              <el-form-item label="服务类型">
-                <el-select v-model="caregiverServiceForm.serviceType" style="width: 100%">
-                  <el-option label="寄养" value="BOARDING" />
-                  <el-option label="遛宠" value="WALKING" />
-                  <el-option label="喂养" value="FEEDING" />
-                  <el-option label="上门" value="DOOR_VISIT" />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="宠物种类">
-                <el-select v-model="caregiverServiceForm.petSpecies" style="width: 100%">
-                  <el-option label="犬" value="DOG" />
-                  <el-option label="猫" value="CAT" />
-                  <el-option label="其他" value="OTHER" />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="价格">
-                <el-input-number v-model="caregiverServiceForm.pricePerUnit" :min="1" :max="10000" style="width: 100%" />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-row :gutter="12">
-            <el-col :span="8">
-              <el-form-item label="计价单位">
-                <el-input v-model="caregiverServiceForm.unitType" placeholder="例如：HOUR" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="最短提前小时">
-                <el-input-number v-model="caregiverServiceForm.minNoticeHours" :min="0" :max="168" style="width: 100%" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="服务城市">
-                <el-input v-model="caregiverServiceForm.serviceCity" placeholder="例如：杭州" />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-form-item>
-            <el-button type="primary" :loading="caregiverServiceSaving" @click="createCaregiverService">新增服务</el-button>
-          </el-form-item>
-        </el-form>
-
-        <el-table :data="caregiverServices" size="small">
-          <el-table-column prop="serviceType" label="服务" min-width="100" />
-          <el-table-column prop="petSpecies" label="宠物" min-width="80" />
-          <el-table-column prop="pricePerUnit" label="价格" min-width="100" />
-          <el-table-column prop="unitType" label="单位" min-width="100" />
-          <el-table-column prop="serviceCity" label="城市" min-width="100" />
-          <el-table-column prop="isActive" label="启用" min-width="80">
-            <template #default="scope">
-              {{ scope.row.isActive ? '是' : '否' }}
-            </template>
-          </el-table-column>
-        </el-table>
-
         <PetPalStatePanel
-          v-if="caregiverServices.length === 0"
+          v-if="servicesLoadState === 'error'"
           eyebrow="服务设置"
-          title="还没有可售照料服务"
-          description="照料者档案保存后，建议至少创建一条可上架服务，主人侧才能更稳定地看到你的报价和能力。"
+          title="照料服务加载失败"
+          :description="servicesLoadErrorMessage"
+          tone="danger"
         >
           <template #actions>
-            <el-button size="small" type="primary" :loading="caregiverServiceSaving" @click="createCaregiverService">新增首个服务</el-button>
-            <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
-              <el-button size="small">看提醒中心</el-button>
-            </RouterLink>
+            <el-button size="small" type="primary" :loading="sectionReloadingKey === 'services'" @click="retryServicesSection">重试服务区</el-button>
           </template>
         </PetPalStatePanel>
+
+        <template v-else>
+          <el-form :model="caregiverServiceForm" label-position="top" size="small">
+            <el-row :gutter="12">
+              <el-col :span="8">
+                <el-form-item label="服务类型">
+                  <el-select v-model="caregiverServiceForm.serviceType" style="width: 100%">
+                    <el-option label="寄养" value="BOARDING" />
+                    <el-option label="遛宠" value="WALKING" />
+                    <el-option label="喂养" value="FEEDING" />
+                    <el-option label="上门" value="DOOR_VISIT" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="宠物种类">
+                  <el-select v-model="caregiverServiceForm.petSpecies" style="width: 100%">
+                    <el-option label="犬" value="DOG" />
+                    <el-option label="猫" value="CAT" />
+                    <el-option label="其他" value="OTHER" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="价格">
+                  <el-input-number v-model="caregiverServiceForm.pricePerUnit" :min="1" :max="10000" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="12">
+              <el-col :span="8">
+                <el-form-item label="计价单位">
+                  <el-input v-model="caregiverServiceForm.unitType" placeholder="例如：HOUR" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="最短提前小时">
+                  <el-input-number v-model="caregiverServiceForm.minNoticeHours" :min="0" :max="168" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="服务城市">
+                  <el-input v-model="caregiverServiceForm.serviceCity" placeholder="例如：杭州" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-form-item>
+              <el-button type="primary" :loading="caregiverServiceSaving" @click="createCaregiverService">新增服务</el-button>
+            </el-form-item>
+          </el-form>
+
+          <el-table :data="caregiverServices" size="small">
+            <el-table-column prop="serviceType" label="服务" min-width="100" />
+            <el-table-column prop="petSpecies" label="宠物" min-width="80" />
+            <el-table-column prop="pricePerUnit" label="价格" min-width="100" />
+            <el-table-column prop="unitType" label="单位" min-width="100" />
+            <el-table-column prop="serviceCity" label="城市" min-width="100" />
+            <el-table-column prop="isActive" label="启用" min-width="80">
+              <template #default="scope">
+                {{ scope.row.isActive ? '是' : '否' }}
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <PetPalStatePanel
+            v-if="caregiverServices.length === 0"
+            eyebrow="服务设置"
+            title="还没有可售照料服务"
+            description="照料者档案保存后，建议至少创建一条可上架服务，主人侧才能更稳定地看到你的报价和能力。"
+          >
+            <template #actions>
+              <el-button size="small" type="primary" :loading="caregiverServiceSaving" @click="createCaregiverService">新增首个服务</el-button>
+              <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+                <el-button size="small">看提醒中心</el-button>
+              </RouterLink>
+            </template>
+          </PetPalStatePanel>
+        </template>
       </article>
         </section>
 
@@ -307,106 +333,123 @@
         </el-space>
       </div>
 
-      <el-table :data="caregiverOrders" size="small" v-loading="caregiverOrdersLoading">
-        <el-table-column prop="orderNo" label="订单号" min-width="160" />
-        <el-table-column prop="ownerNickname" label="主人" min-width="120" />
-        <el-table-column prop="petName" label="宠物" min-width="120" />
-        <el-table-column prop="locationText" label="地点" min-width="160" />
-        <el-table-column prop="appointmentStart" label="预约开始" min-width="170">
-          <template #default="scope">
-            {{ formatTime(scope.row.appointmentStart) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="orderStatus" label="状态" min-width="120">
-          <template #default="scope">
-            {{ getOrderStatusLabel(scope.row.orderStatus) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="订单沟通" min-width="280">
-          <template #default="scope">
-            <div class="petpal-conversation-cell">
-              <div class="petpal-conversation-cell__copy">
-                <p class="petpal-conversation-cell__preview">
-                  {{ formatConversationPreview(scope.row.conversation) }}
-                </p>
-                <p class="petpal-conversation-cell__meta">
-                  {{ formatConversationMeta(scope.row.conversation, 'caregiver') }}
-                </p>
-              </div>
-              <el-tag
-                v-if="getConversationUnreadCount(scope.row.conversation, 'caregiver') > 0"
-                type="danger"
-                size="small"
-              >
-                待读 {{ getConversationUnreadCount(scope.row.conversation, 'caregiver') }}
-              </el-tag>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="动作" min-width="320" fixed="right">
-          <template #default="scope">
-            <el-space wrap>
-              <el-button
-                v-if="scope.row.orderStatus === 'PENDING_ACCEPT'"
-                link
-                type="primary"
-                size="small"
-                :loading="caregiverActionLoadingKey === `accept:${scope.row.id}`"
-                @click="acceptCaregiverOrder(scope.row.id)"
-              >
-                接单
-              </el-button>
-              <el-button
-                v-if="scope.row.orderStatus === 'ACCEPTED'"
-                link
-                type="warning"
-                size="small"
-                :loading="caregiverActionLoadingKey === `checkin:${scope.row.id}`"
-                @click="checkInCaregiverOrder(scope.row.id)"
-              >
-                签到
-              </el-button>
-              <el-button
-                v-if="scope.row.orderStatus === 'SERVING'"
-                link
-                type="primary"
-                size="small"
-                :loading="caregiverActionLoadingKey === `log:${scope.row.id}`"
-                @click="openCaregiverServiceLogDialog(scope.row.id)"
-              >
-                服务记录
-              </el-button>
-              <el-button
-                v-if="scope.row.orderStatus === 'SERVING'"
-                link
-                type="success"
-                size="small"
-                :loading="caregiverActionLoadingKey === `checkout:${scope.row.id}`"
-                @click="checkOutCaregiverOrder(scope.row.id)"
-              >
-                签退
-              </el-button>
-              <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
-                <el-button link type="info" size="small">详情</el-button>
-              </RouterLink>
-            </el-space>
-          </template>
-        </el-table-column>
-      </el-table>
-
       <PetPalStatePanel
-        v-if="!caregiverOrdersLoading && caregiverOrders.length === 0"
+        v-if="ordersLoadState === 'error'"
         eyebrow="履约工作台"
-        title="当前筛选下没有照料者订单"
-        description="可以先完成照料者档案和服务设置，等待主人下单后再回来处理接单、签到、服务记录和签退动作。"
+        title="履约订单加载失败"
+        :description="ordersLoadErrorMessage"
+        tone="danger"
       >
         <template #actions>
-          <el-button size="small" type="primary" :loading="pageLoading" @click="reloadAll">刷新工作台</el-button>
+          <el-button size="small" type="primary" :loading="sectionReloadingKey === 'orders'" @click="retryOrdersSection">重试履约区</el-button>
           <RouterLink :to="{ name: 'frontend-petpal-messages' }">
             <el-button size="small">去消息中心</el-button>
           </RouterLink>
         </template>
       </PetPalStatePanel>
+
+      <template v-else>
+        <el-table :data="caregiverOrders" size="small" v-loading="caregiverOrdersLoading">
+          <el-table-column prop="orderNo" label="订单号" min-width="160" />
+          <el-table-column prop="ownerNickname" label="主人" min-width="120" />
+          <el-table-column prop="petName" label="宠物" min-width="120" />
+          <el-table-column prop="locationText" label="地点" min-width="160" />
+          <el-table-column prop="appointmentStart" label="预约开始" min-width="170">
+            <template #default="scope">
+              {{ formatTime(scope.row.appointmentStart) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="orderStatus" label="状态" min-width="120">
+            <template #default="scope">
+              {{ getOrderStatusLabel(scope.row.orderStatus) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="订单沟通" min-width="280">
+            <template #default="scope">
+              <div class="petpal-conversation-cell">
+                <div class="petpal-conversation-cell__copy">
+                  <p class="petpal-conversation-cell__preview">
+                    {{ formatConversationPreview(scope.row.conversation) }}
+                  </p>
+                  <p class="petpal-conversation-cell__meta">
+                    {{ formatConversationMeta(scope.row.conversation, 'caregiver') }}
+                  </p>
+                </div>
+                <el-tag
+                  v-if="getConversationUnreadCount(scope.row.conversation, 'caregiver') > 0"
+                  type="danger"
+                  size="small"
+                >
+                  待读 {{ getConversationUnreadCount(scope.row.conversation, 'caregiver') }}
+                </el-tag>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="动作" min-width="320" fixed="right">
+            <template #default="scope">
+              <el-space wrap>
+                <el-button
+                  v-if="scope.row.orderStatus === 'PENDING_ACCEPT'"
+                  link
+                  type="primary"
+                  size="small"
+                  :loading="caregiverActionLoadingKey === `accept:${scope.row.id}`"
+                  @click="acceptCaregiverOrder(scope.row.id)"
+                >
+                  接单
+                </el-button>
+                <el-button
+                  v-if="scope.row.orderStatus === 'ACCEPTED'"
+                  link
+                  type="warning"
+                  size="small"
+                  :loading="caregiverActionLoadingKey === `checkin:${scope.row.id}`"
+                  @click="checkInCaregiverOrder(scope.row.id)"
+                >
+                  签到
+                </el-button>
+                <el-button
+                  v-if="scope.row.orderStatus === 'SERVING'"
+                  link
+                  type="primary"
+                  size="small"
+                  :loading="caregiverActionLoadingKey === `log:${scope.row.id}`"
+                  @click="openCaregiverServiceLogDialog(scope.row.id)"
+                >
+                  服务记录
+                </el-button>
+                <el-button
+                  v-if="scope.row.orderStatus === 'SERVING'"
+                  link
+                  type="success"
+                  size="small"
+                  :loading="caregiverActionLoadingKey === `checkout:${scope.row.id}`"
+                  @click="checkOutCaregiverOrder(scope.row.id)"
+                >
+                  签退
+                </el-button>
+                <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
+                  <el-button link type="info" size="small">详情</el-button>
+                </RouterLink>
+              </el-space>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <PetPalStatePanel
+          v-if="!caregiverOrdersLoading && caregiverOrders.length === 0"
+          eyebrow="履约工作台"
+          title="当前筛选下没有照料者订单"
+          description="可以先完成照料者档案和服务设置，等待主人下单后再回来处理接单、签到、服务记录和签退动作。"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" :loading="sectionReloadingKey === 'orders'" @click="retryOrdersSection">刷新履约区</el-button>
+            <RouterLink :to="{ name: 'frontend-petpal-messages' }">
+              <el-button size="small">去消息中心</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+      </template>
         </section>
       </template>
     </template>
@@ -554,6 +597,7 @@ defineOptions({
 });
 
 type PageLoadState = 'idle' | 'ready' | 'error';
+type SectionLoadState = 'idle' | 'ready' | 'error';
 
 type CaregiverProfileFormState = {
   intro: string;
@@ -575,6 +619,13 @@ const qualificationUploadInput = ref<HTMLInputElement | null>(null);
 const pageLoadState = ref<PageLoadState>('idle');
 const pageLoadErrorMessage = ref('');
 const partialLoadNotice = ref('');
+const profileLoadState = ref<SectionLoadState>('idle');
+const servicesLoadState = ref<SectionLoadState>('idle');
+const ordersLoadState = ref<SectionLoadState>('idle');
+const profileLoadErrorMessage = ref('');
+const servicesLoadErrorMessage = ref('');
+const ordersLoadErrorMessage = ref('');
+const sectionReloadingKey = ref<'' | 'profile' | 'services' | 'orders'>('');
 const pageReloading = ref(false);
 const caregiverProfileSaving = ref(false);
 const caregiverServiceSaving = ref(false);
@@ -666,6 +717,7 @@ const mergePageNotice = (items: string[]) => {
     .filter(Boolean);
   return normalized.length ? `${normalized.join('；')}。` : '';
 };
+const isReadySectionState = (state: SectionLoadState) => state === 'ready';
 
 const auditTagType = computed(() => {
   if (!caregiverProfile.value) {
@@ -831,6 +883,8 @@ const onQualificationFilesChange = async (event: Event) => {
 
 const loadCaregiverProfile = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
+    profileLoadState.value = 'idle';
+    profileLoadErrorMessage.value = '';
     const profile = await api.petpal.caregiver.profile();
     caregiverProfile.value = profile;
     caregiverProfileForm.intro = profile.intro || '';
@@ -840,6 +894,7 @@ const loadCaregiverProfile = async ({ showFeedback = true }: { showFeedback?: bo
     caregiverProfileForm.specialtyTagsText = joinTagText(profile.specialtyTags);
     caregiverProfileForm.serviceCommitment = profile.serviceCommitment || '';
     caregiverProfileForm.qualificationMaterials = [...profile.qualificationMaterials];
+    profileLoadState.value = 'ready';
     return null;
   } catch (error: unknown) {
     caregiverProfile.value = null;
@@ -851,9 +906,12 @@ const loadCaregiverProfile = async ({ showFeedback = true }: { showFeedback?: bo
     caregiverProfileForm.serviceCommitment = '';
     caregiverProfileForm.qualificationMaterials = [];
     if (isMissingResourceError(error)) {
+      profileLoadState.value = 'ready';
       return null;
     }
     const message = getErrorMessage(error, '加载照料者档案失败');
+    profileLoadState.value = 'error';
+    profileLoadErrorMessage.value = message;
     if (showFeedback) {
       ElMessage.error(message);
     }
@@ -863,14 +921,20 @@ const loadCaregiverProfile = async ({ showFeedback = true }: { showFeedback?: bo
 
 const loadCaregiverServices = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
+    servicesLoadState.value = 'idle';
+    servicesLoadErrorMessage.value = '';
     caregiverServices.value = await api.petpal.caregiver.services();
+    servicesLoadState.value = 'ready';
     return null;
   } catch (error: unknown) {
     caregiverServices.value = [];
     if (isMissingResourceError(error)) {
+      servicesLoadState.value = 'ready';
       return null;
     }
     const message = getErrorMessage(error, '加载照料服务失败');
+    servicesLoadState.value = 'error';
+    servicesLoadErrorMessage.value = message;
     if (showFeedback) {
       ElMessage.error(message);
     }
@@ -881,19 +945,25 @@ const loadCaregiverServices = async ({ showFeedback = true }: { showFeedback?: b
 const loadCaregiverOrders = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
     caregiverOrdersLoading.value = true;
+    ordersLoadState.value = 'idle';
+    ordersLoadErrorMessage.value = '';
     const response = await api.petpal.caregiver.orders({
       page: caregiverOrderQuery.page,
       pageSize: caregiverOrderQuery.pageSize,
       status: caregiverOrderQuery.status || undefined,
     });
     caregiverOrders.value = response.items;
+    ordersLoadState.value = 'ready';
     return null;
   } catch (error: unknown) {
     caregiverOrders.value = [];
     if (isMissingResourceError(error)) {
+      ordersLoadState.value = 'ready';
       return null;
     }
     const message = getErrorMessage(error, '加载履约订单失败');
+    ordersLoadState.value = 'error';
+    ordersLoadErrorMessage.value = message;
     if (showFeedback) {
       ElMessage.error(message);
     }
@@ -905,6 +975,42 @@ const loadCaregiverOrders = async ({ showFeedback = true }: { showFeedback?: boo
 
 const refreshCaregiverOrders = () => {
   void loadCaregiverOrders();
+};
+
+const retryProfileSection = async () => {
+  sectionReloadingKey.value = 'profile';
+  try {
+    await loadCaregiverProfile({ showFeedback: false });
+    if (isReadySectionState(profileLoadState.value)) {
+      ElMessage.success('照料者档案已刷新');
+    }
+  } finally {
+    sectionReloadingKey.value = '';
+  }
+};
+
+const retryServicesSection = async () => {
+  sectionReloadingKey.value = 'services';
+  try {
+    await loadCaregiverServices({ showFeedback: false });
+    if (isReadySectionState(servicesLoadState.value)) {
+      ElMessage.success('照料服务已刷新');
+    }
+  } finally {
+    sectionReloadingKey.value = '';
+  }
+};
+
+const retryOrdersSection = async () => {
+  sectionReloadingKey.value = 'orders';
+  try {
+    await loadCaregiverOrders({ showFeedback: false });
+    if (isReadySectionState(ordersLoadState.value)) {
+      ElMessage.success('履约订单已刷新');
+    }
+  } finally {
+    sectionReloadingKey.value = '';
+  }
 };
 
 const reloadAll = async () => {
@@ -1109,6 +1215,8 @@ const saveCaregiverProfile = async () => {
     caregiverProfileForm.specialtyTagsText = joinTagText(profile.specialtyTags);
     caregiverProfileForm.serviceCommitment = profile.serviceCommitment || '';
     caregiverProfileForm.qualificationMaterials = [...profile.qualificationMaterials];
+    profileLoadState.value = 'ready';
+    profileLoadErrorMessage.value = '';
     ElMessage.success('照料者档案已更新');
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '保存照料者档案失败'));

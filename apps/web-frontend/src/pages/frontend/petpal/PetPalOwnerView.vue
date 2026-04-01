@@ -195,63 +195,77 @@
       <article class="frontend-card petpal-grid-span-8">
         <span class="frontend-card__eyebrow">宠物列表</span>
         <h3>我的宠物</h3>
-        <el-table :data="pets" size="small" v-loading="petsLoading">
-          <el-table-column prop="name" label="名称" min-width="120" />
-          <el-table-column prop="species" label="物种" min-width="100" />
-          <el-table-column prop="breed" label="品种" min-width="120" />
-          <el-table-column prop="birthday" label="生日" min-width="120">
-            <template #default="scope">
-              {{ scope.row.birthday ? scope.row.birthday.slice(0, 10) : '-' }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="weightKg" label="体重" min-width="100">
-            <template #default="scope">
-              {{ scope.row.weightKg ?? '-' }}
-            </template>
-          </el-table-column>
-          <el-table-column label="性格标签" min-width="180" show-overflow-tooltip>
-            <template #default="scope">
-              {{ formatPetTagSummary(scope.row.temperamentTags) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="喂养/健康" min-width="260" show-overflow-tooltip>
-            <template #default="scope">
-              {{ [scope.row.feedingNote, scope.row.allergyNote, scope.row.medicalNote].filter(Boolean).join(' ｜ ') || '-' }}
-            </template>
-          </el-table-column>
-          <el-table-column label="紧急联系人" min-width="220" show-overflow-tooltip>
-            <template #default="scope">
-              {{ formatEmergencyContact(scope.row.emergencyContact) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="createdAt" label="创建时间" min-width="170">
-            <template #default="scope">
-              {{ formatTime(scope.row.createdAt) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" min-width="120" fixed="right">
-            <template #default="scope">
-              <el-space>
-                <el-button link type="primary" size="small" @click="startEditPet(scope.row)">编辑</el-button>
-                <el-button link type="success" size="small" @click="requestForm.petId = scope.row.id">选中</el-button>
-              </el-space>
-            </template>
-          </el-table-column>
-        </el-table>
-
         <PetPalStatePanel
-          v-if="!petsLoading && pets.length === 0"
+          v-if="petsLoadState === 'error'"
           eyebrow="宠物列表"
-          title="还没有宠物档案"
-          description="主人主流程建议从宠物建档开始。先补齐第一只宠物的基础信息、喂养备注和紧急联系人，再继续发布需求。"
+          title="宠物列表加载失败"
+          :description="petsLoadErrorMessage"
+          tone="danger"
         >
           <template #actions>
-            <el-button size="small" type="primary" @click="resetPetForm">开始建档</el-button>
-            <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
-              <el-button size="small">看提醒中心</el-button>
-            </RouterLink>
+            <el-button size="small" type="primary" :loading="sectionReloadingKey === 'pets'" @click="retryPetsSection">重试宠物列表</el-button>
           </template>
         </PetPalStatePanel>
+
+        <template v-else>
+          <el-table :data="pets" size="small" v-loading="petsLoading">
+            <el-table-column prop="name" label="名称" min-width="120" />
+            <el-table-column prop="species" label="物种" min-width="100" />
+            <el-table-column prop="breed" label="品种" min-width="120" />
+            <el-table-column prop="birthday" label="生日" min-width="120">
+              <template #default="scope">
+                {{ scope.row.birthday ? scope.row.birthday.slice(0, 10) : '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="weightKg" label="体重" min-width="100">
+              <template #default="scope">
+                {{ scope.row.weightKg ?? '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="性格标签" min-width="180" show-overflow-tooltip>
+              <template #default="scope">
+                {{ formatPetTagSummary(scope.row.temperamentTags) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="喂养/健康" min-width="260" show-overflow-tooltip>
+              <template #default="scope">
+                {{ [scope.row.feedingNote, scope.row.allergyNote, scope.row.medicalNote].filter(Boolean).join(' ｜ ') || '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="紧急联系人" min-width="220" show-overflow-tooltip>
+              <template #default="scope">
+                {{ formatEmergencyContact(scope.row.emergencyContact) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="createdAt" label="创建时间" min-width="170">
+              <template #default="scope">
+                {{ formatTime(scope.row.createdAt) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="120" fixed="right">
+              <template #default="scope">
+                <el-space>
+                  <el-button link type="primary" size="small" @click="startEditPet(scope.row)">编辑</el-button>
+                  <el-button link type="success" size="small" @click="requestForm.petId = scope.row.id">选中</el-button>
+                </el-space>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <PetPalStatePanel
+            v-if="!petsLoading && pets.length === 0"
+            eyebrow="宠物列表"
+            title="还没有宠物档案"
+            description="主人主流程建议从宠物建档开始。先补齐第一只宠物的基础信息、喂养备注和紧急联系人，再继续发布需求。"
+          >
+            <template #actions>
+              <el-button size="small" type="primary" @click="resetPetForm">开始建档</el-button>
+              <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+                <el-button size="small">看提醒中心</el-button>
+              </RouterLink>
+            </template>
+          </PetPalStatePanel>
+        </template>
       </article>
         </section>
 
@@ -485,104 +499,133 @@
         <div class="petpal-request-list">
           <div class="petpal-mini-panel">
             <h4>近期需求</h4>
-            <el-table :data="requests" size="small" v-loading="requestsLoading">
-              <el-table-column label="宠物" min-width="120">
-                <template #default="scope">
-                  {{ scope.row.pet?.name || '-' }}
-                </template>
-              </el-table-column>
-              <el-table-column prop="serviceType" label="服务" min-width="100" />
-              <el-table-column prop="locationText" label="地点" min-width="140" show-overflow-tooltip />
-              <el-table-column prop="budgetAmount" label="预算" min-width="100" />
-              <el-table-column prop="status" label="状态" min-width="120" />
-              <el-table-column prop="startTime" label="开始时间" min-width="170">
-                <template #default="scope">
-                  {{ formatTime(scope.row.startTime) }}
-                </template>
-              </el-table-column>
-            </el-table>
-
             <PetPalStatePanel
-              v-if="!requestsLoading && requests.length === 0"
+              v-if="requestsLoadState === 'error'"
               eyebrow="近期需求"
-              title="当前还没有主人需求"
-              description="可以直接在左侧发布第一条真实照料需求，或先去宠物档案补充更多信息再回来发布。"
+              title="主人需求列表加载失败"
+              :description="requestsLoadErrorMessage"
+              tone="danger"
             >
               <template #actions>
-                <el-button size="small" type="primary" :loading="pageLoading" @click="reloadAll">刷新需求区</el-button>
-                <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
-                  <el-button size="small">看提醒中心</el-button>
-                </RouterLink>
+                <el-button size="small" type="primary" :loading="sectionReloadingKey === 'requests'" @click="retryRequestsSection">重试需求列表</el-button>
               </template>
             </PetPalStatePanel>
+
+            <template v-else>
+              <el-table :data="requests" size="small" v-loading="requestsLoading">
+                <el-table-column label="宠物" min-width="120">
+                  <template #default="scope">
+                    {{ scope.row.pet?.name || '-' }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="serviceType" label="服务" min-width="100" />
+                <el-table-column prop="locationText" label="地点" min-width="140" show-overflow-tooltip />
+                <el-table-column prop="budgetAmount" label="预算" min-width="100" />
+                <el-table-column prop="status" label="状态" min-width="120" />
+                <el-table-column prop="startTime" label="开始时间" min-width="170">
+                  <template #default="scope">
+                    {{ formatTime(scope.row.startTime) }}
+                  </template>
+                </el-table-column>
+              </el-table>
+
+              <PetPalStatePanel
+                v-if="!requestsLoading && requests.length === 0"
+                eyebrow="近期需求"
+                title="当前还没有主人需求"
+                description="可以直接在左侧发布第一条真实照料需求，或先去宠物档案补充更多信息再回来发布。"
+              >
+                <template #actions>
+                  <el-button size="small" type="primary" :loading="sectionReloadingKey === 'requests'" @click="retryRequestsSection">刷新需求区</el-button>
+                  <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+                    <el-button size="small">看提醒中心</el-button>
+                  </RouterLink>
+                </template>
+              </PetPalStatePanel>
+            </template>
           </div>
 
           <div class="petpal-mini-panel">
             <h4>订单跟进</h4>
-            <el-table :data="orders" size="small" v-loading="ordersLoading">
-              <el-table-column prop="orderNo" label="订单号" min-width="160" />
-              <el-table-column prop="orderStatus" label="状态" min-width="120">
-                <template #default="scope">
-                  {{ getOrderStatusLabel(scope.row.orderStatus) }}
-                </template>
-              </el-table-column>
-              <el-table-column prop="amountTotal" label="总额" min-width="100" />
-              <el-table-column prop="amountPaid" label="已付" min-width="100" />
-              <el-table-column prop="amountRefunded" label="已退" min-width="100" />
-              <el-table-column label="订单沟通" min-width="280">
-                <template #default="scope">
-                  <div class="petpal-conversation-cell">
-                    <div class="petpal-conversation-cell__copy">
-                      <p class="petpal-conversation-cell__preview">
-                        {{ formatConversationPreview(scope.row.conversation) }}
-                      </p>
-                      <p class="petpal-conversation-cell__meta">
-                        {{ formatConversationMeta(scope.row.conversation, 'owner') }}
-                      </p>
-                    </div>
-                    <el-tag
-                      v-if="getConversationUnreadCount(scope.row.conversation, 'owner') > 0"
-                      type="danger"
-                      size="small"
-                    >
-                      待读 {{ getConversationUnreadCount(scope.row.conversation, 'owner') }}
-                    </el-tag>
-                  </div>
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" min-width="190" fixed="right">
-                <template #default="scope">
-                  <el-space>
-                    <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
-                      <el-button link type="primary" size="small">详情</el-button>
-                    </RouterLink>
-                    <el-button
-                      v-if="scope.row.orderStatus === 'SERVING'"
-                      link
-                      type="success"
-                      size="small"
-                      :loading="ownerActionLoadingKey === `confirm:${scope.row.id}`"
-                      @click="confirmOrderComplete(scope.row.id)"
-                    >
-                      确认完成
-                    </el-button>
-                  </el-space>
-                </template>
-              </el-table-column>
-            </el-table>
-
             <PetPalStatePanel
-              v-if="!ordersLoading && orders.length === 0"
+              v-if="ordersLoadState === 'error'"
               eyebrow="订单跟进"
-              title="当前还没有主人订单"
-              description="订单会在需求匹配和下单完成后出现在这里。你可以继续发布需求，或先去匹配列表看是否有合适照料者。"
+              title="主人订单列表加载失败"
+              :description="ordersLoadErrorMessage"
+              tone="danger"
             >
               <template #actions>
-                <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
-                  <el-button size="small" type="primary">看提醒中心</el-button>
-                </RouterLink>
+                <el-button size="small" type="primary" :loading="sectionReloadingKey === 'orders'" @click="retryOrdersSection">重试订单列表</el-button>
               </template>
             </PetPalStatePanel>
+
+            <template v-else>
+              <el-table :data="orders" size="small" v-loading="ordersLoading">
+                <el-table-column prop="orderNo" label="订单号" min-width="160" />
+                <el-table-column prop="orderStatus" label="状态" min-width="120">
+                  <template #default="scope">
+                    {{ getOrderStatusLabel(scope.row.orderStatus) }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="amountTotal" label="总额" min-width="100" />
+                <el-table-column prop="amountPaid" label="已付" min-width="100" />
+                <el-table-column prop="amountRefunded" label="已退" min-width="100" />
+                <el-table-column label="订单沟通" min-width="280">
+                  <template #default="scope">
+                    <div class="petpal-conversation-cell">
+                      <div class="petpal-conversation-cell__copy">
+                        <p class="petpal-conversation-cell__preview">
+                          {{ formatConversationPreview(scope.row.conversation) }}
+                        </p>
+                        <p class="petpal-conversation-cell__meta">
+                          {{ formatConversationMeta(scope.row.conversation, 'owner') }}
+                        </p>
+                      </div>
+                      <el-tag
+                        v-if="getConversationUnreadCount(scope.row.conversation, 'owner') > 0"
+                        type="danger"
+                        size="small"
+                      >
+                        待读 {{ getConversationUnreadCount(scope.row.conversation, 'owner') }}
+                      </el-tag>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" min-width="190" fixed="right">
+                  <template #default="scope">
+                    <el-space>
+                      <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
+                        <el-button link type="primary" size="small">详情</el-button>
+                      </RouterLink>
+                      <el-button
+                        v-if="scope.row.orderStatus === 'SERVING'"
+                        link
+                        type="success"
+                        size="small"
+                        :loading="ownerActionLoadingKey === `confirm:${scope.row.id}`"
+                        @click="confirmOrderComplete(scope.row.id)"
+                      >
+                        确认完成
+                      </el-button>
+                    </el-space>
+                  </template>
+                </el-table-column>
+              </el-table>
+
+              <PetPalStatePanel
+                v-if="!ordersLoading && orders.length === 0"
+                eyebrow="订单跟进"
+                title="当前还没有主人订单"
+                description="订单会在需求匹配和下单完成后出现在这里。你可以继续发布需求，或先去匹配列表看是否有合适照料者。"
+              >
+                <template #actions>
+                  <el-button size="small" type="primary" :loading="sectionReloadingKey === 'orders'" @click="retryOrdersSection">刷新订单区</el-button>
+                  <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
+                    <el-button size="small">看提醒中心</el-button>
+                  </RouterLink>
+                </template>
+              </PetPalStatePanel>
+            </template>
           </div>
         </div>
       </article>
@@ -624,32 +667,49 @@
         </el-form-item>
       </el-form>
 
-      <el-table :data="matchItems" size="small" v-loading="matchLoading">
-        <el-table-column prop="caregiverName" label="照料者" min-width="140" />
-        <el-table-column prop="city" label="城市" min-width="120" />
-        <el-table-column prop="pricePerUnit" label="价格" min-width="100" />
-        <el-table-column prop="unitType" label="计价单位" min-width="120" />
-        <el-table-column prop="ratingAvg" label="评分" min-width="100" />
-        <el-table-column prop="distanceKm" label="距离(km)" min-width="120">
-          <template #default="scope">
-            {{ scope.row.distanceKm ?? '-' }}
-          </template>
-        </el-table-column>
-      </el-table>
-
       <PetPalStatePanel
-        v-if="!matchLoading && matchItems.length === 0"
+        v-if="matchesLoadState === 'error'"
         eyebrow="匹配结果"
-        title="当前筛选下没有合适照料者"
-        description="可以尝试放宽城市或服务类型筛选，或者先进入提醒中心和消息中心处理已在推进中的订单。"
+        title="照料者匹配加载失败"
+        :description="matchesLoadErrorMessage"
+        tone="danger"
       >
         <template #actions>
-        <el-button size="small" type="primary" :loading="matchLoading" @click="refreshMatches">重新匹配</el-button>
+          <el-button size="small" type="primary" :loading="sectionReloadingKey === 'matches'" @click="retryMatchesSection">重试匹配区</el-button>
           <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
             <el-button size="small">查看照料者工作台</el-button>
           </RouterLink>
         </template>
       </PetPalStatePanel>
+
+      <template v-else>
+        <el-table :data="matchItems" size="small" v-loading="matchLoading">
+          <el-table-column prop="caregiverName" label="照料者" min-width="140" />
+          <el-table-column prop="city" label="城市" min-width="120" />
+          <el-table-column prop="pricePerUnit" label="价格" min-width="100" />
+          <el-table-column prop="unitType" label="计价单位" min-width="120" />
+          <el-table-column prop="ratingAvg" label="评分" min-width="100" />
+          <el-table-column prop="distanceKm" label="距离(km)" min-width="120">
+            <template #default="scope">
+              {{ scope.row.distanceKm ?? '-' }}
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <PetPalStatePanel
+          v-if="!matchLoading && matchItems.length === 0"
+          eyebrow="匹配结果"
+          title="当前筛选下没有合适照料者"
+          description="可以尝试放宽城市或服务类型筛选，或者先进入提醒中心和消息中心处理已在推进中的订单。"
+        >
+          <template #actions>
+            <el-button size="small" type="primary" :loading="sectionReloadingKey === 'matches'" @click="retryMatchesSection">重新匹配</el-button>
+            <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
+              <el-button size="small">查看照料者工作台</el-button>
+            </RouterLink>
+          </template>
+        </PetPalStatePanel>
+      </template>
         </section>
       </template>
     </template>
@@ -707,6 +767,7 @@ defineOptions({
 });
 
 type PageLoadState = 'idle' | 'ready' | 'error';
+type SectionLoadState = 'idle' | 'ready' | 'error';
 
 type PetFormState = {
   name: string;
@@ -747,6 +808,15 @@ const ownerActionLoadingKey = ref('');
 const pageLoadState = ref<PageLoadState>('idle');
 const pageLoadErrorMessage = ref('');
 const partialLoadNotice = ref('');
+const petsLoadState = ref<SectionLoadState>('idle');
+const requestsLoadState = ref<SectionLoadState>('idle');
+const ordersLoadState = ref<SectionLoadState>('idle');
+const matchesLoadState = ref<SectionLoadState>('idle');
+const petsLoadErrorMessage = ref('');
+const requestsLoadErrorMessage = ref('');
+const ordersLoadErrorMessage = ref('');
+const matchesLoadErrorMessage = ref('');
+const sectionReloadingKey = ref<'' | 'pets' | 'requests' | 'orders' | 'matches'>('');
 
 const petForm = reactive<PetFormState>({
   name: '',
@@ -897,6 +967,8 @@ const mergePageNotice = (items: string[]) => {
     .filter(Boolean);
   return normalized.length ? `${normalized.join('；')}。` : '';
 };
+
+const isReadySectionState = (state: SectionLoadState) => state === 'ready';
 
 const formatTime = (value: string) => new Date(value).toLocaleString();
 
@@ -1434,14 +1506,19 @@ const startEditPet = (pet: PetProfileRecord) => {
 const loadPets = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
     petsLoading.value = true;
+    petsLoadState.value = 'idle';
+    petsLoadErrorMessage.value = '';
     pets.value = await api.petpal.pets.list();
     if (!requestForm.petId && pets.value.length > 0) {
       requestForm.petId = pets.value[0].id;
     }
+    petsLoadState.value = 'ready';
     return null;
   } catch (error: unknown) {
     pets.value = [];
     const message = getErrorMessage(error, '加载宠物失败');
+    petsLoadState.value = 'error';
+    petsLoadErrorMessage.value = message;
     if (showFeedback) {
       ElMessage.error(message);
     }
@@ -1454,11 +1531,16 @@ const loadPets = async ({ showFeedback = true }: { showFeedback?: boolean } = {}
 const loadRequests = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
     requestsLoading.value = true;
+    requestsLoadState.value = 'idle';
+    requestsLoadErrorMessage.value = '';
     requests.value = await api.petpal.requests.list();
+    requestsLoadState.value = 'ready';
     return null;
   } catch (error: unknown) {
     requests.value = [];
     const message = getErrorMessage(error, '加载需求失败');
+    requestsLoadState.value = 'error';
+    requestsLoadErrorMessage.value = message;
     if (showFeedback) {
       ElMessage.error(message);
     }
@@ -1471,11 +1553,16 @@ const loadRequests = async ({ showFeedback = true }: { showFeedback?: boolean } 
 const loadOrders = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
     ordersLoading.value = true;
+    ordersLoadState.value = 'idle';
+    ordersLoadErrorMessage.value = '';
     orders.value = await api.petpal.orders.list();
+    ordersLoadState.value = 'ready';
     return null;
   } catch (error: unknown) {
     orders.value = [];
     const message = getErrorMessage(error, '加载订单失败');
+    ordersLoadState.value = 'error';
+    ordersLoadErrorMessage.value = message;
     if (showFeedback) {
       ElMessage.error(message);
     }
@@ -1488,15 +1575,20 @@ const loadOrders = async ({ showFeedback = true }: { showFeedback?: boolean } = 
 const loadMatches = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
   try {
     matchLoading.value = true;
+    matchesLoadState.value = 'idle';
+    matchesLoadErrorMessage.value = '';
     const page = await api.petpal.match.caregivers({
       ...matchQuery,
       city: matchQuery.city || undefined,
     });
     matchItems.value = page.items;
+    matchesLoadState.value = 'ready';
     return null;
   } catch (error: unknown) {
     matchItems.value = [];
     const message = getErrorMessage(error, '匹配照料者失败');
+    matchesLoadState.value = 'error';
+    matchesLoadErrorMessage.value = message;
     if (showFeedback) {
       ElMessage.error(message);
     }
@@ -1508,6 +1600,54 @@ const loadMatches = async ({ showFeedback = true }: { showFeedback?: boolean } =
 
 const refreshMatches = () => {
   void loadMatches();
+};
+
+const retryPetsSection = async () => {
+  sectionReloadingKey.value = 'pets';
+  try {
+    await loadPets({ showFeedback: false });
+    if (isReadySectionState(petsLoadState.value)) {
+      ElMessage.success('宠物列表已刷新');
+    }
+  } finally {
+    sectionReloadingKey.value = '';
+  }
+};
+
+const retryRequestsSection = async () => {
+  sectionReloadingKey.value = 'requests';
+  try {
+    await loadRequests({ showFeedback: false });
+    if (isReadySectionState(requestsLoadState.value)) {
+      ElMessage.success('主人需求已刷新');
+    }
+  } finally {
+    sectionReloadingKey.value = '';
+  }
+};
+
+const retryOrdersSection = async () => {
+  sectionReloadingKey.value = 'orders';
+  try {
+    await loadOrders({ showFeedback: false });
+    if (isReadySectionState(ordersLoadState.value)) {
+      ElMessage.success('主人订单已刷新');
+    }
+  } finally {
+    sectionReloadingKey.value = '';
+  }
+};
+
+const retryMatchesSection = async () => {
+  sectionReloadingKey.value = 'matches';
+  try {
+    await loadMatches({ showFeedback: false });
+    if (isReadySectionState(matchesLoadState.value)) {
+      ElMessage.success('照料者匹配结果已刷新');
+    }
+  } finally {
+    sectionReloadingKey.value = '';
+  }
 };
 
 const withOwnerOrderAction = async (
