@@ -1,10 +1,12 @@
 import type {
+  CaregiverAuditStatus,
   MatchCaregiverQuery,
   OrderConversationRecord,
   OrderStatus,
   PetGender,
   PetServiceType,
   PetSpecies,
+  ServiceLogType,
   ServiceRequestStatus,
 } from '@rbac/api-common'
 import dayjs from 'dayjs'
@@ -15,9 +17,15 @@ export const PETPAL_OWNER_HOME_PAGE = '/pages/petpal/owner-home'
 export const PETPAL_PETS_PAGE = '/pages/petpal/pets'
 export const PETPAL_REQUEST_PAGE = '/pages/petpal/request'
 export const PETPAL_ORDERS_PAGE = '/pages/petpal/orders'
+export const PETPAL_CAREGIVER_HOME_PAGE = '/pages/petpal/caregiver-home'
+export const PETPAL_CAREGIVER_PROFILE_PAGE = '/pages/petpal/caregiver-profile'
+export const PETPAL_CAREGIVER_SERVICES_PAGE = '/pages/petpal/caregiver-services'
+export const PETPAL_CAREGIVER_ORDERS_PAGE = '/pages/petpal/caregiver-orders'
+export const PETPAL_MESSAGES_PAGE = '/pages/petpal/messages'
 export const PETPAL_ORDER_DETAIL_PAGE = '/pages/order-detail/index'
 
 export type ConversationRole = 'owner' | 'caregiver'
+export type CaregiverOrderFilterValue = OrderStatus | 'ALL'
 
 export const serviceTypeLabels: Record<PetServiceType, string> = {
   BOARDING: '寄养',
@@ -47,6 +55,12 @@ export const orderStatusLabels: Record<OrderStatus, string> = {
   DISPUTED: '纠纷中',
   PARTIAL_REFUNDED: '部分退款',
   REFUNDED: '已退款',
+}
+
+export const caregiverAuditLabels: Record<CaregiverAuditStatus, string> = {
+  PENDING: '待审核',
+  APPROVED: '审核通过',
+  REJECTED: '审核驳回',
 }
 
 export const serviceRequestStatusLabels: Record<ServiceRequestStatus, string> = {
@@ -86,6 +100,29 @@ export const ownerFlowOptions = [
   { label: '宠物档案', value: PETPAL_PETS_PAGE, description: '维护宠物资料与照料偏好' },
   { label: '发布需求', value: PETPAL_REQUEST_PAGE, description: '创建临时照料需求并筛选照料者' },
   { label: '订单跟进', value: PETPAL_ORDERS_PAGE, description: '按沟通、履约和售后持续跟进' },
+]
+
+export const caregiverFlowOptions = [
+  { label: '照料者首页', value: PETPAL_CAREGIVER_HOME_PAGE, description: '查看待办、审核状态与履约摘要' },
+  { label: '入驻中心', value: PETPAL_CAREGIVER_PROFILE_PAGE, description: '维护介绍、专长和资质材料' },
+  { label: '服务管理', value: PETPAL_CAREGIVER_SERVICES_PAGE, description: '设置报价、范围与上架状态' },
+  { label: '履约订单', value: PETPAL_CAREGIVER_ORDERS_PAGE, description: '处理接单、签到和服务记录' },
+]
+
+export const caregiverOrderFilterOptions = [
+  { label: '待接单', value: 'PENDING_ACCEPT' },
+  { label: '已接单', value: 'ACCEPTED' },
+  { label: '服务中', value: 'SERVING' },
+  { label: '已完成', value: 'COMPLETED' },
+  { label: '全部', value: 'ALL' },
+]
+
+export const serviceLogTypeOptions = [
+  { label: '备注', value: 'NOTE', description: '交接与补充说明' },
+  { label: '喂养', value: 'FEED', description: '记录饮食和水量' },
+  { label: '遛宠', value: 'WALK', description: '记录外出时长和状态' },
+  { label: '陪伴', value: 'PLAY', description: '记录互动和玩耍情况' },
+  { label: '观察', value: 'HEALTH', description: '记录精神与健康表现' },
 ]
 
 export function formatAmount(value: number | string | null | undefined) {
@@ -132,8 +169,22 @@ export function getOrderStatusLabel(status: OrderStatus) {
   return orderStatusLabels[status] || status
 }
 
+export function getCaregiverAuditLabel(status: CaregiverAuditStatus) {
+  return caregiverAuditLabels[status] || status
+}
+
 export function getRequestStatusLabel(status: ServiceRequestStatus) {
   return serviceRequestStatusLabels[status] || status
+}
+
+export function getCaregiverAuditHint(status: CaregiverAuditStatus | null | undefined) {
+  if (!status || status === 'PENDING') {
+    return '平台会结合资料完整度、资质材料和服务说明进行审核。'
+  }
+  if (status === 'APPROVED') {
+    return '档案已通过审核，继续保持服务配置和履约反馈的时效。'
+  }
+  return '档案曾被驳回，请补齐介绍、城市与资质材料后再次提交。'
 }
 
 export function getOrderTone(status: OrderStatus) {
@@ -174,6 +225,19 @@ export function getConversationHint(
     return `${formatDateTime(conversation.lastMessageAt)} · ${unreadText}`
   }
   return unreadText
+}
+
+export function getServiceLogTypeLabel(logType: ServiceLogType) {
+  const labels: Record<ServiceLogType, string> = {
+    CHECK_IN: '签到记录',
+    FEED: '喂养记录',
+    WALK: '遛宠记录',
+    PLAY: '互动陪伴',
+    HEALTH: '健康观察',
+    CHECK_OUT: '签退记录',
+    NOTE: '服务备注',
+  }
+  return labels[logType] || logType
 }
 
 export function buildOwnerMatchQuery(params: {

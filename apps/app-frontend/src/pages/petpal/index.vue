@@ -8,6 +8,7 @@ import AppTag from '@/components/app-tag/app-tag.vue'
 import { LOGIN_PAGE } from '@/router/config'
 import { useTokenStore, useUserStore } from '@/store'
 import {
+  PETPAL_CAREGIVER_HOME_PAGE,
   PETPAL_OWNER_HOME_PAGE,
   PETPAL_WORKBENCH_PAGE,
 } from './owner-shared'
@@ -43,7 +44,7 @@ function openOwnerFlow() {
 }
 
 function openCaregiverFlow() {
-  uni.redirectTo({ url: `${PETPAL_WORKBENCH_PAGE}?mode=caregiver` })
+  uni.redirectTo({ url: PETPAL_CAREGIVER_HOME_PAGE })
 }
 
 function openLegacyWorkbench() {
@@ -69,7 +70,7 @@ onShow(() => {
           </AppTag>
           <text class="hub-hero__title">{{ displayName }}</text>
           <text class="hub-hero__summary">
-            主人任务流用于宠物建档、需求发布和订单跟进；照料者工作台保留报价、接单和履约动作。
+            主人任务流用于宠物建档、需求发布和订单跟进；照料者任务流用于入驻、服务配置、接单和履约。
           </text>
         </view>
 
@@ -86,8 +87,8 @@ onShow(() => {
           </view>
 
           <view class="hub-card">
-            <text class="hub-card__title">照料者工作台</text>
-            <text class="hub-card__text">继续使用当前已实现的照料者档案、服务配置、接单与履约反馈。</text>
+            <text class="hub-card__title">照料者任务流</text>
+            <text class="hub-card__text">进入照料者首页，分开处理入驻资料、服务配置、接单履约和消息协同。</text>
             <view class="hub-card__tags">
               <AppTag type="warning">服务报价</AppTag>
               <AppTag type="warning">接单</AppTag>

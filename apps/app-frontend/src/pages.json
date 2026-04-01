@@ -62,10 +62,50 @@
       }
     },
     {
+      "path": "pages/petpal/caregiver-home",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "照料者首页",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/petpal/caregiver-orders",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "履约订单",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/petpal/caregiver-profile",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "入驻中心",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/petpal/caregiver-services",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "服务管理",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/petpal/index",
       "type": "page",
       "style": {
         "navigationBarTitleText": "PetPal",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/petpal/messages",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "消息中心",
         "enablePullDownRefresh": true
       }
     },
