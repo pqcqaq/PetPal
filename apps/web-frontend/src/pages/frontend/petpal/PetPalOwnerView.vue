@@ -230,10 +230,189 @@
         <div class="petpal-section-heading">
           <div class="petpal-section-heading__meta">
             <h3>需求与订单</h3>
-            <p>高级退款导出、混合视图和历史兼容逻辑暂时保留在兼容工作台；当前主人页只承载真实主人主流程。</p>
+            <p>主人页已经直接承接订单导出、退款导出和确认完成动作；兼容工作台只保留少量混合兼容流程。</p>
+            <p v-if="auth.isAuthenticated" class="petpal-section-heading__hint">
+              退款导出默认覆盖最近一年，可按退款日期、退款状态、投诉状态、投诉类型与投诉对象等收窄范围。
+            </p>
           </div>
-          <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-legacy' }">
-            高级导出 / 兼容视图
+          <div v-if="auth.isAuthenticated" class="petpal-export-toolbar">
+            <el-space wrap :size="10">
+              <el-date-picker
+                v-model="ownerRefundExportDateRange"
+                type="daterange"
+                unlink-panels
+                clearable
+                range-separator="至"
+                start-placeholder="退款开始日期"
+                end-placeholder="退款结束日期"
+                size="small"
+                style="width: min(100%, 320px)"
+              />
+              <el-select
+                v-model="ownerRefundExportType"
+                clearable
+                placeholder="退款类型"
+                size="small"
+                style="width: 140px"
+              >
+                <el-option
+                  v-for="option in refundTypeOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-select
+                v-model="ownerRefundExportStatus"
+                clearable
+                placeholder="退款状态"
+                size="small"
+                style="width: 140px"
+              >
+                <el-option
+                  v-for="option in refundStatusOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-select
+                v-model="ownerRefundExportComplaintStatus"
+                clearable
+                placeholder="投诉状态"
+                size="small"
+                style="width: 140px"
+              >
+                <el-option
+                  v-for="option in complaintStatusOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-select
+                v-model="ownerRefundExportComplaintType"
+                clearable
+                placeholder="投诉类型"
+                size="small"
+                style="width: 140px"
+              >
+                <el-option
+                  v-for="option in complaintTypeOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-select
+                v-model="ownerRefundExportComplaintTargetRole"
+                clearable
+                placeholder="投诉对象"
+                size="small"
+                style="width: 140px"
+              >
+                <el-option
+                  v-for="option in complaintTargetRoleOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-select
+                v-model="ownerRefundExportServiceType"
+                clearable
+                placeholder="服务类型"
+                size="small"
+                style="width: 140px"
+              >
+                <el-option
+                  v-for="option in refundExportServiceTypeOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-input
+                v-model="ownerRefundExportOrderNoKeyword"
+                clearable
+                maxlength="64"
+                placeholder="订单号关键词"
+                size="small"
+                style="width: min(100%, 180px)"
+              />
+            </el-space>
+            <el-space wrap>
+              <el-select
+                v-model="selectedOwnerRefundExportTemplateId"
+                clearable
+                placeholder="常用筛选模板"
+                size="small"
+                style="width: 180px"
+              >
+                <el-option
+                  v-for="template in ownerRefundExportTemplates"
+                  :key="template.id"
+                  :label="template.name"
+                  :value="template.id"
+                />
+              </el-select>
+              <el-button
+                plain
+                size="small"
+                :disabled="!selectedOwnerRefundExportTemplateId"
+                @click="applySelectedOwnerRefundExportTemplate"
+              >
+                应用模板
+              </el-button>
+              <el-button
+                plain
+                size="small"
+                @click="saveCurrentOwnerRefundExportTemplate"
+              >
+                保存为模板
+              </el-button>
+              <el-button
+                plain
+                size="small"
+                :disabled="!selectedOwnerRefundExportTemplateId"
+                @click="deleteSelectedOwnerRefundExportTemplate"
+              >
+                删除模板
+              </el-button>
+              <el-button
+                plain
+                size="small"
+                :disabled="!hasStoredOwnerRefundExportFilters"
+                @click="restoreStoredOwnerRefundExportFilters"
+              >
+                恢复上次筛选
+              </el-button>
+              <el-button
+                plain
+                size="small"
+                @click="clearOwnerRefundExportFilters"
+              >
+                清空筛选
+              </el-button>
+              <ListExportButton
+                :request="buildOwnerTransactionExportRequest"
+                label="导出近一年交易"
+                pending-label="导出中"
+                error-message="导出交易记录失败"
+              />
+              <ListExportButton
+                :request="buildOwnerRefundExportRequest"
+                label="导出退款明细"
+                pending-label="导出中"
+                error-message="导出退款明细失败"
+              />
+              <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-legacy' }">
+                兼容混合视图
+              </RouterLink>
+            </el-space>
+          </div>
+          <RouterLink v-else class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-legacy' }">
+            兼容混合视图
           </RouterLink>
         </div>
 
@@ -267,6 +446,9 @@
                   {{ getOrderStatusLabel(scope.row.orderStatus) }}
                 </template>
               </el-table-column>
+              <el-table-column prop="amountTotal" label="总额" min-width="100" />
+              <el-table-column prop="amountPaid" label="已付" min-width="100" />
+              <el-table-column prop="amountRefunded" label="已退" min-width="100" />
               <el-table-column label="订单沟通" min-width="280">
                 <template #default="scope">
                   <div class="petpal-conversation-cell">
@@ -288,11 +470,23 @@
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" min-width="120" fixed="right">
+              <el-table-column label="操作" min-width="190" fixed="right">
                 <template #default="scope">
-                  <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
-                    <el-button link type="primary" size="small">详情</el-button>
-                  </RouterLink>
+                  <el-space>
+                    <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
+                      <el-button link type="primary" size="small">详情</el-button>
+                    </RouterLink>
+                    <el-button
+                      v-if="scope.row.orderStatus === 'SERVING'"
+                      link
+                      type="success"
+                      size="small"
+                      :loading="ownerActionLoadingKey === `confirm:${scope.row.id}`"
+                      @click="confirmOrderComplete(scope.row.id)"
+                    >
+                      确认完成
+                    </el-button>
+                  </el-space>
                 </template>
               </el-table-column>
             </el-table>
@@ -355,21 +549,30 @@
 
 <script setup lang="ts">
 import type {
+  ComplaintTargetRole,
+  ComplaintStatus,
+  ComplaintType,
   CreatePetPayload,
   CreateServiceRequestPayload,
   MatchCaregiverQuery,
   MatchedCaregiverRecord,
   OrderRecord,
+  OwnerRefundExportQuery,
   OrderStatus,
   PetGender,
   PetProfileRecord,
+  PetServiceType,
   PetSpecies,
+  RefundStatus,
+  RefundType,
   ServiceRequestRecord,
 } from '@rbac/api-common';
-import { computed, onMounted, reactive, ref } from 'vue';
-import { ElMessage } from 'element-plus';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '@/api/client';
+import ListExportButton from '@/components/download/ListExportButton.vue';
 import { useAuthStore } from '@/stores/auth';
+import { useWorkbenchStore } from '@/stores/workbench';
 import { getErrorMessage } from '@/utils/errors';
 
 defineOptions({
@@ -396,6 +599,7 @@ type PetFormState = {
 };
 
 const auth = useAuthStore();
+const workbench = useWorkbenchStore();
 
 const pets = ref<PetProfileRecord[]>([]);
 const requests = ref<ServiceRequestRecord[]>([]);
@@ -410,6 +614,7 @@ const ordersLoading = ref(false);
 const matchLoading = ref(false);
 const petSaving = ref(false);
 const requestSaving = ref(false);
+const ownerActionLoadingKey = ref('');
 
 const petForm = reactive<PetFormState>({
   name: '',
@@ -454,6 +659,92 @@ const matchQuery = reactive<MatchCaregiverQuery>({
   pageSize: 10,
 });
 
+const refundStatusOptions: Array<{ label: string; value: RefundStatus }> = [
+  { label: '待审核', value: 'PENDING' },
+  { label: '已审核', value: 'APPROVED' },
+  { label: '已驳回', value: 'REJECTED' },
+  { label: '退款成功', value: 'SUCCESS' },
+  { label: '退款失败', value: 'FAILED' },
+];
+
+const refundTypeOptions: Array<{ label: string; value: RefundType }> = [
+  { label: '全额退款', value: 'FULL' },
+  { label: '部分退款', value: 'PARTIAL' },
+];
+
+const complaintStatusOptions: Array<{ label: string; value: ComplaintStatus }> = [
+  { label: '待处理', value: 'OPEN' },
+  { label: '处理中', value: 'PROCESSING' },
+  { label: '已解决', value: 'RESOLVED' },
+  { label: '已驳回', value: 'REJECTED' },
+];
+
+const complaintTypeOptions: Array<{ label: string; value: ComplaintType }> = [
+  { label: '安全问题', value: 'SAFETY' },
+  { label: '费用争议', value: 'FEE' },
+  { label: '服务质量', value: 'SERVICE' },
+  { label: '欺诈风险', value: 'FRAUD' },
+  { label: '其他问题', value: 'OTHER' },
+];
+
+const complaintTargetRoleOptions: Array<{ label: string; value: ComplaintTargetRole }> = [
+  { label: '照料者', value: 'CAREGIVER' },
+  { label: '平台', value: 'PLATFORM' },
+];
+
+const refundExportServiceTypeOptions: Array<{ label: string; value: PetServiceType }> = [
+  { label: '寄养', value: 'BOARDING' },
+  { label: '遛宠', value: 'WALKING' },
+  { label: '喂养', value: 'FEEDING' },
+  { label: '上门陪伴', value: 'DOOR_VISIT' },
+];
+
+const OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY = 'page:petpal:owner-refund-export-filters';
+const OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY = 'petpal-owner-refund-export-filters-v2';
+const OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY = 'petpal-owner-refund-export-filters-v1';
+const OWNER_REFUND_EXPORT_TEMPLATE_LIMIT = 5;
+
+type OwnerRefundExportFilterSnapshot = {
+  ownerUserId: string;
+  dateRange: [string, string] | null;
+  refundType: RefundType | '';
+  refundStatus: RefundStatus | '';
+  complaintStatus: ComplaintStatus | '';
+  complaintType: ComplaintType | '';
+  complaintTargetRole: ComplaintTargetRole | '';
+  serviceType: PetServiceType | '';
+  orderNoKeyword: string;
+};
+
+type OwnerRefundExportFilterTemplate = {
+  id: string;
+  name: string;
+  snapshot: OwnerRefundExportFilterSnapshot;
+  updatedAt: string;
+};
+
+type OwnerRefundExportFilterStorageEntry = {
+  lastUsed: OwnerRefundExportFilterSnapshot | null;
+  templates: OwnerRefundExportFilterTemplate[];
+};
+
+type OwnerRefundExportFilterStorage = {
+  version: 2;
+  users: Record<string, OwnerRefundExportFilterStorageEntry>;
+};
+
+const ownerRefundExportDateRange = ref<[Date, Date] | null>(null);
+const ownerRefundExportType = ref<RefundType | ''>('');
+const ownerRefundExportStatus = ref<RefundStatus | ''>('');
+const ownerRefundExportComplaintStatus = ref<ComplaintStatus | ''>('');
+const ownerRefundExportComplaintType = ref<ComplaintType | ''>('');
+const ownerRefundExportComplaintTargetRole = ref<ComplaintTargetRole | ''>('');
+const ownerRefundExportServiceType = ref<PetServiceType | ''>('');
+const ownerRefundExportOrderNoKeyword = ref('');
+const hasStoredOwnerRefundExportFilters = ref(false);
+const ownerRefundExportTemplates = ref<OwnerRefundExportFilterTemplate[]>([]);
+const selectedOwnerRefundExportTemplateId = ref('');
+
 const pageLoading = computed(() => (
   petsLoading.value
   || requestsLoading.value
@@ -461,6 +752,7 @@ const pageLoading = computed(() => (
   || matchLoading.value
   || petSaving.value
   || requestSaving.value
+  || Boolean(ownerActionLoadingKey.value)
 ));
 
 const unreadOwnerConversationCount = computed(() => orders.value.reduce((total, item) => (
@@ -468,6 +760,16 @@ const unreadOwnerConversationCount = computed(() => orders.value.reduce((total, 
 ), 0));
 
 const formatTime = (value: string) => new Date(value).toLocaleString();
+
+const toDayBoundaryIsoString = (value: Date, boundary: 'start' | 'end') => {
+  const next = new Date(value);
+  if (boundary === 'start') {
+    next.setHours(0, 0, 0, 0);
+  } else {
+    next.setHours(23, 59, 59, 999);
+  }
+  return next.toISOString();
+};
 
 const getOrderStatusLabel = (status: OrderStatus) => ({
   PENDING_ACCEPT: '待接单',
@@ -521,6 +823,420 @@ const splitTagText = (value: string) => [...new Set(
 )];
 
 const joinTagText = (tags?: string[]) => (tags ?? []).join('，');
+
+const resetOwnerRefundExportFilters = () => {
+  ownerRefundExportDateRange.value = null;
+  ownerRefundExportType.value = '';
+  ownerRefundExportStatus.value = '';
+  ownerRefundExportComplaintStatus.value = '';
+  ownerRefundExportComplaintType.value = '';
+  ownerRefundExportComplaintTargetRole.value = '';
+  ownerRefundExportServiceType.value = '';
+  ownerRefundExportOrderNoKeyword.value = '';
+};
+
+const createEmptyOwnerRefundExportFilterStorageEntry = (): OwnerRefundExportFilterStorageEntry => ({
+  lastUsed: null,
+  templates: [],
+});
+
+const createEmptyOwnerRefundExportFilterStorage = (): OwnerRefundExportFilterStorage => ({
+  version: 2,
+  users: {},
+});
+
+const normalizeOwnerRefundExportDateRange = (value: unknown): [string, string] | null => {
+  if (!Array.isArray(value) || value.length !== 2) {
+    return null;
+  }
+
+  const [start, end] = value;
+  return typeof start === 'string' && typeof end === 'string' ? [start, end] : null;
+};
+
+const normalizeOwnerRefundExportFilterSnapshot = (
+  value: Partial<OwnerRefundExportFilterSnapshot>,
+): OwnerRefundExportFilterSnapshot | null => {
+  if (typeof value.ownerUserId !== 'string' || value.ownerUserId.length === 0) {
+    return null;
+  }
+
+  return {
+    ownerUserId: value.ownerUserId,
+    dateRange: normalizeOwnerRefundExportDateRange(value.dateRange),
+    refundType: value.refundType === 'FULL' || value.refundType === 'PARTIAL' ? value.refundType : '',
+    refundStatus: value.refundStatus === 'PENDING'
+      || value.refundStatus === 'APPROVED'
+      || value.refundStatus === 'REJECTED'
+      || value.refundStatus === 'SUCCESS'
+      || value.refundStatus === 'FAILED'
+      ? value.refundStatus
+      : '',
+    complaintStatus: value.complaintStatus === 'OPEN'
+      || value.complaintStatus === 'PROCESSING'
+      || value.complaintStatus === 'RESOLVED'
+      || value.complaintStatus === 'REJECTED'
+      ? value.complaintStatus
+      : '',
+    complaintType: value.complaintType === 'SAFETY'
+      || value.complaintType === 'FEE'
+      || value.complaintType === 'SERVICE'
+      || value.complaintType === 'FRAUD'
+      || value.complaintType === 'OTHER'
+      ? value.complaintType
+      : '',
+    complaintTargetRole: value.complaintTargetRole === 'CAREGIVER' || value.complaintTargetRole === 'PLATFORM'
+      ? value.complaintTargetRole
+      : '',
+    serviceType: value.serviceType === 'BOARDING'
+      || value.serviceType === 'WALKING'
+      || value.serviceType === 'FEEDING'
+      || value.serviceType === 'DOOR_VISIT'
+      ? value.serviceType
+      : '',
+    orderNoKeyword: typeof value.orderNoKeyword === 'string' ? value.orderNoKeyword.trim() : '',
+  };
+};
+
+const normalizeOwnerRefundExportFilterTemplate = (
+  value: Partial<OwnerRefundExportFilterTemplate>,
+): OwnerRefundExportFilterTemplate | null => {
+  const snapshot = normalizeOwnerRefundExportFilterSnapshot(value.snapshot ?? {});
+  const name = typeof value.name === 'string' ? value.name.trim() : '';
+  if (!snapshot || typeof value.id !== 'string' || value.id.length === 0 || name.length === 0) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    name: name.slice(0, 20),
+    snapshot,
+    updatedAt: typeof value.updatedAt === 'string' && value.updatedAt.length > 0
+      ? value.updatedAt
+      : new Date().toISOString(),
+  };
+};
+
+const normalizeOwnerRefundExportFilterStorage = (value: unknown): OwnerRefundExportFilterStorage => {
+  if (!value || typeof value !== 'object' || !('users' in value) || typeof value.users !== 'object' || !value.users) {
+    return createEmptyOwnerRefundExportFilterStorage();
+  }
+
+  const parsedUsers = value.users as Record<string, Partial<OwnerRefundExportFilterStorageEntry>>;
+  const users = Object.fromEntries(
+    Object.entries(parsedUsers).map(([ownerUserId, entry]) => {
+      const lastUsed = normalizeOwnerRefundExportFilterSnapshot(entry.lastUsed ?? {});
+      const templates = Array.isArray(entry.templates)
+        ? entry.templates
+          .map(item => normalizeOwnerRefundExportFilterTemplate(item as Partial<OwnerRefundExportFilterTemplate>))
+          .filter((item): item is OwnerRefundExportFilterTemplate => Boolean(item))
+        : [];
+
+      return [
+        ownerUserId,
+        {
+          lastUsed,
+          templates,
+        } satisfies OwnerRefundExportFilterStorageEntry,
+      ];
+    }),
+  );
+
+  return {
+    version: 2,
+    users,
+  };
+};
+
+const buildOwnerRefundExportFilterSnapshot = (): OwnerRefundExportFilterSnapshot | null => {
+  const ownerUserId = auth.user?.id;
+  if (!ownerUserId) {
+    return null;
+  }
+
+  return {
+    ownerUserId,
+    dateRange: ownerRefundExportDateRange.value
+      ? [
+          ownerRefundExportDateRange.value[0].toISOString(),
+          ownerRefundExportDateRange.value[1].toISOString(),
+        ]
+      : null,
+    refundType: ownerRefundExportType.value,
+    refundStatus: ownerRefundExportStatus.value,
+    complaintStatus: ownerRefundExportComplaintStatus.value,
+    complaintType: ownerRefundExportComplaintType.value,
+    complaintTargetRole: ownerRefundExportComplaintTargetRole.value,
+    serviceType: ownerRefundExportServiceType.value,
+    orderNoKeyword: ownerRefundExportOrderNoKeyword.value.trim(),
+  };
+};
+
+const clearLegacyOwnerRefundExportFilterStorage = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.removeItem(OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY);
+  window.localStorage.removeItem(OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY);
+};
+
+const readStoredOwnerRefundExportFilterStorage = (): OwnerRefundExportFilterStorage => {
+  const storedPageState = workbench.getPageState<OwnerRefundExportFilterStorage>(OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY);
+  if (storedPageState) {
+    return normalizeOwnerRefundExportFilterStorage(storedPageState);
+  }
+
+  if (typeof window === 'undefined') {
+    return createEmptyOwnerRefundExportFilterStorage();
+  }
+
+  try {
+    const raw = window.localStorage.getItem(OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY);
+    if (raw) {
+      const storage = normalizeOwnerRefundExportFilterStorage(JSON.parse(raw));
+      workbench.setPageState(OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY, storage);
+      clearLegacyOwnerRefundExportFilterStorage();
+      return storage;
+    }
+
+    const legacyRaw = window.localStorage.getItem(OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY);
+    if (!legacyRaw) {
+      return createEmptyOwnerRefundExportFilterStorage();
+    }
+
+    const legacySnapshot = normalizeOwnerRefundExportFilterSnapshot(
+      JSON.parse(legacyRaw) as Partial<OwnerRefundExportFilterSnapshot>,
+    );
+    if (!legacySnapshot) {
+      return createEmptyOwnerRefundExportFilterStorage();
+    }
+
+    const storage: OwnerRefundExportFilterStorage = {
+      version: 2,
+      users: {
+        [legacySnapshot.ownerUserId]: {
+          lastUsed: legacySnapshot,
+          templates: [],
+        },
+      },
+    };
+    workbench.setPageState(OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY, storage);
+    clearLegacyOwnerRefundExportFilterStorage();
+    return storage;
+  } catch {
+    return createEmptyOwnerRefundExportFilterStorage();
+  }
+};
+
+const writeStoredOwnerRefundExportFilterStorage = (storage: OwnerRefundExportFilterStorage) => {
+  workbench.setPageState(OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY, storage);
+  clearLegacyOwnerRefundExportFilterStorage();
+};
+
+const applyOwnerRefundExportFilterSnapshot = (snapshot: OwnerRefundExportFilterSnapshot) => {
+  ownerRefundExportDateRange.value = snapshot.dateRange
+    ? [new Date(snapshot.dateRange[0]), new Date(snapshot.dateRange[1])]
+    : null;
+  ownerRefundExportType.value = snapshot.refundType;
+  ownerRefundExportStatus.value = snapshot.refundStatus;
+  ownerRefundExportComplaintStatus.value = snapshot.complaintStatus;
+  ownerRefundExportComplaintType.value = snapshot.complaintType;
+  ownerRefundExportComplaintTargetRole.value = snapshot.complaintTargetRole;
+  ownerRefundExportServiceType.value = snapshot.serviceType;
+  ownerRefundExportOrderNoKeyword.value = snapshot.orderNoKeyword;
+};
+
+const syncOwnerRefundExportFilterState = () => {
+  const ownerUserId = auth.user?.id;
+  if (!ownerUserId) {
+    hasStoredOwnerRefundExportFilters.value = false;
+    ownerRefundExportTemplates.value = [];
+    selectedOwnerRefundExportTemplateId.value = '';
+    return createEmptyOwnerRefundExportFilterStorageEntry();
+  }
+
+  const storage = readStoredOwnerRefundExportFilterStorage();
+  const entry = storage.users[ownerUserId] ?? createEmptyOwnerRefundExportFilterStorageEntry();
+  hasStoredOwnerRefundExportFilters.value = Boolean(entry.lastUsed);
+  ownerRefundExportTemplates.value = [...entry.templates].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  if (!ownerRefundExportTemplates.value.some(item => item.id === selectedOwnerRefundExportTemplateId.value)) {
+    selectedOwnerRefundExportTemplateId.value = '';
+  }
+  return entry;
+};
+
+const updateCurrentOwnerRefundExportFilterStorage = (
+  updater: (entry: OwnerRefundExportFilterStorageEntry) => OwnerRefundExportFilterStorageEntry,
+) => {
+  const ownerUserId = auth.user?.id;
+  if (!ownerUserId) {
+    return null;
+  }
+
+  const storage = readStoredOwnerRefundExportFilterStorage();
+  const currentEntry = storage.users[ownerUserId] ?? createEmptyOwnerRefundExportFilterStorageEntry();
+  const nextEntry = updater({
+    lastUsed: currentEntry.lastUsed,
+    templates: [...currentEntry.templates],
+  });
+  storage.users[ownerUserId] = nextEntry;
+  writeStoredOwnerRefundExportFilterStorage(storage);
+  syncOwnerRefundExportFilterState();
+  return nextEntry;
+};
+
+const persistOwnerRefundExportFilters = () => {
+  const snapshot = buildOwnerRefundExportFilterSnapshot();
+  if (!snapshot) {
+    return;
+  }
+
+  updateCurrentOwnerRefundExportFilterStorage(entry => ({
+    ...entry,
+    lastUsed: snapshot,
+  }));
+};
+
+const restoreStoredOwnerRefundExportFilters = () => {
+  const entry = syncOwnerRefundExportFilterState();
+  if (!entry.lastUsed) {
+    ElMessage.info('暂无可恢复的上次退款导出筛选');
+    return;
+  }
+
+  applyOwnerRefundExportFilterSnapshot(entry.lastUsed);
+  ElMessage.success('已恢复上次退款导出筛选');
+};
+
+const clearOwnerRefundExportFilters = () => {
+  resetOwnerRefundExportFilters();
+  updateCurrentOwnerRefundExportFilterStorage(entry => ({
+    ...entry,
+    lastUsed: null,
+  }));
+  ElMessage.success('已清空退款导出筛选');
+};
+
+const findSelectedOwnerRefundExportTemplate = () => ownerRefundExportTemplates.value
+  .find(item => item.id === selectedOwnerRefundExportTemplateId.value) ?? null;
+
+const applySelectedOwnerRefundExportTemplate = () => {
+  const template = findSelectedOwnerRefundExportTemplate();
+  if (!template) {
+    ElMessage.info('请先选择要应用的常用模板');
+    return;
+  }
+
+  applyOwnerRefundExportFilterSnapshot(template.snapshot);
+  ElMessage.success(`已应用模板：${template.name}`);
+};
+
+const saveCurrentOwnerRefundExportTemplate = async () => {
+  const snapshot = buildOwnerRefundExportFilterSnapshot();
+  if (!snapshot) {
+    ElMessage.info('登录后才可保存常用筛选模板');
+    return;
+  }
+
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '输入模板名称，便于后续快速复用当前退款导出筛选',
+      '保存常用筛选模板',
+      {
+        inputPlaceholder: '例如：平台责任退款',
+        inputValidator: (inputValue) => {
+          const name = inputValue.trim();
+          if (!name) {
+            return '模板名称不能为空';
+          }
+          if (name.length > 20) {
+            return '模板名称最多 20 个字符';
+          }
+          return true;
+        },
+      },
+    );
+
+    const templateName = value.trim();
+    const existingTemplate = ownerRefundExportTemplates.value.find(item => item.name === templateName) ?? null;
+    if (!existingTemplate && ownerRefundExportTemplates.value.length >= OWNER_REFUND_EXPORT_TEMPLATE_LIMIT) {
+      ElMessage.warning(`最多保存 ${OWNER_REFUND_EXPORT_TEMPLATE_LIMIT} 个常用模板，请先删除旧模板`);
+      return;
+    }
+
+    const nextTemplate: OwnerRefundExportFilterTemplate = {
+      id: existingTemplate?.id ?? `refund-template-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      name: templateName,
+      snapshot,
+      updatedAt: new Date().toISOString(),
+    };
+
+    updateCurrentOwnerRefundExportFilterStorage(entry => ({
+      ...entry,
+      templates: existingTemplate
+        ? entry.templates.map(item => (item.id === existingTemplate.id ? nextTemplate : item))
+        : [nextTemplate, ...entry.templates],
+    }));
+    selectedOwnerRefundExportTemplateId.value = nextTemplate.id;
+    ElMessage.success(existingTemplate ? `已更新模板：${templateName}` : `已保存模板：${templateName}`);
+  } catch (error: unknown) {
+    if (error === 'cancel' || error === 'close') {
+      return;
+    }
+    throw error;
+  }
+};
+
+const deleteSelectedOwnerRefundExportTemplate = async () => {
+  const template = findSelectedOwnerRefundExportTemplate();
+  if (!template) {
+    ElMessage.info('请先选择要删除的常用模板');
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(`确认删除模板“${template.name}”吗？`, '删除常用筛选模板', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    });
+    updateCurrentOwnerRefundExportFilterStorage(entry => ({
+      ...entry,
+      templates: entry.templates.filter(item => item.id !== template.id),
+    }));
+    selectedOwnerRefundExportTemplateId.value = '';
+    ElMessage.success(`已删除模板：${template.name}`);
+  } catch (error: unknown) {
+    if (error === 'cancel' || error === 'close') {
+      return;
+    }
+    throw error;
+  }
+};
+
+const buildOwnerTransactionExportRequest = () => api.petpal.orders.exportTransactions();
+
+const buildOwnerRefundExportQuery = (): OwnerRefundExportQuery => ({
+  startDate: ownerRefundExportDateRange.value?.[0]
+    ? toDayBoundaryIsoString(ownerRefundExportDateRange.value[0], 'start')
+    : undefined,
+  endDate: ownerRefundExportDateRange.value?.[1]
+    ? toDayBoundaryIsoString(ownerRefundExportDateRange.value[1], 'end')
+    : undefined,
+  refundType: ownerRefundExportType.value || undefined,
+  refundStatus: ownerRefundExportStatus.value || undefined,
+  complaintStatus: ownerRefundExportComplaintStatus.value || undefined,
+  complaintType: ownerRefundExportComplaintType.value || undefined,
+  complaintTargetRole: ownerRefundExportComplaintTargetRole.value || undefined,
+  serviceType: ownerRefundExportServiceType.value || undefined,
+  orderNoKeyword: ownerRefundExportOrderNoKeyword.value.trim() || undefined,
+});
+
+const buildOwnerRefundExportRequest = () => {
+  persistOwnerRefundExportFilters();
+  return api.petpal.orders.exportRefundDetails(buildOwnerRefundExportQuery());
+};
 
 const formatPetTagSummary = (tags?: string[]) => {
   const normalized = tags ?? [];
@@ -627,6 +1343,26 @@ const loadMatches = async () => {
   }
 };
 
+const withOwnerOrderAction = async (
+  key: string,
+  successMessage: string,
+  action: () => Promise<void>,
+) => {
+  try {
+    ownerActionLoadingKey.value = key;
+    await action();
+    ElMessage.success(successMessage);
+    await loadOrders();
+  } catch (error: unknown) {
+    if (error === 'cancel' || error === 'close') {
+      return;
+    }
+    ElMessage.error(getErrorMessage(error, '订单动作执行失败'));
+  } finally {
+    ownerActionLoadingKey.value = '';
+  }
+};
+
 const reloadAll = async () => {
   if (!auth.isAuthenticated) {
     ElMessage.info('登录后可加载主人业务数据');
@@ -686,6 +1422,14 @@ const createPet = async () => {
   }
 };
 
+const confirmOrderComplete = async (orderId: string) => withOwnerOrderAction(
+  `confirm:${orderId}`,
+  '订单已确认完成',
+  async () => {
+    await api.petpal.orders.confirmComplete(orderId);
+  },
+);
+
 const createRequest = async () => {
   if (!requestForm.petId) {
     ElMessage.warning('请先选择宠物');
@@ -719,7 +1463,22 @@ const createRequest = async () => {
   }
 };
 
+watch(() => auth.user?.id, (ownerUserId) => {
+  const entry = syncOwnerRefundExportFilterState();
+  if (ownerUserId && entry.lastUsed) {
+    applyOwnerRefundExportFilterSnapshot(entry.lastUsed);
+    return;
+  }
+
+  resetOwnerRefundExportFilters();
+});
+
 onMounted(() => {
+  const entry = syncOwnerRefundExportFilterState();
+  if (entry.lastUsed && entry.lastUsed.ownerUserId === auth.user?.id) {
+    applyOwnerRefundExportFilterSnapshot(entry.lastUsed);
+  }
+
   if (!auth.isAuthenticated) {
     return;
   }
@@ -765,6 +1524,13 @@ onMounted(() => {
   margin: 0;
   color: var(--frontend-color-muted);
   line-height: 1.7;
+}
+
+.petpal-section-heading__hint {
+  margin: 0;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .petpal-switch-links {
@@ -817,6 +1583,12 @@ onMounted(() => {
 
 .petpal-side-actions__button {
   justify-content: center;
+}
+
+.petpal-export-toolbar {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
 }
 
 .petpal-request-list {
@@ -882,6 +1654,11 @@ onMounted(() => {
 @media (max-width: 720px) {
   .petpal-section-heading {
     flex-direction: column;
+  }
+
+  .petpal-export-toolbar {
+    width: 100%;
+    justify-items: start;
   }
 
   .petpal-summary-grid {
