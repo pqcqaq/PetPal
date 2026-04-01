@@ -1,22 +1,26 @@
+<!--
+UX Blueprint
+User: 主人 Web 用户处理退款和投诉
+Entry: 从订单详情、首页、提醒进入售后中心
+First screen: 先看到哪些订单最急、为什么急
+Primary action: 打开具体订单的售后详情
+Secondary actions: 去消息、去订单列表
+-->
 <template>
   <div class="frontend-page">
     <section class="frontend-page__hero">
-      <p class="frontend-page__eyebrow">PetPal Aftersales</p>
-      <h1>宠托帮售后中心</h1>
-      <p>把退款、投诉和售后协同从订单详情里抽出来，优先看正在处理、处理失败和仍需沟通补充的订单。</p>
+      <p class="frontend-page__eyebrow">售后中心</p>
+      <h1>宠托帮售后队列</h1>
       <div class="frontend-page__hero-actions">
-        <el-button type="primary" :loading="loading" @click="reloadAll">刷新售后概览</el-button>
+        <el-button type="primary" :loading="loading" @click="reloadAll">刷新</el-button>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal' }">
-          返回主人服务台
+          订单首页
         </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-reminders' }">
-          打开提醒中心
+          提醒
         </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-messages' }">
-          打开消息中心
-        </RouterLink>
-        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-legacy' }">
-          打开兼容入口
+          消息
         </RouterLink>
       </div>
     </section>
@@ -27,22 +31,22 @@
           <article class="frontend-card petpal-grid-span-3">
             <span class="frontend-card__eyebrow">售后订单</span>
             <strong class="petpal-summary-value">{{ aftersalesItems.length }}</strong>
-            <p class="petpal-summary-copy">至少存在退款进度、投诉记录或售后状态变化的订单。</p>
+            <p class="petpal-summary-copy">直接进入处理队列。</p>
           </article>
           <article class="frontend-card petpal-grid-span-3">
             <span class="frontend-card__eyebrow">处理中退款</span>
             <strong class="petpal-summary-value">{{ refundInFlightCount }}</strong>
-            <p class="petpal-summary-copy">等待审核、等待渠道回调和退款失败都需要优先跟进。</p>
+            <p class="petpal-summary-copy">优先处理退款异常。</p>
           </article>
           <article class="frontend-card petpal-grid-span-3">
             <span class="frontend-card__eyebrow">处理中投诉</span>
             <strong class="petpal-summary-value">{{ activeComplaintCount }}</strong>
-            <p class="petpal-summary-copy">待受理或处理中投诉会直接影响售后处理优先级。</p>
+            <p class="petpal-summary-copy">先看投诉进展。</p>
           </article>
           <article class="frontend-card petpal-grid-span-3">
             <span class="frontend-card__eyebrow">累计已退</span>
             <strong class="petpal-summary-value">¥{{ formatAmount(totalSettledRefundAmount) }}</strong>
-            <p class="petpal-summary-copy">按当前可加载订单聚合的已退款金额，用于快速判断售后规模。</p>
+            <p class="petpal-summary-copy">快速核对退款规模。</p>
           </article>
         </section>
 
@@ -88,8 +92,7 @@
       <div class="petpal-section-heading">
         <div class="petpal-section-heading__meta">
           <span class="frontend-card__eyebrow">售后队列</span>
-          <h3>主人侧售后处理</h3>
-          <p>先处理失败退款、处理中投诉和仍有未读沟通的售后订单，再回看已结案记录。</p>
+          <h3>优先处理这些订单</h3>
         </div>
         <el-tag type="warning">共 {{ filteredItems.length }} 条</el-tag>
       </div>

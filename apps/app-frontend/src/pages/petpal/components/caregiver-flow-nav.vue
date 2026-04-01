@@ -16,7 +16,7 @@ defineOptions({
 const props = defineProps<{
   currentPath: string
   title: string
-  description: string
+  description?: string
 }>()
 
 function redirectTo(url: string) {
@@ -41,12 +41,18 @@ function openReminders() {
 
 <template>
   <view class="caregiver-flow-nav">
-    <view class="caregiver-flow-nav__hero">
-      <AppTag type="warning">
-        照料者任务流
-      </AppTag>
-      <text class="caregiver-flow-nav__title">{{ title }}</text>
-      <text class="caregiver-flow-nav__description">{{ description }}</text>
+    <view class="caregiver-flow-nav__top">
+      <view class="caregiver-flow-nav__headline">
+        <AppTag type="warning">
+          照料者
+        </AppTag>
+        <text class="caregiver-flow-nav__title">{{ title }}</text>
+      </view>
+      <view class="caregiver-flow-nav__actions">
+        <AppButton size="medium" type="info" @click="openHub">切换身份</AppButton>
+        <AppButton size="medium" @click="openMessages">消息</AppButton>
+        <AppButton size="medium" type="danger" @click="openReminders">提醒</AppButton>
+      </view>
     </view>
 
     <AppChoiceChips
@@ -54,64 +60,55 @@ function openReminders() {
       :options="caregiverFlowOptions"
       @update:model-value="redirectTo"
     />
-
-    <view class="caregiver-flow-nav__actions">
-      <AppButton size="medium" type="info" @click="openHub">角色入口</AppButton>
-      <AppButton size="medium" @click="openMessages">消息中心</AppButton>
-      <AppButton size="medium" type="danger" @click="openReminders">提醒中心</AppButton>
-    </view>
   </view>
 </template>
 
 <style scoped lang="scss">
 .caregiver-flow-nav {
   display: grid;
-  gap: 18rpx;
+  gap: 14rpx;
   margin: 0 24rpx 20rpx;
-  padding: 26rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.18);
+  padding: 22rpx 24rpx;
+  border: 1rpx solid var(--app-outline-variant);
   border-radius: var(--app-shape-xl);
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.28), transparent 32%),
-    linear-gradient(145deg, var(--app-warning) 0%, var(--app-accent) 100%);
-  box-shadow: var(--app-elevation-3);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
 }
 
-.caregiver-flow-nav__hero {
-  display: grid;
+.caregiver-flow-nav__top,
+.caregiver-flow-nav__actions {
+  display: flex;
   gap: 12rpx;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.caregiver-flow-nav__headline {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .caregiver-flow-nav__title {
-  color: #fff7ed;
-  font-size: 38rpx;
+  color: var(--app-text);
+  font-size: 30rpx;
   line-height: 1.2;
   font-weight: 700;
 }
 
-.caregiver-flow-nav__description {
-  color: rgba(255, 247, 237, 0.88);
-  font-size: 24rpx;
-  line-height: 1.7;
-}
-
 .caregiver-flow-nav :deep(.app-choice-chip) {
-  background: rgba(255, 250, 245, 0.94);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--app-surface-soft);
+  border-color: var(--app-outline-variant);
 }
 
 .caregiver-flow-nav :deep(.app-choice-chip--active) {
-  background: linear-gradient(180deg, #ffffff 0%, var(--app-warning-soft) 100%);
+  background: linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
   border-color: transparent;
 }
 
-.caregiver-flow-nav__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-}
-
 .caregiver-flow-nav__actions .app-button {
-  min-width: 188rpx;
+  min-width: 152rpx;
 }
 </style>

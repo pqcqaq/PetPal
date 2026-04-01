@@ -1,25 +1,29 @@
+<!--
+UX Blueprint
+User: 主人端 Web 用户
+Entry: 登录后进入工作台、从订单/售后回到首页
+First screen: 直接看到订单、需求、消息和售后状态
+Primary action: 去订单、去售后、去需求
+Secondary actions: 消息、提醒、身份切换
+-->
 <template>
   <div class="frontend-page">
     <section class="frontend-page__hero">
-      <p class="frontend-page__eyebrow">PetPal Owner</p>
-      <h1>宠托帮主人服务台</h1>
-      <p>把宠物建档、需求发布、照料者匹配和订单跟进收回到主人语义，不再把照料者工作流混在同一页里。</p>
+      <p class="frontend-page__eyebrow">主人工作台</p>
+      <h1>宠托帮主人首页</h1>
       <div class="frontend-page__hero-actions">
-        <el-button type="primary" :loading="pageLoading" @click="reloadAll">刷新主人数据</el-button>
+        <el-button type="primary" :loading="pageLoading" @click="reloadAll">刷新</el-button>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-aftersales' }">
-          打开售后中心
+          售后
         </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-reminders' }">
-          打开提醒中心
+          提醒
         </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-messages' }">
-          打开消息中心
+          消息
         </RouterLink>
         <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-caregiver' }">
-          进入照料者工作台
-        </RouterLink>
-        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-legacy' }">
-          打开兼容入口
+          照料者
         </RouterLink>
       </div>
     </section>
@@ -60,15 +64,10 @@
 
         <section class="frontend-page__section-grid">
       <article class="frontend-card petpal-grid-span-8">
-        <span class="frontend-card__eyebrow">当前概览</span>
+        <span class="frontend-card__eyebrow">今日看板</span>
         <div class="petpal-section-heading">
           <div class="petpal-section-heading__meta">
-            <h3>主人主流程</h3>
-            <p>优先围绕宠物、需求、订单和售后推进。照料者入驻、服务配置和履约动作已迁往独立照料者页。</p>
-          </div>
-          <div class="petpal-switch-links">
-            <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">照料者页</RouterLink>
-            <RouterLink :to="{ name: 'frontend-petpal-legacy' }">兼容入口</RouterLink>
+            <h3>先看订单和售后</h3>
           </div>
         </div>
 
@@ -76,47 +75,44 @@
           <div class="petpal-summary-card">
             <span>宠物档案</span>
             <strong>{{ pets.length }}</strong>
-            <p>{{ pets.length ? '已建档宠物可直接复用到需求和订单。' : '先建立第一只宠物档案。' }}</p>
+            <p>{{ pets.length ? '可直接下单' : '先去建档' }}</p>
           </div>
           <div class="petpal-summary-card">
             <span>当前需求</span>
             <strong>{{ requests.length }}</strong>
-            <p>{{ requests.length ? '继续确认时间、地点和预算。' : '发布一条真实照料需求。' }}</p>
+            <p>{{ requests.length ? '继续跟进' : '新建需求' }}</p>
           </div>
           <div class="petpal-summary-card">
             <span>订单跟进</span>
             <strong>{{ orders.length }}</strong>
-            <p>{{ orders.length ? '优先看沟通、履约与售后进度。' : '订单将在匹配成功后出现在这里。' }}</p>
+            <p>{{ orders.length ? '直接处理订单' : '暂无订单' }}</p>
           </div>
           <div class="petpal-summary-card">
             <span>待读消息</span>
             <strong>{{ unreadOwnerConversationCount }}</strong>
-            <p>{{ unreadOwnerConversationCount ? '建议优先进入订单详情处理沟通。' : '当前没有未读订单沟通。' }}</p>
+            <p>{{ unreadOwnerConversationCount ? '先去沟通' : '当前已读' }}</p>
           </div>
         </div>
       </article>
 
       <article class="frontend-card petpal-grid-span-4">
-        <span class="frontend-card__eyebrow">切换工作流</span>
-        <h3>相关入口</h3>
+        <span class="frontend-card__eyebrow">快捷入口</span>
+        <h3>直接操作</h3>
         <div class="petpal-side-actions">
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-caregiver' }">
-            照料者档案 / 服务 / 履约
+            照料者工作台
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-messages' }">
-            跨订单消息中心
+            消息中心
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-reminders' }">
-            统一提醒中心
+            提醒中心
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-aftersales' }">
-            退款 / 投诉 / 售后中心
-          </RouterLink>
-          <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-legacy' }">
-            旧链接兼容入口
+            售后中心
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" to="/petpal-admin">
-            后台直达工作区
+            后台工作区
           </RouterLink>
           <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" to="/login">
             {{ auth.isAuthenticated ? '切换账号' : '登录后提交数据' }}

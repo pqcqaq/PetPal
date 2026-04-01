@@ -1,20 +1,35 @@
 <script lang="ts" setup>
-import { computed } from 'vue'
+/**
+ * UX Blueprint
+ * User: 已登录并需要快速进入主人或照料者工作状态的用户
+ * Entry: 打开 App、切换身份、从其他页返回角色中枢
+ * First screen: 只解决“我现在以哪个身份做什么”
+ * Primary action: 进入当前身份首页
+ * Secondary actions: 直接去消息、提醒、订单或服务
+ * States: 未登录、已登录无待办、已登录有未读提醒
+ */
+import { computed, ref } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
+import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
+import AppList from '@/components/app-list/app-list.vue'
+import AppListItem from '@/components/app-list-item/app-list-item.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
 import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { LOGIN_PAGE } from '@/router/config'
 import { useNotificationStore, useTokenStore, useUserStore } from '@/store'
-import ActionSignalCard from './components/action-signal-card.vue'
 import {
+  PETPAL_AFTERSALES_PAGE,
+  PETPAL_CAREGIVER_EARNINGS_PAGE,
   PETPAL_CAREGIVER_HOME_PAGE,
-  PETPAL_GETTING_STARTED_PAGE,
+  PETPAL_CAREGIVER_ORDERS_PAGE,
+  PETPAL_CAREGIVER_SERVICES_PAGE,
   PETPAL_MESSAGES_PAGE,
   PETPAL_OWNER_HOME_PAGE,
+  PETPAL_ORDERS_PAGE,
   PETPAL_REMINDERS_PAGE,
-  PETPAL_WORKBENCH_PAGE,
+  PETPAL_REQUEST_PAGE,
 } from './owner-shared'
 
 defineOptions({
@@ -28,44 +43,91 @@ definePage({
   },
 })
 
+type RoleMode = 'OWNER' | 'CAREGIVER'
+
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const notificationStore = useNotificationStore()
 
-const pageDescription = computed(() => (
-  tokenStore.hasLogin
-    ? 'PetPal 不再把主人与照料者逻辑混在一页里。请选择当前要进入的任务流。'
-    : '登录后进入 PetPal 主人任务流或照料者工作台。'
-))
+const activeRole = ref<RoleMode>('OWNER')
+
+const roleOptions = [
+  { label: '主人', value: 'OWNER' },
+  { label: '照料者', value: 'CAREGIVER' },
+]
 
 const displayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || 'PetPal 用户')
+const unreadNotificationCount = computed(() => notificationStore.items.filter(item => !notificationStore.isRead(item)).length)
+
+const activeRoleTitle = computed(() => activeRole.value === 'OWNER' ? '主人模式' : '照料者模式')
+const activeRoleSummary = computed(() => (
+  activeRole.value === 'OWNER'
+    ? '查看订单、发布需求、处理售后。'
+    : '接单、履约、管理服务和收益。'
+))
+
+const roleActionItems = computed(() => (
+  activeRole.value === 'OWNER'
+    ? [
+        {
+          title: '新建需求',
+          label: '快速开始一次新的照料安排',
+          value: '去发布',
+          action: () => uni.navigateTo({ url: PETPAL_REQUEST_PAGE }),
+        },
+        {
+          title: '我的订单',
+          label: '查看进行中、待确认和待评价订单',
+          value: '去处理',
+          action: () => uni.navigateTo({ url: PETPAL_ORDERS_PAGE }),
+        },
+        {
+          title: '售后中心',
+          label: '退款、投诉、争议统一处理',
+          value: '去跟进',
+          action: () => uni.navigateTo({ url: PETPAL_AFTERSALES_PAGE }),
+        },
+      ]
+    : [
+        {
+          title: '履约订单',
+          label: '先看待接单和服务中订单',
+          value: '去接单',
+          action: () => uni.navigateTo({ url: PETPAL_CAREGIVER_ORDERS_PAGE }),
+        },
+        {
+          title: '服务管理',
+          label: '调整报价、城市和上架状态',
+          value: '去管理',
+          action: () => uni.navigateTo({ url: PETPAL_CAREGIVER_SERVICES_PAGE }),
+        },
+        {
+          title: '收益表现',
+          label: '查看收入、评分和风险订单',
+          value: '去查看',
+          action: () => uni.navigateTo({ url: PETPAL_CAREGIVER_EARNINGS_PAGE }),
+        },
+      ]
+))
 
 function goToLogin() {
   uni.navigateTo({ url: LOGIN_PAGE })
 }
 
-function openOwnerFlow() {
-  uni.redirectTo({ url: PETPAL_OWNER_HOME_PAGE })
-}
-
-function openCaregiverFlow() {
-  uni.redirectTo({ url: PETPAL_CAREGIVER_HOME_PAGE })
-}
-
-function openLegacyWorkbench() {
-  uni.redirectTo({ url: PETPAL_WORKBENCH_PAGE })
+function openActiveRoleHome() {
+  uni.redirectTo({
+    url: activeRole.value === 'OWNER'
+      ? PETPAL_OWNER_HOME_PAGE
+      : PETPAL_CAREGIVER_HOME_PAGE,
+  })
 }
 
 function openMessages() {
-  uni.redirectTo({ url: PETPAL_MESSAGES_PAGE })
+  uni.navigateTo({ url: PETPAL_MESSAGES_PAGE })
 }
 
 function openReminders() {
-  uni.redirectTo({ url: PETPAL_REMINDERS_PAGE })
-}
-
-function openGettingStarted() {
-  uni.redirectTo({ url: PETPAL_GETTING_STARTED_PAGE })
+  uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
 }
 
 onShow(() => {
@@ -79,92 +141,64 @@ onShow(() => {
 </script>
 
 <template>
-  <AppPageShell title="PetPal 入口" :description="pageDescription">
+  <AppPageShell title="PetPal">
     <template v-if="tokenStore.hasLogin">
-      <AppSection title="选择当前任务流" description="按角色和场景拆分入口，避免主人和照料者逻辑混放。">
-        <view class="hub-hero">
-          <view class="hub-hero__copy">
-            <AppTag type="primary">
-              PetPal 角色入口
+      <view class="hub-shell">
+        <view class="hub-top">
+          <view class="hub-top__headline">
+            <text class="hub-top__title">{{ displayName }}</text>
+            <text class="hub-top__meta">直接进入当前要处理的身份任务。</text>
+          </view>
+          <view class="hub-top__tags">
+            <AppTag :type="activeRole === 'OWNER' ? 'primary' : 'warning'">
+              {{ activeRoleTitle }}
             </AppTag>
-            <text class="hub-hero__title">{{ displayName }}</text>
-            <text class="hub-hero__summary">
-              主人任务流用于宠物建档、需求发布和订单跟进；照料者任务流用于入驻、服务配置、接单和履约。
-            </text>
-          </view>
-          <view class="hub-hero__actions">
-            <AppButton size="medium" @click="openOwnerFlow">主人任务流</AppButton>
-            <AppButton size="medium" type="info" @click="openCaregiverFlow">照料者任务流</AppButton>
-            <AppButton size="medium" type="info" @click="openGettingStarted">起步向导</AppButton>
-            <AppButton size="medium" type="danger" @click="openReminders">提醒中心</AppButton>
+            <AppTag :type="unreadNotificationCount > 0 ? 'danger' : 'success'">
+              {{ unreadNotificationCount > 0 ? `${unreadNotificationCount} 待处理` : '当前平稳' }}
+            </AppTag>
           </view>
         </view>
 
-        <view class="hub-grid">
-          <view class="hub-card">
-            <text class="hub-card__title">主人任务流</text>
-            <text class="hub-card__text">进入主人首页，依次完成宠物档案、需求发布、订单跟进与售后处理。</text>
-            <view class="hub-card__tags">
-              <AppTag type="success">建档</AppTag>
-              <AppTag type="success">发布需求</AppTag>
-              <AppTag type="success">跟进订单</AppTag>
-              <AppTag type="success">售后收口</AppTag>
+        <AppSection title="切换身份">
+          <AppChoiceChips v-model="activeRole" :options="roleOptions" />
+        </AppSection>
+
+        <AppSection title="现在开始">
+          <view class="hub-primary">
+            <view class="hub-primary__copy">
+              <text class="hub-primary__title">{{ activeRoleTitle }}</text>
+              <text class="hub-primary__summary">{{ activeRoleSummary }}</text>
             </view>
-            <AppButton @click="openOwnerFlow">进入主人流</AppButton>
-          </view>
-
-          <view class="hub-card">
-            <text class="hub-card__title">照料者任务流</text>
-            <text class="hub-card__text">进入照料者首页，分开处理入驻资料、服务配置、接单履约、提醒与收益表现。</text>
-            <view class="hub-card__tags">
-              <AppTag type="warning">服务报价</AppTag>
-              <AppTag type="warning">接单</AppTag>
-              <AppTag type="warning">履约</AppTag>
-              <AppTag type="warning">收益表现</AppTag>
+            <view class="hub-primary__actions">
+              <AppButton size="medium" @click="openActiveRoleHome">进入首页</AppButton>
+              <AppButton size="medium" type="info" @click="openMessages">消息</AppButton>
+              <AppButton size="medium" type="danger" @click="openReminders">提醒</AppButton>
             </view>
-            <AppButton type="info" @click="openCaregiverFlow">进入照料者</AppButton>
           </view>
-        </view>
-      </AppSection>
+        </AppSection>
 
-      <AppSection title="辅助入口" description="把提醒、消息和兼容入口保留在角色选择页下方，减少来回跳转。">
-        <view class="hub-signal-wrap">
-          <ActionSignalCard
-            title="角色切换前先看这里"
-            description="如果当前存在高优先事项，先处理它再决定进入主人路径还是照料者路径。"
-            scope="ALL"
-            empty-text="当前没有新的跨角色高优先事项，可以自由选择下一条任务流。"
-          />
-        </view>
-        <view class="hub-support-grid">
-          <view class="hub-support-card">
-            <text class="hub-support-card__title">起步向导</text>
-            <text class="hub-support-card__text">把主人路径、照料者路径和角色切换建议拆成明确步骤。</text>
-            <AppButton size="medium" type="info" @click="openGettingStarted">进入起步向导</AppButton>
-          </view>
-          <view class="hub-support-card">
-            <text class="hub-support-card__title">提醒中心</text>
-            <text class="hub-support-card__text">集中查看主人端、照料者端和售后相关待办。</text>
-            <AppButton size="medium" type="danger" @click="openReminders">进入提醒中心</AppButton>
-          </view>
-          <view class="hub-support-card">
-            <text class="hub-support-card__title">消息中心</text>
-            <text class="hub-support-card__text">统一收口跨订单沟通，优先处理未读消息与异常反馈。</text>
-            <AppButton size="medium" type="info" @click="openMessages">进入消息中心</AppButton>
-          </view>
-          <view class="hub-support-card hub-support-card--legacy">
-            <text class="hub-support-card__title">兼容入口</text>
-            <text class="hub-support-card__text">旧综合工作台暂时保留，避免当前照料者流程中断。</text>
-            <AppButton size="medium" type="info" @click="openLegacyWorkbench">打开旧工作台</AppButton>
-          </view>
-        </view>
-      </AppSection>
+        <AppSection title="直接操作">
+          <AppList>
+            <AppListItem
+              v-for="item in roleActionItems"
+              :key="item.title"
+              :title="item.title"
+              :label="item.label"
+              :value="item.value"
+              value-emphasis
+              clickable
+              is-link
+              @click="item.action"
+            />
+          </AppList>
+        </AppSection>
+      </view>
     </template>
 
     <template v-else>
-      <AppSection title="开始使用 PetPal">
+      <AppSection title="登录后开始">
         <view class="hub-empty">
-          <AppStatus text="登录后即可选择主人任务流或照料者工作台。" />
+          <AppStatus text="登录后直接进入主人或照料者任务。" />
         </view>
         <AppButton block @click="goToLogin">去登录</AppButton>
       </AppSection>
@@ -173,125 +207,53 @@ onShow(() => {
 </template>
 
 <style scoped lang="scss">
-.hub-hero {
+.hub-shell {
   display: grid;
-  gap: 20rpx;
-  padding: 28rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.16);
-  border-radius: var(--app-shape-xl);
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.28), transparent 32%),
-    linear-gradient(145deg, #0f766e 0%, #155e75 52%, var(--app-accent) 100%);
-  box-shadow: var(--app-elevation-3);
+  gap: 18rpx;
 }
 
-.hub-hero__copy {
-  display: grid;
-  gap: 12rpx;
-}
-
-.hub-hero__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-}
-
-.hub-hero__title {
-  color: #f8fafc;
-  font-size: 40rpx;
-  line-height: 1.15;
-  font-weight: 700;
-}
-
-.hub-hero__summary {
-  font-size: 24rpx;
-  line-height: 1.7;
-  color: rgba(248, 250, 252, 0.88);
-}
-
-.hub-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
-  margin-top: 18rpx;
-}
-
-.hub-card,
-.hub-support-card {
+.hub-top,
+.hub-primary {
   display: grid;
   gap: 14rpx;
-  padding: 24rpx;
+  padding: 26rpx 28rpx;
   border-radius: var(--app-shape-xl);
   border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  background:
+    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 32%),
+    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
   box-shadow: var(--app-elevation-1);
-  transition:
-    transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
-    box-shadow var(--app-motion-duration-medium) var(--app-motion-easing-standard);
 }
 
-.hub-card:first-child {
-  background:
-    radial-gradient(circle at top right, rgba(11, 122, 117, 0.12), transparent 34%),
-    linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
+.hub-top__headline,
+.hub-primary__copy {
+  display: grid;
+  gap: 8rpx;
 }
 
-.hub-card:last-child {
-  background:
-    radial-gradient(circle at top right, rgba(181, 106, 0, 0.12), transparent 34%),
-    linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
-}
-
-.hub-card__title {
+.hub-top__title,
+.hub-primary__title {
   color: var(--app-text);
-  font-size: 30rpx;
+  font-size: 36rpx;
+  line-height: 1.2;
   font-weight: 700;
 }
 
-.hub-card__text,
-.hub-support-card__text {
+.hub-top__meta,
+.hub-primary__summary {
   color: var(--app-text-secondary);
   font-size: 24rpx;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 
-.hub-card__tags {
+.hub-top__tags,
+.hub-primary__actions {
   display: flex;
+  gap: 12rpx;
   flex-wrap: wrap;
-  gap: 10rpx;
-}
-
-.hub-support-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
-}
-
-.hub-signal-wrap {
-  margin-bottom: 16rpx;
-}
-
-.hub-support-card__title {
-  color: var(--app-text);
-  font-size: 28rpx;
-  line-height: 1.4;
-  font-weight: 700;
-}
-
-.hub-support-card--legacy {
-  background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.08), transparent 34%),
-    linear-gradient(180deg, var(--app-surface-container-high) 0%, var(--app-surface) 100%);
 }
 
 .hub-empty {
   padding-bottom: 28rpx;
-}
-
-@media (max-width: 680px) {
-  .hub-grid,
-  .hub-support-grid {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

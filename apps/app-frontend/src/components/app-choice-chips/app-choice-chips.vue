@@ -50,9 +50,6 @@ function handleSelect(value: string) {
       <view class="app-choice-chip__label">
         {{ item.label }}
       </view>
-      <view v-if="item.description" class="app-choice-chip__description">
-        {{ item.description }}
-      </view>
     </view>
   </view>
 </template>
@@ -66,12 +63,12 @@ function handleSelect(value: string) {
 }
 
 .app-choice-chip {
-  min-width: 164rpx;
+  min-width: 140rpx;
   margin-left: 10rpx;
   margin-bottom: 10rpx;
-  padding: 18rpx 22rpx;
+  padding: 20rpx 24rpx;
   border: 1rpx solid var(--app-outline-variant);
-  border-radius: var(--app-shape-lg);
+  border-radius: 999rpx;
   background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
   box-shadow: 0 6rpx 18rpx rgba(15, 23, 42, 0.04);
   transition:
@@ -99,15 +96,8 @@ function handleSelect(value: string) {
 
 .app-choice-chip__label {
   font-size: 24rpx;
-  line-height: 1.35;
+  line-height: 1.2;
   font-weight: 700;
   color: var(--app-text);
-}
-
-.app-choice-chip__description {
-  margin-top: 8rpx;
-  font-size: 20rpx;
-  line-height: 1.45;
-  color: var(--app-text-muted);
 }
 </style>

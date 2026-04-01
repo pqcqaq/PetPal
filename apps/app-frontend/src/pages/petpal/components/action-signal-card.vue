@@ -19,11 +19,12 @@ defineOptions({
 
 const props = withDefaults(defineProps<{
   title: string
-  description: string
+  description?: string
   scope?: AppNotificationScope | 'ALL'
   emptyText?: string
 }>(), {
   scope: 'ALL',
+  description: '',
   emptyText: '当前没有新的优先事项，可以继续按既有节奏推进。',
 })
 
@@ -114,7 +115,6 @@ function openNotifications() {
       <text class="action-signal-card__title">{{ activeItem.title }}</text>
       <text class="action-signal-card__summary">{{ activeItem.summary }}</text>
       <text class="action-signal-card__detail">{{ activeItem.detail }}</text>
-      <text class="action-signal-card__hint">{{ description }}</text>
 
       <view class="action-signal-card__actions">
         <AppButton size="medium" :type="activeItem.priority === 'HIGH' ? 'danger' : 'primary'" @click="runAction(activeItem)">
@@ -211,15 +211,10 @@ function openNotifications() {
 }
 
 .action-signal-card__summary,
-.action-signal-card__detail,
-.action-signal-card__hint {
+.action-signal-card__detail {
   color: var(--app-text-secondary);
   font-size: 22rpx;
   line-height: 1.72;
-}
-
-.action-signal-card__hint {
-  color: var(--app-text-muted);
 }
 
 .action-signal-card__empty,

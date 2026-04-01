@@ -1,4 +1,13 @@
 <script lang="ts" setup>
+/**
+ * UX Blueprint
+ * User: 已登录主人，需要快速处理订单
+ * Entry: 首页点击订单、消息跳转、售后跳转、支付后回流
+ * First screen: 先按状态筛订单，再直接执行下一步
+ * Primary action: 根据订单状态进入详情、服务、沟通或售后
+ * Secondary actions: 去售后中心、去发布新需求
+ * States: 未登录、空订单、进行中、已完成、售后中
+ */
 import type { OrderRecord } from '@rbac/api-common'
 import { computed, ref } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
@@ -15,8 +24,6 @@ import OwnerFlowNav from './components/owner-flow-nav.vue'
 import {
   formatAmount,
   formatRange,
-  getConversationHint,
-  getConversationPreview,
   getConversationUnreadCount,
   getOrderStatusLabel,
   getOrderTone,
@@ -25,6 +32,7 @@ import {
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDERS_PAGE,
   PETPAL_REQUEST_PAGE,
+  serviceTypeLabels,
 } from './owner-shared'
 
 defineOptions({
@@ -33,7 +41,7 @@ defineOptions({
 
 definePage({
   style: {
-    navigationBarTitleText: '订单跟进',
+    navigationBarTitleText: '订单',
     enablePullDownRefresh: true,
   },
 })
@@ -47,17 +55,22 @@ const orders = ref<OrderRecord[]>([])
 const activeFilter = ref<OwnerOrderFilter>('ACTIVE')
 
 const orderFilterOptions = [
-  { label: '进行中', value: 'ACTIVE', description: '优先处理待接单、已接单和服务中订单' },
-  { label: '全部', value: 'ALL', description: '查看全部历史订单' },
-  { label: '已完成', value: 'COMPLETED', description: '核对已完成订单与评价状态' },
-  { label: '售后', value: 'AFTERSALES', description: '聚焦退款、投诉和争议订单' },
+  { label: '进行中', value: 'ACTIVE' },
+  { label: '全部', value: 'ALL' },
+  { label: '已完成', value: 'COMPLETED' },
+  { label: '售后', value: 'AFTERSALES' },
 ]
 
-const pageDescription = computed(() => (
-  tokenStore.hasLogin
-    ? '按沟通、履约和售后场景重组订单跟进，不再把所有信息堆在单一工作台。'
-    : '登录后即可跟进订单履约和售后。'
-))
+const activeCount = computed(() => orders.value.filter(item => (
+  item.orderStatus === 'PENDING_ACCEPT'
+  || item.orderStatus === 'ACCEPTED'
+  || item.orderStatus === 'SERVING'
+)).length)
+const completedCount = computed(() => orders.value.filter(item => item.orderStatus === 'COMPLETED').length)
+const aftersalesCount = computed(() => orders.value.filter(item => isOrderAftersalesTracked(item)).length)
+const unreadCount = computed(() => orders.value.reduce((total, item) => (
+  total + getConversationUnreadCount(item.conversation, 'owner')
+), 0))
 
 const filteredOrders = computed(() => orders.value.filter((item) => {
   if (activeFilter.value === 'ALL') {
@@ -74,24 +87,6 @@ const filteredOrders = computed(() => orders.value.filter((item) => {
     || item.orderStatus === 'SERVING'
 }))
 
-const summaryCards = computed(() => [
-  {
-    label: '进行中',
-    value: String(orders.value.filter(item => item.orderStatus === 'PENDING_ACCEPT' || item.orderStatus === 'ACCEPTED' || item.orderStatus === 'SERVING').length),
-    hint: '需要继续跟进履约或确认完成。',
-  },
-  {
-    label: '售后中',
-    value: String(orders.value.filter(item => isOrderAftersalesTracked(item)).length),
-    hint: '需要持续关注退款、投诉和争议进展。',
-  },
-  {
-    label: '未读沟通',
-    value: String(orders.value.reduce((total, item) => total + getConversationUnreadCount(item.conversation, 'owner'), 0)),
-    hint: '订单内的说明、服务回传和异常反馈。',
-  },
-])
-
 function getOrderTagType(status: OrderRecord['orderStatus']) {
   return getOrderTone(status) === 'danger'
     ? 'danger'
@@ -100,6 +95,19 @@ function getOrderTagType(status: OrderRecord['orderStatus']) {
       : getOrderTone(status) === 'success'
         ? 'success'
         : 'default'
+}
+
+function getPrimaryAction(order: OrderRecord) {
+  if (isOrderAftersalesTracked(order)) {
+    return { label: '处理售后', tab: 'aftersales' as const, type: 'danger' as const }
+  }
+  if (order.orderStatus === 'SERVING' || order.orderStatus === 'ACCEPTED') {
+    return { label: '看服务', tab: 'service' as const, type: 'primary' as const }
+  }
+  if (order.orderStatus === 'COMPLETED') {
+    return { label: '看详情', tab: 'overview' as const, type: 'primary' as const }
+  }
+  return { label: '查看详情', tab: 'overview' as const, type: 'primary' as const }
 }
 
 function goToLogin() {
@@ -131,7 +139,7 @@ async function loadPage(showError = false) {
   catch (error: unknown) {
     if (showError) {
       uni.showToast({
-        title: getErrorMessage(error, '加载订单跟进页失败'),
+        title: getErrorMessage(error, '加载订单失败'),
         icon: 'none',
       })
     }
@@ -155,78 +163,79 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <AppPageShell title="订单跟进" :description="pageDescription">
+  <AppPageShell title="订单">
     <template v-if="tokenStore.hasLogin">
       <OwnerFlowNav
         :current-path="PETPAL_ORDERS_PAGE"
-        title="订单沟通、履约与售后分段跟进"
-        description="主人不再从一个大工作台里翻找信息，而是按处理任务直接进入相应订单场景。"
+        title="订单"
       />
 
-      <AppSection title="订单概览">
-        <view class="order-metric-grid">
-          <view v-for="item in summaryCards" :key="item.label" class="order-metric-card">
-            <text class="order-metric-card__label">{{ item.label }}</text>
-            <text class="order-metric-card__value">{{ item.value }}</text>
-            <text class="order-metric-card__hint">{{ item.hint }}</text>
+      <AppSection title="订单状态">
+        <view class="order-summary">
+          <view class="order-summary__card">
+            <text class="order-summary__label">进行中</text>
+            <text class="order-summary__value">{{ activeCount }}</text>
+          </view>
+          <view class="order-summary__card">
+            <text class="order-summary__label">已完成</text>
+            <text class="order-summary__value">{{ completedCount }}</text>
+          </view>
+          <view class="order-summary__card">
+            <text class="order-summary__label">售后中</text>
+            <text class="order-summary__value">{{ aftersalesCount }}</text>
+          </view>
+          <view class="order-summary__card">
+            <text class="order-summary__label">未读消息</text>
+            <text class="order-summary__value">{{ unreadCount }}</text>
           </view>
         </view>
       </AppSection>
 
-      <AppSection title="筛选视图" description="根据当前任务快速聚焦进行中订单、已完成订单或售后订单。">
+      <AppSection title="筛选">
         <AppChoiceChips v-model="activeFilter" :options="orderFilterOptions" />
-        <view class="order-filter-actions">
-          <AppButton size="medium" type="danger" @click="openAftersalesCenter">进入售后中心</AppButton>
+        <view class="order-toolbar">
+          <AppButton size="medium" type="danger" @click="openAftersalesCenter">售后中心</AppButton>
+          <AppButton size="medium" type="info" @click="openRequestFlow">新建需求</AppButton>
         </view>
       </AppSection>
 
       <AppSection :title="filteredOrders.length ? `订单列表 (${filteredOrders.length})` : '订单列表'">
-        <view v-if="filteredOrders.length" class="order-card-list">
-          <view v-for="order in filteredOrders" :key="order.id" class="order-card">
-            <view class="order-card__header">
-              <view class="order-card__headline">
-                <text class="order-card__title">{{ order.orderNo }}</text>
-                <text class="order-card__meta">
-                  {{ getOrderStatusLabel(order.orderStatus) }} · {{ formatRange(order.appointmentStart, order.appointmentEnd) }}
+        <view v-if="filteredOrders.length" class="order-list">
+          <view v-for="order in filteredOrders" :key="order.id" class="order-row">
+            <view class="order-row__header">
+              <view class="order-row__copy">
+                <text class="order-row__title">{{ order.orderNo }}</text>
+                <text class="order-row__meta">
+                  {{ serviceTypeLabels[order.serviceType] }} · {{ formatRange(order.appointmentStart, order.appointmentEnd) }}
+                </text>
+                <text class="order-row__meta">
+                  总额 ¥{{ formatAmount(order.amountTotal) }} · 实付 ¥{{ formatAmount(order.amountPaid) }} · 已退 ¥{{ formatAmount(order.amountRefunded) }}
                 </text>
               </view>
-              <AppTag :type="getOrderTagType(order.orderStatus)">
-                {{ getOrderStatusLabel(order.orderStatus) }}
-              </AppTag>
-            </view>
-
-            <view class="order-card__amounts">
-              <text>订单总额 ¥{{ formatAmount(order.amountTotal) }}</text>
-              <text>实付 ¥{{ formatAmount(order.amountPaid) }}</text>
-              <text>已退 ¥{{ formatAmount(order.amountRefunded) }}</text>
-            </view>
-
-            <view class="order-card__conversation">
-              <text class="order-card__conversation-title">订单沟通</text>
-              <text class="order-card__conversation-text">{{ getConversationPreview(order.conversation) }}</text>
-              <text class="order-card__conversation-meta">{{ getConversationHint(order.conversation, 'owner') }}</text>
-            </view>
-
-            <view class="order-card__footer">
-              <AppTag :type="getConversationUnreadCount(order.conversation, 'owner') > 0 ? 'warning' : 'default'">
-                {{ getConversationUnreadCount(order.conversation, 'owner') > 0 ? `待读 ${getConversationUnreadCount(order.conversation, 'owner')}` : '沟通已读' }}
-              </AppTag>
-              <view class="order-card__actions">
-                <AppButton size="medium" type="info" @click="openOrderDetail(order.id, 'chat')">沟通</AppButton>
-                <AppButton size="medium" type="info" @click="openOrderDetail(order.id, 'service')">履约</AppButton>
-                <AppButton
-                  size="medium"
-                  :type="order.orderStatus === 'DISPUTED' || order.orderStatus === 'PARTIAL_REFUNDED' || order.orderStatus === 'REFUNDED' ? 'danger' : 'primary'"
-                  @click="openOrderDetail(order.id, order.orderStatus === 'DISPUTED' || order.orderStatus === 'PARTIAL_REFUNDED' || order.orderStatus === 'REFUNDED' ? 'aftersales' : 'overview')"
-                >
-                  {{ order.orderStatus === 'DISPUTED' || order.orderStatus === 'PARTIAL_REFUNDED' || order.orderStatus === 'REFUNDED' ? '售后' : '详情' }}
-                </AppButton>
+              <view class="order-row__tags">
+                <AppTag :type="getOrderTagType(order.orderStatus)">
+                  {{ getOrderStatusLabel(order.orderStatus) }}
+                </AppTag>
+                <AppTag :type="getConversationUnreadCount(order.conversation, 'owner') > 0 ? 'warning' : 'default'">
+                  {{ getConversationUnreadCount(order.conversation, 'owner') > 0 ? `待读 ${getConversationUnreadCount(order.conversation, 'owner')}` : '已读' }}
+                </AppTag>
               </view>
+            </view>
+
+            <view class="order-row__actions">
+              <AppButton size="medium" type="info" @click="openOrderDetail(order.id, 'chat')">沟通</AppButton>
+              <AppButton
+                size="medium"
+                :type="getPrimaryAction(order).type"
+                @click="openOrderDetail(order.id, getPrimaryAction(order).tab)"
+              >
+                {{ getPrimaryAction(order).label }}
+              </AppButton>
             </view>
           </view>
         </view>
         <view v-else class="order-empty">
-          <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步订单列表' : '当前筛选下没有订单'" />
+          <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步订单' : '当前筛选下没有订单'" />
           <view v-if="!loading" class="order-empty__actions">
             <AppButton size="medium" @click="openRequestFlow">去发布需求</AppButton>
           </view>
@@ -235,9 +244,9 @@ onPullDownRefresh(() => {
     </template>
 
     <template v-else>
-      <AppSection title="开始跟进订单">
+      <AppSection title="登录后查看订单">
         <view class="order-empty order-empty--login">
-          <AppStatus text="登录后即可跟进订单履约和售后进展。" />
+          <AppStatus text="登录后即可查看订单、服务和售后状态。" />
         </view>
         <AppButton block @click="goToLogin">去登录</AppButton>
       </AppSection>
@@ -246,101 +255,74 @@ onPullDownRefresh(() => {
 </template>
 
 <style scoped lang="scss">
-.order-metric-grid {
+.order-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16rpx;
 }
 
-.order-metric-card,
-.order-card {
+.order-summary__card,
+.order-row {
   display: grid;
   gap: 12rpx;
   padding: 24rpx;
-  border-radius: 26rpx;
-  border: 1rpx solid var(--app-border);
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
-  box-shadow: 0 12rpx 30rpx rgba(15, 23, 42, 0.06);
+  border-radius: var(--app-shape-xl);
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
 }
 
-.order-metric-card__label {
-  color: var(--app-text-muted);
+.order-summary__label,
+.order-row__meta {
+  color: var(--app-text-secondary);
   font-size: 22rpx;
+  line-height: 1.6;
 }
 
-.order-metric-card__value {
+.order-summary__value {
   color: var(--app-text);
   font-size: 40rpx;
   line-height: 1.05;
   font-weight: 700;
 }
 
-.order-metric-card__hint,
-.order-card__meta,
-.order-card__amounts,
-.order-card__conversation-meta {
-  color: var(--app-text-secondary);
-  font-size: 22rpx;
-  line-height: 1.7;
+.order-toolbar,
+.order-row__actions {
+  display: flex;
+  gap: 12rpx;
+  flex-wrap: wrap;
 }
 
-.order-card-list {
+.order-list {
   display: grid;
   gap: 16rpx;
 }
 
-.order-filter-actions,
-.order-card__actions,
-.order-empty__actions {
+.order-row__header {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-}
-
-.order-card__header,
-.order-card__footer {
-  display: flex;
-  justify-content: space-between;
   gap: 16rpx;
   align-items: flex-start;
+  justify-content: space-between;
 }
 
-.order-card__headline {
+.order-row__copy {
   display: grid;
   gap: 6rpx;
+  min-width: 0;
 }
 
-.order-card__title {
+.order-row__title {
   color: var(--app-text);
   font-size: 30rpx;
   line-height: 1.3;
   font-weight: 700;
 }
 
-.order-card__amounts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12rpx;
-}
-
-.order-card__conversation {
-  display: grid;
-  gap: 8rpx;
-  padding: 18rpx;
-  border-radius: 20rpx;
-  background: #eefaf7;
-}
-
-.order-card__conversation-title {
-  color: #0f766e;
-  font-size: 20rpx;
-  font-weight: 700;
-}
-
-.order-card__conversation-text {
-  color: var(--app-text);
-  font-size: 24rpx;
-  line-height: 1.6;
+.order-row__tags,
+.order-empty__actions {
+  display: flex;
+  gap: 10rpx;
+  flex-wrap: wrap;
 }
 
 .order-empty {
@@ -352,13 +334,11 @@ onPullDownRefresh(() => {
 }
 
 @media (max-width: 680px) {
-  .order-metric-grid,
-  .order-card__amounts {
+  .order-summary {
     grid-template-columns: 1fr;
   }
 
-  .order-card__header,
-  .order-card__footer {
+  .order-row__header {
     flex-direction: column;
   }
 }

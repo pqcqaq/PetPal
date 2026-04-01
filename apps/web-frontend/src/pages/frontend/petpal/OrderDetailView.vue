@@ -1,9 +1,16 @@
+<!--
+UX Blueprint
+User: 主人或照料者查看单笔订单
+Entry: 从订单列表、消息、售后进入
+First screen: 状态、金额、时间、下一步动作
+Primary action: 依据状态进入沟通、履约或售后
+Secondary actions: 刷新、返回列表
+-->
 <template>
   <div class="frontend-page">
     <section class="frontend-page__hero">
       <p class="frontend-page__eyebrow">订单详情</p>
       <h1>订单 {{ orderNo }}</h1>
-      <p>查看订单状态、履约时间线、服务记录以及支付退款进度</p>
       <div class="frontend-page__hero-actions">
         <el-button @click="goBack">返回列表</el-button>
         <el-button v-if="order" type="primary" :loading="loading" @click="reload">刷新</el-button>

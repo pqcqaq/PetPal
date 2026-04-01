@@ -160,7 +160,7 @@
       "path": "pages/petpal/orders",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "订单跟进",
+        "navigationBarTitleText": "订单",
         "enablePullDownRefresh": true
       }
     },

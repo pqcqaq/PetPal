@@ -16,7 +16,7 @@ defineOptions({
 const props = defineProps<{
   currentPath: string
   title: string
-  description: string
+  description?: string
 }>()
 
 function redirectTo(url: string) {
@@ -41,12 +41,18 @@ function openReminders() {
 
 <template>
   <view class="owner-flow-nav">
-    <view class="owner-flow-nav__hero">
-      <AppTag type="primary">
-        主人任务流
-      </AppTag>
-      <text class="owner-flow-nav__title">{{ title }}</text>
-      <text class="owner-flow-nav__description">{{ description }}</text>
+    <view class="owner-flow-nav__top">
+      <view class="owner-flow-nav__headline">
+        <AppTag type="primary">
+          主人
+        </AppTag>
+        <text class="owner-flow-nav__title">{{ title }}</text>
+      </view>
+      <view class="owner-flow-nav__actions">
+        <AppButton size="medium" type="info" @click="openHub">切换身份</AppButton>
+        <AppButton size="medium" @click="openMessages">消息</AppButton>
+        <AppButton size="medium" type="danger" @click="openReminders">提醒</AppButton>
+      </view>
     </view>
 
     <AppChoiceChips
@@ -54,64 +60,55 @@ function openReminders() {
       :options="ownerFlowOptions"
       @update:model-value="redirectTo"
     />
-
-    <view class="owner-flow-nav__actions">
-      <AppButton size="medium" type="info" @click="openHub">角色入口</AppButton>
-      <AppButton size="medium" @click="openMessages">消息中心</AppButton>
-      <AppButton size="medium" type="danger" @click="openReminders">提醒中心</AppButton>
-    </view>
   </view>
 </template>
 
 <style scoped lang="scss">
 .owner-flow-nav {
   display: grid;
-  gap: 18rpx;
+  gap: 14rpx;
   margin: 0 24rpx 20rpx;
-  padding: 26rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.18);
+  padding: 22rpx 24rpx;
+  border: 1rpx solid var(--app-outline-variant);
   border-radius: var(--app-shape-xl);
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.28), transparent 32%),
-    linear-gradient(145deg, var(--app-accent) 0%, var(--app-accent-pressed) 100%);
-  box-shadow: var(--app-elevation-3);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
 }
 
-.owner-flow-nav__hero {
-  display: grid;
+.owner-flow-nav__top,
+.owner-flow-nav__actions {
+  display: flex;
   gap: 12rpx;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.owner-flow-nav__headline {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .owner-flow-nav__title {
-  color: #f8fafc;
-  font-size: 38rpx;
+  color: var(--app-text);
+  font-size: 30rpx;
   line-height: 1.2;
   font-weight: 700;
 }
 
-.owner-flow-nav__description {
-  color: rgba(248, 250, 252, 0.86);
-  font-size: 24rpx;
-  line-height: 1.7;
-}
-
 .owner-flow-nav :deep(.app-choice-chip) {
-  background: rgba(255, 255, 255, 0.92);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--app-surface-soft);
+  border-color: var(--app-outline-variant);
 }
 
 .owner-flow-nav :deep(.app-choice-chip--active) {
-  background: linear-gradient(180deg, #ffffff 0%, var(--app-accent-soft) 100%);
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
   border-color: transparent;
 }
 
-.owner-flow-nav__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-}
-
 .owner-flow-nav__actions .app-button {
-  min-width: 188rpx;
+  min-width: 152rpx;
 }
 </style>

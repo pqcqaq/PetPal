@@ -1,4 +1,13 @@
 <script lang="ts" setup>
+/**
+ * UX Blueprint
+ * User: 主人或照料者查看单笔订单
+ * Entry: 从订单列表、消息中心、售后中心进入
+ * First screen: 必须先看到状态、金额、时间和下一步动作
+ * Primary action: 依据状态进入沟通、履约、确认完成、售后或评价
+ * Secondary actions: 查看支付、退款、服务记录和附件
+ * States: 加载中、订单不存在、待确认、待评价、售后中
+ */
 import type {
   CaregiverQualificationMaterialRecord,
   ComplaintActionType,
@@ -277,33 +286,21 @@ const currentConversationUnreadCount = computed(() => {
 const canSendMessage = computed(() => Boolean(order.value))
 const ownerActionSummary = computed(() => {
   if (!isOwnerView.value) {
-    return '当前页面展示订单履约、沟通和售后状态，主人侧专属操作已自动隐藏。'
+    return '当前先看订单状态、沟通和履约记录。'
   }
   if (canConfirmComplete.value) {
-    return '照料服务已在进行中。确认完成前，请先核对服务记录和签到签退时间。'
+    return '先核对服务记录，再确认完成。'
   }
   if (canCreateReview.value) {
-    return '本单已完成且尚未评价。提交评价后会同步影响照料者评分。'
+    return '订单已完成，现在可以直接写评价。'
   }
   if (activeComplaint.value) {
-    return `当前存在进行中的投诉：${getComplaintStatusLabel(activeComplaint.value.status)}。平台处理进度会在下方持续更新。`
+    return `当前投诉${getComplaintStatusLabel(activeComplaint.value.status)}，先看售后进度。`
   }
   if (order.value?.review) {
-    return '本单评价已经提交，仍可在下方继续查看退款、投诉和履约详情。'
+    return '评价已提交，仍可继续查看履约和售后。'
   }
-  return '这里集中处理完成确认、评价反馈和投诉发起。'
-})
-const pageDescription = computed(() => {
-  if (detailTab.value === 'chat') {
-    return '聚焦订单沟通、附件回传和未读处理。'
-  }
-  if (detailTab.value === 'service') {
-    return '聚焦签到、服务记录和履约时间线。'
-  }
-  if (detailTab.value === 'aftersales') {
-    return '聚焦退款、投诉和售后处理进展。'
-  }
-  return '查看订单概览、金额信息和主人侧关键操作。'
+  return '在这里处理确认完成、评价和投诉。'
 })
 const orderFocusSummary = computed(() => {
   if (!order.value) {
@@ -311,18 +308,18 @@ const orderFocusSummary = computed(() => {
   }
   if (detailTab.value === 'chat') {
     return currentConversationUnreadCount.value > 0
-      ? `当前有 ${currentConversationUnreadCount.value} 条未读消息，建议先确认交接与异常反馈。`
-      : '当前沟通已读，仍可继续补充交接说明或附件。'
+      ? `当前有 ${currentConversationUnreadCount.value} 条未读消息。`
+      : '当前沟通已读。'
   }
   if (detailTab.value === 'service') {
     return order.value.serviceLogs.length > 0
-      ? `已沉淀 ${order.value.serviceLogs.length} 条服务记录和 ${order.value.timeline.length} 个履约事件。`
-      : '照料者尚未上传服务记录，请重点查看履约时间线。'
+      ? `已有 ${order.value.serviceLogs.length} 条服务记录。`
+      : '暂时还没有服务记录。'
   }
   if (detailTab.value === 'aftersales') {
     return aftersalesTimeline.value.length > 0
-      ? `已汇总 ${aftersalesTimeline.value.length} 条售后进度，便于集中查看退款和投诉演进。`
-      : '当前没有退款申请或投诉处理记录。'
+      ? `已有 ${aftersalesTimeline.value.length} 条售后进度。`
+      : '当前没有售后记录。'
   }
   return ownerActionSummary.value
 })
@@ -1039,7 +1036,7 @@ onLoad((options: Record<string, string | undefined>) => {
 </script>
 
 <template>
-  <AppPageShell title="订单详情" :description="pageDescription">
+  <AppPageShell title="订单详情">
     <template v-if="loading">
       <AppSection title="同步状态">
         <AppStatus mode="loading" text="正在加载订单详情" />
@@ -1048,7 +1045,7 @@ onLoad((options: Record<string, string | undefined>) => {
 
     <template v-else-if="order">
       <view class="petpal-order-container">
-        <AppSection title="场景导航" description="按任务切换视图，避免在超长详情页中反复滚动查找信息。">
+        <AppSection title="订单概览">
           <view class="petpal-order-overview-banner">
             <view class="petpal-order-overview-banner__headline">
               <text class="petpal-order-overview-banner__title">{{ order.orderNo }}</text>
@@ -1056,12 +1053,26 @@ onLoad((options: Record<string, string | undefined>) => {
                 {{ labels.orderStatus[order.orderStatus] || order.orderStatus }} · {{ labels.serviceType[order.serviceType] || order.serviceType }}
               </text>
             </view>
+            <view class="petpal-order-overview-banner__stats">
+              <view class="petpal-order-overview-banner__stat">
+                <text class="petpal-order-overview-banner__stat-label">预约</text>
+                <text class="petpal-order-overview-banner__stat-value">{{ formatDate(order.appointmentStart) }}</text>
+              </view>
+              <view class="petpal-order-overview-banner__stat">
+                <text class="petpal-order-overview-banner__stat-label">实付</text>
+                <text class="petpal-order-overview-banner__stat-value">¥{{ formatAmount(order.amountPaid) }}</text>
+              </view>
+              <view class="petpal-order-overview-banner__stat">
+                <text class="petpal-order-overview-banner__stat-label">已退</text>
+                <text class="petpal-order-overview-banner__stat-value">¥{{ formatAmount(order.amountRefunded) }}</text>
+              </view>
+            </view>
             <text class="petpal-order-overview-banner__summary">{{ orderFocusSummary }}</text>
           </view>
           <AppChoiceChips v-model="detailTab" :options="detailTabOptions" />
         </AppSection>
 
-        <AppSection v-if="detailTab === 'overview'" title="订单操作" description="确认完成、提交评价和发起投诉都在这里完成。">
+        <AppSection v-if="detailTab === 'overview'" title="订单操作">
           <view class="petpal-owner-actions">
             <view class="petpal-note-card">
               <text>{{ ownerActionSummary }}</text>
@@ -1732,6 +1743,31 @@ onLoad((options: Record<string, string | undefined>) => {
   color: rgba(248, 250, 252, 0.9);
 }
 
+.petpal-order-overview-banner__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.petpal-order-overview-banner__stat {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.petpal-order-overview-banner__stat-label {
+  font-size: 11px;
+  color: rgba(248, 250, 252, 0.72);
+}
+
+.petpal-order-overview-banner__stat-value {
+  font-size: 14px;
+  color: #fff;
+  font-weight: 700;
+}
+
 .petpal-owner-actions {
   display: grid;
   gap: 12px;
@@ -2320,5 +2356,11 @@ onLoad((options: Record<string, string | undefined>) => {
   display: flex;
   gap: 12px;
   padding: 12px 0;
+}
+
+@media (max-width: 680px) {
+  .petpal-order-overview-banner__stats {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

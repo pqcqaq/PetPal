@@ -3,6 +3,8 @@ title: PetPal Web / App 体验重构执行方案
 description: 以 App 为第一优先级的 Web / App 用户操作逻辑页面重构方案，包含 Material Design 3 风格、信息架构、交互规则和实施优先级。
 ---
 
+> 编码前强制约束：先阅读并遵循 [PetPal 前端重构蓝图](./PetPal-Frontend-Blueprint.md)。该蓝图冻结了用户流、页面职责、首屏结构与交互禁区，后续页面重构以它为唯一前置依据。
+
 ## 1. 重构目标
 
 本方案作为 PetPal 当前最高优先级的前端体验重构文档执行，不再使用日期排期，而是严格按优先级推进。
