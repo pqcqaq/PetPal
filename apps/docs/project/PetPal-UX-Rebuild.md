@@ -295,6 +295,7 @@ Web：
   - 新增 `pages/order-review/index.vue` 承接评价动作。
   - 新增 `pages/order-complaint/index.vue` 承接投诉动作。
   - `pages/order-detail/index.vue` 已移除内嵌评价/投诉表单，只保留动作入口与状态摘要。
+- 旧的 `pages/petpal/workbench.vue` 已收口为兼容跳转页，只负责把历史入口导向新的主人 / 照料者 / 消息 / 提醒页面。
 - App 端已新增 `pages/petpal/messages.vue`，把主人与照料者两侧订单沟通收口为跨订单消息中心。
 - App 端已新增 `pages/petpal/aftersales.vue`，把主人端退款、投诉和争议订单收口为独立售后中心。
 - App 端已新增 `pages/petpal/reminders.vue`，把主人端、照料者端和售后相关待办统一聚合到提醒中心。
@@ -324,7 +325,7 @@ Web：
 
 ### 10.2 仍未完成
 
-- 旧的 `pages/petpal/workbench.vue` 仍保留为兼容入口，更多新手引导和角色切换辅助流还未拆出更完整体系。
+- `pages/petpal/workbench.vue` 已改为兼容跳转页，但更完整的新手引导和角色切换辅助流仍需继续补齐。
 - App 端提醒中心、通知中心、帮助页、账户辅助页、起步向导和应用内主动催办信号都已落地，但真正的系统主动提醒、推送触达和更深的动态引导仍未形成完整体系。
 - Web 前台虽然已经完成主人页、照料者页、提醒中心、消息中心和售后中心拆分，并把核心工作台页推进到分区级恢复态基线，但更细的弱网态、动作后结果引导和跨页面主动引导仍需继续补齐。
 
