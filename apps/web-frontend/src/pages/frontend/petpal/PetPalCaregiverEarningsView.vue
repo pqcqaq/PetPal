@@ -103,6 +103,35 @@
               {{ preset.label }}
             </el-button>
           </div>
+          <div class="petpal-export-toolbar__templates">
+            <span class="petpal-export-toolbar__label">常用模板</span>
+            <el-select
+              v-model="selectedExportTemplateName"
+              clearable
+              placeholder="选择常用导出模板"
+              class="petpal-export-toolbar__template"
+            >
+              <el-option
+                v-for="item in exportTemplates"
+                :key="item.name"
+                :label="item.name"
+                :value="item.name"
+              />
+            </el-select>
+            <el-button :disabled="!selectedExportTemplate" @click="applySelectedExportTemplate">
+              应用模板
+            </el-button>
+            <el-button :disabled="!hasExportFilters" @click="saveCurrentExportTemplate">
+              保存为模板
+            </el-button>
+            <el-button
+              v-if="selectedExportTemplate"
+              text
+              @click="deleteSelectedExportTemplate"
+            >
+              删除模板
+            </el-button>
+          </div>
           <div class="petpal-export-toolbar__filters">
             <el-date-picker
               v-model="exportDateRange"
@@ -130,7 +159,7 @@
             </el-button>
           </div>
           <p class="petpal-export-toolbar__hint">
-            导出筛选只影响经营明细，不改变当前摘要和趋势口径；系统会按当前账号记住最近一次导出条件。
+            导出筛选只影响经营明细，不改变当前摘要和趋势口径；系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
           </p>
         </div>
 
@@ -383,7 +412,7 @@ import type {
 } from '@rbac/api-common';
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '@/api/client';
 import ListExportButton from '@/components/download/ListExportButton.vue';
 import { usePageState } from '@/composables/use-page-state';
@@ -414,12 +443,20 @@ const summaryState = ref<PetPalSectionLoadState>('idle');
 const sectionReloadingKey = ref<'' | 'summary'>('');
 
 type EarningsExportDatePreset = '' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
-type CaregiverEarningsExportPageState = {
+type CaregiverEarningsExportFilterSnapshot = {
   startDate: string;
   endDate: string;
   serviceType: PetServiceType | '';
   datePreset: EarningsExportDatePreset;
 };
+type CaregiverEarningsExportTemplate = CaregiverEarningsExportFilterSnapshot & {
+  name: string;
+};
+type CaregiverEarningsExportPageState = CaregiverEarningsExportFilterSnapshot & {
+  templates: CaregiverEarningsExportTemplate[];
+};
+
+const MAX_EARNINGS_EXPORT_TEMPLATE_COUNT = 5;
 
 const exportPresetOptions: Array<{ label: string; value: Exclude<EarningsExportDatePreset, ''> }> = [
   { label: '近 7 天', value: 'last7days' },
@@ -428,15 +465,17 @@ const exportPresetOptions: Array<{ label: string; value: Exclude<EarningsExportD
   { label: '上月', value: 'lastMonth' },
 ];
 
-const { state: exportPageState, reset: resetExportPageState } = usePageState<CaregiverEarningsExportPageState>(
+const { state: exportPageState } = usePageState<CaregiverEarningsExportPageState>(
   'page:petpal:caregiver-earnings-export-filters',
   {
     startDate: '',
     endDate: '',
     serviceType: '',
     datePreset: '',
+    templates: [],
   },
 );
+const selectedExportTemplateName = ref('');
 
 const emptyTotals: CaregiverEarningsSummaryRecord['totals'] = {
   totalIncome: 0,
@@ -495,13 +534,33 @@ const addDays = (value: Date, amount: number) => {
   next.setDate(next.getDate() + amount);
   return next;
 };
-const setExportDateRange = (
-  value: [Date, Date] | null,
-  datePreset: EarningsExportDatePreset = '',
-) => {
-  exportPageState.startDate = value?.[0]?.toISOString() ?? '';
-  exportPageState.endDate = value?.[1]?.toISOString() ?? '';
-  exportPageState.datePreset = value ? datePreset : '';
+const applyExportFilterSnapshot = (snapshot: CaregiverEarningsExportFilterSnapshot) => {
+  exportPageState.startDate = snapshot.startDate;
+  exportPageState.endDate = snapshot.endDate;
+  exportPageState.serviceType = snapshot.serviceType;
+  exportPageState.datePreset = snapshot.datePreset;
+};
+const buildCurrentExportFilterSnapshot = (): CaregiverEarningsExportFilterSnapshot => ({
+  startDate: exportPageState.startDate,
+  endDate: exportPageState.endDate,
+  serviceType: exportPageState.serviceType,
+  datePreset: exportPageState.datePreset,
+});
+const clearCurrentExportFilters = () => {
+  applyExportFilterSnapshot({
+    startDate: '',
+    endDate: '',
+    serviceType: '',
+    datePreset: '',
+  });
+};
+const setExportDateRange = (value: [Date, Date] | null, datePreset: EarningsExportDatePreset = '') => {
+  applyExportFilterSnapshot({
+    ...buildCurrentExportFilterSnapshot(),
+    startDate: value?.[0]?.toISOString() ?? '',
+    endDate: value?.[1]?.toISOString() ?? '',
+    datePreset: value ? datePreset : '',
+  });
 };
 const resolveExportPresetRange = (
   preset: Exclude<EarningsExportDatePreset, ''>,
@@ -548,6 +607,10 @@ const exportServiceType = computed<PetServiceType | ''>({
     exportPageState.serviceType = value || '';
   },
 });
+const exportTemplates = computed(() => exportPageState.templates);
+const selectedExportTemplate = computed(
+  () => exportTemplates.value.find((item) => item.name === selectedExportTemplateName.value) ?? null,
+);
 const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
 const latestActiveOrder = computed(() => summary.value?.latestActiveOrder ?? null);
 const recentCompletedOrders = computed(() => {
@@ -703,7 +766,98 @@ function applyExportPreset(preset: Exclude<EarningsExportDatePreset, ''>) {
 }
 
 function clearExportFilters() {
-  resetExportPageState();
+  clearCurrentExportFilters();
+}
+
+function applySelectedExportTemplate() {
+  if (!selectedExportTemplate.value) {
+    return;
+  }
+
+  applyExportFilterSnapshot(selectedExportTemplate.value);
+  ElMessage.success(`已应用模板「${selectedExportTemplate.value.name}」`);
+}
+
+async function saveCurrentExportTemplate() {
+  if (!hasExportFilters.value) {
+    ElMessage.warning('请先选择至少一个导出筛选条件');
+    return;
+  }
+
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '为当前导出条件取一个名字，便于后续快速套用。',
+      '保存经营导出模板',
+      {
+        confirmButtonText: '保存',
+        cancelButtonText: '取消',
+        inputValue: selectedExportTemplateName.value,
+        inputValidator: (inputValue) => {
+          const name = inputValue.trim();
+          if (!name) {
+            return '模板名称不能为空';
+          }
+          if (name.length > 20) {
+            return '模板名称请控制在 20 个字符以内';
+          }
+          return true;
+        },
+      },
+    );
+
+    const name = value.trim();
+    const nextTemplate: CaregiverEarningsExportTemplate = {
+      name,
+      ...buildCurrentExportFilterSnapshot(),
+    };
+    const existingIndex = exportPageState.templates.findIndex((item) => item.name === name);
+
+    if (existingIndex === -1 && exportPageState.templates.length >= MAX_EARNINGS_EXPORT_TEMPLATE_COUNT) {
+      ElMessage.warning(`最多只能保存 ${MAX_EARNINGS_EXPORT_TEMPLATE_COUNT} 个导出模板`);
+      return;
+    }
+
+    const nextTemplates = [...exportPageState.templates];
+    if (existingIndex >= 0) {
+      nextTemplates.splice(existingIndex, 1);
+    }
+    nextTemplates.unshift(nextTemplate);
+    exportPageState.templates = nextTemplates;
+    selectedExportTemplateName.value = name;
+    ElMessage.success(existingIndex >= 0 ? `模板「${name}」已更新` : `模板「${name}」已保存`);
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error(getErrorMessage(error, '保存经营导出模板失败'));
+    }
+  }
+}
+
+async function deleteSelectedExportTemplate() {
+  if (!selectedExportTemplate.value) {
+    return;
+  }
+
+  const templateName = selectedExportTemplate.value.name;
+
+  try {
+    await ElMessageBox.confirm(
+      `删除后将不再保留模板「${templateName}」的导出条件。`,
+      '删除经营导出模板',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+      },
+    );
+
+    exportPageState.templates = exportPageState.templates.filter((item) => item.name !== templateName);
+    selectedExportTemplateName.value = '';
+    ElMessage.success(`模板「${templateName}」已删除`);
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error(getErrorMessage(error, '删除经营导出模板失败'));
+    }
+  }
 }
 
 function buildEarningsExportRequest() {
@@ -845,6 +999,7 @@ onMounted(() => {
 }
 
 .petpal-export-toolbar__presets,
+.petpal-export-toolbar__templates,
 .petpal-export-toolbar__filters {
   display: flex;
   gap: 12px;
@@ -860,6 +1015,7 @@ onMounted(() => {
   text-transform: uppercase;
 }
 
+.petpal-export-toolbar__template,
 .petpal-export-toolbar__service {
   width: 220px;
 }
@@ -1098,10 +1254,12 @@ onMounted(() => {
   }
 
   .petpal-export-toolbar__presets,
+  .petpal-export-toolbar__templates,
   .petpal-export-toolbar__filters {
     align-items: stretch;
   }
 
+  .petpal-export-toolbar__template,
   .petpal-export-toolbar__service {
     width: 100%;
   }
