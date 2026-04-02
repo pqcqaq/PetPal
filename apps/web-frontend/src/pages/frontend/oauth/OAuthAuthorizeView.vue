@@ -1,58 +1,83 @@
 <template>
-  <div class="frontend-page oauth-authorize-page">
-    <section v-if="loading" class="frontend-card oauth-authorize-page__status">
-      <p class="frontend-card__eyebrow">OAuth 授权</p>
-      <h2>正在加载授权信息</h2>
-      <p>请稍候，系统正在准备应用信息与本次授权内容。</p>
+  <div class="oauth-gate">
+    <section v-if="loading" class="oauth-gate__hero">
+      <p class="oauth-gate__eyebrow">OAuth 授权</p>
+      <h1>正在准备授权确认</h1>
+      <p>系统正在读取应用信息与本次权限申请，通常只需要几秒。</p>
     </section>
 
-    <section v-else-if="loadError" class="frontend-card oauth-authorize-page__status is-error">
-      <p class="frontend-card__eyebrow">授权失败</p>
-      <h2>无法继续授权</h2>
+    <section v-else-if="loadError" class="oauth-gate__hero is-error">
+      <p class="oauth-gate__eyebrow">授权失败</p>
+      <h1>这次授权无法继续</h1>
       <p>{{ loadError }}</p>
-      <div class="oauth-authorize-page__actions">
-        <RouterLink class="frontend-page__button is-secondary" to="/oauth/error?error=invalid_request">查看错误详情</RouterLink>
+      <div class="oauth-gate__actions">
+        <RouterLink class="oauth-gate__button is-secondary" to="/">回到首页</RouterLink>
+        <RouterLink class="oauth-gate__button is-primary" to="/oauth/error?error=invalid_request">查看错误页</RouterLink>
       </div>
     </section>
 
     <template v-else-if="session">
-      <section class="frontend-page__hero oauth-authorize-page__hero">
-        <p class="frontend-page__eyebrow">第三方应用申请访问</p>
-        <h1>{{ session.application.name }}</h1>
-        <p>
-          {{ session.application.description || '该应用正在请求访问你的 PetPal 账号资料与本次授权内容。' }}
+      <header class="oauth-gate__hero">
+        <div class="oauth-gate__hero-copy">
+          <p class="oauth-gate__eyebrow">第三方应用授权</p>
+          <h1>{{ session.application.name }}</h1>
+          <p>
+            {{ session.application.description || '该应用希望继续当前流程，需要读取你的 PetPal 账号资料与本次授权范围。' }}
+          </p>
+        </div>
+
+        <div class="oauth-gate__meta-grid">
+          <div class="oauth-gate__meta-item">
+            <span>当前账号</span>
+            <strong>{{ session.user.nickname }} · {{ session.user.username }}</strong>
+          </div>
+          <div class="oauth-gate__meta-item">
+            <span>会话有效期</span>
+            <strong>{{ expiresAtText }}</strong>
+          </div>
+        </div>
+      </header>
+
+      <section class="oauth-gate__panel">
+        <div class="oauth-gate__panel-copy">
+          <p class="oauth-gate__panel-eyebrow">授权范围</p>
+          <h2>只确认这次真正需要的权限</h2>
+          <p>同意后会立即跳回发起本次授权的业务应用。</p>
+        </div>
+
+        <ol v-if="session.scopes.length" class="oauth-gate__scope-list">
+          <li v-for="scope in session.scopes" :key="scope.code" class="oauth-gate__scope-item">
+            <div class="oauth-gate__scope-head">
+              <strong>{{ scope.name }}</strong>
+              <span>{{ scope.code }}</span>
+            </div>
+            <p>{{ scope.description }}</p>
+          </li>
+        </ol>
+
+        <p v-else class="oauth-gate__scope-empty">
+          当前授权申请没有声明具体权限，建议先拒绝并返回业务应用重新发起。
         </p>
       </section>
 
-      <section class="frontend-card oauth-authorize-page__card">
-        <p class="frontend-card__eyebrow">当前账号</p>
-        <h3>{{ session.user.nickname }}（{{ session.user.username }}）</h3>
-        <p>会话有效期至：{{ expiresAtText }}</p>
-      </section>
+      <section class="oauth-gate__decision">
+        <div class="oauth-gate__panel-copy">
+          <p class="oauth-gate__panel-eyebrow">下一步</p>
+          <h2>确认后立刻返回业务应用</h2>
+          <p>如果你不认识这个应用，或本次申请范围超出预期，直接拒绝即可。</p>
+        </div>
 
-      <section class="frontend-card oauth-authorize-page__card">
-        <p class="frontend-card__eyebrow">本次授权内容</p>
-        <ul class="oauth-authorize-page__scope-list">
-          <li v-for="scope in session.scopes" :key="scope.code" class="oauth-authorize-page__scope-item">
-            <strong>{{ scope.name }}</strong>
-            <span>{{ scope.description }}</span>
-          </li>
-        </ul>
-      </section>
-
-      <section class="frontend-card oauth-authorize-page__actions-panel">
-        <p>你可以拒绝或同意，系统会返回到发起本次接入的业务应用。</p>
-        <div class="oauth-authorize-page__actions">
+        <div class="oauth-gate__actions">
           <button
-            class="frontend-page__button is-secondary"
+            class="oauth-gate__button is-secondary"
             type="button"
             :disabled="submitting"
             @click="submitDecision('deny')"
           >
-            拒绝
+            拒绝授权
           </button>
           <button
-            class="frontend-page__button is-primary"
+            class="oauth-gate__button is-primary"
             type="button"
             :disabled="submitting"
             @click="submitDecision('approve')"
@@ -172,31 +197,109 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
-.oauth-authorize-page {
+.oauth-gate {
+  display: grid;
+  gap: 18px;
+  max-width: 860px;
+  margin: 0 auto;
   padding-bottom: 24px;
 }
 
-.oauth-authorize-page__hero h1 {
-  margin: 0;
+.oauth-gate__hero,
+.oauth-gate__panel,
+.oauth-gate__decision {
+  display: grid;
+  gap: 18px;
+  padding: 28px;
+  border: 1px solid rgba(44, 37, 29, 0.12);
+  background: rgba(255, 252, 248, 0.92);
+  box-shadow: 0 24px 56px rgba(43, 36, 31, 0.08);
 }
 
-.oauth-authorize-page__status,
-.oauth-authorize-page__card,
-.oauth-authorize-page__actions-panel {
+.oauth-gate__hero {
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 26%),
+    linear-gradient(180deg, rgba(255, 251, 247, 0.98) 0%, rgba(252, 247, 241, 0.94) 100%);
+}
+
+.oauth-gate__hero.is-error {
+  border-color: rgba(160, 74, 48, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(194, 65, 12, 0.08), transparent 26%),
+    linear-gradient(180deg, rgba(255, 248, 244, 0.98) 0%, rgba(255, 244, 239, 0.94) 100%);
+}
+
+.oauth-gate__eyebrow,
+.oauth-gate__panel-eyebrow {
+  margin: 0;
+  color: #8f6c4f;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.oauth-gate__hero-copy,
+.oauth-gate__panel-copy {
+  display: grid;
   gap: 10px;
 }
 
-.oauth-authorize-page__status h2,
-.oauth-authorize-page__card h3 {
+.oauth-gate__hero h1,
+.oauth-gate__panel h2,
+.oauth-gate__decision h2 {
   margin: 0;
+  font-family: 'Playfair Display', 'STSong', serif;
+  color: #2b241f;
+  line-height: 0.98;
 }
 
-.oauth-authorize-page__status.is-error {
-  border-color: rgba(169, 67, 50, 0.22);
-  background: rgba(255, 244, 242, 0.88);
+.oauth-gate__hero h1 {
+  font-size: clamp(34px, 5vw, 54px);
 }
 
-.oauth-authorize-page__scope-list {
+.oauth-gate__panel h2,
+.oauth-gate__decision h2 {
+  font-size: clamp(24px, 3vw, 32px);
+}
+
+.oauth-gate__hero p:not(.oauth-gate__eyebrow),
+.oauth-gate__panel-copy p:not(.oauth-gate__panel-eyebrow),
+.oauth-gate__scope-item p,
+.oauth-gate__scope-empty {
+  margin: 0;
+  color: #62584f;
+  line-height: 1.75;
+}
+
+.oauth-gate__meta-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.oauth-gate__meta-item {
+  display: grid;
+  gap: 6px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(44, 37, 29, 0.1);
+}
+
+.oauth-gate__meta-item span {
+  color: #8f7b69;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.oauth-gate__meta-item strong {
+  color: #2b241f;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.oauth-gate__scope-list {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -204,42 +307,93 @@ onMounted(async () => {
   gap: 12px;
 }
 
-.oauth-authorize-page__scope-item {
+.oauth-gate__scope-item {
   display: grid;
-  gap: 6px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(39, 61, 77, 0.1);
-  background: rgba(255, 255, 255, 0.7);
+  gap: 8px;
+  padding: 16px 0;
+  border-top: 1px solid rgba(44, 37, 29, 0.1);
 }
 
-.oauth-authorize-page__scope-item strong {
-  font-size: 14px;
+.oauth-gate__scope-head {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
 }
 
-.oauth-authorize-page__scope-item span {
-  color: #5b6a72;
-  line-height: 1.6;
+.oauth-gate__scope-head strong {
+  color: #2b241f;
+  font-size: 16px;
 }
 
-.oauth-authorize-page__actions {
+.oauth-gate__scope-head span {
+  color: #8f6c4f;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.oauth-gate__scope-empty {
+  padding-top: 14px;
+  border-top: 1px solid rgba(44, 37, 29, 0.1);
+}
+
+.oauth-gate__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 8px;
 }
 
-@media (max-width: 900px) {
-  .oauth-authorize-page {
-    gap: 16px;
+.oauth-gate__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid rgba(44, 37, 29, 0.12);
+  background: #fffdf9;
+  color: #332c26;
+  font-size: 14px;
+  font-weight: 700;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+}
+
+.oauth-gate__button.is-primary {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff8ef;
+}
+
+.oauth-gate__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+@media (max-width: 720px) {
+  .oauth-gate__hero,
+  .oauth-gate__panel,
+  .oauth-gate__decision {
+    padding: 20px;
   }
 
-  .oauth-authorize-page__actions {
+  .oauth-gate__meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .oauth-gate__actions {
     flex-direction: column;
   }
 
-  .oauth-authorize-page__actions :deep(.frontend-page__button) {
+  .oauth-gate__button {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oauth-gate__button {
+    transition: none;
   }
 }
 </style>
