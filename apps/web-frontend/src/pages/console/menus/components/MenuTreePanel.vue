@@ -216,7 +216,7 @@ const contextMenuItems = computed<ContextMenuItem<MenuNodeRecord>[]>(() => [
   {
     key: 'edit',
     label: '编辑节点',
-    description: '打开节点编辑弹窗',
+    description: '切换右侧工作区到节点编辑模式',
     divided: true,
     hidden: () => !props.canUpdate,
     onSelect: (node) => {
@@ -597,4 +597,3 @@ watch(
   }
 }
 </style>
-

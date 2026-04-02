@@ -1,13 +1,18 @@
 <template>
   <PageScaffold :stats="stats">
     <template #actions>
-      <el-space>
+      <el-space v-if="!isDetailMode">
         <el-button @click="loadLogs">刷新日志</el-button>
         <ListExportButton :request="buildExportRequest" error-message="导出审计日志失败" />
       </el-space>
+
+      <el-space v-else>
+        <el-button @click="openList">返回审计清单</el-button>
+        <el-button @click="refreshCurrentScreen">刷新当前详情</el-button>
+      </el-space>
     </template>
 
-    <template #toolbar>
+    <template v-if="!isDetailMode" #toolbar>
       <AuditToolbar
         :filters="pageState.filters"
         :loading="loading"
@@ -16,7 +21,7 @@
       />
     </template>
 
-    <div class="audit-workbench">
+    <div v-if="!isDetailMode" class="audit-workbench">
       <AuditTable
         :logs="logs"
         :loading="loading"
@@ -37,17 +42,15 @@
       />
     </div>
 
-    <AuditDetailDrawer
-      v-model:visible="drawerVisible"
-      :log="selectedLog"
-    />
+    <AuditDetailDrawer v-else :log="selectedLog" />
   </PageScaffold>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { RequestAuditRecord } from '@rbac/api-common';
+import { useRoute, useRouter } from 'vue-router';
 import PageScaffold from '@/components/workbench/PageScaffold.vue';
 import ListExportButton from '@/components/download/ListExportButton.vue';
 import { usePageState } from '@/composables/use-page-state';
@@ -76,12 +79,15 @@ type AuditPageState = {
   page: number;
 };
 
+type AuditScreenMode = 'list' | 'detail';
+
 const logs = ref<RequestAuditRecord[]>([]);
 const selectedLogId = ref<string | null>(null);
-const drawerVisible = ref(false);
 const loading = ref(false);
 const total = ref(0);
 const pageSize = 10;
+const route = useRoute();
+const router = useRouter();
 
 const { state: pageState } = usePageState<AuditPageState>('page:audit', {
   filters: {
@@ -93,6 +99,14 @@ const { state: pageState } = usePageState<AuditPageState>('page:audit', {
   },
   page: 1,
 });
+
+const allowedModes: AuditScreenMode[] = ['list', 'detail'];
+const screenMode = computed<AuditScreenMode>(() => {
+  const value = typeof route.query.mode === 'string' ? route.query.mode : '';
+  return allowedModes.includes(value as AuditScreenMode) ? (value as AuditScreenMode) : 'list';
+});
+const activeAuditId = computed(() => (typeof route.query.id === 'string' ? route.query.id : ''));
+const isDetailMode = computed(() => screenMode.value === 'detail');
 
 const selectedLog = computed(() =>
   logs.value.find(item => item.id === selectedLogId.value)
@@ -175,10 +189,29 @@ const buildFilterParams = () => ({
 
 const buildExportRequest = () => api.audit.export(buildFilterParams());
 
+const navigateToMode = async (mode: AuditScreenMode, id?: string) => {
+  const query: Record<string, string> = {};
+  if (mode !== 'list') {
+    query.mode = mode;
+  }
+  if (id) {
+    query.id = id;
+  }
+  await router.replace({ path: route.path, query });
+};
+
+const openList = async () => {
+  await navigateToMode('list');
+};
+
 const syncSelectedLog = () => {
   if (!logs.value.length) {
     selectedLogId.value = null;
     return;
+  }
+
+  if (isDetailMode.value && activeAuditId.value) {
+    selectedLogId.value = activeAuditId.value;
   }
 
   const keepSelected = selectedLogId.value
@@ -208,6 +241,10 @@ const loadLogs = async () => {
   }
 };
 
+const refreshCurrentScreen = async () => {
+  await loadLogs();
+};
+
 const applyFilters = async () => {
   pageState.page = 1;
   await loadLogs();
@@ -232,10 +269,27 @@ const selectLog = (row: RequestAuditRecord) => {
   selectedLogId.value = row.id;
 };
 
-const openDetail = (row: RequestAuditRecord) => {
+const openDetail = async (row: RequestAuditRecord) => {
   selectedLogId.value = row.id;
-  drawerVisible.value = true;
+  await navigateToMode('detail', row.id);
 };
+
+watch(
+  () => [screenMode.value, activeAuditId.value] as const,
+  async ([mode, id]) => {
+    if (mode === 'list') {
+      return;
+    }
+
+    if (!id) {
+      await openList();
+      return;
+    }
+
+    selectedLogId.value = id;
+  },
+  { immediate: true },
+);
 
 onMounted(loadLogs);
 </script>

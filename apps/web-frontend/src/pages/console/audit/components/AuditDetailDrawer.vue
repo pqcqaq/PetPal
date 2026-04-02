@@ -1,10 +1,8 @@
 <template>
-  <el-drawer
-    class="audit-detail-drawer"
-    :model-value="visible"
+  <SurfacePanel
+    caption="Request Detail"
     :title="log ? `${log.method} ${log.path}` : '审计详情'"
-    size="62%"
-    @update:model-value="emit('update:visible', $event)"
+    :description="log ? '完整请求、载荷与数据库操作都在这个工作区里查看。' : '当前没有可查看的审计请求。'"
   >
     <div v-if="log" class="detail-stack">
       <section class="detail-section audit-request-overview">
@@ -290,7 +288,7 @@
         <el-empty v-else description="这次请求没有记录到数据库操作" />
       </section>
     </div>
-  </el-drawer>
+  </SurfacePanel>
 </template>
 
 <script setup lang="ts">
@@ -298,6 +296,7 @@ import { computed } from 'vue';
 import VueJsonPretty from 'vue-json-pretty';
 import 'vue-json-pretty/lib/styles.css';
 import type { RequestAuditOperationRecord, RequestAuditRecord } from '@rbac/api-common';
+import SurfacePanel from '@/components/workbench/SurfacePanel.vue';
 import {
   formatAuditAuthMode,
   formatAuditDuration,
@@ -315,12 +314,7 @@ import {
 } from '../audit-display';
 
 const props = defineProps<{
-  visible: boolean;
   log: RequestAuditRecord | null;
-}>();
-
-const emit = defineEmits<{
-  'update:visible': [value: boolean];
 }>();
 
 const requestPayloadBlocks = computed(() => [
@@ -399,10 +393,6 @@ const getOperationPayloadBlocks = (operation: RequestAuditOperationRecord): any 
 </script>
 
 <style scoped lang="scss">
-:deep(.audit-detail-drawer .el-drawer__body) {
-  padding-top: 0;
-}
-
 .audit-request-overview {
   gap: 14px;
 }
