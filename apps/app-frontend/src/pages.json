@@ -51,7 +51,7 @@
       "path": "pages/help/index",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "帮助中心"
+        "navigationBarTitleText": "帮助"
       }
     },
     {
@@ -82,7 +82,7 @@
       "path": "pages/notifications/index",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "通知中心",
+        "navigationBarTitleText": "通知",
         "enablePullDownRefresh": true
       }
     },
