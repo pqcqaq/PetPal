@@ -1,7 +1,5 @@
 <template>
   <div class="auth-layout">
-    <AuthShowcasePanel :capability-items="capabilityItems" />
-
     <AuthAccessPanel
       :tab="tab"
       :can-switch-to-login="hasLoginStrategies"
@@ -80,7 +78,6 @@ import AuthAccessPanel from './components/AuthAccessPanel.vue';
 import AuthLoginStrategyForm from './components/AuthLoginStrategyForm.vue';
 import AuthOAuthProviders from './components/AuthOAuthProviders.vue';
 import AuthRegisterStrategyForm from './components/AuthRegisterStrategyForm.vue';
-import AuthShowcasePanel from './components/AuthShowcasePanel.vue';
 import AuthStrategySelector from './components/AuthStrategySelector.vue';
 import { resolvePreferredAdminEntry } from '@/utils/admin-entry';
 
@@ -125,20 +122,6 @@ const authConfig = reactive<AuthStrategyCollection>(createEmptyConfig());
 const loginForms = reactive<Record<string, StrategyFormState>>({});
 const registerForms = reactive<Record<string, StrategyFormState>>({});
 const sendingCodes = reactive<Record<string, boolean>>({});
-const capabilityItems = [
-  {
-    title: '统一入口',
-    copy: '一个入口完成登录、注册与身份校验。',
-  },
-  {
-    title: '按权限进入',
-    copy: '登录后只展示当前角色可用的页面和操作。',
-  },
-  {
-    title: '管理清晰',
-    copy: '登录后可直接进入 PetPal 后台治理区或主人服务台。',
-  },
-];
 
 const hasLoginStrategies = computed(() => authConfig.loginStrategies.length > 0);
 const hasRegisterStrategies = computed(() => authConfig.registerStrategies.length > 0);
@@ -362,22 +345,11 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 .auth-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(460px, 0.92fr);
+  min-height: 100vh;
 }
 
 .auth-panel__stack {
   display: grid;
   gap: 18px;
-}
-
-@media (max-width: 1120px) {
-  .auth-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .auth-layout :deep(.auth-access-panel) {
-    order: -1;
-  }
 }
 </style>
