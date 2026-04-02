@@ -663,7 +663,7 @@ const ownerReminderCards = computed<ReminderCard[]>(() => {
       summary: `${servingOrder.orderNo} 正在履约，建议持续确认签到、服务记录和完成时机。`,
       detail: '主人侧最容易遗漏的是“服务已开始但没有持续回看履约过程”，这里优先提醒补看。',
       actionLabel: '查看履约',
-      actionTo: { name: 'frontend-petpal-order-detail', params: { id: servingOrder.id } },
+      actionTo: { name: 'frontend-petpal-order-detail', params: { id: servingOrder.id }, query: { tab: 'service' } },
     });
   }
 
@@ -798,7 +798,7 @@ const caregiverReminderCards = computed<ReminderCard[]>(() => {
       summary: `${servingOrder.orderNo} 正在服务中，建议及时上传服务记录和补充说明。`,
       detail: '服务日志越及时，主人确认和售后透明度就越高。',
       actionLabel: '查看履约',
-      actionTo: { name: 'frontend-petpal-order-detail', params: { id: servingOrder.id } },
+      actionTo: { name: 'frontend-petpal-order-detail', params: { id: servingOrder.id }, query: { tab: 'service' } },
     });
   }
 
@@ -825,7 +825,7 @@ const caregiverReminderCards = computed<ReminderCard[]>(() => {
       summary: `${riskOrder.orderNo} · ${getPetPalOrderStatusLabel(riskOrder.orderStatus)}`,
       detail: '这些订单会影响收入沉淀、评分和后续复购，建议及时回看订单详情与沟通记录。',
       actionLabel: '查看订单',
-      actionTo: { name: 'frontend-petpal-order-detail', params: { id: riskOrder.id } },
+      actionTo: { name: 'frontend-petpal-order-detail', params: { id: riskOrder.id }, query: { tab: 'aftersales' } },
     });
   }
 

@@ -156,7 +156,7 @@
               >
                 标记已读
               </el-button>
-              <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
+              <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id }, query: { tab: 'chat' } }">
                 <el-button link type="primary" size="small">打开订单</el-button>
               </RouterLink>
             </el-space>
@@ -275,7 +275,7 @@
               >
                 标记已读
               </el-button>
-              <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
+              <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id }, query: { tab: 'chat' } }">
                 <el-button link type="primary" size="small">打开订单</el-button>
               </RouterLink>
             </el-space>

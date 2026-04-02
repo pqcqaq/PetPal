@@ -19,8 +19,76 @@ Secondary actions: 刷新、返回列表
 
     <div v-loading="loading" class="petpal-order-detail">
       <div v-if="order" class="petpal-order-detail__content">
+        <article class="frontend-card petpal-order-hero">
+          <div class="petpal-order-hero__header">
+            <div class="petpal-order-hero__copy">
+              <div class="petpal-order-hero__tags">
+                <el-tag
+                  v-for="tag in heroTags"
+                  :key="tag.label"
+                  :type="tag.type"
+                  effect="dark"
+                >
+                  {{ tag.label }}
+                </el-tag>
+              </div>
+              <h2>{{ currentStageLabel }}</h2>
+              <p>{{ actionSummary }}</p>
+            </div>
+
+            <div class="petpal-order-hero__actions">
+              <el-button type="primary" :loading="confirmCompleting" @click="openPrimaryAction">
+                {{ primaryActionLabel }}
+              </el-button>
+              <el-button @click="openTab('chat')">沟通</el-button>
+              <el-button @click="openTab('service')">履约</el-button>
+              <el-button
+                v-if="isOwnerView && (hasAftersalesActivity || canCreateComplaint)"
+                :type="hasAftersalesActivity ? 'danger' : 'default'"
+                plain
+                @click="openAftersalesAction"
+              >
+                {{ hasAftersalesActivity ? '查看售后' : '发起投诉' }}
+              </el-button>
+              <el-button
+                v-if="isOwnerView && (canCreateReview || order.review)"
+                plain
+                @click="openReviewAction"
+              >
+                {{ order.review ? '查看评价' : '写评价' }}
+              </el-button>
+            </div>
+          </div>
+
+          <div class="petpal-order-hero__signals">
+            <div
+              v-for="signal in signalCards"
+              :key="signal.key"
+              class="petpal-order-hero__signal"
+              :class="`is-${signal.tone}`"
+            >
+              <span>{{ signal.title }}</span>
+              <strong>{{ signal.value }}</strong>
+              <p>{{ signal.hint }}</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="frontend-card petpal-order-detail__tabs">
+          <span class="frontend-card__eyebrow">查看内容</span>
+          <el-radio-group v-model="activeDetailTab" size="large" class="petpal-order-detail__tab-group">
+            <el-radio-button
+              v-for="tab in detailTabs"
+              :key="tab.value"
+              :label="tab.value"
+            >
+              {{ tab.label }}
+            </el-radio-button>
+          </el-radio-group>
+        </article>
+
         <!-- 订单基础信息卡片 -->
-        <article class="frontend-card petpal-order-detail__header">
+        <article v-show="activeDetailTab === 'overview'" class="frontend-card petpal-order-detail__header">
           <span class="frontend-card__eyebrow">订单信息</span>
           <h3>{{ orderNo }}</h3>
           <div class="petpal-order-info">
@@ -50,7 +118,7 @@ Secondary actions: 刷新、返回列表
         </article>
 
         <!-- 金额统计卡片 -->
-        <article class="frontend-card petpal-order-detail__amounts">
+        <article v-show="activeDetailTab === 'overview'" class="frontend-card petpal-order-detail__amounts">
           <span class="frontend-card__eyebrow">金额信息</span>
           <h3>金额统计</h3>
           <div class="petpal-amounts-grid">
@@ -75,7 +143,7 @@ Secondary actions: 刷新、返回列表
           </div>
         </article>
 
-        <article class="frontend-card petpal-order-detail__fulfillment">
+        <article v-show="activeDetailTab === 'service'" class="frontend-card petpal-order-detail__fulfillment">
           <span class="frontend-card__eyebrow">履约时间线</span>
           <h3>{{ order.timeline.length > 0 ? `共 ${order.timeline.length} 条履约事件` : '暂无履约事件' }}</h3>
           <template v-if="order.timeline.length > 0">
@@ -117,7 +185,7 @@ Secondary actions: 刷新、返回列表
           </div>
         </article>
 
-        <article class="frontend-card petpal-order-detail__service-logs">
+        <article v-show="activeDetailTab === 'service'" class="frontend-card petpal-order-detail__service-logs">
           <span class="frontend-card__eyebrow">服务记录</span>
           <h3>{{ order.serviceLogs.length > 0 ? `共 ${order.serviceLogs.length} 条服务记录` : '暂无服务记录' }}</h3>
           <template v-if="order.serviceLogs.length > 0">
@@ -181,7 +249,7 @@ Secondary actions: 刷新、返回列表
           </div>
         </article>
 
-        <article class="frontend-card petpal-order-detail__messages">
+        <article v-show="activeDetailTab === 'chat'" class="frontend-card petpal-order-detail__messages">
           <span class="frontend-card__eyebrow">订单沟通</span>
           <div class="petpal-message-panel__header">
             <div class="petpal-message-panel__headline">
@@ -306,7 +374,7 @@ Secondary actions: 刷新、返回列表
           </div>
         </article>
 
-        <article class="frontend-card petpal-order-detail__review">
+        <article v-show="activeDetailTab === 'overview'" class="frontend-card petpal-order-detail__review">
           <span class="frontend-card__eyebrow">服务评价</span>
           <div class="petpal-review-card__header">
             <div class="petpal-review-card__headline">
@@ -367,7 +435,7 @@ Secondary actions: 刷新、返回列表
           </div>
         </article>
 
-        <article v-if="isOwnerView" class="frontend-card petpal-order-detail__refund-progress">
+        <article v-if="isOwnerView" v-show="activeDetailTab === 'aftersales'" class="frontend-card petpal-order-detail__refund-progress">
           <span class="frontend-card__eyebrow">退款进度</span>
           <div class="petpal-refund-progress__header">
             <div class="petpal-refund-progress__headline">
@@ -425,7 +493,7 @@ Secondary actions: 刷新、返回列表
           </div>
         </article>
 
-        <article v-if="isOwnerView" class="frontend-card petpal-order-detail__complaints">
+        <article v-if="isOwnerView" v-show="activeDetailTab === 'aftersales'" class="frontend-card petpal-order-detail__complaints">
           <span class="frontend-card__eyebrow">投诉与进度</span>
           <div class="petpal-complaint-panel__header">
             <div class="petpal-complaint-panel__headline">
@@ -519,7 +587,7 @@ Secondary actions: 刷新、返回列表
           </div>
         </article>
 
-        <article v-if="isOwnerView" class="frontend-card petpal-order-detail__aftersales">
+        <article v-if="isOwnerView" v-show="activeDetailTab === 'aftersales'" class="frontend-card petpal-order-detail__aftersales">
           <span class="frontend-card__eyebrow">售后时间线</span>
           <h3>{{ aftersalesTimeline.length > 0 ? `共 ${aftersalesTimeline.length} 个售后节点` : '暂无售后节点' }}</h3>
           <template v-if="aftersalesTimeline.length > 0">
@@ -561,7 +629,7 @@ Secondary actions: 刷新、返回列表
         </article>
 
         <!-- 支付时间线 -->
-        <article class="frontend-card petpal-order-detail__payments">
+        <article v-show="activeDetailTab === 'overview'" class="frontend-card petpal-order-detail__payments">
           <span class="frontend-card__eyebrow">支付记录</span>
           <h3>{{ order.payments.length > 0 ? `共 ${order.payments.length} 条支付记录` : '暂无支付记录' }}</h3>
           <template v-if="order.payments.length > 0">
@@ -605,7 +673,7 @@ Secondary actions: 刷新、返回列表
         </article>
 
         <!-- 退款时间线 -->
-        <article class="frontend-card petpal-order-detail__refunds">
+        <article v-show="activeDetailTab === 'aftersales'" class="frontend-card petpal-order-detail__refunds">
           <span class="frontend-card__eyebrow">退款记录</span>
           <div class="petpal-section-heading">
             <h3>{{ order.refunds.length > 0 ? `共 ${order.refunds.length} 条退款记录` : '暂无退款记录' }}</h3>
@@ -780,9 +848,9 @@ Secondary actions: 刷新、返回列表
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '@/api/client';
 import ListExportButton from '@/components/download/ListExportButton.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -815,7 +883,8 @@ import type {
 } from '@rbac/api-common';
 
 const router = useRouter();
-const orderId = router.currentRoute.value.params.id as string;
+const route = useRoute();
+const orderId = route.params.id as string;
 const auth = useAuthStore();
 
 const order = ref<OrderDetailRecord | null>(null);
@@ -828,6 +897,7 @@ const reviewDialogVisible = ref(false);
 const reviewSubmitting = ref(false);
 const complaintDialogVisible = ref(false);
 const complaintSubmitting = ref(false);
+const confirmCompleting = ref(false);
 const messageSubmitting = ref(false);
 const messageUploadProgress = ref<number | null>(null);
 const messageFileInput = ref<HTMLInputElement | null>(null);
@@ -857,6 +927,7 @@ const messageForm = reactive({
 });
 
 type AftersalesTimelineDotClass = 'pending' | 'success' | 'warning' | 'error';
+type DetailTab = 'overview' | 'chat' | 'service' | 'aftersales';
 
 interface AftersalesTimelineItem {
   id: string;
@@ -871,9 +942,46 @@ interface AftersalesTimelineItem {
   details: string[];
 }
 
+interface OrderDetailSignalCard {
+  key: string;
+  title: string;
+  value: string;
+  hint: string;
+  tone: 'primary' | 'success' | 'warning' | 'info' | 'danger';
+}
+
+const detailTabs: Array<{ label: string; value: DetailTab }> = [
+  { label: '总览', value: 'overview' },
+  { label: '沟通', value: 'chat' },
+  { label: '履约', value: 'service' },
+  { label: '售后', value: 'aftersales' },
+];
+
+const activeDetailTab = ref<DetailTab>('overview');
+
 const isOwnerView = computed(() => Boolean(auth.user?.id && order.value?.ownerId === auth.user.id));
+const totalAmount = computed(() => {
+  if (!order.value) {
+    return 0;
+  }
+  return Number(order.value.amountTotal) + Number(order.value.amountAdjusted);
+});
+const outstandingAmount = computed(() => {
+  if (!order.value) {
+    return 0;
+  }
+  return Number(Math.max(0, totalAmount.value - Number(order.value.amountPaid)).toFixed(2));
+});
+const hasAftersalesActivity = computed(() => Boolean(
+  refundProgress.value?.stage && refundProgress.value.stage !== 'NONE'
+  || complaints.value.length > 0
+  || order.value?.refunds.length,
+));
 const canCreateReview = computed(() =>
   Boolean(isOwnerView.value && order.value?.orderStatus === 'COMPLETED' && !order.value?.review),
+);
+const canConfirmComplete = computed(() =>
+  Boolean(isOwnerView.value && order.value?.orderStatus === 'SERVING'),
 );
 const activeComplaint = computed(() =>
   complaints.value.find((item) => item.status === 'OPEN' || item.status === 'PROCESSING') ?? null,
@@ -894,6 +1002,181 @@ const currentConversationUnreadCount = computed(() => {
   return isOwnerView.value
     ? messageConversation.value.ownerUnreadCount
     : messageConversation.value.caregiverUnreadCount;
+});
+
+const normalizeDetailTab = (value: unknown): DetailTab => {
+  if (value === 'chat' || value === 'service' || value === 'aftersales') {
+    return value;
+  }
+  return 'overview';
+};
+
+watch(
+  () => route.query.tab,
+  (value) => {
+    activeDetailTab.value = normalizeDetailTab(value);
+  },
+  { immediate: true },
+);
+
+const currentStageLabel = computed(() => {
+  if (!order.value) {
+    return '正在同步订单状态';
+  }
+  if (outstandingAmount.value > 0 && order.value.orderStatus === 'PENDING_ACCEPT') {
+    return `待支付 ¥${formatAmount(outstandingAmount.value)}`;
+  }
+  if (activeComplaint.value) {
+    return `投诉${getComplaintStatusLabel(activeComplaint.value.status)}`;
+  }
+  if (refundProgress.value && refundProgress.value.stage !== 'NONE') {
+    return getRefundProgressStageLabel(refundProgress.value.stage);
+  }
+  if (canConfirmComplete.value) {
+    return '服务中，待确认完成';
+  }
+  if (canCreateReview.value) {
+    return '订单已完成，待评价';
+  }
+  return getOrderStatusLabel(order.value.orderStatus);
+});
+
+const currentStageType = computed<'primary' | 'success' | 'warning' | 'info' | 'danger'>(() => {
+  if (!order.value) {
+    return 'info';
+  }
+  if (outstandingAmount.value > 0 && order.value.orderStatus === 'PENDING_ACCEPT') {
+    return 'warning';
+  }
+  if (activeComplaint.value) {
+    return getComplaintStatusType(activeComplaint.value.status);
+  }
+  if (refundProgress.value && refundProgress.value.stage !== 'NONE') {
+    return getRefundProgressStageType(refundProgress.value.stage);
+  }
+  return getOrderStatusType(order.value.orderStatus);
+});
+
+const heroTags = computed<Array<{ label: string; type: 'primary' | 'success' | 'warning' | 'info' | 'danger' }>>(() => {
+  if (!order.value) {
+    return [];
+  }
+
+  const tags = [
+    { label: currentStageLabel.value, type: currentStageType.value },
+    { label: getServiceTypeLabel(order.value.serviceType), type: 'primary' as const },
+  ];
+
+  if (currentConversationUnreadCount.value > 0) {
+    tags.push({
+      label: `${currentConversationUnreadCount.value} 条未读`,
+      type: 'danger' as const,
+    });
+  }
+  else if (order.value.review) {
+    tags.push({
+      label: `${order.value.review.rating} / 5 分`,
+      type: 'success' as const,
+    });
+  }
+
+  return tags;
+});
+
+const actionSummary = computed(() => {
+  if (!order.value) {
+    return '正在同步订单、沟通和售后状态。';
+  }
+  if (outstandingAmount.value > 0 && order.value.orderStatus === 'PENDING_ACCEPT') {
+    return '这笔订单还有待支付金额，当前页面会先保留订单上下文与沟通、售后信息。';
+  }
+  if (canConfirmComplete.value) {
+    return '先核对服务记录和沟通，再确认完成，避免过早结束订单。';
+  }
+  if (canCreateReview.value) {
+    return '订单已经完成，现在可以直接提交评价。';
+  }
+  if (activeComplaint.value) {
+    return '当前投诉仍在处理，建议先看售后分栏里的处理日志和退款联动。';
+  }
+  if (refundProgress.value && refundProgress.value.stage !== 'NONE') {
+    return '当前存在退款进度，建议先看售后分栏确认最新结果与下一步。';
+  }
+  if (currentConversationUnreadCount.value > 0) {
+    return '当前还有未读沟通，建议先切到沟通分栏消化重点消息。';
+  }
+  if (order.value.orderStatus === 'ACCEPTED' || order.value.orderStatus === 'SERVING') {
+    return '当前订单正在履约阶段，建议优先查看签到、服务记录和最近沟通。';
+  }
+  return '先看状态，再进入沟通、履约或售后分栏处理下一步。';
+});
+
+const signalCards = computed<OrderDetailSignalCard[]>(() => {
+  if (!order.value) {
+    return [];
+  }
+
+  return [
+    {
+      key: 'amount',
+      title: '金额',
+      value: outstandingAmount.value > 0
+        ? `还差 ¥${formatAmount(outstandingAmount.value)}`
+        : `已付 ¥${formatAmount(order.value.amountPaid)}`,
+      hint: `总额 ¥${formatAmount(totalAmount.value)} · 已退 ¥${formatAmount(order.value.amountRefunded)}`,
+      tone: outstandingAmount.value > 0 ? 'warning' : 'success',
+    },
+    {
+      key: 'chat',
+      title: '沟通',
+      value: currentConversationUnreadCount.value > 0
+        ? `${currentConversationUnreadCount.value} 条未读`
+        : order.value.conversation?.lastMessageAt
+          ? '沟通已读'
+          : '暂未沟通',
+      hint: order.value.conversation?.lastMessageAt
+        ? `最近更新 ${formatDateTime(order.value.conversation.lastMessageAt)}`
+        : '需要时可以直接进入沟通分栏发送消息',
+      tone: currentConversationUnreadCount.value > 0 ? 'danger' : 'info',
+    },
+    {
+      key: 'follow-up',
+      title: '下一步',
+      value: hasAftersalesActivity.value
+        ? '售后跟进'
+        : order.value.serviceLogs.length > 0
+          ? `${order.value.serviceLogs.length} 条服务记录`
+          : '回看订单概览',
+      hint: hasAftersalesActivity.value
+        ? '退款、投诉和售后时间线都集中在售后分栏'
+        : order.value.orderStatus === 'ACCEPTED' || order.value.orderStatus === 'SERVING'
+          ? '履约分栏会集中展示签到、服务记录和附件'
+          : '总览分栏优先看状态、金额和评价',
+      tone: hasAftersalesActivity.value ? 'warning' : 'primary',
+    },
+  ];
+});
+
+const primaryActionLabel = computed(() => {
+  if (!order.value) {
+    return '返回列表';
+  }
+  if (canConfirmComplete.value) {
+    return '确认完成';
+  }
+  if (canCreateReview.value) {
+    return '提交评价';
+  }
+  if (activeComplaint.value || hasAftersalesActivity.value) {
+    return '查看售后';
+  }
+  if (currentConversationUnreadCount.value > 0) {
+    return '处理沟通';
+  }
+  if (order.value.orderStatus === 'ACCEPTED' || order.value.orderStatus === 'SERVING') {
+    return '查看履约';
+  }
+  return '查看总览';
 });
 
 const formatAmount = (value: unknown) => {
@@ -1590,6 +1873,7 @@ const submitMessage = async () => {
     const conversation = await api.petpal.orders.sendMessage(order.value.id, payload);
     applyConversationDetail(conversation);
     resetMessageComposer();
+    activeDetailTab.value = 'chat';
     ElMessage.success('消息已发送');
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '发送消息失败'));
@@ -1605,6 +1889,7 @@ const resetReviewDialog = () => {
 
 const openReviewDialog = () => {
   resetReviewDialog();
+  activeDetailTab.value = 'overview';
   reviewDialogVisible.value = true;
 };
 
@@ -1614,7 +1899,86 @@ const resetComplaintDialog = () => {
 
 const openComplaintDialog = () => {
   resetComplaintDialog();
+  activeDetailTab.value = 'aftersales';
   complaintDialogVisible.value = true;
+};
+
+const openTab = (tab: DetailTab) => {
+  activeDetailTab.value = tab;
+};
+
+const openReviewAction = () => {
+  activeDetailTab.value = 'overview';
+  if (canCreateReview.value) {
+    openReviewDialog();
+  }
+};
+
+const openAftersalesAction = () => {
+  activeDetailTab.value = 'aftersales';
+  if (!hasAftersalesActivity.value && canCreateComplaint.value) {
+    openComplaintDialog();
+  }
+};
+
+const confirmOrderComplete = async () => {
+  if (!order.value || !canConfirmComplete.value || confirmCompleting.value) {
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      '确认后订单会进入已完成状态，后续可以继续提交评价。',
+      '确认完成订单',
+      {
+        type: 'warning',
+        confirmButtonText: '确认完成',
+        cancelButtonText: '再看看',
+      },
+    );
+  } catch {
+    return;
+  }
+
+  confirmCompleting.value = true;
+  try {
+    await api.petpal.orders.confirmComplete(order.value.id);
+    await reload();
+    activeDetailTab.value = 'overview';
+    ElMessage.success('订单已确认完成');
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '确认完成失败'));
+  } finally {
+    confirmCompleting.value = false;
+  }
+};
+
+const openPrimaryAction = async () => {
+  if (!order.value) {
+    goBack();
+    return;
+  }
+  if (canConfirmComplete.value) {
+    await confirmOrderComplete();
+    return;
+  }
+  if (canCreateReview.value) {
+    openReviewDialog();
+    return;
+  }
+  if (activeComplaint.value || hasAftersalesActivity.value) {
+    openTab('aftersales');
+    return;
+  }
+  if (currentConversationUnreadCount.value > 0) {
+    openTab('chat');
+    return;
+  }
+  if (order.value.orderStatus === 'ACCEPTED' || order.value.orderStatus === 'SERVING') {
+    openTab('service');
+    return;
+  }
+  openTab('overview');
 };
 
 const submitReview = async () => {
@@ -1639,6 +2003,7 @@ const submitReview = async () => {
     order.value = detail;
     orderNo.value = detail.orderNo;
     reviewDialogVisible.value = false;
+    activeDetailTab.value = 'overview';
     ElMessage.success('评价已提交');
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '提交评价失败'));
@@ -1671,6 +2036,7 @@ const submitComplaint = async () => {
     await api.petpal.orders.createComplaint(order.value.id, payload);
     complaintDialogVisible.value = false;
     await reload();
+    activeDetailTab.value = 'aftersales';
     ElMessage.success('投诉已提交');
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '提交投诉失败'));
@@ -1752,6 +2118,106 @@ onMounted(() => {
 .petpal-order-detail__content {
   display: grid;
   gap: 2rem;
+}
+
+.petpal-order-hero {
+  display: grid;
+  gap: 1.5rem;
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 28%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.96));
+}
+
+.petpal-order-hero__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.petpal-order-hero__copy {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.petpal-order-hero__copy h2 {
+  margin: 0;
+  font-size: clamp(1.6rem, 2.5vw, 2.2rem);
+  line-height: 1.15;
+  color: #1f2937;
+}
+
+.petpal-order-hero__copy p {
+  margin: 0;
+  max-width: 60ch;
+  color: #4b5563;
+  line-height: 1.7;
+}
+
+.petpal-order-hero__tags,
+.petpal-order-hero__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.petpal-order-hero__signals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.petpal-order-hero__signal {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.petpal-order-hero__signal span {
+  color: #6b7280;
+  font-size: 0.86rem;
+}
+
+.petpal-order-hero__signal strong {
+  font-size: 1.15rem;
+  line-height: 1.3;
+  color: #111827;
+}
+
+.petpal-order-hero__signal p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.petpal-order-hero__signal.is-primary {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.petpal-order-hero__signal.is-success {
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.petpal-order-hero__signal.is-warning {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.petpal-order-hero__signal.is-danger {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.petpal-order-detail__tabs {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.petpal-order-detail__tab-group {
+  display: flex;
+  flex-wrap: wrap;
 }
 
 .petpal-order-info,
@@ -2322,5 +2788,34 @@ onMounted(() => {
   padding: 2rem;
   text-align: center;
   color: #999;
+}
+
+@media (max-width: 1024px) {
+  .petpal-order-hero__header {
+    flex-direction: column;
+  }
+
+  .petpal-order-hero__signals {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .petpal-order-info,
+  .petpal-amounts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .petpal-message-composer__actions,
+  .petpal-timeline__header,
+  .petpal-timeline__meta,
+  .petpal-refund-progress__latest-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .petpal-order-hero__actions {
+    width: 100%;
+  }
 }
 </style>

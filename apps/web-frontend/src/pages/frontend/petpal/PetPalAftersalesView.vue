@@ -59,7 +59,7 @@ Secondary actions: 去消息、去订单列表
           >
             <template #actions>
               <el-button size="small" type="primary" :loading="loading" @click="reloadAll">重新加载</el-button>
-              <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: aftersalesItems[0]?.order.id } }">
+              <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: aftersalesItems[0]?.order.id }, query: { tab: 'aftersales' } }">
                 <el-button v-if="aftersalesItems[0]" size="small">打开最近订单</el-button>
               </RouterLink>
             </template>
@@ -187,7 +187,7 @@ Secondary actions: 去消息、去订单列表
           </div>
 
           <div class="petpal-aftersales-actions">
-            <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: item.order.id } }">
+            <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: item.order.id }, query: { tab: 'aftersales' } }">
               <el-button type="primary" size="small">打开订单</el-button>
             </RouterLink>
             <RouterLink :to="{ name: 'frontend-petpal-messages' }">
