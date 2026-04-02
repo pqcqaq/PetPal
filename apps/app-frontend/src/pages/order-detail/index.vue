@@ -35,7 +35,6 @@ import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
 import { computed, reactive, ref, watch } from 'vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
-import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
 import AppSection from '@/components/app-section/app-section.vue'
 import AppButton from '@/components/app-button/app-button.vue'
@@ -218,10 +217,16 @@ interface OrderHeroTag {
   type: AppTagTone
 }
 
+interface OrderDetailTabCard {
+  label: string
+  value: OrderDetailTab
+  metric: string
+  hint: string
+}
+
 const confirmingCompletion = ref(false)
 const messageSubmitting = ref(false)
 const detailTab = ref<OrderDetailTab>('overview')
-const quickActionSelection = ref('')
 
 const {
   uploading: messageAttachmentUploading,
@@ -231,12 +236,6 @@ const {
   maxSizeMb: 10,
 })
 
-const detailTabOptions = [
-  { label: '总览', value: 'overview', description: '订单信息、金额和主人动作' },
-  { label: '沟通', value: 'chat', description: '查看消息、附件与未读状态' },
-  { label: '履约', value: 'service', description: '查看时间线和服务记录' },
-  { label: '售后', value: 'aftersales', description: '查看退款、投诉和处理进度' },
-]
 const messageForm = reactive({
   content: '',
   attachments: [] as CaregiverQualificationMaterialRecord[],
@@ -392,6 +391,46 @@ const orderHeroTags = computed<OrderHeroTag[]>(() => {
 
   return tags
 })
+const detailTabCards = computed<OrderDetailTabCard[]>(() => {
+  if (!order.value) {
+    return []
+  }
+
+  return [
+    {
+      label: '总览',
+      value: 'overview',
+      metric: currentStageLabel.value,
+      hint: ownerActionSummary.value,
+    },
+    {
+      label: '沟通',
+      value: 'chat',
+      metric: currentConversationUnreadCount.value > 0
+        ? `${currentConversationUnreadCount.value} 未读`
+        : `${messageConversation.value?.messages.length || 0} 条`,
+      hint: currentConversationUnreadCount.value > 0 ? '先回消息' : '查看最近沟通',
+    },
+    {
+      label: '履约',
+      value: 'service',
+      metric: order.value.serviceLogs.length > 0
+        ? `${order.value.serviceLogs.length} 条`
+        : `${order.value.timeline.length} 条`,
+      hint: order.value.serviceLogs.length > 0 ? '看服务记录' : '看履约轨迹',
+    },
+    {
+      label: '售后',
+      value: 'aftersales',
+      metric: activeComplaint.value
+        ? getComplaintStatusLabel(activeComplaint.value.status)
+        : refundProgress.value && refundProgress.value.stage !== 'NONE'
+          ? getRefundProgressStageLabel(refundProgress.value.stage)
+          : '无售后',
+      hint: activeComplaint.value || (refundProgress.value && refundProgress.value.stage !== 'NONE') ? '看处理进度' : '当前稳定',
+    },
+  ]
+})
 const overviewQuickActionOptions = computed(() => {
   if (!order.value) {
     return []
@@ -459,6 +498,7 @@ const overviewQuickActionOptions = computed(() => {
 
   return options
 })
+const primaryOverviewAction = computed(() => overviewQuickActionOptions.value[0] ?? null)
 const overviewSignalCards = computed<OrderOverviewSignalCard[]>(() => {
   if (!order.value) {
     return []
@@ -615,6 +655,17 @@ function handleQuickAction(action: OrderQuickAction) {
   }
   if (action === 'COMPLAINT') {
     openComplaintPage()
+  }
+}
+
+function handleDetailTabSelect(tab: OrderDetailTab) {
+  if (detailTab.value === tab) {
+    return
+  }
+
+  detailTab.value = tab
+  if (tab === 'chat') {
+    void markConversationAsRead()
   }
 }
 
@@ -1208,14 +1259,6 @@ watch(orderId, (newId) => {
   }
 })
 
-watch(quickActionSelection, (action) => {
-  if (!action) {
-    return
-  }
-  handleQuickAction(action as OrderQuickAction)
-  quickActionSelection.value = ''
-})
-
 function isOrderDetailTab(value: string | undefined): value is OrderDetailTab {
   return value === 'overview' || value === 'chat' || value === 'service' || value === 'aftersales'
 }
@@ -1279,17 +1322,49 @@ onLoad((options: Record<string, string | undefined>) => {
             </view>
             <text class="petpal-order-overview-banner__summary">{{ orderFocusSummary }}</text>
           </view>
-          <AppChoiceChips v-model="detailTab" :options="detailTabOptions" />
+          <scroll-view class="petpal-detail-tab-scroll" :scroll-x="true" :show-scrollbar="false">
+            <view class="petpal-detail-tab-track">
+              <view
+                v-for="item in detailTabCards"
+                :key="item.value"
+                class="petpal-detail-tab-card"
+                :class="detailTab === item.value ? 'petpal-detail-tab-card--active' : ''"
+                @click="handleDetailTabSelect(item.value)"
+              >
+                <text class="petpal-detail-tab-card__label">{{ item.label }}</text>
+                <text class="petpal-detail-tab-card__metric">{{ item.metric }}</text>
+                <text class="petpal-detail-tab-card__hint">{{ item.hint }}</text>
+              </view>
+            </view>
+          </scroll-view>
         </AppSection>
 
         <AppSection v-if="detailTab === 'overview'" title="下一步">
           <view class="petpal-owner-actions">
-            <AppChoiceChips
-              v-if="overviewQuickActionOptions.length"
-              v-model="quickActionSelection"
-              :options="overviewQuickActionOptions"
-              show-descriptions
-            />
+            <view v-if="primaryOverviewAction" class="petpal-overview-focus">
+              <view class="petpal-overview-focus__copy">
+                <text class="petpal-overview-focus__eyebrow">现在先做这个</text>
+                <text class="petpal-overview-focus__title">{{ primaryOverviewAction.label }}</text>
+                <text class="petpal-overview-focus__hint">{{ primaryOverviewAction.description }}</text>
+              </view>
+              <view class="petpal-overview-focus__actions">
+                <AppButton size="medium" @click="handleQuickAction(primaryOverviewAction.value)">
+                  {{ primaryOverviewAction.label }}
+                </AppButton>
+              </view>
+            </view>
+
+            <view v-if="overviewQuickActionOptions.length" class="petpal-quick-grid">
+              <view
+                v-for="item in overviewQuickActionOptions"
+                :key="item.value"
+                class="petpal-quick-card"
+                @click="handleQuickAction(item.value)"
+              >
+                <text class="petpal-quick-card__title">{{ item.label }}</text>
+                <text class="petpal-quick-card__hint">{{ item.description }}</text>
+              </view>
+            </view>
 
             <view class="petpal-signal-grid">
               <view
@@ -1926,6 +2001,52 @@ onLoad((options: Record<string, string | undefined>) => {
   color: rgba(248, 250, 252, 0.9);
 }
 
+.petpal-detail-tab-scroll {
+  white-space: nowrap;
+}
+
+.petpal-detail-tab-track {
+  display: inline-flex;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+.petpal-detail-tab-card {
+  display: grid;
+  gap: 6px;
+  width: 148px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #e5ebf3;
+  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  box-sizing: border-box;
+}
+
+.petpal-detail-tab-card--active {
+  border-color: transparent;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.petpal-detail-tab-card__label {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.petpal-detail-tab-card__metric {
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.petpal-detail-tab-card__hint {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .petpal-order-overview-banner__stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1954,6 +2075,76 @@ onLoad((options: Record<string, string | undefined>) => {
 .petpal-owner-actions {
   display: grid;
   gap: 12px;
+}
+
+.petpal-overview-focus {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid #dbeafe;
+  background:
+    radial-gradient(circle at top right, rgba(53, 89, 224, 0.12), transparent 34%),
+    linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.petpal-overview-focus__copy {
+  display: grid;
+  gap: 6px;
+}
+
+.petpal-overview-focus__eyebrow {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.petpal-overview-focus__title {
+  color: #1f2937;
+  font-size: 16px;
+  line-height: 1.28;
+  font-weight: 700;
+}
+
+.petpal-overview-focus__hint {
+  color: #475467;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.petpal-overview-focus__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.petpal-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.petpal-quick-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #e5ebf3;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.petpal-quick-card__title {
+  color: #1f2937;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.petpal-quick-card__hint {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .petpal-signal-grid {
@@ -2610,6 +2801,7 @@ onLoad((options: Record<string, string | undefined>) => {
 }
 
 @media (max-width: 680px) {
+  .petpal-quick-grid,
   .petpal-signal-grid,
   .petpal-order-overview-banner__stats {
     grid-template-columns: 1fr;

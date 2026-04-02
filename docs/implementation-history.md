@@ -132,6 +132,9 @@ Last updated: 2026-04-02
 - 2026-04-02 已继续重构 App 投诉结果页与评价结果页：
   - `apps/app-frontend/src/pages/petpal/complaint-result.vue` 已改成“投诉结论 + 下一步动作 + 紧凑处理日志”结构。
   - `apps/app-frontend/src/pages/petpal/review-result.vue` 已改成“评分结果 + 下一步动作 + 紧凑评价卡片”结构。
+- 2026-04-02 已继续重构订单详情页顶部决策区：
+  - `apps/app-frontend/src/pages/order-detail/index.vue` 已把顶部改成“分栏轨道 + 当前先做这个 + 高频动作卡”结构。
+  - 订单详情页首屏已从“先读信息”进一步压向“先做事”，减少 chips 式说明入口。
 - 2026-04-01 已继续完成 App P2 照料者侧重构：
   - 照料者首页改为“今天先做这个 + 当前优先 + 今日订单 + 服务与收益”结构。
   - 履约订单页改为状态筛选 + 任务队列 + 就地服务记录面板，接单、签到、记录服务和签退都可直接执行。
