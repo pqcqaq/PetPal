@@ -1,14 +1,20 @@
 <script lang="ts" setup>
+/**
+ * UX Blueprint
+ * User: 已登录用户，需要修改头像、昵称和邮箱
+ * Entry: 我的页进入、订单或消息页补资料回流
+ * First screen: 直接看到头像和可编辑资料，不先展示能力说明
+ * Primary action: 保存昵称和邮箱，必要时更换头像
+ * Secondary actions: 提醒、设置、帮助、账户支持
+ * States: 资料未修改、资料待保存、头像不可上传、账号同步中
+ */
 import { storeToRefs } from 'pinia'
 import { computed, reactive, ref, watch } from 'vue'
 import { appApi } from '@/api/client'
 import AppAvatarUploader from '@/components/app-avatar-uploader/app-avatar-uploader.vue'
 import AppButton from '@/components/app-button/app-button.vue'
 import AppInput from '@/components/app-input/app-input.vue'
-import AppList from '@/components/app-list/app-list.vue'
-import AppListItem from '@/components/app-list-item/app-list-item.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { PETPAL_REMINDERS_PAGE } from '@/pages/petpal/owner-shared'
@@ -16,11 +22,29 @@ import { useUserStore } from '@/store'
 import { useTokenStore } from '@/store/token'
 import { getErrorMessage } from '@/utils/error'
 
+defineOptions({
+  name: 'PetPalProfilePage',
+})
+
 definePage({
   style: {
-    navigationBarTitleText: 'PetPal 资料',
+    navigationBarTitleText: '个人资料',
+    enablePullDownRefresh: true,
   },
 })
+
+type ShortcutItem = {
+  title: string
+  value: string
+  hint: string
+  action: () => void
+}
+
+type AccountRow = {
+  title: string
+  value: string
+  hint: string
+}
 
 const userStore = useUserStore()
 const tokenStore = useTokenStore()
@@ -39,7 +63,6 @@ const canUploadAvatar = computed(() => {
   const permissions = userInfo.value.permissions || []
   return permissions.includes('file.upload.avatar') || permissions.includes('file.upload')
 })
-const hasPetPalAdminAccess = computed(() => userInfo.value.permissions.some(permission => permission.startsWith('petpal.')))
 
 const profileDirty = computed(() => {
   const nickname = profileForm.nickname.trim()
@@ -48,52 +71,65 @@ const profileDirty = computed(() => {
   return nickname !== userInfo.value.nickname || email !== currentEmail
 })
 
-const statusText = computed(() => userInfo.value.status === 'ACTIVE' ? '正常' : '停用')
-const statusTagType = computed(() => userInfo.value.status === 'ACTIVE' ? 'success' : 'warning')
-const roleSummary = computed(() => userInfo.value.roles.map(role => role.name).join('、') || '主人端账号')
-const workspaceSummary = computed(() => hasPetPalAdminAccess.value ? '主人端 + 后台' : '主人端')
-const profileAbilities = computed(() => [
+const displayName = computed(() => userInfo.value.nickname || userInfo.value.username || 'PetPal 用户')
+const accountMeta = computed(() => userInfo.value.username || '账户同步中')
+const statusTagType = computed(() => {
+  if (!userInfo.value.status) {
+    return 'default'
+  }
+  return userInfo.value.status === 'ACTIVE' ? 'success' : 'warning'
+})
+const statusTagText = computed(() => {
+  if (!userInfo.value.status) {
+    return '同步中'
+  }
+  return userInfo.value.status === 'ACTIVE' ? '账号正常' : '账号受限'
+})
+const emailTagText = computed(() => userInfo.value.email ? '邮箱已绑定' : '待补邮箱')
+const formHint = computed(() => profileDirty.value ? '资料有改动，保存后会同步到首页、消息和订单页显示。' : '当前资料已是最新状态。')
+
+const shortcutItems = computed<ShortcutItem[]>(() => [
   {
-    title: '主人服务台',
-    value: '已开通',
-    label: '宠物档案、需求发布、订单跟进和售后主流程可直接使用。',
+    title: '提醒',
+    value: '查看',
+    hint: '待办和售后提醒',
+    action: openReminders,
   },
   {
-    title: '头像上传',
-    value: canUploadAvatar.value ? '可用' : '受限',
-    label: canUploadAvatar.value ? '当前账号可以更新头像。' : '当前账号暂未开通头像上传能力。',
+    title: '设置',
+    value: '调整',
+    hint: '通知和界面选项',
+    action: openSettings,
   },
   {
-    title: 'PetPal 后台',
-    value: hasPetPalAdminAccess.value ? '可进入' : '未开通',
-    label: hasPetPalAdminAccess.value ? '当前账号具备部分后台治理能力。' : '当前账号以主人端主流程为主。',
+    title: '帮助',
+    value: '查看',
+    hint: '常见问题',
+    action: openHelpCenter,
   },
   {
-    title: '资料同步',
-    value: '已开启',
-    label: '昵称、邮箱和体验设置会跟随账号保持同步。',
+    title: '支持',
+    value: '联系',
+    hint: '账号异常处理',
+    action: openAccountSupport,
   },
 ])
-const profileSummaryCards = computed(() => [
+
+const accountRows = computed<AccountRow[]>(() => [
   {
-    label: '账号状态',
-    value: statusText.value,
-    hint: '决定账号是否可以继续访问 PetPal 主流程。',
+    title: '用户名',
+    value: userInfo.value.username || '--',
+    hint: '用于登录和账号识别',
   },
   {
-    label: '当前身份',
-    value: userInfo.value.roles.length ? `${userInfo.value.roles.length} 个` : '默认',
-    hint: roleSummary.value,
+    title: '账号状态',
+    value: statusTagText.value,
+    hint: '影响是否可继续使用主流程',
   },
   {
-    label: '工作区',
-    value: workspaceSummary.value,
-    hint: hasPetPalAdminAccess.value ? '当前账号同时具备治理后台权限。' : '当前账号以主人主流程为主。',
-  },
-  {
-    label: '头像上传',
-    value: canUploadAvatar.value ? '可用' : '受限',
-    hint: canUploadAvatar.value ? '当前可以直接更新头像。' : '如需开放可联系管理员。',
+    title: '邮箱',
+    value: userInfo.value.email || '未绑定',
+    hint: '建议用于接收订单和售后通知',
   },
 ])
 
@@ -174,84 +210,101 @@ async function handleSaveProfile() {
   }
 }
 
+async function loadProfile(showError = false) {
+  if (!tokenStore.hasLogin) {
+    uni.stopPullDownRefresh()
+    return
+  }
+
+  try {
+    await userStore.fetchUserInfo()
+  }
+  catch (error: unknown) {
+    if (showError) {
+      uni.showToast({
+        title: getErrorMessage(error, '加载资料失败'),
+        icon: 'none',
+      })
+    }
+  }
+  finally {
+    uni.stopPullDownRefresh()
+  }
+}
+
 onShow(() => {
   if (!tokenStore.hasLogin) {
     uni.reLaunch({ url: '/pages/auth/login' })
     return
   }
 
-  void userStore.fetchUserInfo().catch(() => undefined)
+  void loadProfile(false)
+})
+
+onPullDownRefresh(() => {
+  void loadProfile(true)
 })
 </script>
 
 <template>
-  <AppPageShell title="PetPal 资料" description="编辑昵称、邮箱和头像，并查看当前账号在 PetPal 中的可用能力。">
-    <AppSection title="资料总览" description="先确认账号状态、工作区和快捷入口，再决定是否继续编辑资料。">
-      <view class="profile-hero">
-        <view class="profile-hero__copy">
-          <view class="app-tag-row app-tag-row--compact">
+  <AppPageShell title="个人资料">
+    <view class="profile-page">
+      <view class="profile-head">
+        <view class="profile-head__copy">
+          <text class="profile-head__name">{{ displayName }}</text>
+          <text class="profile-head__meta">{{ accountMeta }}</text>
+          <view class="profile-head__tags">
             <AppTag :type="statusTagType">
-              {{ statusText }}
+              {{ statusTagText }}
             </AppTag>
-            <AppTag type="primary">
-              {{ workspaceSummary }}
+            <AppTag :type="userInfo.email ? 'primary' : 'default'">
+              {{ emailTagText }}
             </AppTag>
           </view>
-          <view class="profile-hero__title">
-            {{ userInfo.nickname || userInfo.username || 'PetPal 用户' }}
-          </view>
-          <view class="profile-hero__summary">
-            当前身份：{{ roleSummary }}。资料、头像和体验设置都会随账号同步，减少多入口重复维护。
-          </view>
         </view>
-        <view class="profile-hero__actions">
-          <AppButton size="medium" type="info" @click="openSettings">
-            体验设置
-          </AppButton>
-          <AppButton size="medium" @click="openReminders">
-            提醒中心
-          </AppButton>
-          <AppButton size="medium" type="info" @click="openAccountSupport">
-            账户支持
-          </AppButton>
-        </view>
-      </view>
 
-      <view class="profile-summary-grid">
-        <view v-for="item in profileSummaryCards" :key="item.label" class="profile-summary-card">
-          <view class="profile-summary-card__label">
-            {{ item.label }}
-          </view>
-          <view class="profile-summary-card__value">
-            {{ item.value }}
-          </view>
-          <view class="profile-summary-card__hint">
-            {{ item.hint }}
-          </view>
-        </view>
-      </view>
-    </AppSection>
-
-    <AppSection title="头像" description="头像会在首页、消息和订单沟通场景复用。">
-      <view class="profile-card-wrap">
         <AppAvatarUploader
           :avatar-url="userInfo.avatarUrl"
-          :display-name="userInfo.nickname || userInfo.username"
+          :display-name="displayName"
           :disabled="!canUploadAvatar"
           @updated="handleAvatarUpdated"
         />
-        <view v-if="!canUploadAvatar" class="profile-card__hint">
-          当前账号暂未开通头像上传能力，如需开放可联系平台管理员处理。
-        </view>
-      </view>
-    </AppSection>
 
-    <AppSection title="基本资料" description="修改后会同步到当前 PetPal 账号。">
-      <AppList>
-        <AppInput v-model="profileForm.nickname" class="app-auth-input" label="昵称" placeholder="请输入昵称" />
-        <AppInput v-model="profileForm.email" class="app-auth-input" label="邮箱" placeholder="请输入邮箱（可留空）" />
-      </AppList>
-      <view class="profile-actions">
+        <text v-if="!canUploadAvatar" class="profile-head__hint">
+          当前账号暂未开通头像上传，可先保存昵称和邮箱。
+        </text>
+      </view>
+
+      <scroll-view class="profile-shortcut-scroll" :scroll-x="true" :show-scrollbar="false">
+        <view class="profile-shortcut-track">
+          <view
+            v-for="item in shortcutItems"
+            :key="item.title"
+            class="profile-shortcut-card"
+            @click="item.action"
+          >
+            <text class="profile-shortcut-card__title">{{ item.title }}</text>
+            <text class="profile-shortcut-card__value">{{ item.value }}</text>
+            <text class="profile-shortcut-card__hint">{{ item.hint }}</text>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="profile-form">
+        <view class="profile-form__head">
+          <text class="profile-form__title">基本资料</text>
+          <AppTag :type="profileDirty ? 'warning' : 'default'">
+            {{ profileDirty ? '待保存' : '已同步' }}
+          </AppTag>
+        </view>
+
+        <view class="profile-input-group">
+          <AppInput v-model="profileForm.nickname" clearable label="昵称" placeholder="请输入昵称" />
+          <AppInput v-model="profileForm.email" clearable label="邮箱" placeholder="请输入邮箱（可留空）" />
+        </view>
+
+        <text class="profile-form__hint">{{ formHint }}</text>
+
         <AppButton
           block
           size="large"
@@ -262,149 +315,160 @@ onShow(() => {
           保存资料
         </AppButton>
       </view>
-    </AppSection>
 
-    <AppSection title="PetPal 账户" description="这里展示账号在 PetPal 中的基础状态与身份。">
-      <AppList>
-        <AppListItem title="用户名" :value="userInfo.username || '--'" />
-        <AppListItem title="账号状态" :value="statusText" value-emphasis />
-        <AppListItem title="当前身份" :label="roleSummary" />
-        <AppListItem title="邮箱状态" :value="userInfo.email ? '已绑定' : '未绑定'" />
-        <AppListItem title="头像上传" :value="canUploadAvatar ? '可用' : '受限'" />
-      </AppList>
-      <view class="profile-tag-block">
-        <view class="app-tag-row app-tag-row--compact">
-          <AppTag :type="statusTagType">
-            {{ statusText }}
-          </AppTag>
-          <AppTag v-for="role in userInfo.roles" :key="role.id" type="primary">
-            {{ role.name }}
-          </AppTag>
+      <view class="profile-group">
+        <view
+          v-for="item in accountRows"
+          :key="item.title"
+          class="profile-row"
+        >
+          <view class="profile-row__copy">
+            <text class="profile-row__title">{{ item.title }}</text>
+            <text class="profile-row__hint">{{ item.hint }}</text>
+          </view>
+          <text class="profile-row__value">{{ item.value }}</text>
         </view>
       </view>
-    </AppSection>
 
-    <AppSection title="当前账号能力" description="围绕主人服务、头像上传和后台治理能力做快速确认。">
-      <AppList>
-        <AppListItem
-          v-for="item in profileAbilities"
-          :key="item.title"
-          :title="item.title"
-          :label="item.label"
-          :value="item.value"
-          :value-emphasis="item.value !== '未开通'"
-        />
-      </AppList>
-    </AppSection>
-
-    <AppSection title="帮助与辅助" description="帮助中心和账户支持页从资料页里独立出去，但在这里仍然保持直达入口。">
-      <AppList>
-        <AppListItem title="账户支持" label="查看账号状态、推荐动作和同步情况。" is-link clickable @click="openAccountSupport" />
-        <AppListItem title="帮助中心" label="按主人、照料者、售后和账户场景查看说明。" is-link clickable @click="openHelpCenter" />
-        <AppListItem title="体验设置" label="继续调整主题、首页布局和动效。" is-link clickable @click="openSettings" />
-      </AppList>
-    </AppSection>
+      <view class="profile-support">
+        <AppStatus text="资料保存后会同步到首页、消息和订单等显示位置。" />
+      </view>
+    </view>
   </AppPageShell>
 </template>
 
 <style scoped lang="scss">
-.profile-hero {
+.profile-page {
   display: grid;
   gap: 20rpx;
-  margin: 0 24rpx 18rpx;
-  padding: 28rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.16);
-  border-radius: var(--app-shape-xl);
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 34%),
-    linear-gradient(145deg, var(--app-accent) 0%, var(--app-accent-pressed) 54%, var(--app-success) 100%);
-  box-shadow: var(--app-elevation-3);
+  padding-bottom: 36rpx;
 }
 
-.profile-hero__copy {
+.profile-head,
+.profile-form,
+.profile-group,
+.profile-support {
   display: grid;
-  gap: 12rpx;
+  gap: 16rpx;
+  margin: 0 24rpx;
+  padding: 26rpx 28rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  border-radius: 30rpx;
+  background:
+    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 34%),
+    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
 }
 
-.profile-hero__title {
-  color: #eff6ff;
-  font-size: 40rpx;
-  line-height: 1.16;
+.profile-head__copy,
+.profile-form__head,
+.profile-row__copy {
+  display: grid;
+  gap: 8rpx;
+}
+
+.profile-head__name,
+.profile-form__title,
+.profile-row__title {
+  color: var(--app-text);
+  font-size: 30rpx;
+  line-height: 1.28;
   font-weight: 700;
 }
 
-.profile-hero__summary {
-  color: rgba(239, 246, 255, 0.9);
-  font-size: 24rpx;
+.profile-head__meta,
+.profile-head__hint,
+.profile-shortcut-card__hint,
+.profile-form__hint,
+.profile-row__hint {
+  color: var(--app-text-secondary);
+  font-size: 22rpx;
   line-height: 1.7;
 }
 
-.profile-hero__actions {
+.profile-head__tags {
   display: flex;
   flex-wrap: wrap;
   gap: 12rpx;
 }
 
-.profile-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.profile-shortcut-scroll {
+  white-space: nowrap;
+}
+
+.profile-shortcut-track {
+  display: inline-flex;
   gap: 16rpx;
   padding: 0 24rpx;
+  box-sizing: border-box;
 }
 
-.profile-summary-card {
+.profile-shortcut-card {
   display: grid;
   gap: 10rpx;
-  padding: 22rpx;
+  width: 220rpx;
+  padding: 24rpx;
   border: 1rpx solid var(--app-outline-variant);
-  border-radius: var(--app-shape-xl);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  border-radius: 26rpx;
+  background:
+    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 34%),
+    linear-gradient(180deg, var(--app-surface-container-high) 0%, var(--app-surface) 100%);
   box-shadow: var(--app-elevation-1);
+  box-sizing: border-box;
 }
 
-.profile-summary-card__label {
-  font-size: 22rpx;
+.profile-shortcut-card__title {
   color: var(--app-text-muted);
+  font-size: 22rpx;
+  line-height: 1.5;
 }
 
-.profile-summary-card__value {
-  font-size: 34rpx;
-  line-height: 1.12;
+.profile-shortcut-card__value,
+.profile-row__value {
   color: var(--app-text);
+  font-size: 28rpx;
+  line-height: 1.32;
   font-weight: 700;
 }
 
-.profile-summary-card__hint {
-  font-size: 22rpx;
-  line-height: 1.62;
-  color: var(--app-text-secondary);
-}
-
-.profile-card-wrap {
-  padding: 0 32rpx;
-}
-
-.profile-card__hint {
-  margin-top: 14rpx;
-  font-size: 22rpx;
-  line-height: 1.55;
-  color: var(--app-warning);
-}
-
-.profile-actions {
-  padding: 20rpx 32rpx 0;
-}
-
-.profile-tag-block {
-  padding: 0 32rpx 16rpx;
+.profile-input-group {
+  display: grid;
+  gap: 8rpx;
+  border-radius: 24rpx;
   background: var(--app-surface);
-  border-top: 1rpx solid var(--app-border);
-  border-bottom: 1rpx solid var(--app-border);
+  overflow: hidden;
+}
+
+.profile-input-group :deep(.app-input) + :deep(.app-input) {
+  border-top: 1rpx solid var(--app-outline-variant);
+}
+
+.profile-group {
+  padding: 0;
+  overflow: hidden;
+}
+
+.profile-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+  align-items: center;
+  padding: 24rpx 28rpx;
+}
+
+.profile-row + .profile-row {
+  border-top: 1rpx solid var(--app-outline-variant);
+}
+
+.profile-support {
+  background:
+    radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 34%),
+    linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
 }
 
 @media (max-width: 680px) {
-  .profile-summary-grid {
-    grid-template-columns: 1fr;
+  .profile-row {
+    align-items: flex-start;
   }
 }
 </style>

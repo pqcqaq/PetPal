@@ -74,7 +74,8 @@
       "path": "pages/me/profile",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "PetPal 资料"
+        "navigationBarTitleText": "个人资料",
+        "enablePullDownRefresh": true
       }
     },
     {
