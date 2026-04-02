@@ -35,6 +35,7 @@ Last updated: 2026-04-03
   - Web 前台恢复态工具已开始共享化，页面级 notice 拼接和分区重试逻辑不再散落复制在多个 PetPal 页面中。
   - 提醒中心现已补齐主人侧 / 照料者侧双分区恢复与角色聚焦，照料者入驻资料页也已支持 notice 回流、定向重试和保存后返回工作台。
   - 照料者工作台、服务清单、服务表单与 `legacy` 兼容页之间的高频入口现已补齐统一 handoff，旧入口回流时不再丢失上下文说明。
+  - 主人工作台、宠物清单、宠物表单与需求表单之间的高频入口现也已补齐统一 handoff，建档 / 编辑宠物 / 发需求不再出现 owner 侧裸跳转。
 - 订单详情页已具备支付/退款时间线、服务记录、评价、投诉、消息沟通等完整信息面板。
 - 2026-04-01 新增前端重构蓝图文档，开始把 Web 首屏从“解释产品结构”改为“状态 + 动作 + 列表入口”。
 - 主人工作台、照料者工作台、售后中心和订单详情页首屏已移除一批面向开发者/产品语义的讲解文案，开始收敛为真实可操作的工作台。
@@ -119,6 +120,8 @@ Last updated: 2026-04-03
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetFormView.vue`、`PetPalOwnerRequestFormView.vue`、`PetPalCaregiverServiceFormView.vue` 保存成功后已带 notice 和焦点项回到对应列表，不再落回无上下文状态。
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue` 与 `PetPalCaregiverView.vue` 已拆成分区级恢复态，宠物 / 需求 / 订单和资料 / 服务 / 履约现在都可独立重试。
   - 主人 / 照料者总览里的“当前下一步”和卡片内入口也开始带上下文跳转，不再只是泛化的页面级跳转。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue` 与 `PetPalOwnerPetsView.vue` 已继续补齐主人侧残余入口 handoff，建档、编辑宠物和发需求的高频入口现在都走统一 query helper。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerRequestFormView.vue` 与 `PetPalOwnerPetFormView.vue` 已开始承接 handoff notice，并为缺失宠物对象的编辑回流补齐带说明的返回路径。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

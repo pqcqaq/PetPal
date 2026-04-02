@@ -8,6 +8,10 @@
     :actions="[{ label: '返回需求队列', to: { name: 'frontend-petpal-requests' }, tone: 'secondary' }]"
     :stats="heroStats"
   >
+    <template v-if="pageNotice" #notice>
+      <PetPalDeskNotice eyebrow="Handoff" :title="pageNotice.title" :description="pageNotice.description" :tone="pageNotice.tone" />
+    </template>
+
     <PetPalDeskSection eyebrow="Form" title="需求信息" description="时间、地点、预算越清晰，后续匹配越稳定。">
       <PetPalDeskEmpty
         v-if="!pets.length"
@@ -15,7 +19,12 @@
         description="需求发布依赖宠物档案，请先建档后再回来。"
       >
         <template #actions>
-          <RouterLink class="frontend-page__button is-primary" :to="{ name: 'frontend-petpal-pet-create' }">去建宠物档案</RouterLink>
+          <RouterLink
+            class="frontend-page__button is-primary"
+            :to="buildOwnerPetCreateRoute('这里已经定位到新建宠物档案，建档完成后可从宠物清单继续发起需求。')"
+          >
+            去建宠物档案
+          </RouterLink>
         </template>
       </PetPalDeskEmpty>
 
@@ -70,9 +79,10 @@ import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
-import { buildPetPalDeskHandoffQuery } from './recovery';
+import { buildPetPalDeskHandoffQuery, getPetPalQueryString, mergePetPalPageNotice } from './recovery';
 import { normalizePetPalTagText, petPalOwnerWorkspaceNav, petPalServiceTypeOptions } from './shared';
 
 const route = useRoute();
@@ -89,6 +99,8 @@ const form = reactive({
   budgetAmount: 0,
   demandTagsText: '',
 });
+const preferredPetId = computed(() => getPetPalQueryString(route.query, 'petId'));
+const preferredPet = computed(() => pets.value.find((item) => item.id === preferredPetId.value) ?? null);
 
 const heroStats = computed(() => [
   { label: '可用宠物', value: String(pets.value.length), hint: '先选一只作为本次需求对象' },
@@ -96,13 +108,33 @@ const heroStats = computed(() => [
   { label: '预算', value: form.budgetAmount ? `¥${form.budgetAmount}` : '待填写', hint: '预算会影响匹配结果' },
   { label: '状态', value: '待提交', hint: '提交后回需求队列继续' },
 ]);
+const pageNotice = computed(() => {
+  const description = mergePetPalPageNotice([
+    getPetPalQueryString(route.query, 'notice'),
+    preferredPet.value ? `当前已带入宠物：${preferredPet.value.name}` : '',
+  ]);
+  if (!description) {
+    return null;
+  }
+  return {
+    title: '已进入需求表单',
+    description,
+    tone: 'accent' as const,
+  };
+});
+
+function buildOwnerPetCreateRoute(notice: string) {
+  return {
+    name: 'frontend-petpal-pet-create',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
 
 async function loadPage() {
   try {
     pets.value = await api.petpal.pets.list();
-    const preferredPetId = typeof route.query.petId === 'string' ? route.query.petId : '';
-    form.petId = pets.value.some((item) => item.id === preferredPetId)
-      ? preferredPetId
+    form.petId = pets.value.some((item) => item.id === preferredPetId.value)
+      ? preferredPetId.value
       : pets.value[0]?.id || '';
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '加载宠物档案失败'));

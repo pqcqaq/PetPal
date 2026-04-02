@@ -7113,6 +7113,50 @@ flowchart TD
 2. 继续补更多系统级主动提醒、角色聚焦入口和更细的弱网恢复说明，减少提醒中心仍需用户自己判断的部分。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.147 2026-04-03（P3-M1 Slice 147）
+
+**概述**：继续推进 Web 前台收口，本轮把主人侧残余的高频裸跳转补齐，并让宠物 / 需求两个表单页真正承接 handoff notice，避免 owner 侧入口只带 query 但目标页没有反馈。
+
+已完成：
+
+- 补齐主人侧高频入口 handoff：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+    - “主按钮 / 当前下一步 / 宠物卡片动作 / 宠物与需求空态动作” 现在都改走统一 helper，进入建档、编辑宠物、发需求时都会带明确 notice，不再存在同页内部分入口有上下文、部分入口裸跳转。
+    - 新建需求入口现在会优先带上当前宠物上下文，减少进入表单后还要重新选择宠物的步骤。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetsView.vue`
+    - “新建宠物 / 继续编辑这只宠物 / 编辑资料 / 为它发需求” 已统一接入 handoff query，宠物清单与主人总览之间的跳转语义保持一致。
+- 让主人侧表单页真正承接 notice：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerRequestFormView.vue`
+    - 已新增 notice 区块，能显示上一页带来的 handoff 说明和当前预选宠物。
+    - “去建宠物档案” 空态入口已补齐 notice，不再是无说明跳到宠物表单。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetFormView.vue`
+    - 已新增 notice 区块，能承接来自主人总览、宠物清单和需求表单的 handoff 说明。
+    - 编辑页在目标宠物不存在时，现会带 notice 回到宠物清单，而不是静默跳回列表。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮只改动 Web 前台主人侧路由跳转与表单页 notice 承接，没有新增后端接口或数据模型变更。
+- 已确认主人总览、宠物清单、宠物表单、需求表单之间的高频入口现在都遵循同一套 notice / handoff 规则，owner 侧回流语义已与前几轮 caregiver 侧收口保持一致。
+- 已确认缺失宠物对象的编辑回流现在具备明确说明，避免静默跳转造成用户误判为页面未响应。
+
+风险与缓解：
+
+- 风险：主人侧主入口已基本收口，但订单详情、售后中心与结果页仍可能残留少量辅助入口没有完全对齐 handoff 规则。
+- 缓解：下一轮继续扫描结果页和详情辅助动作，补齐最后一批裸跳转与 notice 不一致点。
+
+下一步（1-3）：
+
+1. 继续扫描订单详情、售后中心和结果页的辅助入口，收掉最后一批 handoff 不一致点。
+2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
+3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
+
 ### 14.146 2026-04-03（P3-M1 Slice 146）
 
 **概述**：继续推进 Web 前台收口，本轮把照料者侧残余的无上下文入口补齐，并让 `legacy` 兼容页也承接统一 notice，把旧链接稳定分发到带 handoff 的新页面。

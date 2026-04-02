@@ -8,6 +8,10 @@
     :actions="[{ label: '返回宠物清单', to: { name: 'frontend-petpal-pets' }, tone: 'secondary' }]"
     :stats="heroStats"
   >
+    <template v-if="pageNotice" #notice>
+      <PetPalDeskNotice eyebrow="Handoff" :title="pageNotice.title" :description="pageNotice.description" :tone="pageNotice.tone" />
+    </template>
+
     <PetPalDeskSection eyebrow="Form" :title="isEditing ? '编辑资料' : '填写资料'" description="姓名、护理说明和紧急联系人优先填写。">
       <el-form label-position="top" class="petpal-field-grid">
         <el-form-item label="宠物名字">
@@ -76,9 +80,10 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { getErrorMessage } from '@/utils/errors';
+import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
-import { buildPetPalDeskHandoffQuery } from './recovery';
+import { buildPetPalDeskHandoffQuery, getPetPalQueryString, mergePetPalPageNotice } from './recovery';
 import { normalizePetPalTagText, petPalOwnerWorkspaceNav, petPalSpeciesOptions } from './shared';
 
 const route = useRoute();
@@ -117,6 +122,19 @@ const heroStats = computed(() => [
   { label: '绝育状态', value: form.neutered ? '已绝育' : '未绝育', hint: '如实填写即可' },
   { label: '紧急联系人', value: form.emergencyPhone || '待填写', hint: '建议保留真实电话' },
 ]);
+const pageNotice = computed(() => {
+  const description = mergePetPalPageNotice([
+    getPetPalQueryString(route.query, 'notice'),
+  ]);
+  if (!description) {
+    return null;
+  }
+  return {
+    title: isEditing.value ? '已进入宠物编辑页' : '已进入新建宠物页',
+    description,
+    tone: 'accent' as const,
+  };
+});
 
 function applyPet(pet: PetProfileRecord) {
   form.name = pet.name;
@@ -144,7 +162,12 @@ async function loadPage() {
     const target = pets.find((item) => item.id === editingPetId.value);
     if (!target) {
       ElMessage.warning('没有找到对应宠物档案');
-      void router.replace({ name: 'frontend-petpal-pets' });
+      void router.replace({
+        name: 'frontend-petpal-pets',
+        query: buildPetPalDeskHandoffQuery({
+          notice: '未找到对应宠物档案，已回到宠物清单，可改为检查其他宠物资料。',
+        }),
+      });
       return;
     }
     applyPet(target);

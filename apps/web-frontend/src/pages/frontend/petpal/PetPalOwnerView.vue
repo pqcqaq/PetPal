@@ -83,8 +83,12 @@
               <p class="petpal-sheet-row__desc">{{ pet.feedingNote || '喂养说明待补充' }}</p>
             </div>
             <div class="petpal-sheet-row__tail">
-              <RouterLink :to="{ name: 'frontend-petpal-pet-edit', params: { id: pet.id } }">编辑</RouterLink>
-              <RouterLink :to="{ name: 'frontend-petpal-request-create', query: { petId: pet.id } }">用它发需求</RouterLink>
+              <RouterLink :to="buildOwnerPetEditRoute(pet.id)">编辑</RouterLink>
+              <RouterLink
+                :to="buildOwnerRequestCreateRoute(pet.id, '这里已经带着这只宠物进入需求表单，可直接继续填写服务时间和预算。')"
+              >
+                用它发需求
+              </RouterLink>
             </div>
           </div>
         </div>
@@ -94,7 +98,12 @@
           description="先补齐第一只宠物的信息，后面的需求和订单都以它为起点。"
         >
           <template #actions>
-            <RouterLink class="frontend-page__button is-primary" :to="{ name: 'frontend-petpal-pet-create' }">新建宠物档案</RouterLink>
+            <RouterLink
+              class="frontend-page__button is-primary"
+              :to="buildOwnerPetCreateRoute('这里已经定位到新建宠物档案，可先补齐第一只宠物后再回来继续主人任务。')"
+            >
+              新建宠物档案
+            </RouterLink>
           </template>
         </PetPalDeskEmpty>
       </PetPalDeskSection>
@@ -134,7 +143,15 @@
           description="需求发布已经单独拆到表单页，队列页只保留匹配和下单。"
         >
           <template #actions>
-            <RouterLink class="frontend-page__button is-primary" :to="{ name: 'frontend-petpal-request-create' }">新建需求</RouterLink>
+            <RouterLink
+              class="frontend-page__button is-primary"
+              :to="buildOwnerRequestCreateRoute(
+                pets[0]?.id || '',
+                '这里已经定位到新建需求页，可直接继续填写时间、地点和预算。',
+              )"
+            >
+              新建需求
+            </RouterLink>
           </template>
         </PetPalDeskEmpty>
       </PetPalDeskSection>
@@ -244,6 +261,37 @@ const pageNotice = computed(() => {
   };
 });
 
+function buildOwnerPetCreateRoute(notice: string) {
+  return {
+    name: 'frontend-petpal-pet-create',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
+
+function buildOwnerPetEditRoute(petId: string) {
+  return {
+    name: 'frontend-petpal-pet-edit',
+    params: { id: petId },
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这里已经定位到这只宠物档案，可直接继续补齐资料。',
+      focusPetId: petId,
+    }),
+  };
+}
+
+function buildOwnerRequestCreateRoute(petId: string, notice: string) {
+  return {
+    name: 'frontend-petpal-request-create',
+    query: {
+      ...(petId ? { petId } : {}),
+      ...buildPetPalDeskHandoffQuery({
+        notice,
+        ...(petId ? { focusPetId: petId } : {}),
+      }),
+    },
+  };
+}
+
 const heroStats = computed(() => [
   { label: '宠物档案', value: String(pets.value.length), hint: pets.value.length ? '资料可复用' : '先建第一只' },
   { label: '活跃需求', value: String(activeRequests.value.length), hint: activeRequests.value.length ? '继续匹配' : '可直接新建' },
@@ -256,9 +304,20 @@ const primaryAction = computed(() => {
     return { label: '去登录', to: '/login', tone: 'primary' as const };
   }
   if (!pets.value.length) {
-    return { label: '先建宠物档案', to: { name: 'frontend-petpal-pet-create' }, tone: 'primary' as const };
+    return {
+      label: '先建宠物档案',
+      to: buildOwnerPetCreateRoute('这里已经定位到新建宠物档案，可先补齐第一只宠物后再回来继续主人任务。'),
+      tone: 'primary' as const,
+    };
   }
-  return { label: '新建照料需求', to: { name: 'frontend-petpal-request-create' }, tone: 'primary' as const };
+  return {
+    label: '新建照料需求',
+    to: buildOwnerRequestCreateRoute(
+      pets.value[0]?.id || '',
+      '这里已经定位到新建需求页，可直接继续填写时间、地点和预算。',
+    ),
+    tone: 'primary' as const,
+  };
 });
 
 const heroActions = computed(() => [
@@ -297,7 +356,7 @@ const focusTask = computed(() => {
       title: '先建立第一只宠物档案',
       description: '宠物建档完成后，需求表单和后续订单都能直接复用资料，避免重复输入。',
       actionLabel: '去建档',
-      to: { name: 'frontend-petpal-pet-create' },
+      to: buildOwnerPetCreateRoute('这里已经定位到新建宠物档案，可先补齐第一只宠物后再回来继续主人任务。'),
     };
   }
   if (outstandingOrders.value.length) {
@@ -347,7 +406,10 @@ const focusTask = computed(() => {
     title: '开始新的照料需求',
     description: '宠物档案已经可用，可以直接发布新的服务时间、地点和预算需求。',
     actionLabel: '新建需求',
-    to: { name: 'frontend-petpal-request-create' },
+    to: buildOwnerRequestCreateRoute(
+      pets.value[0]?.id || '',
+      '这里已经定位到新建需求页，可直接继续填写时间、地点和预算。',
+    ),
   };
 });
 

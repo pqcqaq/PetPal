@@ -5,7 +5,7 @@
     summary="这个页面只保留宠物清单和进入编辑表单的入口。"
     :nav-items="petPalOwnerWorkspaceNav"
     active-name="frontend-petpal-pets"
-    :primary-action="{ label: '新建宠物档案', to: { name: 'frontend-petpal-pet-create' }, tone: 'primary' }"
+    :primary-action="primaryAction"
     :actions="[{ label: '返回主人总览', to: { name: 'frontend-petpal' }, tone: 'secondary' }]"
     :stats="heroStats"
   >
@@ -21,7 +21,7 @@
           </el-button>
           <RouterLink
             v-else-if="highlightedPet"
-            :to="{ name: 'frontend-petpal-pet-edit', params: { id: highlightedPet.id } }"
+            :to="buildOwnerPetEditRoute(highlightedPet.id)"
           >
             继续编辑这只宠物
           </RouterLink>
@@ -46,7 +46,12 @@
         description="先建第一只宠物，再进入需求页发布照料计划。"
       >
         <template #actions>
-          <RouterLink class="frontend-page__button is-primary" :to="{ name: 'frontend-petpal-pet-create' }">新建宠物档案</RouterLink>
+          <RouterLink
+            class="frontend-page__button is-primary"
+            :to="buildOwnerPetCreateRoute('这里已经定位到新建宠物档案，可先补齐第一只宠物后再回来继续主人任务。')"
+          >
+            新建宠物档案
+          </RouterLink>
         </template>
       </PetPalDeskEmpty>
 
@@ -63,8 +68,12 @@
             </div>
           </div>
           <div class="petpal-sheet-row__tail">
-            <RouterLink :to="{ name: 'frontend-petpal-pet-edit', params: { id: pet.id } }">编辑资料</RouterLink>
-            <RouterLink :to="{ name: 'frontend-petpal-request-create', query: { petId: pet.id } }">为它发需求</RouterLink>
+            <RouterLink :to="buildOwnerPetEditRoute(pet.id)">编辑资料</RouterLink>
+            <RouterLink
+              :to="buildOwnerRequestCreateRoute(pet.id, '这里已经带着这只宠物进入需求表单，可直接继续填写服务时间和预算。')"
+            >
+              为它发需求
+            </RouterLink>
           </div>
         </div>
       </div>
@@ -93,6 +102,7 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalDeskHandoffQuery,
   getPetPalQueryString,
   mergePetPalPageNotice,
   runPetPalSectionRetry,
@@ -107,6 +117,11 @@ const loadState = ref<PetPalSectionLoadState>('idle');
 const sectionReloadingKey = ref<'' | 'pets'>('');
 const highlightedPetId = computed(() => getPetPalQueryString(route.query, 'focusPetId'));
 const highlightedPet = computed(() => pets.value.find((item) => item.id === highlightedPetId.value) ?? null);
+const primaryAction = computed(() => ({
+  label: '新建宠物档案',
+  to: buildOwnerPetCreateRoute('这里已经定位到新建宠物档案，可先补齐第一只宠物后再回来继续主人任务。'),
+  tone: 'primary' as const,
+}));
 
 const heroStats = computed(() => {
   const withEmergencyContact = pets.value.filter((item) => item.emergencyContact?.phone).length;
@@ -132,6 +147,37 @@ const pageNotice = computed(() => {
     tone: loadState.value === 'error' ? 'warning' as const : 'accent' as const,
   };
 });
+
+function buildOwnerPetCreateRoute(notice: string) {
+  return {
+    name: 'frontend-petpal-pet-create',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
+
+function buildOwnerPetEditRoute(petId: string) {
+  return {
+    name: 'frontend-petpal-pet-edit',
+    params: { id: petId },
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这里已经定位到这只宠物档案，可直接继续补齐资料。',
+      focusPetId: petId,
+    }),
+  };
+}
+
+function buildOwnerRequestCreateRoute(petId: string, notice: string) {
+  return {
+    name: 'frontend-petpal-request-create',
+    query: {
+      petId,
+      ...buildPetPalDeskHandoffQuery({
+        notice,
+        focusPetId: petId,
+      }),
+    },
+  };
+}
 
 async function loadPage() {
   if (!auth.isAuthenticated) {
