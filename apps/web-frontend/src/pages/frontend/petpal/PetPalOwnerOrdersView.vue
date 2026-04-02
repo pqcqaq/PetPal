@@ -41,35 +41,17 @@
       </div>
 
       <div class="petpal-export-toolbar">
-        <div class="petpal-export-toolbar__templates">
-          <span class="petpal-export-toolbar__label">常用模板</span>
-          <el-select
-            v-model="selectedExportTemplateName"
-            clearable
-            placeholder="选择交易导出模板"
-            class="petpal-export-toolbar__template"
-          >
-            <el-option
-              v-for="item in exportTemplates"
-              :key="item.name"
-              :label="item.name"
-              :value="item.name"
-            />
-          </el-select>
-          <el-button :disabled="!selectedExportTemplate" @click="applySelectedExportTemplate">
-            应用模板
-          </el-button>
-          <el-button :disabled="!hasExportFilters" @click="saveCurrentExportTemplate">
-            保存为模板
-          </el-button>
-          <el-button
-            v-if="selectedExportTemplate"
-            text
-            @click="deleteSelectedExportTemplate"
-          >
-            删除模板
-          </el-button>
-        </div>
+        <PetPalExportTemplateActions
+          v-model="selectedExportTemplateName"
+          :templates="exportTemplates"
+          placeholder="选择交易导出模板"
+          :apply-disabled="!selectedExportTemplate"
+          :save-disabled="!hasExportFilters"
+          :can-remove="!!selectedExportTemplate"
+          @apply="applySelectedExportTemplate"
+          @save="saveCurrentExportTemplate"
+          @remove="deleteSelectedExportTemplate"
+        />
 
         <div class="petpal-export-toolbar__filters">
           <el-date-picker
@@ -173,6 +155,7 @@ import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
+import PetPalExportTemplateActions from './rebuild/petpal-export-template-actions.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
   PETPAL_EXPORT_TEMPLATE_LIMIT,
@@ -534,7 +517,6 @@ onMounted(() => {
   margin-top: 12px;
 }
 
-.petpal-export-toolbar__templates,
 .petpal-export-toolbar__filters {
   display: flex;
   gap: 12px;
@@ -542,15 +524,6 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-.petpal-export-toolbar__label {
-  color: #6b625a;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.petpal-export-toolbar__template,
 .petpal-export-toolbar__control {
   width: 220px;
 }
@@ -569,12 +542,10 @@ onMounted(() => {
 }
 
 @media (max-width: 720px) {
-  .petpal-export-toolbar__templates,
   .petpal-export-toolbar__filters {
     align-items: stretch;
   }
 
-  .petpal-export-toolbar__template,
   .petpal-export-toolbar__control {
     width: 100%;
   }

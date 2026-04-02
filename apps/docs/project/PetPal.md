@@ -7640,6 +7640,52 @@ flowchart TD
 2. 继续评估是否为交易导出补更细的退款状态或支付状态筛选，前提是不把简单导出链路重新做成过重表单。
 3. 在导出链路共享层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.178 2026-04-03（P3-M1 Slice 178）
+
+**概述**：延续上一轮把主人交易导出模板补齐后的收口，本轮不再继续叠加新的导出字段，而是先把 Web 端已经重复三次的“模板选择 + 应用 / 保存 / 删除”操作壳层抽成共享组件，避免照料者收益页、主人售后中心和主人订单页后续继续并行维护同一段模板交互 UI。
+
+已完成：
+
+- 提取共享导出模板动作组件：
+  - `apps/web-frontend/src/pages/frontend/petpal/rebuild/petpal-export-template-actions.vue`
+    - 新增 `PetPalExportTemplateActions` 共享组件，统一承接模板标签、模板下拉、应用模板、保存模板和删除模板动作。
+    - 组件通过 `modelValue`、`templates`、`applyDisabled`、`saveDisabled`、`canRemove` 和 `apply/save/remove` 事件对外暴露状态与交互，不接管页面自己的筛选快照和业务逻辑。
+    - 组件内部已补齐桌面端横向排布和移动端纵向拉伸，避免三个页面继续各自维护相同响应式样式。
+- 三个页面切到共享模板动作壳层：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 收益页现已改用共享模板动作组件，保留快捷时间窗和经营导出筛选区自身逻辑。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalAftersalesView.vue`
+    - 售后中心退款导出模板区现已改用共享组件，退款 / 投诉筛选区保持原样。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerOrdersView.vue`
+    - 订单队列交易导出模板区现已改用共享组件，时间范围、服务类型、订单状态和订单号关键词筛选仍由页面自身维护。
+- 页面样式收口：
+  - 上述三个页面已删除重复的模板标签、模板下拉宽度和模板区对齐样式，减少导出工具条样式散落复制。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\use-petpal-export-templates.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增后端接口、导出参数、页面状态结构或模板存储结构，只收口 Web 端重复的模板动作 UI 壳层。
+- 已确认照料者收益页、主人售后中心和主人订单页继续各自保留筛选快照、模板保存逻辑和导出请求构建，不会因为共用壳层把不同导出业务错误耦合到一起。
+- 已确认共享组件只负责模板动作区本身，移动端和桌面端布局也已同步统一，后续新增导出页时不需要再复制同一段模板操作 UI。
+
+风险与缓解：
+
+- 风险：当前导出工具条仍只共享了模板动作区，日期范围、关键词输入、清空动作和筛选快照桥接还分散在各页面。
+- 缓解：下一轮继续优先评估是否把导出筛选条剩余公共壳层也逐步抽成更完整的共享工具条，同时保持各页筛选字段差异不被过度抽象。
+
+下一步（1-3）：
+
+1. 继续评估是否把日期范围、关键词输入、清空筛选和模板动作组合成更完整的 PetPal 导出工具条组件。
+2. 继续评估主人交易导出、主人退款导出和照料者收益导出的筛选快照桥接逻辑，减少重复 computed 和样式壳层。
+3. 在导出工具条共享层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
 ### 14.172 2026-04-03（P3-M1 Slice 172）
 
 **概述**：延续退款原因关键词专项导出，本轮继续把照料者经营明细推进到“能按投诉摘要检索复盘”的层面，新增投诉摘要关键词筛选，让照料者可以快速定位服务争议、平台流程异常、处理结论等特定投诉上下文的完成订单。
