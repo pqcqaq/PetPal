@@ -211,11 +211,11 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
   getPetPalDeskFocusRole,
   getPetPalDeskSectionTab,
   getPetPalQueryString,
-  mergePetPalPageNotice,
   runPetPalSectionRetry,
   type PetPalSectionLoadState,
 } from './recovery';
@@ -290,22 +290,15 @@ const heroStats = computed(() => [
   { label: '履约留痕', value: String(order.value ? order.value.timeline.length + order.value.serviceLogs.length : 0), hint: '包含事件和服务记录' },
   { label: '售后摘要', value: isOwnerView.value ? `${complaints.value.length} / ${refundProgress.value ? getPetPalRefundProgressStageLabel(refundProgress.value.stage) : '暂无'}` : '照料者侧不展示', hint: '退款与投诉去结果页处理' },
 ]);
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  warnings: [
     conversationState.value === 'error' ? '订单沟通暂未刷新完成，可只重试沟通区' : '',
     aftersalesState.value === 'error' && isOwnerView.value ? '售后摘要暂未刷新完成，可只重试售后区' : '',
-  ]);
-  if (!description) {
-    return null;
-  }
-  const hasError = conversationState.value === 'error' || (aftersalesState.value === 'error' && isOwnerView.value);
-  return {
-    title: hasError ? '订单详情还有部分分区未刷新完成' : '已回到订单详情',
-    description,
-    tone: hasError ? 'warning' as const : 'accent' as const,
-  };
-});
+  ],
+  successTitle: '已回到订单详情',
+  warningTitle: '订单详情还有部分分区未刷新完成',
+}));
 
 function resolveOrderFilter(record: OrderDetailRecord) {
   if (isPetPalOutstandingOrder(record)) {

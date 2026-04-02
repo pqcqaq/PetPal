@@ -44,6 +44,7 @@ Last updated: 2026-04-03
   - 主人侧表单页页头返回和主人 / 照料者总览的残余 bare fallback 现也已补齐统一 handoff，宠物 / 需求表单回列表、售后中心 / 服务清单 fallback 不再静默跳转。
   - 主人 / 照料者工作台、提醒中心、消息中心、需求队列和售后中心的 page notice 逻辑已开始共享化，warning 标题、弱网提示和回流说明的拼接规则不再散落复制。
   - 宠物清单、主人订单、照料者资料、履约队列和服务清单这批资源页 / 队列页的 page notice 现也已迁到共享 helper，常用列表页的 notice 规则基本统一。
+  - 宠物 / 需求 / 服务表单页、订单详情页和支付 / 退款 / 投诉 / 评价结果页的 page notice 也已改走共享 helper，PetPal Web 主要入口页的 notice 逻辑基本统一。
 - 订单详情页已具备支付/退款时间线、服务记录、评价、投诉、消息沟通等完整信息面板。
 - 2026-04-01 新增前端重构蓝图文档，开始把 Web 首屏从“解释产品结构”改为“状态 + 动作 + 列表入口”。
 - 主人工作台、照料者工作台、售后中心和订单详情页首屏已移除一批面向开发者/产品语义的讲解文案，开始收敛为真实可操作的工作台。
@@ -140,6 +141,7 @@ Last updated: 2026-04-03
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetFormView.vue`、`PetPalOwnerRequestFormView.vue`、`PetPalOwnerView.vue`、`PetPalCaregiverView.vue` 已继续补齐主人侧表单返回动作和总览页残余 fallback 的 handoff。
   - `apps/web-frontend/src/pages/frontend/petpal/recovery.ts`、`PetPalOwnerView.vue`、`PetPalCaregiverView.vue`、`PetPalRemindersView.vue`、`PetPalMessagesView.vue`、`PetPalOwnerRequestsView.vue`、`PetPalAftersalesView.vue` 已开始共享 page notice 计算，统一 warning / success 标题与说明拼接逻辑。
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetsView.vue`、`PetPalOwnerOrdersView.vue`、`PetPalCaregiverProfileView.vue`、`PetPalCaregiverOrdersView.vue`、`PetPalCaregiverServicesView.vue` 已继续改走共享 page notice helper。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetFormView.vue`、`PetPalOwnerRequestFormView.vue`、`PetPalCaregiverServiceFormView.vue`、`OrderDetailView.vue`、`PetPalOrderResultWorkbench.vue` 已继续改走共享 page notice helper。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

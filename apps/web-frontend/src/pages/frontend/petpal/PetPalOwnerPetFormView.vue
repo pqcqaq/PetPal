@@ -83,7 +83,7 @@ import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
-import { buildPetPalDeskHandoffQuery, getPetPalQueryString, mergePetPalPageNotice } from './recovery';
+import { buildPetPalDeskHandoffQuery, buildPetPalPageNotice, getPetPalQueryString } from './recovery';
 import { normalizePetPalTagText, petPalOwnerWorkspaceNav, petPalSpeciesOptions } from './shared';
 
 const route = useRoute();
@@ -134,19 +134,11 @@ const pageActions = computed(() => [
     tone: 'secondary' as const,
   },
 ]);
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
-  ]);
-  if (!description) {
-    return null;
-  }
-  return {
-    title: isEditing.value ? '已进入宠物编辑页' : '已进入新建宠物页',
-    description,
-    tone: 'accent' as const,
-  };
-});
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  successTitle: isEditing.value ? '已进入宠物编辑页' : '已进入新建宠物页',
+  warningTitle: isEditing.value ? '宠物编辑页还有部分内容待确认' : '新建宠物页还有部分内容待确认',
+}));
 
 function buildPetListRoute(notice: string, petId?: string) {
   return {

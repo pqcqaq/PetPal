@@ -82,7 +82,7 @@ import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
-import { buildPetPalDeskHandoffQuery, getPetPalQueryString, mergePetPalPageNotice } from './recovery';
+import { buildPetPalDeskHandoffQuery, buildPetPalPageNotice, getPetPalQueryString } from './recovery';
 import { normalizePetPalTagText, petPalOwnerWorkspaceNav, petPalServiceTypeOptions } from './shared';
 
 const route = useRoute();
@@ -119,20 +119,14 @@ const pageActions = computed(() => [
     tone: 'secondary' as const,
   },
 ]);
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  notes: [
     preferredPet.value ? `当前已带入宠物：${preferredPet.value.name}` : '',
-  ]);
-  if (!description) {
-    return null;
-  }
-  return {
-    title: '已进入需求表单',
-    description,
-    tone: 'accent' as const,
-  };
-});
+  ],
+  successTitle: '已进入需求表单',
+  warningTitle: '需求表单还有部分内容待确认',
+}));
 
 function buildOwnerPetCreateRoute(notice: string) {
   return {

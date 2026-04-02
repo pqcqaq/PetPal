@@ -227,9 +227,9 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
   getPetPalQueryString,
-  mergePetPalPageNotice,
   type PetPalDeskOrderFilter,
 } from './recovery';
 import {
@@ -293,24 +293,21 @@ const pageSummary = computed(() => ({
   complaint: '投诉记录和新投诉提交都在这里处理。',
   review: '评价查看与提交都在这里单独完成。',
 }[props.mode]));
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
-  ]);
-  if (!description) {
-    return null;
-  }
-  return {
-    title: ({
-      payment: '已进入支付结果页',
-      refund: '已进入退款结果页',
-      complaint: '已进入投诉结果页',
-      review: '已进入评价结果页',
-    } satisfies Record<typeof props.mode, string>)[props.mode],
-    description,
-    tone: 'accent' as const,
-  };
-});
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  successTitle: ({
+    payment: '已进入支付结果页',
+    refund: '已进入退款结果页',
+    complaint: '已进入投诉结果页',
+    review: '已进入评价结果页',
+  } satisfies Record<typeof props.mode, string>)[props.mode],
+  warningTitle: ({
+    payment: '支付结果页还有部分内容待确认',
+    refund: '退款结果页还有部分内容待确认',
+    complaint: '投诉结果页还有部分内容待确认',
+    review: '评价结果页还有部分内容待确认',
+  } satisfies Record<typeof props.mode, string>)[props.mode],
+}));
 
 const currentOrderId = computed(() => order.value?.id || orderId.value);
 

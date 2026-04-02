@@ -7202,6 +7202,45 @@ flowchart TD
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.156 2026-04-03（P3-M1 Slice 156）
+
+**概述**：继续推进 Web 前台收口，本轮把表单页、订单详情页和结果工作台的 page notice 也迁到共享 helper，准备结束这一轮 notice 统一化改造。
+
+已完成：
+
+- 第三批接入共享 notice helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetFormView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerRequestFormView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverServiceFormView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOrderResultWorkbench.vue`
+    - 宠物 / 需求 / 服务表单页不再各自手写只含 accent 的 notice 计算。
+    - 需求表单里的“当前已带入宠物”说明已被归入 `notes`，不会误当 warning。
+    - 订单详情页和支付 / 退款 / 投诉 / 评价结果页现在也统一改走 `buildPetPalPageNotice()`。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮只调整 Web 前台表单、详情和结果页的 notice 计算，没有改动下单、付款、退款、投诉、评价等业务动作。
+- 主人 / 照料者列表页、表单页、订单详情页和结果页现已基本统一到同一套 page notice helper。
+
+风险与缓解：
+
+- 风险：仍需再做一次整体梳理，确认没有遗漏的旧 notice 计算分支或文档缺口。
+- 缓解：下一轮转向扫尾检查、补测试说明和交付文档整理，不再继续扩散页面壳层改动。
+
+下一步（1-3）：
+
+1. 做一次 page notice 覆盖清点，确认 PetPal Web 主要入口页已全部迁完。
+2. 补验收向测试说明、链路清单与交付文档索引。
+3. 继续按最小切片推进剩余非 notice 类收口项。
+
 ### 14.155 2026-04-03（P3-M1 Slice 155）
 
 **概述**：继续推进 Web 前台收口，本轮把剩余一批主人 / 照料者资源页与订单队列页的 page notice 也迁到共享 helper，补齐宠物清单、主人订单、照料者资料、履约队列和服务清单这几类高频入口的统一反馈逻辑。
