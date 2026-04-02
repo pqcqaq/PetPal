@@ -255,6 +255,7 @@ type CaregiverEarningsExportFilters = {
   endDate?: Date;
   serviceType?: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
   refundType?: 'FULL' | 'PARTIAL';
+  refundStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
   riskOnly?: boolean;
   complaintStatus?: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
   complaintType?: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
@@ -1977,12 +1978,21 @@ export const petpalService = {
               },
             }
           : {}),
-        ...(normalizedFilters.refundType
+        ...(normalizedFilters.refundType || normalizedFilters.refundStatus
           ? {
               refunds: {
                 some: {
                   deleteAt: null,
-                  refundType: normalizedFilters.refundType,
+                  ...(normalizedFilters.refundType
+                    ? {
+                        refundType: normalizedFilters.refundType,
+                      }
+                    : {}),
+                  ...(normalizedFilters.refundStatus
+                    ? {
+                        refundStatus: normalizedFilters.refundStatus,
+                      }
+                    : {}),
                 },
               },
             }

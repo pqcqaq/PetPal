@@ -557,6 +557,7 @@ export interface CaregiverEarningsExportQuery {
   endDate?: string;
   serviceType?: PetServiceType;
   refundType?: RefundType;
+  refundStatus?: RefundStatus;
   riskOnly?: boolean;
   complaintStatus?: ComplaintStatus;
   complaintType?: ComplaintType;

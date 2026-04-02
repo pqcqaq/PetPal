@@ -168,6 +168,19 @@
               />
             </el-select>
             <el-select
+              v-model="exportRefundStatus"
+              clearable
+              placeholder="导出全部退款状态"
+              class="petpal-export-toolbar__service"
+            >
+              <el-option
+                v-for="item in petPalRefundStatusOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+            <el-select
               v-model="exportComplaintStatus"
               clearable
               placeholder="导出全部投诉状态"
@@ -214,7 +227,7 @@
             </el-button>
           </div>
           <p class="petpal-export-toolbar__hint">
-            导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按退款类型、退款风险单、投诉状态、投诉类型或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
+            导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按退款类型、退款状态、退款风险单、投诉状态、投诉类型或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
           </p>
         </div>
 
@@ -466,6 +479,7 @@ import type {
   PetServiceType,
   ComplaintStatus,
   RefundType,
+  RefundStatus,
   CaregiverEarningsOrderRecord,
   CaregiverEarningsSummaryRecord,
 } from '@rbac/api-common';
@@ -496,6 +510,7 @@ import {
   petPalComplaintStatusOptions,
   petPalComplaintTypeOptions,
   petPalCaregiverWorkspaceNav,
+  petPalRefundStatusOptions,
   petPalRefundTypeOptions,
   petPalServiceTypeOptions,
 } from './shared';
@@ -511,6 +526,7 @@ type CaregiverEarningsExportFilterSnapshot = {
   endDate: string;
   serviceType: PetServiceType | '';
   refundType: RefundType | '';
+  refundStatus: RefundStatus | '';
   complaintStatus: ComplaintStatus | '';
   complaintType: ComplaintType | '';
   complaintTargetRole: ComplaintTargetRole | '';
@@ -540,6 +556,7 @@ const { state: exportPageState } = usePageState<CaregiverEarningsExportPageState
     endDate: '',
     serviceType: '',
     refundType: '',
+    refundStatus: '',
     complaintStatus: '',
     complaintType: '',
     complaintTargetRole: '',
@@ -612,6 +629,7 @@ const applyExportFilterSnapshot = (snapshot: CaregiverEarningsExportFilterSnapsh
   exportPageState.endDate = snapshot.endDate;
   exportPageState.serviceType = snapshot.serviceType;
   exportPageState.refundType = snapshot.refundType;
+  exportPageState.refundStatus = snapshot.refundStatus;
   exportPageState.complaintStatus = snapshot.complaintStatus;
   exportPageState.complaintType = snapshot.complaintType;
   exportPageState.complaintTargetRole = snapshot.complaintTargetRole;
@@ -623,6 +641,7 @@ const buildCurrentExportFilterSnapshot = (): CaregiverEarningsExportFilterSnapsh
   endDate: exportPageState.endDate,
   serviceType: exportPageState.serviceType,
   refundType: exportPageState.refundType,
+  refundStatus: exportPageState.refundStatus,
   complaintStatus: exportPageState.complaintStatus,
   complaintType: exportPageState.complaintType,
   complaintTargetRole: exportPageState.complaintTargetRole,
@@ -635,6 +654,7 @@ const clearCurrentExportFilters = () => {
     endDate: '',
     serviceType: '',
     refundType: '',
+    refundStatus: '',
     complaintStatus: '',
     complaintType: '',
     complaintTargetRole: '',
@@ -699,6 +719,12 @@ const exportRefundType = computed<RefundType | ''>({
   get: () => exportPageState.refundType,
   set: (value) => {
     exportPageState.refundType = value || '';
+  },
+});
+const exportRefundStatus = computed<RefundStatus | ''>({
+  get: () => exportPageState.refundStatus,
+  set: (value) => {
+    exportPageState.refundStatus = value || '';
   },
 });
 const exportComplaintStatus = computed<ComplaintStatus | ''>({
@@ -767,6 +793,7 @@ const hasExportFilters = computed(() => Boolean(
   exportDateRange.value
   || exportServiceType.value
   || exportRefundType.value
+  || exportRefundStatus.value
   || exportComplaintStatus.value
   || exportComplaintType.value
   || exportComplaintTargetRole.value
@@ -992,6 +1019,7 @@ function buildEarningsExportRequest() {
     endDate: exportDateRange.value?.[1]?.toISOString(),
     serviceType: exportServiceType.value || undefined,
     refundType: exportRefundType.value || undefined,
+    refundStatus: exportRefundStatus.value || undefined,
     complaintStatus: exportComplaintStatus.value || undefined,
     complaintType: exportComplaintType.value || undefined,
     complaintTargetRole: exportComplaintTargetRole.value || undefined,

@@ -9,6 +9,7 @@ import type {
   OrderStatus,
   PetSpecies,
   PetServiceType,
+  RefundStatus,
   ServiceLogType,
   RefundType,
   ServiceRequestStatus,
@@ -85,6 +86,14 @@ export const petPalComplaintStatusOptions: Array<{ label: string; value: Complai
 export const petPalRefundTypeOptions: Array<{ label: string; value: RefundType }> = [
   { label: '全额退款', value: 'FULL' },
   { label: '部分退款', value: 'PARTIAL' },
+];
+
+export const petPalRefundStatusOptions: Array<{ label: string; value: RefundStatus }> = [
+  { label: '待审核', value: 'PENDING' },
+  { label: '待退款', value: 'APPROVED' },
+  { label: '已驳回', value: 'REJECTED' },
+  { label: '退款成功', value: 'SUCCESS' },
+  { label: '退款失败', value: 'FAILED' },
 ];
 
 export const petPalServiceLogOptions: Array<{ label: string; value: ServiceLogType; note: string }> = [
