@@ -24,8 +24,143 @@
     </template>
 
     <PetPalDeskSection eyebrow="Export" title="导出与售后清单" description="左侧看售后订单，右侧只看当前选中订单的退款和投诉摘要。">
-      <div class="petpal-toolbar">
-        <ListExportButton :request="() => api.petpal.orders.exportRefundDetails()" label="导出全部退款明细" pending-label="导出中" />
+      <div class="petpal-export-toolbar">
+        <div class="petpal-export-toolbar__templates">
+          <span class="petpal-export-toolbar__label">常用模板</span>
+          <el-select
+            v-model="selectedExportTemplateName"
+            clearable
+            placeholder="选择退款导出模板"
+            class="petpal-export-toolbar__template"
+          >
+            <el-option
+              v-for="item in exportTemplates"
+              :key="item.name"
+              :label="item.name"
+              :value="item.name"
+            />
+          </el-select>
+          <el-button :disabled="!selectedExportTemplate" @click="applySelectedExportTemplate">
+            应用模板
+          </el-button>
+          <el-button :disabled="!hasExportFilters" @click="saveCurrentExportTemplate">
+            保存为模板
+          </el-button>
+          <el-button
+            v-if="selectedExportTemplate"
+            text
+            @click="deleteSelectedExportTemplate"
+          >
+            删除模板
+          </el-button>
+        </div>
+
+        <div class="petpal-export-toolbar__filters">
+          <el-date-picker
+            v-model="exportDateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="退款开始日期"
+            end-placeholder="退款结束日期"
+            clearable
+          />
+          <el-select
+            v-model="exportServiceType"
+            clearable
+            placeholder="全部服务类型"
+            class="petpal-export-toolbar__control"
+          >
+            <el-option
+              v-for="item in petPalServiceTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <el-input
+            v-model="exportOrderNoKeyword"
+            clearable
+            placeholder="订单号关键词"
+            class="petpal-export-toolbar__control"
+          />
+          <el-select
+            v-model="exportRefundType"
+            clearable
+            placeholder="全部退款类型"
+            class="petpal-export-toolbar__control"
+          >
+            <el-option
+              v-for="item in petPalRefundTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <el-select
+            v-model="exportRefundStatus"
+            clearable
+            placeholder="全部退款状态"
+            class="petpal-export-toolbar__control"
+          >
+            <el-option
+              v-for="item in petPalRefundStatusOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <el-select
+            v-model="exportComplaintStatus"
+            clearable
+            placeholder="全部投诉状态"
+            class="petpal-export-toolbar__control"
+          >
+            <el-option
+              v-for="item in petPalComplaintStatusOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <el-select
+            v-model="exportComplaintType"
+            clearable
+            placeholder="全部投诉类型"
+            class="petpal-export-toolbar__control"
+          >
+            <el-option
+              v-for="item in petPalComplaintTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <el-select
+            v-model="exportComplaintTargetRole"
+            clearable
+            placeholder="全部责任角色"
+            class="petpal-export-toolbar__control"
+          >
+            <el-option
+              v-for="item in petPalComplaintTargetOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <el-button v-if="hasExportFilters" text @click="clearExportFilters">
+            清空导出筛选
+          </el-button>
+          <ListExportButton
+            :request="buildRefundExportRequest"
+            label="导出退款明细"
+            pending-label="导出中"
+          />
+        </div>
+
+        <p class="petpal-export-toolbar__hint">
+          退款导出只影响当前导出文件，不改变左侧售后订单选择；系统会记住最近一次退款筛选，并可保存最多 5 套常用模板。
+        </p>
       </div>
     </PetPalDeskSection>
 
@@ -122,14 +257,31 @@
 import type { ComplaintRecord, OrderRecord, OrderRefundProgressRecord } from '@rbac/api-common';
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '@/api/client';
 import ListExportButton from '@/components/download/ListExportButton.vue';
+import { usePetPalExportTemplates } from '@/composables/use-petpal-export-templates';
+import { usePageState } from '@/composables/use-page-state';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import {
+  PETPAL_EXPORT_TEMPLATE_LIMIT,
+  validatePetPalExportTemplateName,
+} from './export-template-state';
+import {
+  applyOwnerRefundExportFilterSnapshot,
+  buildOwnerRefundExportQuery,
+  cloneOwnerRefundExportFilterSnapshot,
+  createEmptyOwnerRefundExportFilterSnapshot,
+  hasOwnerRefundExportFilters,
+  parseOwnerRefundExportDateRange,
+  type OwnerRefundExportFilterSnapshot,
+  type OwnerRefundExportTemplate,
+  withOwnerRefundExportDateRange,
+} from './owner-refund-export-state';
 import {
   buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
@@ -146,7 +298,13 @@ import {
   getPetPalRefundProgressStageLabel,
   getPetPalServiceTypeLabel,
   isPetPalAftersalesStatus,
+  petPalComplaintStatusOptions,
+  petPalComplaintTargetOptions,
+  petPalComplaintTypeOptions,
   petPalOwnerWorkspaceNav,
+  petPalRefundStatusOptions,
+  petPalRefundTypeOptions,
+  petPalServiceTypeOptions,
 } from './shared';
 
 const route = useRoute();
@@ -157,6 +315,31 @@ const selectedOrderId = ref('');
 const loadState = ref<PetPalSectionLoadState>('idle');
 const sectionReloadingKey = ref<'' | 'aftersales'>('');
 const summaryFailureCount = ref(0);
+
+type OwnerRefundExportPageState = OwnerRefundExportFilterSnapshot & {
+  templates: OwnerRefundExportTemplate[];
+};
+
+const { state: exportPageState } = usePageState<OwnerRefundExportPageState>(
+  'page:petpal:owner-refund-export-filters',
+  {
+    ...createEmptyOwnerRefundExportFilterSnapshot(),
+    templates: [],
+  },
+);
+const exportTemplateState = computed<OwnerRefundExportTemplate[]>({
+  get: () => exportPageState.templates,
+  set: (value) => {
+    exportPageState.templates = value;
+  },
+});
+const {
+  selectedTemplateName: selectedExportTemplateName,
+  selectedTemplate: selectedExportTemplate,
+  applySelectedTemplate: applyNamedExportTemplate,
+  saveTemplate: saveNamedExportTemplate,
+  removeSelectedTemplate: removeNamedExportTemplate,
+} = usePetPalExportTemplates(exportTemplateState);
 
 const aftersalesOrders = computed(() => orders.value.filter((item) => (
   isPetPalAftersalesStatus(item.orderStatus)
@@ -192,6 +375,60 @@ const pageNotice = computed(() => buildPetPalPageNotice({
   successTitle: '已回到售后中心',
   warningTitle: '售后摘要还有部分内容待刷新',
 }));
+
+const exportDateRange = computed<[Date, Date] | null>({
+  get: () => parseOwnerRefundExportDateRange(exportPageState),
+  set: (value) => {
+    applyOwnerRefundExportFilterSnapshot(
+      exportPageState,
+      withOwnerRefundExportDateRange(exportPageState, value),
+    );
+  },
+});
+const exportServiceType = computed<OwnerRefundExportFilterSnapshot['serviceType']>({
+  get: () => exportPageState.serviceType,
+  set: (value) => {
+    exportPageState.serviceType = value || '';
+  },
+});
+const exportOrderNoKeyword = computed<string>({
+  get: () => exportPageState.orderNoKeyword,
+  set: (value) => {
+    exportPageState.orderNoKeyword = value.trimStart();
+  },
+});
+const exportRefundType = computed<OwnerRefundExportFilterSnapshot['refundType']>({
+  get: () => exportPageState.refundType,
+  set: (value) => {
+    exportPageState.refundType = value || '';
+  },
+});
+const exportRefundStatus = computed<OwnerRefundExportFilterSnapshot['refundStatus']>({
+  get: () => exportPageState.refundStatus,
+  set: (value) => {
+    exportPageState.refundStatus = value || '';
+  },
+});
+const exportComplaintStatus = computed<OwnerRefundExportFilterSnapshot['complaintStatus']>({
+  get: () => exportPageState.complaintStatus,
+  set: (value) => {
+    exportPageState.complaintStatus = value || '';
+  },
+});
+const exportComplaintType = computed<OwnerRefundExportFilterSnapshot['complaintType']>({
+  get: () => exportPageState.complaintType,
+  set: (value) => {
+    exportPageState.complaintType = value || '';
+  },
+});
+const exportComplaintTargetRole = computed<OwnerRefundExportFilterSnapshot['complaintTargetRole']>({
+  get: () => exportPageState.complaintTargetRole,
+  set: (value) => {
+    exportPageState.complaintTargetRole = value || '';
+  },
+});
+const exportTemplates = computed(() => exportPageState.templates);
+const hasExportFilters = computed(() => hasOwnerRefundExportFilters(exportPageState));
 
 function buildOrderDetailLink(orderId: string) {
   return {
@@ -247,6 +484,96 @@ function buildComplaintResultLink(orderId: string) {
       focusOrderId: orderId,
     }),
   };
+}
+
+function clearExportFilters() {
+  applyOwnerRefundExportFilterSnapshot(
+    exportPageState,
+    createEmptyOwnerRefundExportFilterSnapshot(),
+  );
+}
+
+function applySelectedExportTemplate() {
+  const appliedTemplate = applyNamedExportTemplate((template) => {
+    applyOwnerRefundExportFilterSnapshot(exportPageState, template);
+  });
+
+  if (!appliedTemplate) {
+    return;
+  }
+  ElMessage.success(`已应用模板「${appliedTemplate.name}」`);
+}
+
+async function saveCurrentExportTemplate() {
+  if (!hasExportFilters.value) {
+    ElMessage.warning('请先选择至少一个退款导出筛选条件');
+    return;
+  }
+
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '为当前退款导出条件取一个名字，便于后续快速套用。',
+      '保存退款导出模板',
+      {
+        confirmButtonText: '保存',
+        cancelButtonText: '取消',
+        inputValue: selectedExportTemplateName.value,
+        inputValidator: validatePetPalExportTemplateName,
+      },
+    );
+
+    const name = value.trim();
+    const nextTemplate: OwnerRefundExportTemplate = {
+      name,
+      ...cloneOwnerRefundExportFilterSnapshot(exportPageState),
+    };
+    const result = saveNamedExportTemplate(nextTemplate);
+
+    if (result.status === 'limit_exceeded') {
+      ElMessage.warning(`最多只能保存 ${PETPAL_EXPORT_TEMPLATE_LIMIT} 个导出模板`);
+      return;
+    }
+
+    ElMessage.success(result.status === 'updated' ? `模板「${name}」已更新` : `模板「${name}」已保存`);
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error(getErrorMessage(error, '保存退款导出模板失败'));
+    }
+  }
+}
+
+async function deleteSelectedExportTemplate() {
+  if (!selectedExportTemplate.value) {
+    return;
+  }
+
+  const templateName = selectedExportTemplate.value.name;
+
+  try {
+    await ElMessageBox.confirm(
+      `删除后将不再保留模板「${templateName}」的退款导出条件。`,
+      '删除退款导出模板',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+      },
+    );
+
+    const removedTemplateName = removeNamedExportTemplate();
+    if (!removedTemplateName) {
+      return;
+    }
+    ElMessage.success(`模板「${removedTemplateName}」已删除`);
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error(getErrorMessage(error, '删除退款导出模板失败'));
+    }
+  }
+}
+
+function buildRefundExportRequest() {
+  return api.petpal.orders.exportRefundDetails(buildOwnerRefundExportQuery(exportPageState));
 }
 
 function applyRouteContext() {
@@ -313,6 +640,39 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+.petpal-export-toolbar {
+  display: grid;
+  gap: 12px;
+}
+
+.petpal-export-toolbar__templates,
+.petpal-export-toolbar__filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.petpal-export-toolbar__label {
+  color: #6b625a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.petpal-export-toolbar__template,
+.petpal-export-toolbar__control {
+  width: 220px;
+}
+
+.petpal-export-toolbar__hint {
+  margin: 0;
+  color: #6b625a;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .petpal-aftersales-row {
   width: 100%;
   display: flex;
@@ -340,5 +700,17 @@ onMounted(() => {
   margin-inline: -10px;
   padding-inline: 16px;
   background: rgba(244, 248, 255, 0.9);
+}
+
+@media (max-width: 720px) {
+  .petpal-export-toolbar__templates,
+  .petpal-export-toolbar__filters {
+    align-items: stretch;
+  }
+
+  .petpal-export-toolbar__template,
+  .petpal-export-toolbar__control {
+    width: 100%;
+  }
 }
 </style>
