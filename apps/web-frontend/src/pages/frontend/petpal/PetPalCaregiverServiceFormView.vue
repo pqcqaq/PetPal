@@ -1,180 +1,84 @@
-<!--
-UX Blueprint
-User: 照料者已经决定新增或编辑某项服务，只想专注填写价格和上架信息
-Entry: 服务清单、新建服务入口
-First screen: 当前模式、城市、是否上架
-Primary action: 保存服务
-Secondary actions: 返回服务清单、回入驻资料
-States: 未登录、可新建、可编辑、未建档
--->
 <template>
-  <div class="frontend-page">
-    <PetPalWorkspaceHero
-      eyebrow="照料者工作区"
-      :title="heroTitle"
-      summary="服务表单页只负责配置一项服务，不再混入清单筛选和上下架动作。"
-      :nav-items="petPalCaregiverWorkspaceNav"
-      active-name="frontend-petpal-caregiver-services"
-      :stats="heroStats"
-      :primary-action="null"
-      :actions="heroActions"
-    />
-
-    <template v-if="auth.isAuthenticated">
-      <section v-if="!hasProfile" class="frontend-card">
-        <PetPalStatePanel
-          eyebrow="服务表单"
-          title="请先完成入驻资料"
-          description="没有照料者档案时，无法创建或编辑服务。"
-          tone="warning"
-        >
-          <template #actions>
-            <RouterLink :to="{ name: 'frontend-petpal-caregiver-profile' }">
-              <el-button size="small" type="primary">去入驻资料</el-button>
-            </RouterLink>
-          </template>
-        </PetPalStatePanel>
-      </section>
-
-      <section v-else class="frontend-page__section-grid">
-        <article class="frontend-card petpal-grid-span-8">
-          <span class="frontend-card__eyebrow">服务表单</span>
-          <el-form :model="serviceForm" label-position="top" size="small" class="petpal-form-grid">
-            <div class="petpal-form-grid__row">
-              <el-form-item label="服务类型">
-                <el-select v-model="serviceForm.serviceType" style="width: 100%">
-                  <el-option label="寄养" value="BOARDING" />
-                  <el-option label="遛宠" value="WALKING" />
-                  <el-option label="喂养" value="FEEDING" />
-                  <el-option label="上门陪伴" value="DOOR_VISIT" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="适配宠物">
-                <el-select v-model="serviceForm.petSpecies" style="width: 100%">
-                  <el-option label="犬" value="DOG" />
-                  <el-option label="猫" value="CAT" />
-                  <el-option label="其他" value="OTHER" />
-                </el-select>
-              </el-form-item>
-            </div>
-
-            <div class="petpal-form-grid__row">
-              <el-form-item label="报价">
-                <el-input-number v-model="serviceForm.pricePerUnit" :min="1" :max="10000" style="width: 100%" />
-              </el-form-item>
-              <el-form-item label="计价单位">
-                <el-input v-model="serviceForm.unitType" placeholder="例如：小时 / 次" />
-              </el-form-item>
-            </div>
-
-            <div class="petpal-form-grid__row">
-              <el-form-item label="最短提前小时">
-                <el-input-number v-model="serviceForm.minNoticeHours" :min="0" :max="168" style="width: 100%" />
-              </el-form-item>
-              <el-form-item label="服务城市">
-                <el-input v-model="serviceForm.serviceCity" placeholder="例如：杭州" />
-              </el-form-item>
-            </div>
-
-            <el-form-item label="是否上架">
-              <el-switch v-model="serviceForm.isActive" />
-            </el-form-item>
-          </el-form>
-        </article>
-
-        <aside class="frontend-card petpal-grid-span-4">
-          <span class="frontend-card__eyebrow">提交前确认</span>
-          <div class="petpal-side-stack">
-            <div class="petpal-side-item">
-              <strong>这页只做一件事</strong>
-              <p>配置一项服务，保存后回服务清单继续看整个组合。</p>
-            </div>
-            <div class="petpal-side-item">
-              <strong>建议先确认</strong>
-              <p>价格、计价单位、服务城市和上架状态会直接影响主人筛选结果。</p>
-            </div>
-            <div class="petpal-card-actions">
-              <el-button type="primary" :loading="saving" @click="saveService">
-                {{ editingServiceId ? '保存修改' : '创建服务' }}
-              </el-button>
-              <RouterLink :to="{ name: 'frontend-petpal-caregiver-services' }">
-                <el-button>返回清单</el-button>
-              </RouterLink>
-            </div>
-          </div>
-        </aside>
-      </section>
-    </template>
-
-    <section v-else class="frontend-card">
-      <PetPalStatePanel
-        eyebrow="服务表单"
-        title="登录后继续编辑服务"
-        description="登录后在独立服务表单页新增或编辑一项服务。"
+  <PetPalDeskPage
+    eyebrow="服务表单"
+    :title="isEditing ? '更新服务配置' : '新建服务配置'"
+    summary="表单页只负责一个服务的配置，不再展示审核或履约内容。"
+    :nav-items="petPalCaregiverWorkspaceNav"
+    active-name="frontend-petpal-caregiver-services"
+    :actions="[{ label: '返回服务清单', to: { name: 'frontend-petpal-caregiver-services' }, tone: 'secondary' }]"
+    :stats="heroStats"
+  >
+    <PetPalDeskSection eyebrow="Form" :title="isEditing ? '编辑服务' : '填写服务'" description="价格、计价单位、提前时长和城市是主人最先看到的字段。">
+      <PetPalDeskEmpty
+        v-if="!hasProfile"
+        title="请先完成入驻资料"
+        description="没有入驻资料时，先去资料页完成建档，再回来创建服务。"
       >
         <template #actions>
-          <RouterLink to="/login">
-            <el-button size="small" type="primary">去登录</el-button>
-          </RouterLink>
+          <RouterLink class="frontend-page__button is-primary" :to="{ name: 'frontend-petpal-caregiver-profile' }">去资料页</RouterLink>
         </template>
-      </PetPalStatePanel>
-    </section>
-  </div>
+      </PetPalDeskEmpty>
+
+      <el-form v-else label-position="top" class="petpal-field-grid">
+        <el-form-item label="服务类型">
+          <el-select v-model="form.serviceType" style="width: 100%">
+            <el-option v-for="item in petPalServiceTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="适配宠物">
+          <el-select v-model="form.petSpecies" style="width: 100%">
+            <el-option v-for="item in petPalSpeciesOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="报价">
+          <el-input-number v-model="form.pricePerUnit" :min="1" :max="10000" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="计价单位">
+          <el-input v-model="form.unitType" maxlength="12" placeholder="例如：小时 / 次" />
+        </el-form-item>
+        <el-form-item label="最短提前小时">
+          <el-input-number v-model="form.minNoticeHours" :min="0" :max="168" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="服务城市">
+          <el-input v-model="form.serviceCity" maxlength="30" placeholder="例如：杭州" />
+        </el-form-item>
+        <el-form-item label="是否上架">
+          <el-switch v-model="form.isActive" />
+        </el-form-item>
+      </el-form>
+    </PetPalDeskSection>
+
+    <PetPalDeskSection eyebrow="Submit" title="保存服务" description="保存后回服务清单继续查看所有服务组合。">
+      <div class="petpal-actions">
+        <el-button type="primary" :loading="submitting" :disabled="!hasProfile" @click="submit">{{ isEditing ? '保存更新' : '创建服务' }}</el-button>
+      </div>
+    </PetPalDeskSection>
+  </PetPalDeskPage>
 </template>
 
 <script setup lang="ts">
-import type { CaregiverProfileRecord, CaregiverServiceRecord, PetServiceType, PetSpecies } from '@rbac/api-common';
+import type { CaregiverServiceRecord } from '@rbac/api-common';
 import { computed, onMounted, reactive, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { ElButton, ElMessage } from 'element-plus';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
-import PetPalStatePanel from '@/pages/frontend/petpal/PetPalStatePanel.vue';
-import PetPalWorkspaceHero from '@/pages/frontend/petpal/components/PetPalWorkspaceHero.vue';
-import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
-import { petPalCaregiverWorkspaceNav } from './shared';
+import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
+import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import { petPalCaregiverWorkspaceNav, petPalServiceTypeOptions, petPalSpeciesOptions } from './shared';
 
-const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 
-const hasProfile = ref(true);
-const saving = ref(false);
-const caregiverProfile = ref<CaregiverProfileRecord | null>(null);
-
 const editingServiceId = computed(() => typeof route.params.id === 'string' ? route.params.id : '');
-const heroTitle = computed(() => editingServiceId.value ? '编辑服务' : '新建服务');
-const heroStats = computed(() => [
-  {
-    label: '当前模式',
-    value: editingServiceId.value ? '编辑' : '新建',
-    hint: '表单页只负责一项服务',
-  },
-  {
-    label: '服务城市',
-    value: serviceForm.serviceCity || caregiverProfile.value?.serviceCity || '待补充',
-    hint: '会直接影响主人筛选',
-  },
-  {
-    label: '上架状态',
-    value: serviceForm.isActive ? '在售' : '停用',
-    hint: '保存后回清单继续看组合',
-  },
-  {
-    label: '下一步',
-    value: '保存服务',
-    hint: '不会留在清单页里混合编辑',
-  },
-]);
+const isEditing = computed(() => Boolean(editingServiceId.value));
+const hasProfile = ref(false);
+const submitting = ref(false);
 
-const heroActions = computed(() => [
-  { label: '返回服务清单', to: { name: 'frontend-petpal-caregiver-services' }, tone: 'secondary' as const },
-  { label: '入驻资料', to: { name: 'frontend-petpal-caregiver-profile' }, tone: 'secondary' as const },
-]);
-
-const serviceForm = reactive({
-  serviceType: 'BOARDING' as PetServiceType,
-  petSpecies: 'DOG' as PetSpecies,
+const form = reactive({
+  serviceType: 'BOARDING' as typeof petPalServiceTypeOptions[number]['value'],
+  petSpecies: 'DOG' as typeof petPalSpeciesOptions[number]['value'],
   pricePerUnit: 60,
   unitType: '小时',
   minNoticeHours: 2,
@@ -182,58 +86,67 @@ const serviceForm = reactive({
   isActive: true,
 });
 
-const applyService = (service: CaregiverServiceRecord) => {
-  serviceForm.serviceType = service.serviceType;
-  serviceForm.petSpecies = service.petSpecies;
-  serviceForm.pricePerUnit = Number(service.pricePerUnit);
-  serviceForm.unitType = service.unitType;
-  serviceForm.minNoticeHours = service.minNoticeHours;
-  serviceForm.serviceCity = service.serviceCity || '';
-  serviceForm.isActive = service.isActive;
-};
+const heroStats = computed(() => [
+  { label: '当前模式', value: isEditing.value ? '编辑' : '新建', hint: '一次只维护一个服务' },
+  { label: '服务类型', value: form.serviceType, hint: '会影响主人匹配入口' },
+  { label: '服务城市', value: form.serviceCity || '待填写', hint: '默认沿用资料页城市' },
+  { label: '在售状态', value: form.isActive ? '在售' : '停用', hint: '保存后可随时切换' },
+]);
+
+function applyService(service: CaregiverServiceRecord) {
+  form.serviceType = service.serviceType;
+  form.petSpecies = service.petSpecies;
+  form.pricePerUnit = Number(service.pricePerUnit);
+  form.unitType = service.unitType;
+  form.minNoticeHours = service.minNoticeHours;
+  form.serviceCity = service.serviceCity || '';
+  form.isActive = service.isActive;
+}
 
 async function loadPage() {
-  if (!auth.isAuthenticated) {
+  try {
+    const profile = await api.petpal.caregiver.profile();
+    hasProfile.value = true;
+    form.serviceCity = profile.serviceCity || '';
+  } catch {
+    hasProfile.value = false;
+    return;
+  }
+
+  if (!editingServiceId.value) {
     return;
   }
 
   try {
-    caregiverProfile.value = await api.petpal.caregiver.profile();
-    hasProfile.value = true;
-    serviceForm.serviceCity = caregiverProfile.value.serviceCity || '';
-
-    if (editingServiceId.value) {
-      const services = await api.petpal.caregiver.services();
-      const target = services.find((item) => item.id === editingServiceId.value) ?? null;
-      if (!target) {
-        ElMessage.warning('没有找到要编辑的服务');
-        await router.push({ name: 'frontend-petpal-caregiver-services' });
-        return;
-      }
-      applyService(target);
+    const services = await api.petpal.caregiver.services();
+    const target = services.find((item) => item.id === editingServiceId.value);
+    if (!target) {
+      ElMessage.warning('没有找到对应服务');
+      void router.replace({ name: 'frontend-petpal-caregiver-services' });
+      return;
     }
+    applyService(target);
   } catch (error: unknown) {
-    caregiverProfile.value = null;
-    hasProfile.value = false;
+    ElMessage.error(getErrorMessage(error, '加载服务配置失败'));
   }
 }
 
-async function saveService() {
-  if (!serviceForm.unitType.trim()) {
+async function submit() {
+  if (!form.unitType.trim()) {
     ElMessage.warning('请填写计价单位');
     return;
   }
 
-  saving.value = true;
+  submitting.value = true;
   try {
     const payload = {
-      serviceType: serviceForm.serviceType,
-      petSpecies: serviceForm.petSpecies,
-      pricePerUnit: Number(serviceForm.pricePerUnit),
-      unitType: serviceForm.unitType.trim(),
-      minNoticeHours: serviceForm.minNoticeHours,
-      serviceCity: serviceForm.serviceCity.trim() || undefined,
-      isActive: serviceForm.isActive,
+      serviceType: form.serviceType,
+      petSpecies: form.petSpecies,
+      pricePerUnit: Number(form.pricePerUnit),
+      unitType: form.unitType.trim(),
+      minNoticeHours: form.minNoticeHours,
+      serviceCity: form.serviceCity.trim() || undefined,
+      isActive: form.isActive,
       availableSlots: [],
     };
 
@@ -244,63 +157,15 @@ async function saveService() {
       await api.petpal.caregiver.createService(payload);
       ElMessage.success('服务已创建');
     }
-
     await router.push({ name: 'frontend-petpal-caregiver-services' });
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, editingServiceId.value ? '更新服务失败' : '创建服务失败'));
+    ElMessage.error(getErrorMessage(error, '保存服务失败'));
   } finally {
-    saving.value = false;
+    submitting.value = false;
   }
 }
 
 onMounted(() => {
-  if (!auth.isAuthenticated) {
-    return;
-  }
   void loadPage();
 });
 </script>
-
-<style scoped lang="scss">
-.petpal-grid-span-8 {
-  grid-column: span 8;
-}
-
-.petpal-grid-span-4 {
-  grid-column: span 4;
-}
-
-.petpal-form-grid,
-.petpal-side-stack {
-  display: grid;
-  gap: 16px;
-}
-
-.petpal-form-grid__row,
-.petpal-card-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.petpal-side-item {
-  padding: 16px;
-  border-radius: 18px;
-  background: rgba(248, 252, 251, 0.86);
-  border: 1px solid rgba(18, 53, 51, 0.08);
-}
-
-@media (max-width: 1080px) {
-  .petpal-grid-span-8,
-  .petpal-grid-span-4 {
-    grid-column: span 12;
-  }
-}
-
-@media (max-width: 720px) {
-  .petpal-form-grid__row,
-  .petpal-card-actions {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

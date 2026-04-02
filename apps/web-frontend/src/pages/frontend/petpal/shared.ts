@@ -3,10 +3,13 @@ import type {
   ComplaintStatus,
   ComplaintTargetRole,
   ComplaintType,
+  OwnerPayChannel,
   OrderConversationRecord,
   OrderRefundProgressRecord,
   OrderStatus,
+  PetSpecies,
   PetServiceType,
+  ServiceLogType,
   RefundType,
   ServiceRequestStatus,
 } from '@rbac/api-common';
@@ -29,6 +32,57 @@ export const petPalCaregiverWorkspaceNav = [
   { label: '提醒', name: 'frontend-petpal-reminders' },
   { label: '消息', name: 'frontend-petpal-messages' },
 ] as const;
+
+export const petPalServiceTypeOptions: Array<{ label: string; value: PetServiceType }> = [
+  { label: '寄养', value: 'BOARDING' },
+  { label: '遛宠', value: 'WALKING' },
+  { label: '喂养', value: 'FEEDING' },
+  { label: '上门陪伴', value: 'DOOR_VISIT' },
+];
+
+export const petPalSpeciesOptions: Array<{ label: string; value: PetSpecies }> = [
+  { label: '犬', value: 'DOG' },
+  { label: '猫', value: 'CAT' },
+  { label: '其他', value: 'OTHER' },
+];
+
+export const petPalPayChannelOptions: Array<{ label: string; value: OwnerPayChannel; note: string }> = [
+  { label: '微信支付', value: 'WECHAT_PAY', note: '适合快速完成下单' },
+  { label: '支付宝', value: 'ALIPAY', note: '适合常用移动支付' },
+  { label: '余额支付', value: 'BALANCE', note: '适合账户内已有余额' },
+];
+
+export const petPalReviewTagOptions = [
+  '准时到达',
+  '沟通清晰',
+  '对宠温柔',
+  '照片反馈及时',
+  '环境整洁',
+  '可再次预约',
+];
+
+export const petPalComplaintTargetOptions: Array<{ label: string; value: ComplaintTargetRole }> = [
+  { label: '照料者', value: 'CAREGIVER' },
+  { label: '平台', value: 'PLATFORM' },
+];
+
+export const petPalComplaintTypeOptions: Array<{ label: string; value: ComplaintType }> = [
+  { label: '安全问题', value: 'SAFETY' },
+  { label: '费用争议', value: 'FEE' },
+  { label: '服务质量', value: 'SERVICE' },
+  { label: '欺诈风险', value: 'FRAUD' },
+  { label: '其他问题', value: 'OTHER' },
+];
+
+export const petPalServiceLogOptions: Array<{ label: string; value: ServiceLogType; note: string }> = [
+  { label: '签到', value: 'CHECK_IN', note: '到达后快速留痕' },
+  { label: '喂养', value: 'FEED', note: '记录进食和饮水' },
+  { label: '遛宠', value: 'WALK', note: '记录外出和活动' },
+  { label: '陪伴', value: 'PLAY', note: '记录互动和安抚' },
+  { label: '健康', value: 'HEALTH', note: '记录观察结果' },
+  { label: '签退', value: 'CHECK_OUT', note: '记录服务结束' },
+  { label: '备注', value: 'NOTE', note: '补充其他说明' },
+];
 
 export const getPetPalOrderStatusLabel = (status: OrderStatus) => ({
   PENDING_ACCEPT: '待接单',
@@ -175,6 +229,8 @@ export const formatPetPalAmount = (value: number | string | null | undefined) =>
   return Number.isFinite(amount) ? amount.toFixed(2) : '0.00';
 };
 
+export const formatPetPalMoney = (value: number | string | null | undefined) => `¥${formatPetPalAmount(value)}`;
+
 export const formatPetPalDate = (value: string | null | undefined) => {
   if (!value) {
     return '--';
@@ -203,3 +259,21 @@ export const formatPetPalTime = (value: string | null | undefined) => {
 
 export const formatPetPalRange = (start: string | null | undefined, end: string | null | undefined) =>
   `${formatPetPalTime(start)} - ${formatPetPalTime(end)}`;
+
+export const normalizePetPalTagText = (value: string | null | undefined) =>
+  (value ?? '')
+    .split(/[\n,，、/]+/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+export const isPetPalOutstandingOrder = (
+  order: Pick<OrderRefundProgressRecord, never> & Pick<{ amountTotal: number | string; amountAdjusted: number | string; amountPaid: number | string }, 'amountTotal' | 'amountAdjusted' | 'amountPaid'>,
+) => {
+  const total = Number(order.amountTotal) + Number(order.amountAdjusted);
+  const paid = Number(order.amountPaid);
+  return total - paid > 0.01;
+};
+
+export const isPetPalAftersalesStatus = (status: OrderStatus) => (
+  status === 'DISPUTED' || status === 'PARTIAL_REFUNDED' || status === 'REFUNDED'
+);

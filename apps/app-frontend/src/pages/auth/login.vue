@@ -2,12 +2,13 @@
 import { reactive, ref } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
 import AppInput from '@/components/app-input/app-input.vue'
-import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
 import { REGISTER_PAGE } from '@/router/config'
 import { isPageTabbar } from '@/tabbar/store'
 import { useTokenStore } from '@/store/token'
 import { HOME_PAGE } from '@/utils'
 import { getErrorMessage } from '@/utils/error'
+import PetpalPage from '../petpal/rebuild/petpal-page.vue'
+import PetpalSection from '../petpal/rebuild/petpal-section.vue'
 
 definePage({
   style: {
@@ -93,9 +94,14 @@ function toRegister() {
 </script>
 
 <template>
-  <AppPageShell auth title="登录" description="使用账号和密码进入系统。">
-    <view class="app-auth-sheet">
-      <view class="app-auth-form">
+  <PetpalPage
+    title="进入宠托帮"
+    subtitle="登录页只保留输入和跳转，不展示多余介绍。"
+    eyebrow="Login"
+    back
+  >
+    <PetpalSection title="账号登录" subtitle="使用账号和密码继续当前任务。">
+      <view class="app-auth-block">
         <AppInput
           v-model="form.account"
           label="账号"
@@ -113,16 +119,56 @@ function toRegister() {
           class="app-auth-input"
           @confirm="doLogin"
         />
+        <AppButton block size="large" :loading="submitting" @click="doLogin">
+          登录
+        </AppButton>
       </view>
+    </PetpalSection>
 
-      <AppButton block size="large" :loading="submitting" class="app-auth-submit" @click="doLogin">
-        登录
-      </AppButton>
-
-      <view class="app-inline-action">
-        <text class="app-inline-action__label">没有账号？</text>
-        <text class="app-inline-action__link" @click="toRegister">去注册</text>
-      </view>
-    </view>
-  </AppPageShell>
+    <PetpalSection title="还没有账号" subtitle="注册后会直接回到当前设备。">
+      <button class="app-auth-link-row" hover-class="none" @click="toRegister">
+        <view class="app-auth-link-row__copy">
+          <text class="app-auth-link-row__title">去注册</text>
+          <text class="app-auth-link-row__meta">创建一个新的主人服务账号。</text>
+        </view>
+        <text class="app-auth-link-row__value">进入</text>
+      </button>
+    </PetpalSection>
+  </PetpalPage>
 </template>
+
+<style scoped lang="scss">
+.app-auth-block {
+  display: grid;
+  gap: 20rpx;
+}
+
+.app-auth-link-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+}
+
+.app-auth-link-row__copy {
+  display: grid;
+  gap: 8rpx;
+}
+
+.app-auth-link-row__title {
+  font-size: 30rpx;
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.app-auth-link-row__meta,
+.app-auth-link-row__value {
+  font-size: 24rpx;
+  color: var(--app-text-secondary);
+}
+</style>

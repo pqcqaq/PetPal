@@ -40,19 +40,23 @@ const userLabel = computed(() => auth.isAuthenticated ? `当前用户 · ${auth.
 </script>
 
 <style scoped lang="scss">
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+
 .frontend-shell {
   min-height: 100vh;
-  color: #143634;
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: #2f2924;
   background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.08), transparent 22%),
-    radial-gradient(circle at top right, rgba(185, 113, 24, 0.08), transparent 18%),
-    linear-gradient(180deg, #f9fcfb 0%, #f1f7f5 52%, #e7f0ed 100%);
+    radial-gradient(circle at top left, rgba(249, 115, 22, 0.09), transparent 20%),
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 18%),
+    linear-gradient(180deg, #f7f2eb 0%, #f6eee5 52%, #f2e8de 100%);
 }
 
 .frontend-shell__main {
-  width: min(1320px, calc(100vw - 32px));
+  width: min(1180px, calc(100vw - 32px));
   margin: 0 auto;
-  padding-top: 18px;
+  padding-top: 20px;
+  padding-bottom: 28px;
 }
 
 :deep(.frontend-page) {
@@ -61,70 +65,68 @@ const userLabel = computed(() => auth.isAuthenticated ? `当前用户 · ${auth.
 }
 
 :deep(.frontend-page__hero) {
-  position: relative;
-  overflow: hidden;
   display: grid;
-  gap: 12px;
-  padding: 20px 22px;
-  border: 1px solid rgba(18, 53, 51, 0.1);
-  border-radius: 24px;
+  gap: 14px;
+  padding: 28px;
+  border: 1px solid rgba(44, 37, 29, 0.12);
   background:
-    radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 251, 250, 0.96) 100%);
-  box-shadow: 0 16px 34px rgba(12, 33, 31, 0.08);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 26%),
+    linear-gradient(180deg, rgba(255, 251, 247, 0.96) 0%, rgba(252, 247, 241, 0.94) 100%);
+  box-shadow: 0 26px 60px rgba(43, 36, 31, 0.08);
 }
 
 :deep(.frontend-page__eyebrow) {
   margin: 0;
-  color: #6d8683;
+  color: #8f6c4f;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
 :deep(.frontend-page__hero h1) {
-  max-width: 920px;
+  font-family: 'Playfair Display', 'STSong', serif;
+  max-width: 840px;
   margin: 0;
-  font-size: clamp(28px, 4vw, 42px);
-  line-height: 1.04;
+  font-size: clamp(38px, 6vw, 62px);
+  line-height: 0.96;
+  letter-spacing: -0.03em;
 }
 
 :deep(.frontend-page__hero > p:not(.frontend-page__eyebrow)) {
-  display: none;
+  margin: 0;
+  max-width: 760px;
+  color: #62584f;
+  font-size: 15px;
+  line-height: 1.78;
 }
 
 :deep(.frontend-page__hero-actions) {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 2px;
 }
 
 :deep(.frontend-page__button) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 16px;
-  border-radius: 999px;
+  border: 1px solid rgba(44, 37, 29, 0.12);
   font-weight: 700;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 :deep(.frontend-page__button.is-primary) {
-  background: linear-gradient(135deg, #0f766e 0%, #0b5d57 100%);
-  color: #f7fffd;
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff8ef;
 }
 
 :deep(.frontend-page__button.is-secondary) {
-  border: 1px solid rgba(18, 53, 51, 0.12);
-  background: rgba(255, 255, 255, 0.9);
-  color: #143634;
-}
-
-:deep(.frontend-page__button:hover) {
-  transform: translateY(-1px);
+  background: rgba(255, 252, 248, 0.92);
+  color: #332c26;
 }
 
 :deep(.frontend-page__section-grid) {
@@ -135,36 +137,33 @@ const userLabel = computed(() => auth.isAuthenticated ? `当前用户 · ${auth.
 
 :deep(.frontend-card) {
   display: grid;
-  gap: 10px;
-  padding: 20px;
-  border: 1px solid rgba(18, 53, 51, 0.08);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 14px 28px rgba(12, 33, 31, 0.06);
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid rgba(44, 37, 29, 0.1);
+  background: rgba(255, 252, 248, 0.88);
+  box-shadow: 0 18px 40px rgba(43, 36, 31, 0.06);
 }
 
 :deep(.frontend-card__eyebrow) {
-  color: #728884;
+  color: #927965;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 :deep(.frontend-card h2),
 :deep(.frontend-card h3) {
   margin: 0;
-  color: #143634;
+  font-family: 'Playfair Display', 'STSong', serif;
+  color: #2b241f;
+  line-height: 1.04;
 }
 
 :deep(.frontend-card p) {
   margin: 0;
-  color: #5f7673;
-  line-height: 1.68;
-}
-
-:deep(.petpal-section-heading__meta p) {
-  display: none;
+  color: #62584f;
+  line-height: 1.72;
 }
 
 @media (max-width: 900px) {
@@ -173,8 +172,7 @@ const userLabel = computed(() => auth.isAuthenticated ? `当前用户 · ${auth.
   }
 
   :deep(.frontend-page__hero) {
-    padding: 18px;
-    border-radius: 20px;
+    padding: 20px;
   }
 
   :deep(.frontend-page__section-grid) {

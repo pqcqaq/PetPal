@@ -1,683 +1,195 @@
 <template>
-  <div class="frontend-page">
-    <section class="frontend-page__hero">
-      <p class="frontend-page__eyebrow">PetPal Messages</p>
-      <h1>宠托帮跨订单消息中心</h1>
-      <p>把主人和照料者两侧的订单沟通从详情页里抽出来，按角色和未读状态集中处理，减少来回翻订单的成本。</p>
-      <div class="frontend-page__hero-actions">
-        <el-button type="primary" :loading="loading || Boolean(markingReadKey) || Boolean(sectionReloadingKey)" @click="reloadAll">
-          刷新消息概览
-        </el-button>
-        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal' }">
-          返回主人服务台
-        </RouterLink>
-        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-reminders' }">
-          打开提醒中心
-        </RouterLink>
-        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-caregiver' }">
-          返回照料者工作台
-        </RouterLink>
+  <PetPalDeskPage
+    eyebrow="消息中心"
+    title="跨订单沟通统一查看，再决定进入哪一笔订单"
+    summary="消息中心只负责找出有未读或最近更新的会话，发送消息和完整上下文留在订单详情页。"
+    :nav-items="petPalOwnerWorkspaceNav"
+    active-name="frontend-petpal-messages"
+    :actions="[{ label: '提醒中心', to: { name: 'frontend-petpal-reminders' }, tone: 'secondary' }]"
+    :stats="heroStats"
+  >
+    <PetPalDeskSection eyebrow="Role" title="选择查看视角" description="主人和照料者的跨订单消息在这里分开查看。">
+      <div class="petpal-toolbar">
+        <el-radio-group v-model="role" size="small">
+          <el-radio-button label="owner">主人视角</el-radio-button>
+          <el-radio-button label="caregiver">照料者视角</el-radio-button>
+        </el-radio-group>
       </div>
-    </section>
+    </PetPalDeskSection>
 
-    <template v-if="auth.isAuthenticated">
-      <section class="frontend-page__section-grid">
-        <article class="frontend-card petpal-grid-span-3">
-          <span class="frontend-card__eyebrow">主人未读</span>
-          <strong class="petpal-summary-value">{{ ownerUnreadCount }}</strong>
-          <p class="petpal-summary-copy">优先处理主人视角下待确认的订单沟通。</p>
-        </article>
-        <article class="frontend-card petpal-grid-span-3">
-          <span class="frontend-card__eyebrow">照料者未读</span>
-          <strong class="petpal-summary-value">{{ caregiverUnreadCount }}</strong>
-          <p class="petpal-summary-copy">快速查看接单前确认和履约中的补充消息。</p>
-        </article>
-        <article class="frontend-card petpal-grid-span-3">
-          <span class="frontend-card__eyebrow">有沟通订单</span>
-          <strong class="petpal-summary-value">{{ totalConversationCount }}</strong>
-          <p class="petpal-summary-copy">跨订单聚合会话，不必逐张订单切换查找。</p>
-        </article>
-        <article class="frontend-card petpal-grid-span-3">
-          <span class="frontend-card__eyebrow">筛选范围</span>
-          <strong class="petpal-summary-value">{{ activeScopeLabel }}</strong>
-          <p class="petpal-summary-copy">支持按角色、未读和订单关键词快速收窄范围。</p>
-        </article>
-      </section>
+    <div class="petpal-split-grid">
+      <PetPalDeskSection class="petpal-span-5" eyebrow="Threads" title="会话队列" description="优先显示最近有未读或最近更新的订单会话。">
+        <PetPalDeskEmpty
+          v-if="!conversations.length"
+          title="当前没有可查看的会话"
+          description="如果订单还没有开始沟通，会话会在发送第一条消息后出现。"
+        />
 
-      <section class="frontend-card">
-        <span class="frontend-card__eyebrow">筛选消息</span>
-        <div class="petpal-filter-toolbar">
-          <el-radio-group v-model="messageScope" size="small">
-            <el-radio-button label="ALL">全部</el-radio-button>
-            <el-radio-button label="OWNER">主人视角</el-radio-button>
-            <el-radio-button label="CAREGIVER">照料者视角</el-radio-button>
-          </el-radio-group>
-          <el-checkbox v-model="unreadOnly">仅看未读</el-checkbox>
-          <el-input
-            v-model="keyword"
-            clearable
-            size="small"
-            maxlength="64"
-            placeholder="按订单号或主人昵称筛选"
-            style="width: min(100%, 240px)"
-          />
-        </div>
-      </section>
-
-      <section v-if="shouldShowOwnerSection" class="frontend-card">
-      <span class="frontend-card__eyebrow">主人消息</span>
-      <div class="petpal-section-heading">
-        <div class="petpal-section-heading__meta">
-          <h3>主人侧订单沟通</h3>
-          <p>聚合主人视角下的订单会话，适合先处理未读和最近更新的沟通。</p>
-        </div>
-        <el-tag type="info">共 {{ filteredOwnerOrders.length }} 条</el-tag>
-      </div>
-
-      <PetPalStatePanel
-        v-if="ownerLoadState === 'role_unavailable'"
-        eyebrow="主人能力"
-        title="当前账号未开通主人消息视角"
-        description="主人订单沟通不会展示在这里。你可以先切到照料者工作台，或登录具备主人能力的账号后再回来处理。"
-        tone="warning"
-      >
-        <template #actions>
-          <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
-            <el-button size="small">去照料者工作台</el-button>
-          </RouterLink>
-          <RouterLink to="/login">
-            <el-button size="small" type="primary">切换账号</el-button>
-          </RouterLink>
-        </template>
-      </PetPalStatePanel>
-
-      <PetPalStatePanel
-        v-else-if="ownerLoadState === 'error'"
-        eyebrow="主人消息"
-        title="主人侧会话加载失败"
-        :description="ownerLoadErrorMessage"
-        tone="danger"
-      >
-        <template #actions>
-          <el-button size="small" type="primary" :loading="sectionReloadingKey === 'owner'" @click="retryOwnerSection">
-            重试主人消息
-          </el-button>
-          <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
-            <el-button size="small">去提醒中心</el-button>
-          </RouterLink>
-        </template>
-      </PetPalStatePanel>
-
-      <template v-else>
-        <el-table :data="filteredOwnerOrders" size="small" v-loading="loading">
-        <el-table-column prop="orderNo" label="订单号" min-width="180" />
-        <el-table-column prop="serviceType" label="服务" min-width="100" />
-        <el-table-column prop="orderStatus" label="状态" min-width="120">
-          <template #default="scope">
-            {{ getOrderStatusLabel(scope.row.orderStatus) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="最近沟通" min-width="320">
-          <template #default="scope">
-            <div class="petpal-conversation-cell">
-              <div class="petpal-conversation-cell__copy">
-                <p class="petpal-conversation-cell__preview">
-                  {{ formatConversationPreview(scope.row.conversation) }}
-                </p>
-                <p class="petpal-conversation-cell__meta">
-                  {{ formatConversationMeta(scope.row.conversation, 'owner') }}
-                </p>
-              </div>
-              <el-tag
-                v-if="getConversationUnreadCount(scope.row.conversation, 'owner') > 0"
-                type="danger"
-                size="small"
-              >
-                待读 {{ getConversationUnreadCount(scope.row.conversation, 'owner') }}
-              </el-tag>
+        <div v-else class="petpal-sheet-list">
+          <button
+            v-for="item in conversations"
+            :key="item.id"
+            type="button"
+            class="petpal-conversation-row"
+            :class="{ 'is-active': item.id === selectedOrderId }"
+            @click="selectedOrderId = item.id"
+          >
+            <div class="petpal-sheet-row__copy">
+              <h3 class="petpal-sheet-row__title">{{ item.orderNo }}</h3>
+              <p class="petpal-sheet-row__desc">{{ getPetPalOrderStatusLabel(item.orderStatus) }} · {{ getPetPalServiceTypeLabel(item.serviceType) }}</p>
+              <p class="petpal-sheet-row__desc">{{ formatPetPalConversationPreview(item.conversation) }}</p>
             </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="appointmentStart" label="预约开始" min-width="170">
-          <template #default="scope">
-            {{ formatTime(scope.row.appointmentStart) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="动作" min-width="190" fixed="right">
-          <template #default="scope">
-            <el-space wrap>
-              <el-button
-                v-if="getConversationUnreadCount(scope.row.conversation, 'owner') > 0"
-                link
-                type="warning"
-                size="small"
-                :loading="markingReadKey === `owner:${scope.row.id}`"
-                @click="markConversationRead(scope.row.id, 'owner')"
-              >
-                标记已读
-              </el-button>
-              <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id }, query: { tab: 'chat' } }">
-                <el-button link type="primary" size="small">打开订单</el-button>
-              </RouterLink>
-            </el-space>
-          </template>
-        </el-table-column>
-        </el-table>
-
-        <PetPalStatePanel
-          v-if="!loading && filteredOwnerOrders.length === 0"
-          eyebrow="主人消息"
-          title="当前筛选下没有主人侧会话"
-          description="可以先回到主人服务台检查是否已有进行中的订单，或直接进入提醒中心查看更紧急的待办。"
-        >
-          <template #actions>
-            <RouterLink :to="{ name: 'frontend-petpal' }">
-              <el-button size="small" type="primary">去主人服务台</el-button>
-            </RouterLink>
-            <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
-              <el-button size="small">去提醒中心</el-button>
-            </RouterLink>
-          </template>
-        </PetPalStatePanel>
-      </template>
-      </section>
-
-      <section v-if="shouldShowCaregiverSection" class="frontend-card">
-      <span class="frontend-card__eyebrow">照料者消息</span>
-      <div class="petpal-section-heading">
-        <div class="petpal-section-heading__meta">
-          <h3>照料者侧订单沟通</h3>
-          <p>聚合照料者视角下的订单会话，适合集中确认接单前沟通和履约补充信息。</p>
-        </div>
-        <el-tag type="success">共 {{ filteredCaregiverOrders.length }} 条</el-tag>
-      </div>
-
-      <PetPalStatePanel
-        v-if="caregiverLoadState === 'role_unavailable'"
-        eyebrow="照料者能力"
-        title="当前账号未开通照料者消息视角"
-        description="照料者订单沟通不会展示在这里。你可以先回到主人服务台，或切换到具备照料者能力的账号继续处理。"
-        tone="warning"
-      >
-        <template #actions>
-          <RouterLink :to="{ name: 'frontend-petpal' }">
-            <el-button size="small">去主人服务台</el-button>
-          </RouterLink>
-          <RouterLink to="/login">
-            <el-button size="small" type="primary">切换账号</el-button>
-          </RouterLink>
-        </template>
-      </PetPalStatePanel>
-
-      <PetPalStatePanel
-        v-else-if="caregiverLoadState === 'error'"
-        eyebrow="照料者消息"
-        title="照料者侧会话加载失败"
-        :description="caregiverLoadErrorMessage"
-        tone="danger"
-      >
-        <template #actions>
-          <el-button size="small" type="primary" :loading="sectionReloadingKey === 'caregiver'" @click="retryCaregiverSection">
-            重试照料者消息
-          </el-button>
-          <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
-            <el-button size="small">去照料者工作台</el-button>
-          </RouterLink>
-        </template>
-      </PetPalStatePanel>
-
-      <template v-else>
-        <el-table :data="filteredCaregiverOrders" size="small" v-loading="loading">
-        <el-table-column prop="orderNo" label="订单号" min-width="160" />
-        <el-table-column prop="ownerNickname" label="主人" min-width="120" />
-        <el-table-column prop="petName" label="宠物" min-width="120" />
-        <el-table-column prop="orderStatus" label="状态" min-width="120">
-          <template #default="scope">
-            {{ getOrderStatusLabel(scope.row.orderStatus) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="最近沟通" min-width="320">
-          <template #default="scope">
-            <div class="petpal-conversation-cell">
-              <div class="petpal-conversation-cell__copy">
-                <p class="petpal-conversation-cell__preview">
-                  {{ formatConversationPreview(scope.row.conversation) }}
-                </p>
-                <p class="petpal-conversation-cell__meta">
-                  {{ formatConversationMeta(scope.row.conversation, 'caregiver') }}
-                </p>
-              </div>
-              <el-tag
-                v-if="getConversationUnreadCount(scope.row.conversation, 'caregiver') > 0"
-                type="danger"
-                size="small"
-              >
-                待读 {{ getConversationUnreadCount(scope.row.conversation, 'caregiver') }}
-              </el-tag>
+            <div class="petpal-sheet-row__tail">
+              <span class="petpal-pill" :class="threadUnread(item) ? 'is-danger' : ''">未读 {{ threadUnread(item) }}</span>
+              <span class="petpal-muted">{{ formatPetPalConversationMeta(item.conversation, role, formatPetPalTime) }}</span>
             </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="appointmentStart" label="预约开始" min-width="170">
-          <template #default="scope">
-            {{ formatTime(scope.row.appointmentStart) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="动作" min-width="190" fixed="right">
-          <template #default="scope">
-            <el-space wrap>
-              <el-button
-                v-if="getConversationUnreadCount(scope.row.conversation, 'caregiver') > 0"
-                link
-                type="warning"
-                size="small"
-                :loading="markingReadKey === `caregiver:${scope.row.id}`"
-                @click="markConversationRead(scope.row.id, 'caregiver')"
-              >
-                标记已读
-              </el-button>
-              <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id }, query: { tab: 'chat' } }">
-                <el-button link type="primary" size="small">打开订单</el-button>
-              </RouterLink>
-            </el-space>
-          </template>
-        </el-table-column>
-        </el-table>
+          </button>
+        </div>
+      </PetPalDeskSection>
 
-        <PetPalStatePanel
-          v-if="!loading && filteredCaregiverOrders.length === 0"
-          eyebrow="照料者消息"
-          title="当前筛选下没有照料者侧会话"
-          description="可以先回到照料者工作台查看是否已有待接单或服务中订单，或去提醒中心看更紧急的事项。"
-        >
-          <template #actions>
-            <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
-              <el-button size="small" type="primary">去照料者工作台</el-button>
-            </RouterLink>
-            <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
-              <el-button size="small">去提醒中心</el-button>
-            </RouterLink>
-          </template>
-        </PetPalStatePanel>
-      </template>
-      </section>
-    </template>
+      <PetPalDeskSection class="petpal-span-7" eyebrow="Current" title="当前会话摘要" description="确认这笔订单需要优先处理后，再进入订单详情发送消息。">
+        <PetPalDeskEmpty
+          v-if="!activeConversation"
+          title="先选择左侧会话"
+          description="选中会话后，这里会展示未读数量、最近消息和跳转入口。"
+        />
 
-    <section v-else class="frontend-card">
-      <PetPalStatePanel
-        eyebrow="开始使用"
-        title="登录后查看跨订单消息中心"
-        description="这里会聚合主人侧和照料者侧的订单沟通、未读状态和快捷跳转。未登录时不加载任何消息数据。"
-      >
-        <template #actions>
-          <RouterLink to="/login">
-            <el-button size="small" type="primary">去登录</el-button>
-          </RouterLink>
-          <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
-            <el-button size="small">先看提醒中心</el-button>
-          </RouterLink>
+        <template v-else>
+          <div class="petpal-summary-strip">
+            <div>
+              <span>订单状态</span>
+              <strong>{{ getPetPalOrderStatusLabel(activeConversation.orderStatus) }}</strong>
+            </div>
+            <div>
+              <span>服务类型</span>
+              <strong>{{ getPetPalServiceTypeLabel(activeConversation.serviceType) }}</strong>
+            </div>
+            <div>
+              <span>未读数量</span>
+              <strong>{{ threadUnread(activeConversation) }}</strong>
+            </div>
+          </div>
+
+          <div class="petpal-side-stack">
+            <p class="petpal-sheet-row__desc">{{ formatPetPalConversationPreview(activeConversation.conversation) }}</p>
+            <p class="petpal-sheet-row__desc">{{ formatPetPalConversationMeta(activeConversation.conversation, role, formatPetPalTime) }}</p>
+          </div>
+
+          <div class="petpal-actions">
+            <el-button
+              v-if="threadUnread(activeConversation)"
+              @click="markThreadRead(activeConversation.id)"
+            >
+              标记已读
+            </el-button>
+            <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: activeConversation.id } }">进入订单详情继续沟通</RouterLink>
+          </div>
         </template>
-      </PetPalStatePanel>
-    </section>
-  </div>
+      </PetPalDeskSection>
+    </div>
+  </PetPalDeskPage>
 </template>
 
 <script setup lang="ts">
-import type {
-  CaregiverOrderRecord,
-  OrderConversationRecord,
-  OrderRecord,
-} from '@rbac/api-common';
+import type { CaregiverOrderRecord, OrderRecord } from '@rbac/api-common';
 import { computed, onMounted, ref } from 'vue';
+import { RouterLink } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
-import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
-import PetPalStatePanel from './PetPalStatePanel.vue';
-import {
-  runPetPalSectionRetry,
-  type PetPalRoleAwareSectionLoadState,
-} from './recovery';
+import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
+import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
   formatPetPalConversationMeta,
   formatPetPalConversationPreview,
+  formatPetPalTime,
   getPetPalConversationUnreadCount,
   getPetPalOrderStatusLabel,
+  getPetPalServiceTypeLabel,
+  petPalOwnerWorkspaceNav,
 } from './shared';
 
-defineOptions({
-  name: 'PetPalMessagesView',
-});
-
-type MessageScope = 'ALL' | 'OWNER' | 'CAREGIVER';
-
-const auth = useAuthStore();
-
-const hasStatusCode = (error: unknown): error is { status: number } => (
-  typeof error === 'object'
-  && error !== null
-  && typeof Reflect.get(error, 'status') === 'number'
-);
-
-const isRoleUnavailableError = (error: unknown) => (
-  hasStatusCode(error)
-  && [401, 403, 404].includes(error.status)
-);
+type ConversationItem = Pick<OrderRecord, 'id' | 'orderNo' | 'orderStatus' | 'serviceType' | 'conversation'>
+  | Pick<CaregiverOrderRecord, 'id' | 'orderNo' | 'orderStatus' | 'serviceType' | 'conversation'>;
 
 const ownerOrders = ref<OrderRecord[]>([]);
 const caregiverOrders = ref<CaregiverOrderRecord[]>([]);
-const loading = ref(false);
-const markingReadKey = ref('');
-const sectionReloadingKey = ref<'owner' | 'caregiver' | ''>('');
-const ownerLoadState = ref<PetPalRoleAwareSectionLoadState>('idle');
-const caregiverLoadState = ref<PetPalRoleAwareSectionLoadState>('idle');
-const ownerLoadErrorMessage = ref('');
-const caregiverLoadErrorMessage = ref('');
-const messageScope = ref<MessageScope>('ALL');
-const unreadOnly = ref(false);
-const keyword = ref('');
+const role = ref<'owner' | 'caregiver'>('owner');
+const selectedOrderId = ref('');
 
-const formatTime = (value: string) => new Date(value).toLocaleString();
-
-const sortOrdersByConversation = <T extends OrderRecord>(items: T[], role: 'owner' | 'caregiver') => [...items]
-  .sort((left, right) => {
-    const unreadDiff = getPetPalConversationUnreadCount(right.conversation, role)
-      - getPetPalConversationUnreadCount(left.conversation, role);
-    if (unreadDiff !== 0) {
-      return unreadDiff;
+const conversations = computed<ConversationItem[]>(() => {
+  const source = role.value === 'owner' ? ownerOrders.value : caregiverOrders.value;
+  return [...source].sort((left, right) => {
+    const unreadGap = getPetPalConversationUnreadCount(right.conversation, role.value) - getPetPalConversationUnreadCount(left.conversation, role.value);
+    if (unreadGap !== 0) {
+      return unreadGap;
     }
-
-    const rightTime = right.conversation?.lastMessageAt ?? right.updatedAt;
-    const leftTime = left.conversation?.lastMessageAt ?? left.updatedAt;
-    return new Date(rightTime).getTime() - new Date(leftTime).getTime();
+    return String(right.conversation?.lastMessageAt || '').localeCompare(String(left.conversation?.lastMessageAt || ''));
   });
+});
 
-const matchesKeyword = (input: string, values: Array<string | null | undefined>) => {
-  const normalized = input.trim().toLowerCase();
-  if (!normalized) {
-    return true;
-  }
+const activeConversation = computed(() => conversations.value.find((item) => item.id === selectedOrderId.value) ?? conversations.value[0] ?? null);
+const heroStats = computed(() => [
+  { label: '主人会话', value: String(ownerOrders.value.length), hint: '按主人视角聚合' },
+  { label: '照料者会话', value: String(caregiverOrders.value.length), hint: '按照料者视角聚合' },
+  { label: '当前视角未读', value: String(conversations.value.reduce((sum, item) => sum + threadUnread(item), 0)), hint: '可先标记已读再进入详情' },
+  { label: '当前视角', value: role.value === 'owner' ? '主人' : '照料者', hint: '两端消息不再混排' },
+]);
 
-  return values.some((item) => item?.toLowerCase().includes(normalized));
-};
+const threadUnread = (item: ConversationItem) => getPetPalConversationUnreadCount(item.conversation, role.value);
 
-const filteredOwnerOrders = computed(() => sortOrdersByConversation(ownerOrders.value.filter((item) => {
-  if (unreadOnly.value && getPetPalConversationUnreadCount(item.conversation, 'owner') === 0) {
-    return false;
-  }
-
-  return matchesKeyword(keyword.value, [item.orderNo, item.serviceType, getPetPalOrderStatusLabel(item.orderStatus)]);
-}), 'owner'));
-
-const filteredCaregiverOrders = computed(() => sortOrdersByConversation(caregiverOrders.value.filter((item) => {
-  if (unreadOnly.value && getPetPalConversationUnreadCount(item.conversation, 'caregiver') === 0) {
-    return false;
-  }
-
-  return matchesKeyword(keyword.value, [
-    item.orderNo,
-    item.ownerNickname,
-    item.petName,
-    item.serviceType,
-    getPetPalOrderStatusLabel(item.orderStatus),
+async function loadPage() {
+  const [ownerResult, caregiverResult] = await Promise.allSettled([
+    api.petpal.orders.list(),
+    api.petpal.caregiver.orders({ page: 1, pageSize: 50 }),
   ]);
-}), 'caregiver'));
-
-const ownerUnreadCount = computed(() => ownerOrders.value.reduce((total, item) => (
-  total + getPetPalConversationUnreadCount(item.conversation, 'owner')
-), 0));
-
-const caregiverUnreadCount = computed(() => caregiverOrders.value.reduce((total, item) => (
-  total + getPetPalConversationUnreadCount(item.conversation, 'caregiver')
-), 0));
-
-const totalConversationCount = computed(() => (
-  ownerOrders.value.filter(item => item.conversation).length
-  + caregiverOrders.value.filter(item => item.conversation).length
-));
-
-const shouldShowOwnerSection = computed(() => messageScope.value === 'ALL' || messageScope.value === 'OWNER');
-const shouldShowCaregiverSection = computed(() => messageScope.value === 'ALL' || messageScope.value === 'CAREGIVER');
-
-const activeScopeLabel = computed(() => ({
-  ALL: '全部会话',
-  OWNER: '主人视角',
-  CAREGIVER: '照料者视角',
-}[messageScope.value]));
-
-const getOrderStatusLabel = getPetPalOrderStatusLabel;
-const getConversationUnreadCount = getPetPalConversationUnreadCount;
-const formatConversationPreview = formatPetPalConversationPreview;
-const formatConversationMeta = (
-  conversation: OrderConversationRecord | null | undefined,
-  role: 'owner' | 'caregiver',
-) => formatPetPalConversationMeta(conversation, role, formatTime);
-
-const applyConversationSummaryToOrders = (
-  target: 'owner' | 'caregiver',
-  orderId: string,
-  summary: OrderConversationRecord,
-) => {
-  const source = target === 'owner' ? ownerOrders.value : caregiverOrders.value;
-  const next = source.map(item => (item.id === orderId ? { ...item, conversation: { ...summary } } : item));
-  if (target === 'owner') {
-    ownerOrders.value = next;
-    return;
+  ownerOrders.value = ownerResult.status === 'fulfilled' ? ownerResult.value : [];
+  caregiverOrders.value = caregiverResult.status === 'fulfilled' ? caregiverResult.value.items : [];
+  if (!selectedOrderId.value && conversations.value.length) {
+    selectedOrderId.value = conversations.value[0].id;
   }
-  caregiverOrders.value = next as CaregiverOrderRecord[];
-};
 
-const loadOwnerOrders = async () => {
-  ownerLoadErrorMessage.value = '';
+  if (ownerResult.status === 'rejected' && caregiverResult.status === 'rejected') {
+    ElMessage.error(getErrorMessage(ownerResult.reason, '加载消息中心失败'));
+  }
+}
+
+async function markThreadRead(orderId: string) {
   try {
-    ownerOrders.value = await api.petpal.orders.list();
-    ownerLoadState.value = 'ready';
-  } catch (error: unknown) {
-    ownerOrders.value = [];
-    if (isRoleUnavailableError(error)) {
-      ownerLoadState.value = 'role_unavailable';
-      return;
-    }
-    ownerLoadState.value = 'error';
-    ownerLoadErrorMessage.value = getErrorMessage(error, '加载主人消息概览失败');
-    throw error;
-  }
-};
-
-const loadCaregiverOrders = async () => {
-  caregiverLoadErrorMessage.value = '';
-  try {
-    const page = await api.petpal.caregiver.orders({
-      page: 1,
-      pageSize: 100,
-    });
-    caregiverOrders.value = page.items;
-    caregiverLoadState.value = 'ready';
-  } catch (error: unknown) {
-    caregiverOrders.value = [];
-    if (isRoleUnavailableError(error)) {
-      caregiverLoadState.value = 'role_unavailable';
-      return;
-    }
-    caregiverLoadState.value = 'error';
-    caregiverLoadErrorMessage.value = getErrorMessage(error, '加载照料者消息概览失败');
-    throw error;
-  }
-};
-
-const reloadAll = async () => {
-  if (!auth.isAuthenticated) {
-    ElMessage.info('登录后可查看跨订单消息中心');
-    return;
-  }
-
-  loading.value = true;
-  ownerLoadState.value = 'idle';
-  caregiverLoadState.value = 'idle';
-  const results = await Promise.allSettled([
-    loadOwnerOrders(),
-    loadCaregiverOrders(),
-  ]);
-  loading.value = false;
-
-  if (results[0].status === 'rejected' && ownerLoadState.value === 'idle') {
-    ownerLoadState.value = 'error';
-    ownerLoadErrorMessage.value = getErrorMessage(results[0].reason, '加载主人消息概览失败');
-  }
-
-  if (results[1].status === 'rejected' && caregiverLoadState.value === 'idle') {
-    caregiverLoadState.value = 'error';
-    caregiverLoadErrorMessage.value = getErrorMessage(results[1].reason, '加载照料者消息概览失败');
-  }
-};
-
-const retryOwnerSection = async () => {
-  ownerLoadState.value = 'idle';
-  await runPetPalSectionRetry({
-    key: 'owner',
-    sectionReloadingKey,
-    reload: loadOwnerOrders,
-    getState: () => ownerLoadState.value,
-    successMessage: '主人侧消息已刷新',
-    swallowError: true,
-  });
-};
-
-const retryCaregiverSection = async () => {
-  caregiverLoadState.value = 'idle';
-  await runPetPalSectionRetry({
-    key: 'caregiver',
-    sectionReloadingKey,
-    reload: loadCaregiverOrders,
-    getState: () => caregiverLoadState.value,
-    successMessage: '照料者侧消息已刷新',
-    swallowError: true,
-  });
-};
-
-const markConversationRead = async (orderId: string, target: 'owner' | 'caregiver') => {
-  try {
-    markingReadKey.value = `${target}:${orderId}`;
-    const summary = await api.petpal.orders.markMessagesRead(orderId);
-    applyConversationSummaryToOrders(target, orderId, summary);
-    ElMessage.success('已标记为已读');
+    await api.petpal.orders.markMessagesRead(orderId);
+    await loadPage();
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '标记已读失败'));
-  } finally {
-    markingReadKey.value = '';
   }
-};
+}
 
 onMounted(() => {
-  if (!auth.isAuthenticated) {
-    return;
-  }
-  void reloadAll();
+  void loadPage();
 });
 </script>
 
 <style scoped lang="scss">
-.petpal-grid-span-3 {
-  grid-column: span 3;
-}
-
-.petpal-summary-value {
-  display: block;
-  font-size: 32px;
-  line-height: 1.05;
-  color: #17384a;
-}
-
-.petpal-summary-copy {
-  margin: 8px 0 0;
-  color: var(--frontend-color-muted);
-  line-height: 1.7;
-}
-
-.petpal-filter-toolbar {
+.petpal-conversation-row {
+  width: 100%;
   display: flex;
-  align-items: center;
+  gap: 14px;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.petpal-section-heading {
-  display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  padding: 16px 0;
+  border: 0;
+  border-top: 1px solid rgba(44, 37, 29, 0.1);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 }
 
-.petpal-section-heading__meta {
-  display: grid;
-  gap: 8px;
+.petpal-conversation-row:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
-.petpal-section-heading h3 {
-  margin: 0;
-}
-
-.petpal-section-heading__meta p {
-  margin: 0;
-  color: var(--frontend-color-muted);
-  line-height: 1.7;
-}
-
-.petpal-conversation-cell {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.petpal-conversation-cell__copy {
-  min-width: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.petpal-conversation-cell__preview,
-.petpal-conversation-cell__meta {
-  margin: 0;
-  line-height: 1.6;
-}
-
-.petpal-conversation-cell__preview {
-  color: #0f172a;
-}
-
-.petpal-conversation-cell__meta {
-  color: var(--frontend-color-muted);
-  font-size: 12px;
-}
-
-.petpal-empty-state {
-  margin: 16px 0 0;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
-  color: var(--frontend-color-muted);
-  line-height: 1.7;
-}
-
-@media (max-width: 1200px) {
-  .petpal-grid-span-3 {
-    grid-column: span 6;
-  }
-}
-
-@media (max-width: 720px) {
-  .petpal-grid-span-3 {
-    grid-column: span 12;
-  }
-
-  .petpal-section-heading {
-    flex-direction: column;
-  }
-
-  .petpal-filter-toolbar {
-    align-items: stretch;
-  }
+.petpal-conversation-row.is-active {
+  color: #2563eb;
 }
 </style>

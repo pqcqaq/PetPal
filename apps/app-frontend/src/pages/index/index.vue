@@ -1,423 +1,214 @@
 <script lang="ts" setup>
-import type {
-  MatchedCaregiverRecord,
-  MatchCaregiverQuery,
-  OrderRecord,
-  OrderStatus,
-  PetProfileRecord,
-  ServiceRequestRecord,
-  ServiceRequestStatus,
-} from '@rbac/api-common'
-import dayjs from 'dayjs'
-import { computed, ref } from 'vue'
-import AppList from '@/components/app-list/app-list.vue'
-import AppListItem from '@/components/app-list-item/app-list-item.vue'
-import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppSection from '@/components/app-section/app-section.vue'
-import AppStatus from '@/components/app-status/app-status.vue'
-import AppTag from '@/components/app-tag/app-tag.vue'
-import { listOrders, listPets, listServiceRequests, matchCaregivers } from '@/api/petpal'
-import ActionSignalCard from '@/pages/petpal/components/action-signal-card.vue'
+import { computed } from 'vue'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
+import { storeToRefs } from 'pinia'
+import { useNotificationStore, useTokenStore, useUserStore } from '@/store'
+import PetpalEmpty from '../petpal/rebuild/petpal-empty.vue'
+import PetpalPage from '../petpal/rebuild/petpal-page.vue'
+import PetpalSection from '../petpal/rebuild/petpal-section.vue'
 import {
-  isOrderAftersalesTracked,
-  PETPAL_GETTING_STARTED_PAGE,
+  initials,
+  isCaregiverEnabled,
+  openLoginPage,
+  openRoleHome,
+  PETPAL_HUB_PAGE,
   PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_REMINDERS_PAGE,
-} from '@/pages/petpal/owner-shared'
-import { useNotificationStore, useTokenStore, useUiStore, useUserStore } from '@/store'
-import { getErrorMessage } from '@/utils/error'
-
-defineOptions({
-  name: 'Home',
-})
+  REGISTER_PAGE,
+  roleSummary,
+  stopPullDown,
+} from '../petpal/rebuild/shared'
 
 definePage({
   style: {
-    navigationBarTitleText: 'PetPal',
+    navigationBarTitleText: '首页',
     enablePullDownRefresh: true,
   },
 })
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
-const uiStore = useUiStore()
 const notificationStore = useNotificationStore()
+const { userInfo } = storeToRefs(userStore)
+const { unreadCount, unreadHighPriorityCount } = storeToRefs(notificationStore)
 
-const loading = ref(false)
-const pets = ref<PetProfileRecord[]>([])
-const requests = ref<ServiceRequestRecord[]>([])
-const orders = ref<OrderRecord[]>([])
-const caregivers = ref<MatchedCaregiverRecord[]>([])
+const displayName = computed(() => userInfo.value.nickname || userInfo.value.username || 'PetPal 用户')
+const canOpenCaregiver = computed(() => isCaregiverEnabled(userInfo.value))
 
-const isFocusLayout = computed(() => uiStore.preferences.portalLayout === 'focus')
-const displayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || 'PetPal 用户')
-const layoutLabel = computed(() => isFocusLayout.value ? '聚焦办事' : '概览看板')
-const unreadNotificationCount = computed(() => notificationStore.unreadCount)
-const notificationHint = computed(() => unreadNotificationCount.value
-  ? `当前有 ${unreadNotificationCount.value} 条未读通知，优先进入统一通知流查看。`
-  : '统一查看提醒、未读沟通和账户提示。')
-
-const activeRequestCount = computed(() => requests.value.filter(item => (
-  item.status === 'OPEN' || item.status === 'MATCHED'
-)).length)
-
-const activeOrderCount = computed(() => orders.value.filter(item => (
-  item.orderStatus === 'PENDING_ACCEPT'
-  || item.orderStatus === 'ACCEPTED'
-  || item.orderStatus === 'SERVING'
-)).length)
-
-const aftersaleCount = computed(() => orders.value.filter(item => isOrderAftersalesTracked(item)).length)
-
-const upcomingOrders = computed(() => {
-  const limit = isFocusLayout.value ? 2 : 4
-  return [...orders.value]
-    .sort((left, right) => dayjs(right.createdAt).valueOf() - dayjs(left.createdAt).valueOf())
-    .slice(0, limit)
-})
-
-const latestRequests = computed(() => {
-  const limit = isFocusLayout.value ? 2 : 4
-  return [...requests.value]
-    .sort((left, right) => dayjs(right.createdAt).valueOf() - dayjs(left.createdAt).valueOf())
-    .slice(0, limit)
-})
-
-const latestPets = computed(() => {
-  const limit = isFocusLayout.value ? 2 : 4
-  return [...pets.value]
-    .sort((left, right) => dayjs(right.createdAt).valueOf() - dayjs(left.createdAt).valueOf())
-    .slice(0, limit)
-})
-
-const recommendedCaregivers = computed(() => caregivers.value.slice(0, isFocusLayout.value ? 2 : 4))
-
-const summaryCards = computed(() => [
-  {
-    label: '宠物档案',
-    value: String(pets.value.length),
-    hint: pets.value.length ? '已建档宠物，可直接用于发布需求。' : '还没有宠物档案，先去创建第一只宠物。',
-  },
-  {
-    label: '活跃需求',
-    value: String(activeRequestCount.value),
-    hint: activeRequestCount.value ? '仍在匹配或已确认的需求。' : '当前没有待跟进需求。',
-  },
-  {
-    label: '进行中订单',
-    value: String(activeOrderCount.value),
-    hint: activeOrderCount.value ? '需要持续关注签到、服务进展和确认完成。' : '当前没有进行中的订单。',
-  },
-  {
-    label: '售后关注',
-    value: String(aftersaleCount.value),
-    hint: aftersaleCount.value ? '存在退款、争议或已退款订单。' : '当前没有售后风险订单。',
-  },
-])
-
-const pageDescription = computed(() => (
-  `${displayName.value}，当前有 ${pets.value.length} 只宠物、${activeRequestCount.value} 条活跃需求和 ${activeOrderCount.value} 笔进行中订单。`
-))
-
-const accountStatusTag = computed(() => userStore.userInfo.status === 'ACTIVE' ? 'success' : 'warning')
-
-const formatTime = (value: string) => dayjs(value).format('MM-DD HH:mm')
-const formatAmount = (value: number | string) => typeof value === 'number' ? value.toFixed(2) : value
-
-const getOrderStatusLabel = (status: OrderStatus) => ({
-  PENDING_ACCEPT: '待接单',
-  ACCEPTED: '已接单',
-  SERVING: '服务中',
-  COMPLETED: '已完成',
-  CANCELLED: '已取消',
-  DISPUTED: '纠纷中',
-  PARTIAL_REFUNDED: '部分退款',
-  REFUNDED: '已退款',
-}[status] ?? status)
-
-const getRequestStatusLabel = (status: ServiceRequestStatus) => ({
-  OPEN: '待匹配',
-  MATCHED: '已匹配',
-  CLOSED: '已关闭',
-  MATCHING: '匹配中',
-  CONFIRMED: '已确认',
-  CANCELLED: '已取消',
-  COMPLETED: '已完成',
-}[status] ?? status)
-
-function openServiceBoard() {
-  uni.switchTab({ url: '/pages/petpal/owner-home' })
+async function loadPage() {
+  if (!tokenStore.hasLogin) {
+    stopPullDown()
+    return
+  }
+  await Promise.all([
+    userStore.fetchUserInfo().catch(() => undefined),
+    notificationStore.refreshNotifications().catch(() => undefined),
+  ])
+  stopPullDown()
 }
 
-function openProfile() {
-  uni.navigateTo({ url: '/pages/me/profile' })
-}
-
-function openSettings() {
-  uni.navigateTo({ url: '/pages/settings/index' })
-}
-
-function openReminders() {
-  uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
+function openHub() {
+  uni.navigateTo({ url: PETPAL_HUB_PAGE })
 }
 
 function openNotifications() {
   uni.navigateTo({ url: PETPAL_NOTIFICATIONS_PAGE })
 }
 
-function openGettingStarted() {
-  uni.navigateTo({ url: PETPAL_GETTING_STARTED_PAGE })
+function openReminders() {
+  uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
 }
 
-function openMine() {
-  uni.switchTab({ url: '/pages/me/me' })
+function goRegister() {
+  uni.navigateTo({ url: REGISTER_PAGE })
 }
-
-function goToOrderDetail(orderId: string) {
-  uni.navigateTo({ url: `/pages/order-detail/index?id=${orderId}` })
-}
-
-function buildMatchQuery(): MatchCaregiverQuery {
-  const referencePet = pets.value[0]
-  const referenceRequest = requests.value[0]
-
-  return {
-    serviceType: referenceRequest?.serviceType || 'BOARDING',
-    petSpecies: referencePet?.species || 'DOG',
-    page: 1,
-    pageSize: 6,
-  }
-}
-
-async function loadHome(showError = false) {
-  if (loading.value) {
-    return
-  }
-
-  loading.value = true
-  try {
-    await tokenStore.bootstrap()
-    await userStore.fetchUserInfo().catch(() => undefined)
-
-    const [petRows, requestRows, orderRows] = await Promise.all([
-      listPets(),
-      listServiceRequests(),
-      listOrders(),
-    ])
-
-    pets.value = petRows
-    requests.value = requestRows
-    orders.value = orderRows
-    caregivers.value = (await matchCaregivers(buildMatchQuery())).items
-  }
-  catch (error: unknown) {
-    if (showError) {
-      uni.showToast({
-        title: getErrorMessage(error, '加载 PetPal 首页失败'),
-        icon: 'none',
-      })
-    }
-  }
-  finally {
-    loading.value = false
-    uni.stopPullDownRefresh()
-  }
-}
-
-onLoad(() => {
-  void loadHome(false)
-})
 
 onShow(() => {
-  if (!tokenStore.hasLogin) {
-    return
-  }
-  void notificationStore.refreshNotifications()
+  void loadPage()
 })
 
 onPullDownRefresh(() => {
-  void loadHome(true)
+  void loadPage()
 })
 </script>
 
 <template>
-  <AppPageShell title="PetPal" :description="pageDescription">
-    <template #extra>
-      <view class="petpal-chip-row">
-        <AppTag type="primary">
-          {{ layoutLabel }}
-        </AppTag>
-        <AppTag :type="accountStatusTag">
-          {{ userStore.userInfo.status === 'ACTIVE' ? '账号正常' : '账号受限' }}
-        </AppTag>
-        <AppTag v-if="tokenStore.hasLogin" :type="unreadNotificationCount ? 'danger' : 'default'">
-          {{ unreadNotificationCount ? `通知 ${unreadNotificationCount}` : '通知已读' }}
-        </AppTag>
-      </view>
+  <PetpalPage
+    title="选择你现在要继续的入口"
+    :subtitle="tokenStore.hasLogin ? '首页只做分流，不再展示旧门户式概览。' : '先登录，再进入主人或照料者主流程。'"
+    eyebrow="Home"
+    with-tabbar
+  >
+    <template v-if="!tokenStore.hasLogin">
+      <PetpalSection title="先登录" subtitle="登录后直接进入新的 PetPal 办事流。">
+        <PetpalEmpty title="当前未登录" description="不展示介绍性内容，只保留登录和注册两个入口。">
+          <view class="app-entry-actions">
+            <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openLoginPage">去登录</button>
+            <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="goRegister">注册账号</button>
+          </view>
+        </PetpalEmpty>
+      </PetpalSection>
     </template>
 
-    <AppSection title="同步状态" description="首页围绕宠物、需求、订单与售后进展组织，不再展示通用 RBAC 门户数据。">
-      <view class="app-status-wrap">
-        <AppStatus
-          :mode="loading ? 'loading' : 'empty'"
-          :text="loading ? '正在同步 PetPal 数据' : '已同步最新 PetPal 首页数据'"
-        />
-      </view>
-    </AppSection>
-
-    <AppSection title="今日概览">
-      <view class="petpal-metric-grid">
-        <view v-for="item in summaryCards" :key="item.label" class="petpal-metric-card">
-          <text class="petpal-metric-card__label">{{ item.label }}</text>
-          <text class="petpal-metric-card__value">{{ item.value }}</text>
-          <text class="petpal-metric-card__hint">{{ item.hint }}</text>
+    <template v-else>
+      <PetpalSection tone="accent">
+        <view class="app-home-banner">
+          <view class="app-home-banner__profile">
+            <view class="petpal-avatar-badge">{{ initials(displayName) }}</view>
+            <view class="app-home-banner__copy">
+              <text class="app-home-banner__title">{{ displayName }}</text>
+              <text class="app-home-banner__meta">{{ roleSummary(userInfo) }}</text>
+            </view>
+          </view>
+          <button class="petpal-icon-btn" hover-class="none" @click="openNotifications">
+            通知 {{ unreadCount }}
+          </button>
         </view>
-      </view>
-    </AppSection>
+      </PetpalSection>
 
-    <AppSection title="主动信号" description="把系统判断的优先事项直接前置，不再要求你先进入通知中心自己筛。">
-      <view class="petpal-signal-wrap">
-        <ActionSignalCard
-          title="当前最值得先处理的事项"
-          description="主动信号会优先展示未读且高优先的主人、照料者或账户事项。"
-          scope="ALL"
-          empty-text="当前没有新的高优先事项，可以继续从快捷操作进入你要处理的主流程。"
-        />
-      </view>
-    </AppSection>
+      <PetpalSection title="主人入口" subtitle="宠物、需求、下单、消息和售后都从主人首页分流。">
+        <button class="app-entry-row" hover-class="none" @click="openRoleHome('owner')">
+          <view class="app-entry-row__copy">
+            <text class="app-entry-row__title">进入主人首页</text>
+            <text class="app-entry-row__meta">继续宠物建档、需求发布和订单跟进。</text>
+          </view>
+          <text class="app-entry-row__value">打开</text>
+        </button>
+      </PetpalSection>
 
-    <AppSection title="快捷操作" description="把常用 PetPal 动作放到首页第一屏。">
-      <AppList>
-        <AppListItem title="进入服务台" label="发布需求、维护宠物档案和查看匹配照料者。" is-link clickable @click="openServiceBoard" />
-        <AppListItem title="起步向导" label="按主人路径和照料者路径查看当前最值得优先完成的步骤。" is-link clickable @click="openGettingStarted" />
-        <AppListItem title="通知中心" :label="notificationHint" is-link clickable @click="openNotifications" />
-        <AppListItem title="提醒中心" label="集中查看主人端、照料者端和售后相关待办。" is-link clickable @click="openReminders" />
-        <AppListItem title="查看我的资料" label="更新昵称、头像、联系方式与账号状态。" is-link clickable @click="openProfile" />
-        <AppListItem title="PetPal 设置" label="调整首页布局、底栏样式与主题外观。" is-link clickable @click="openSettings" />
-        <AppListItem title="进入我的" label="查看账号状态、宠物资产和订单提醒。" is-link clickable @click="openMine" />
-      </AppList>
-    </AppSection>
+      <PetpalSection title="照料者入口" subtitle="资料、服务、履约和收益都已经拆成独立页面。">
+        <button class="app-entry-row" hover-class="none" @click="openRoleHome('caregiver')">
+          <view class="app-entry-row__copy">
+            <text class="app-entry-row__title">进入照料者首页</text>
+            <text class="app-entry-row__meta">{{ canOpenCaregiver ? '继续处理资料、服务和履约。' : '未开通照料者角色时也可先查看入口结构。' }}</text>
+          </view>
+          <text class="app-entry-row__value">打开</text>
+        </button>
+      </PetpalSection>
 
-    <AppSection title="宠物档案预览">
-      <AppList v-if="latestPets.length">
-        <AppListItem
-          v-for="pet in latestPets"
-          :key="pet.id"
-          :title="`${pet.name} · ${pet.species}`"
-          :label="pet.breed || '未填写品种'"
-          :value="`体重 ${pet.weightKg || '-'}kg`"
-        />
-      </AppList>
-      <view v-else class="app-status-wrap">
-        <AppStatus text="还没有宠物档案，先去服务台创建第一只宠物。" />
-      </view>
-    </AppSection>
-
-    <AppSection title="近期需求">
-      <AppList v-if="latestRequests.length">
-        <AppListItem
-          v-for="item in latestRequests"
-          :key="item.id"
-          :title="`${item.pet?.name || '宠物'} · ${item.serviceType}`"
-          :label="`${getRequestStatusLabel(item.status)} · ${item.locationText}`"
-          :value="formatTime(item.startTime)"
-        />
-      </AppList>
-      <view v-else class="app-status-wrap">
-        <AppStatus text="暂无需求，进入服务台发布新的照料计划。" />
-      </view>
-    </AppSection>
-
-    <AppSection title="订单跟进">
-      <AppList v-if="upcomingOrders.length">
-        <AppListItem
-          v-for="order in upcomingOrders"
-          :key="order.id"
-          :title="order.orderNo"
-          :label="`状态：${getOrderStatusLabel(order.orderStatus)}`"
-          :value="`实付 ${formatAmount(order.amountPaid)} / 已退 ${formatAmount(order.amountRefunded)}`"
-          is-link
-          clickable
-          @click="goToOrderDetail(order.id)"
-        />
-      </AppList>
-      <view v-else class="app-status-wrap">
-        <AppStatus text="暂无订单，完成需求发布后会在这里持续跟进。" />
-      </view>
-    </AppSection>
-
-    <AppSection title="推荐照料者" description="默认按当前宠物与最新需求做快速匹配。">
-      <AppList v-if="recommendedCaregivers.length">
-        <AppListItem
-          v-for="caregiver in recommendedCaregivers"
-          :key="caregiver.serviceId"
-          :title="caregiver.caregiverName"
-          :label="`${caregiver.city || '未知城市'} · 评分 ${caregiver.ratingAvg}`"
-          :value="`${formatAmount(caregiver.pricePerUnit)} / ${caregiver.unitType}`"
-        />
-      </AppList>
-      <view v-else class="app-status-wrap">
-        <AppStatus text="暂无推荐照料者，补齐宠物档案后会更容易匹配。" />
-      </view>
-    </AppSection>
-  </AppPageShell>
+      <PetpalSection title="统一待办" subtitle="高优先通知和待办集中收口，不再散落在首页。">
+        <button class="app-entry-row" hover-class="none" @click="openReminders">
+          <view class="app-entry-row__copy">
+            <text class="app-entry-row__title">提醒中心</text>
+            <text class="app-entry-row__meta">当前高优先待办 {{ unreadHighPriorityCount }} 条。</text>
+          </view>
+          <text class="app-entry-row__value">进入</text>
+        </button>
+        <button class="app-entry-row" hover-class="none" @click="openHub">
+          <view class="app-entry-row__copy">
+            <text class="app-entry-row__title">PetPal 中枢</text>
+            <text class="app-entry-row__meta">查看主人和照料者的分流入口。</text>
+          </view>
+          <text class="app-entry-row__value">进入</text>
+        </button>
+      </PetpalSection>
+    </template>
+  </PetpalPage>
 </template>
 
 <style scoped lang="scss">
-.petpal-chip-row {
+.app-entry-actions {
   display: flex;
+  gap: 20rpx;
   flex-wrap: wrap;
-  margin-left: -12rpx;
-  margin-bottom: -12rpx;
+  margin-top: 12rpx;
 }
 
-.petpal-chip-row :deep(.app-tag) {
-  margin-left: 12rpx;
-  margin-bottom: 12rpx;
+.app-home-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+  align-items: center;
 }
 
-.petpal-metric-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.app-home-banner__profile {
+  display: flex;
   gap: 16rpx;
-  padding: 0 24rpx;
+  align-items: center;
 }
 
-.petpal-signal-wrap {
-  padding: 0 24rpx;
-}
-
-.petpal-metric-card {
+.app-home-banner__copy {
   display: grid;
-  gap: 10rpx;
-  padding: 22rpx;
-  border: 1rpx solid var(--app-outline-variant);
-  border-radius: var(--app-shape-xl);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
-  box-shadow: var(--app-elevation-1);
+  gap: 6rpx;
 }
 
-.petpal-metric-card__label {
-  font-size: 22rpx;
-  color: var(--app-text-muted);
-}
-
-.petpal-metric-card__value {
-  font-size: 42rpx;
-  line-height: 1.05;
+.app-home-banner__title {
+  font-size: 34rpx;
   color: var(--app-text);
   font-weight: 700;
 }
 
-.petpal-metric-card__hint {
-  font-size: 22rpx;
-  line-height: 1.6;
+.app-home-banner__meta {
+  font-size: 24rpx;
   color: var(--app-text-secondary);
 }
 
-@media (max-width: 680px) {
-  .petpal-metric-grid {
-    grid-template-columns: 1fr;
-  }
+.app-entry-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+}
+
+.app-entry-row__copy {
+  display: grid;
+  gap: 8rpx;
+}
+
+.app-entry-row__title {
+  font-size: 30rpx;
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.app-entry-row__meta,
+.app-entry-row__value {
+  font-size: 24rpx;
+  color: var(--app-text-secondary);
 }
 </style>

@@ -1,254 +1,168 @@
-<!--
-UX Blueprint
-User: 照料者需要按阶段处理待接单、签到、服务记录和签退
-Entry: 照料者总览、提醒回流
-First screen: 阶段筛选、待接单和服务中数量、直接执行当前动作
-Primary action: 接单、签到、记录服务、签退
-Secondary actions: 查看订单详情
-States: 未登录、加载失败、空态、动作执行中
--->
 <template>
-  <div class="frontend-page">
-    <PetPalWorkspaceHero
-      eyebrow="照料者工作区"
-      title="履约队列"
-      summary="履约页只负责处理订单阶段动作，入驻资料和服务配置继续留在各自页面。"
-      :nav-items="petPalCaregiverWorkspaceNav"
-      active-name="frontend-petpal-caregiver-orders"
-      :stats="heroStats"
-      :primary-action="{ label: '返回照料者总览', to: { name: 'frontend-petpal-caregiver' } }"
-      :actions="heroActions"
-    />
-
-    <template v-if="auth.isAuthenticated">
-      <section v-if="pageLoadState === 'error'" class="frontend-card">
-        <PetPalStatePanel
-          eyebrow="履约队列"
-          title="履约队列加载失败"
-          :description="pageLoadErrorMessage"
-          tone="danger"
-        >
-          <template #actions>
-            <el-button size="small" type="primary" :loading="loading" @click="loadPage">重试加载</el-button>
-          </template>
-        </PetPalStatePanel>
-      </section>
-
-      <section v-else class="frontend-card">
-        <span class="frontend-card__eyebrow">履约筛选</span>
-        <div class="petpal-toolbar">
-          <el-radio-group v-model="statusFilter" size="small" @change="loadPage">
-            <el-radio-button label="">全部</el-radio-button>
-            <el-radio-button label="PENDING_ACCEPT">待接单</el-radio-button>
-            <el-radio-button label="ACCEPTED">已接单</el-radio-button>
-            <el-radio-button label="SERVING">服务中</el-radio-button>
-            <el-radio-button label="COMPLETED">已完成</el-radio-button>
-          </el-radio-group>
-          <RouterLink :to="{ name: 'frontend-petpal-messages' }">去消息中心</RouterLink>
-        </div>
-
-        <div v-if="orders.length" class="petpal-order-list">
-          <article v-for="order in orders" :key="order.id" class="petpal-order-card">
-            <div class="petpal-order-card__head">
-              <div>
-                <h3>{{ order.orderNo }}</h3>
-                <p>{{ order.ownerNickname }} · {{ order.petName || '宠物待同步' }} · {{ formatPetPalRange(order.appointmentStart, order.appointmentEnd) }}</p>
-              </div>
-              <el-tag size="small" :type="order.orderStatus === 'SERVING' ? 'warning' : order.orderStatus === 'COMPLETED' ? 'success' : 'primary'">
-                {{ order.orderStatus }}
-              </el-tag>
-            </div>
-
-            <div class="petpal-order-card__metrics">
-              <div>
-                <span>地点</span>
-                <strong>{{ order.locationText || '待确认' }}</strong>
-              </div>
-              <div>
-                <span>主人</span>
-                <strong>{{ order.ownerNickname }}</strong>
-              </div>
-              <div>
-                <span>最近沟通</span>
-                <strong>{{ order.conversation?.lastMessagePreview || '暂无' }}</strong>
-              </div>
-            </div>
-
-            <div class="petpal-card-actions">
-              <el-button
-                v-if="order.orderStatus === 'PENDING_ACCEPT'"
-                type="primary"
-                size="small"
-                :loading="actionLoadingKey === `accept:${order.id}`"
-                @click="acceptOrder(order.id)"
-              >
-                接单
-              </el-button>
-              <el-button
-                v-if="order.orderStatus === 'ACCEPTED'"
-                type="warning"
-                size="small"
-                :loading="actionLoadingKey === `checkin:${order.id}`"
-                @click="checkInOrder(order.id)"
-              >
-                签到
-              </el-button>
-              <el-button
-                v-if="order.orderStatus === 'SERVING'"
-                type="primary"
-                size="small"
-                :loading="actionLoadingKey === `log:${order.id}`"
-                @click="openLogDialog(order.id)"
-              >
-                服务记录
-              </el-button>
-              <el-button
-                v-if="order.orderStatus === 'SERVING'"
-                type="success"
-                size="small"
-                :loading="actionLoadingKey === `checkout:${order.id}`"
-                @click="checkOutOrder(order.id)"
-              >
-                签退
-              </el-button>
-              <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-order-detail', params: { id: order.id } }">
-                查看详情
-              </RouterLink>
-            </div>
-          </article>
-        </div>
-
-        <PetPalStatePanel
-          v-else
-          eyebrow="履约队列"
-          title="当前筛选下没有订单"
-          description="先补好入驻资料和服务清单，再回这里处理接单和履约。"
+  <PetPalDeskPage
+    eyebrow="履约队列"
+    title="接单、签到、服务记录和签退都收口到这一页"
+    summary="履约页只服务当前订单动作，资料和服务配置都回各自页面维护。"
+    :nav-items="petPalCaregiverWorkspaceNav"
+    active-name="frontend-petpal-caregiver-orders"
+    :actions="[{ label: '返回照料者总览', to: { name: 'frontend-petpal-caregiver' }, tone: 'secondary' }]"
+    :stats="heroStats"
+  >
+    <div class="petpal-split-grid">
+      <PetPalDeskSection class="petpal-span-5" eyebrow="Orders" title="履约订单" description="先选中一笔订单，再看右侧当前可执行动作。">
+        <PetPalDeskEmpty
+          v-if="!orders.length"
+          title="当前没有履约订单"
+          description="当主人创建订单并由你接单后，这里会持续显示履约任务。"
         />
-      </section>
-    </template>
 
-    <section v-else class="frontend-card">
-      <PetPalStatePanel
-        eyebrow="履约队列"
-        title="登录后查看履约队列"
-        description="登录后按阶段处理接单、签到、服务记录和签退。"
-      >
-        <template #actions>
-          <RouterLink to="/login">
-            <el-button size="small" type="primary">去登录</el-button>
-          </RouterLink>
+        <div v-else class="petpal-sheet-list">
+          <button
+            v-for="order in orders"
+            :key="order.id"
+            type="button"
+            class="petpal-order-row"
+            :class="{ 'is-active': order.id === selectedOrderId }"
+            @click="selectedOrderId = order.id"
+          >
+            <div class="petpal-sheet-row__copy">
+              <h3 class="petpal-sheet-row__title">{{ order.orderNo }}</h3>
+              <p class="petpal-sheet-row__desc">{{ getPetPalOrderStatusLabel(order.orderStatus) }} · {{ order.ownerNickname }} · {{ order.petName || '宠物待同步' }}</p>
+              <p class="petpal-sheet-row__desc">{{ formatPetPalRange(order.appointmentStart, order.appointmentEnd) }}</p>
+            </div>
+            <div class="petpal-sheet-row__tail">
+              <span class="petpal-pill" :class="statusTone(order.orderStatus)">{{ getPetPalOrderStatusLabel(order.orderStatus) }}</span>
+            </div>
+          </button>
+        </div>
+      </PetPalDeskSection>
+
+      <PetPalDeskSection class="petpal-span-7" eyebrow="Actions" title="当前履约动作" description="右侧只处理当前订单的履约动作，复杂沟通继续回订单详情。">
+        <PetPalDeskEmpty
+          v-if="!activeOrder"
+          title="先选择左侧订单"
+          description="选中订单后，这里会显示当前状态和下一步动作。"
+        />
+
+        <template v-else>
+          <div class="petpal-summary-strip">
+            <div>
+              <span>订单状态</span>
+              <strong>{{ getPetPalOrderStatusLabel(activeOrder.orderStatus) }}</strong>
+            </div>
+            <div>
+              <span>宠物 / 主人</span>
+              <strong>{{ activeOrder.petName || '宠物待同步' }} / {{ activeOrder.ownerNickname }}</strong>
+            </div>
+            <div>
+              <span>服务时间</span>
+              <strong>{{ formatPetPalRange(activeOrder.appointmentStart, activeOrder.appointmentEnd) }}</strong>
+            </div>
+          </div>
+
+          <div class="petpal-actions">
+            <el-button
+              v-if="activeOrder.orderStatus === 'PENDING_ACCEPT'"
+              type="primary"
+              :loading="loadingKey === `accept:${activeOrder.id}`"
+              @click="acceptOrder(activeOrder.id)"
+            >
+              接单
+            </el-button>
+            <el-button
+              v-if="activeOrder.orderStatus === 'ACCEPTED'"
+              type="primary"
+              :loading="loadingKey === `checkin:${activeOrder.id}`"
+              @click="checkInOrder(activeOrder.id)"
+            >
+              签到
+            </el-button>
+            <el-button
+              v-if="activeOrder.orderStatus === 'SERVING'"
+              type="primary"
+              :loading="loadingKey === `checkout:${activeOrder.id}`"
+              @click="checkOutOrder(activeOrder.id)"
+            >
+              签退
+            </el-button>
+            <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: activeOrder.id } }">查看完整订单详情</RouterLink>
+          </div>
+
+          <div v-if="activeOrder.orderStatus === 'SERVING'" class="petpal-side-stack">
+            <h3 class="petpal-sheet-row__title">补充一条服务记录</h3>
+            <div class="petpal-field-grid">
+              <el-form-item label="记录类型">
+                <el-select v-model="serviceLogForm.logType" style="width: 100%">
+                  <el-option v-for="item in petPalServiceLogOptions" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="记录内容">
+                <el-input v-model="serviceLogForm.textNote" type="textarea" :rows="4" maxlength="200" show-word-limit placeholder="记录这次照料情况" />
+              </el-form-item>
+            </div>
+            <div class="petpal-actions">
+              <el-button type="primary" :loading="loadingKey === `log:${activeOrder.id}`" @click="submitServiceLog(activeOrder.id)">提交服务记录</el-button>
+            </div>
+          </div>
         </template>
-      </PetPalStatePanel>
-    </section>
-
-    <el-dialog v-model="serviceLogDialogVisible" title="记录服务" width="420px">
-      <el-form label-position="top" size="small">
-        <el-form-item label="记录类型">
-          <el-select v-model="serviceLogForm.logType" style="width: 100%">
-            <el-option label="备注" value="NOTE" />
-            <el-option label="喂养" value="FEED" />
-            <el-option label="遛宠" value="WALK" />
-            <el-option label="陪伴" value="PLAY" />
-            <el-option label="观察" value="HEALTH" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="说明">
-          <el-input v-model="serviceLogForm.textNote" type="textarea" :rows="4" placeholder="记录本次照料情况" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="serviceLogDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="actionLoadingKey === `log:${serviceLogForm.orderId}`" @click="submitServiceLog">
-          保存记录
-        </el-button>
-      </template>
-    </el-dialog>
-  </div>
+      </PetPalDeskSection>
+    </div>
+  </PetPalDeskPage>
 </template>
 
 <script setup lang="ts">
-import type { CaregiverOrderRecord, OrderStatus, ServiceLogType } from '@rbac/api-common';
+import type { CaregiverOrderRecord } from '@rbac/api-common';
 import { computed, onMounted, reactive, ref } from 'vue';
-import { ElButton, ElMessage } from 'element-plus';
+import { RouterLink } from 'vue-router';
+import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
-import PetPalStatePanel from '@/pages/frontend/petpal/PetPalStatePanel.vue';
-import PetPalWorkspaceHero from '@/pages/frontend/petpal/components/PetPalWorkspaceHero.vue';
-import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
-import { formatPetPalRange, petPalCaregiverWorkspaceNav } from './shared';
+import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
+import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import {
+  formatPetPalRange,
+  getPetPalOrderStatusLabel,
+  petPalCaregiverWorkspaceNav,
+  petPalServiceLogOptions,
+} from './shared';
 
-const auth = useAuthStore();
-
-const loading = ref(false);
-const actionLoadingKey = ref('');
-const statusFilter = ref<OrderStatus | ''>('');
-const pageLoadState = ref<'idle' | 'ready' | 'error'>('idle');
-const pageLoadErrorMessage = ref('');
 const orders = ref<CaregiverOrderRecord[]>([]);
-
-const serviceLogDialogVisible = ref(false);
+const selectedOrderId = ref('');
+const loadingKey = ref('');
 const serviceLogForm = reactive({
-  orderId: '',
-  logType: 'NOTE' as ServiceLogType,
+  logType: 'NOTE' as typeof petPalServiceLogOptions[number]['value'],
   textNote: '',
 });
 
+const activeOrder = computed(() => orders.value.find((item) => item.id === selectedOrderId.value) ?? null);
 const heroStats = computed(() => [
-  {
-    label: '当前筛选',
-    value: statusFilter.value || '全部',
-    hint: '履约页只看订单阶段',
-  },
-  {
-    label: '待接单',
-    value: String(orders.value.filter((item) => item.orderStatus === 'PENDING_ACCEPT').length),
-    hint: '优先处理新订单',
-  },
-  {
-    label: '服务中',
-    value: String(orders.value.filter((item) => item.orderStatus === 'SERVING').length),
-    hint: '继续记录和签退',
-  },
-  {
-    label: '已完成',
-    value: String(orders.value.filter((item) => item.orderStatus === 'COMPLETED').length),
-    hint: '可回看履约结果',
-  },
+  { label: '订单总数', value: String(orders.value.length), hint: '照料者全部履约订单' },
+  { label: '待接单', value: String(orders.value.filter((item) => item.orderStatus === 'PENDING_ACCEPT').length), hint: '优先处理新订单' },
+  { label: '服务中', value: String(orders.value.filter((item) => item.orderStatus === 'SERVING').length), hint: '签到后记得持续留痕' },
+  { label: '已接单', value: String(orders.value.filter((item) => item.orderStatus === 'ACCEPTED').length), hint: '到达现场后再签到' },
 ]);
 
-const heroActions = computed(() => [
-  { label: '服务清单', to: { name: 'frontend-petpal-caregiver-services' }, tone: 'secondary' as const },
-  { label: '入驻资料', to: { name: 'frontend-petpal-caregiver-profile' }, tone: 'secondary' as const },
-]);
+const statusTone = (status: CaregiverOrderRecord['orderStatus']) => {
+  if (status === 'SERVING') return 'is-success';
+  if (status === 'PENDING_ACCEPT' || status === 'ACCEPTED') return 'is-warning';
+  return '';
+};
 
 async function loadPage() {
-  if (!auth.isAuthenticated || loading.value) {
-    return;
-  }
-
-  loading.value = true;
-  pageLoadState.value = 'idle';
-  pageLoadErrorMessage.value = '';
-
   try {
-    const page = await api.petpal.caregiver.orders({
-      page: 1,
-      pageSize: 20,
-      status: statusFilter.value || undefined,
-    });
+    const page = await api.petpal.caregiver.orders({ page: 1, pageSize: 50 });
     orders.value = page.items;
-    pageLoadState.value = 'ready';
+    if (page.items.length && !selectedOrderId.value) {
+      selectedOrderId.value = page.items[0].id;
+    }
   } catch (error: unknown) {
-    orders.value = [];
-    pageLoadState.value = 'error';
-    pageLoadErrorMessage.value = getErrorMessage(error, '加载履约队列失败');
-  } finally {
-    loading.value = false;
+    ElMessage.error(getErrorMessage(error, '加载履约订单失败'));
   }
 }
 
 async function acceptOrder(orderId: string) {
-  actionLoadingKey.value = `accept:${orderId}`;
+  loadingKey.value = `accept:${orderId}`;
   try {
     await api.petpal.caregiver.acceptOrder(orderId);
     ElMessage.success('已接单');
@@ -256,12 +170,12 @@ async function acceptOrder(orderId: string) {
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '接单失败'));
   } finally {
-    actionLoadingKey.value = '';
+    loadingKey.value = '';
   }
 }
 
 async function checkInOrder(orderId: string) {
-  actionLoadingKey.value = `checkin:${orderId}`;
+  loadingKey.value = `checkin:${orderId}`;
   try {
     await api.petpal.caregiver.checkInOrder(orderId);
     ElMessage.success('签到成功');
@@ -269,45 +183,12 @@ async function checkInOrder(orderId: string) {
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '签到失败'));
   } finally {
-    actionLoadingKey.value = '';
-  }
-}
-
-function openLogDialog(orderId: string) {
-  serviceLogForm.orderId = orderId;
-  serviceLogForm.logType = 'NOTE';
-  serviceLogForm.textNote = '';
-  serviceLogDialogVisible.value = true;
-}
-
-async function submitServiceLog() {
-  if (!serviceLogForm.orderId) {
-    return;
-  }
-  if (!serviceLogForm.textNote.trim()) {
-    ElMessage.warning('请先填写服务说明');
-    return;
-  }
-
-  actionLoadingKey.value = `log:${serviceLogForm.orderId}`;
-  try {
-    await api.petpal.caregiver.addServiceLog(serviceLogForm.orderId, {
-      logType: serviceLogForm.logType,
-      textNote: serviceLogForm.textNote.trim(),
-      mediaUrls: [],
-    });
-    serviceLogDialogVisible.value = false;
-    ElMessage.success('服务记录已保存');
-    await loadPage();
-  } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '保存服务记录失败'));
-  } finally {
-    actionLoadingKey.value = '';
+    loadingKey.value = '';
   }
 }
 
 async function checkOutOrder(orderId: string) {
-  actionLoadingKey.value = `checkout:${orderId}`;
+  loadingKey.value = `checkout:${orderId}`;
   try {
     await api.petpal.caregiver.checkOutOrder(orderId);
     ElMessage.success('签退成功');
@@ -315,64 +196,57 @@ async function checkOutOrder(orderId: string) {
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '签退失败'));
   } finally {
-    actionLoadingKey.value = '';
+    loadingKey.value = '';
+  }
+}
+
+async function submitServiceLog(orderId: string) {
+  if (!serviceLogForm.textNote.trim()) {
+    ElMessage.warning('请先填写服务记录内容');
+    return;
+  }
+  loadingKey.value = `log:${orderId}`;
+  try {
+    await api.petpal.caregiver.addServiceLog(orderId, {
+      logType: serviceLogForm.logType,
+      textNote: serviceLogForm.textNote.trim(),
+    });
+    serviceLogForm.textNote = '';
+    ElMessage.success('服务记录已提交');
+    await loadPage();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '提交服务记录失败'));
+  } finally {
+    loadingKey.value = '';
   }
 }
 
 onMounted(() => {
-  if (!auth.isAuthenticated) {
-    return;
-  }
   void loadPage();
 });
 </script>
 
 <style scoped lang="scss">
-.petpal-toolbar,
-.petpal-order-card__head,
-.petpal-card-actions {
+.petpal-order-row {
+  width: 100%;
   display: flex;
-  gap: 12px;
+  gap: 14px;
   justify-content: space-between;
   align-items: flex-start;
-  flex-wrap: wrap;
+  padding: 16px 0;
+  border: 0;
+  border-top: 1px solid rgba(44, 37, 29, 0.1);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 }
 
-.petpal-order-list,
-.petpal-order-card {
-  display: grid;
-  gap: 14px;
+.petpal-order-row:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
-.petpal-order-card {
-  padding: 18px;
-  border-radius: 20px;
-  border: 1px solid rgba(18, 53, 51, 0.08);
-  background: rgba(248, 252, 251, 0.86);
-}
-
-.petpal-order-card__metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.petpal-order-card__metrics div {
-  display: grid;
-  gap: 6px;
-  padding: 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.petpal-order-card__metrics span {
-  color: #6d8683;
-  font-size: 12px;
-}
-
-@media (max-width: 720px) {
-  .petpal-order-card__metrics {
-    grid-template-columns: 1fr;
-  }
+.petpal-order-row.is-active {
+  color: #2563eb;
 }
 </style>

@@ -1,410 +1,196 @@
-<!--
-UX Blueprint
-User: 照料者需要专注填写入驻资料和上传资质
-Entry: 照料者总览、服务清单前置要求
-First screen: 当前审核状态、资料完整度、直接保存
-Primary action: 保存照料者档案
-Secondary actions: 上传资质材料、返回总览
-States: 未登录、加载中、可新建、可编辑
--->
 <template>
-  <div class="frontend-page">
-    <PetPalWorkspaceHero
-      eyebrow="照料者工作区"
-      title="入驻资料"
-      summary="资料页只负责入驻信息和资质材料，不再混入服务清单和履约订单。"
-      :nav-items="petPalCaregiverWorkspaceNav"
-      active-name="frontend-petpal-caregiver-profile"
-      :stats="heroStats"
-      :primary-action="null"
-      :actions="heroActions"
-    />
+  <PetPalDeskPage
+    eyebrow="入驻资料"
+    title="把服务能力和审核资料写在单独页面"
+    summary="这页只负责入驻资料，不承接服务上架和履约动作。"
+    :nav-items="petPalCaregiverWorkspaceNav"
+    active-name="frontend-petpal-caregiver-profile"
+    :actions="[{ label: '返回照料者总览', to: { name: 'frontend-petpal-caregiver' }, tone: 'secondary' }]"
+    :stats="heroStats"
+  >
+    <PetPalDeskSection eyebrow="Profile" title="基础资料" description="城市、半径、经验和专长直接影响主人匹配结果。">
+      <el-form label-position="top" class="petpal-field-grid">
+        <el-form-item label="服务城市">
+          <el-input v-model="form.serviceCity" maxlength="30" placeholder="例如：杭州" />
+        </el-form-item>
+        <el-form-item label="服务半径 (km)">
+          <el-input-number v-model="form.serviceRadiusKm" :min="1" :max="100" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="经验年限">
+          <el-input-number v-model="form.experienceYears" :min="0" :max="30" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="专长标签">
+          <el-input v-model="form.specialtyTagsText" placeholder="例如：幼宠、老年犬、猫咪喂药" />
+        </el-form-item>
+        <el-form-item label="个人简介" class="petpal-span-12">
+          <el-input v-model="form.intro" type="textarea" :rows="4" maxlength="300" show-word-limit placeholder="用 2-3 句话说明你的照料风格和经验。" />
+        </el-form-item>
+        <el-form-item label="服务承诺" class="petpal-span-12">
+          <el-input v-model="form.serviceCommitment" type="textarea" :rows="3" maxlength="200" show-word-limit placeholder="例如：每 4 小时回传一次照片" />
+        </el-form-item>
+      </el-form>
+    </PetPalDeskSection>
 
-    <template v-if="auth.isAuthenticated">
-      <section class="frontend-page__section-grid">
-        <article class="frontend-card petpal-grid-span-8">
-          <span class="frontend-card__eyebrow">资料表单</span>
-          <el-form :model="profileForm" label-position="top" size="small" class="petpal-form-grid">
-            <el-form-item label="简介">
-              <el-input v-model="profileForm.intro" type="textarea" :rows="4" placeholder="介绍照料经验、擅长宠物和服务风格" />
-            </el-form-item>
+    <PetPalDeskSection eyebrow="Materials" title="资质材料" description="为了简化流程，这里改成手动维护材料条目，不再堆叠上传卡片。">
+      <div class="petpal-field-grid petpal-material-entry">
+        <el-form-item label="材料名称">
+          <el-input v-model="materialDraft.name" maxlength="40" placeholder="例如：宠物护理证书" />
+        </el-form-item>
+        <el-form-item label="材料链接">
+          <el-input v-model="materialDraft.url" maxlength="240" placeholder="例如：https://..." />
+        </el-form-item>
+      </div>
+      <div class="petpal-actions">
+        <el-button @click="appendMaterial">添加材料</el-button>
+      </div>
 
-            <div class="petpal-form-grid__row">
-              <el-form-item label="经验年限">
-                <el-input-number v-model="profileForm.experienceYears" :min="0" :max="60" style="width: 100%" />
-              </el-form-item>
-              <el-form-item label="服务半径(km)">
-                <el-input-number v-model="profileForm.serviceRadiusKm" :min="1" :max="100" style="width: 100%" />
-              </el-form-item>
-            </div>
+      <PetPalDeskEmpty
+        v-if="!form.qualificationMaterials.length"
+        title="当前没有资质材料"
+        description="如果暂时没有材料，也可以先保存基础资料，后续再补充。"
+      />
 
-            <div class="petpal-form-grid__row">
-              <el-form-item label="服务城市">
-                <el-input v-model="profileForm.serviceCity" placeholder="例如：杭州" />
-              </el-form-item>
-              <el-form-item label="专长标签">
-                <el-input v-model="specialtyTagsText" placeholder="例如：幼宠看护，猫咪喂养，异宠熟悉" />
-              </el-form-item>
-            </div>
-
-            <el-form-item label="服务承诺">
-              <el-input
-                v-model="profileForm.serviceCommitment"
-                type="textarea"
-                :rows="4"
-                placeholder="例如：支持每日两次图文反馈，紧急情况第一时间联系主人"
-              />
-            </el-form-item>
-          </el-form>
-        </article>
-
-        <aside class="frontend-card petpal-grid-span-4">
-          <span class="frontend-card__eyebrow">审核与资质</span>
-          <div class="petpal-side-stack">
-            <div class="petpal-side-item">
-              <strong>审核状态</strong>
-              <p>{{ caregiverProfile?.auditStatus || '待提交' }}</p>
-              <p>{{ loadNotice }}</p>
-            </div>
-
-            <div class="petpal-side-item">
-              <div class="petpal-side-item__head">
-                <strong>资质材料</strong>
-                <span>{{ profileForm.qualificationMaterials.length }}/12</span>
-              </div>
-              <input
-                ref="qualificationUploadInput"
-                type="file"
-                multiple
-                class="petpal-hidden-file-input"
-                accept="image/*,.pdf"
-                @change="onQualificationFilesChange"
-              >
-              <el-button plain :loading="qualificationUploading" @click="openQualificationFilePicker">
-                上传资质材料
-              </el-button>
-              <el-progress
-                v-if="qualificationUploadProgress !== null"
-                :percentage="qualificationUploadProgress"
-                :status="qualificationUploadProgress >= 100 ? 'success' : undefined"
-              />
-            </div>
-
-            <div v-if="profileForm.qualificationMaterials.length" class="petpal-qualification-list">
-              <div v-for="item in profileForm.qualificationMaterials" :key="item.fileId" class="petpal-qualification-item">
-                <div class="petpal-qualification-item__copy">
-                  <strong>{{ item.name }}</strong>
-                  <span>{{ item.mimeType }} · {{ Math.round(item.size / 1024) }} KB</span>
-                </div>
-                <div class="petpal-inline-actions">
-                  <el-button link type="primary" size="small" @click="openExternalLink(item.url)">预览</el-button>
-                  <el-button link type="danger" size="small" @click="removeQualificationMaterial(item.fileId)">移除</el-button>
-                </div>
-              </div>
-            </div>
-
-            <div class="petpal-card-actions">
-              <el-button type="primary" :loading="saving" @click="saveProfile">保存档案</el-button>
-              <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
-                <el-button>返回总览</el-button>
-              </RouterLink>
-            </div>
+      <div v-else class="petpal-sheet-list">
+        <div v-for="item in form.qualificationMaterials" :key="item.fileId" class="petpal-sheet-row">
+          <div class="petpal-sheet-row__copy">
+            <h3 class="petpal-sheet-row__title">{{ item.name }}</h3>
+            <p class="petpal-sheet-row__desc">{{ item.url }}</p>
+            <p class="petpal-sheet-row__desc">{{ item.mimeType }} · {{ item.uploadedAt.slice(0, 10) }}</p>
           </div>
-        </aside>
-      </section>
-    </template>
+          <div class="petpal-sheet-row__tail">
+            <a :href="item.url" target="_blank" rel="noreferrer">查看</a>
+            <button type="button" class="petpal-link-button" @click="removeMaterial(item.fileId)">移除</button>
+          </div>
+        </div>
+      </div>
+    </PetPalDeskSection>
 
-    <section v-else class="frontend-card">
-      <PetPalStatePanel
-        eyebrow="入驻资料"
-        title="登录后继续维护入驻资料"
-        description="登录后在独立资料页填写介绍、城市、专长和资质材料。"
-      >
-        <template #actions>
-          <RouterLink to="/login">
-            <el-button size="small" type="primary">去登录</el-button>
-          </RouterLink>
-        </template>
-      </PetPalStatePanel>
-    </section>
-  </div>
+    <PetPalDeskSection eyebrow="Submit" title="保存资料" description="资料保存后仍可继续调整，审核状态会自动刷新。">
+      <div class="petpal-actions">
+        <el-button type="primary" :loading="submitting" @click="submit">保存资料</el-button>
+      </div>
+    </PetPalDeskSection>
+  </PetPalDeskPage>
 </template>
 
 <script setup lang="ts">
 import type { CaregiverProfileRecord, CaregiverQualificationMaterialRecord } from '@rbac/api-common';
 import { computed, onMounted, reactive, ref } from 'vue';
-import { ElButton, ElMessage } from 'element-plus';
+import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
-import PetPalStatePanel from '@/pages/frontend/petpal/PetPalStatePanel.vue';
-import PetPalWorkspaceHero from '@/pages/frontend/petpal/components/PetPalWorkspaceHero.vue';
-import { useAuthStore } from '@/stores/auth';
-import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
-import { petPalCaregiverWorkspaceNav } from './shared';
+import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
+import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import { getPetPalCaregiverAuditLabel, normalizePetPalTagText, petPalCaregiverWorkspaceNav } from './shared';
 
-const auth = useAuthStore();
+const profile = ref<CaregiverProfileRecord | null>(null);
+const submitting = ref(false);
 
-const loading = ref(false);
-const saving = ref(false);
-const qualificationUploading = ref(false);
-const qualificationUploadProgress = ref<number | null>(null);
-const qualificationUploadInput = ref<HTMLInputElement | null>(null);
-const caregiverProfile = ref<CaregiverProfileRecord | null>(null);
-const loadNotice = ref('首次填写后即可提交审核。');
-const specialtyTagsText = ref('');
-
-const profileForm = reactive({
+const form = reactive({
   intro: '',
   experienceYears: 0,
   serviceRadiusKm: 5,
   serviceCity: '',
+  specialtyTagsText: '',
   serviceCommitment: '',
   qualificationMaterials: [] as CaregiverQualificationMaterialRecord[],
 });
 
+const materialDraft = reactive({
+  name: '',
+  url: '',
+});
+
 const heroStats = computed(() => [
-  {
-    label: '审核状态',
-    value: caregiverProfile.value?.auditStatus || '待提交',
-    hint: '资料页只负责入驻信息',
-  },
-  {
-    label: '资质材料',
-    value: String(profileForm.qualificationMaterials.length),
-    hint: '支持图片和 PDF',
-  },
-  {
-    label: '服务城市',
-    value: profileForm.serviceCity || '待补充',
-    hint: '会影响后续服务清单',
-  },
-  {
-    label: '下一步',
-    value: '保存档案',
-    hint: '保存后再去服务清单',
-  },
+  { label: '审核状态', value: profile.value ? getPetPalCaregiverAuditLabel(profile.value.auditStatus) : '待提交', hint: '保存后平台可继续审核' },
+  { label: '材料数量', value: String(form.qualificationMaterials.length), hint: '条目越清晰越方便审核' },
+  { label: '服务城市', value: form.serviceCity || '待填写', hint: '会影响主人筛选' },
+  { label: '服务半径', value: `${form.serviceRadiusKm} km`, hint: '建议按真实接单范围填写' },
 ]);
 
-const heroActions = computed(() => [
-  { label: '返回总览', to: { name: 'frontend-petpal-caregiver' }, tone: 'secondary' as const },
-  { label: '服务清单', to: { name: 'frontend-petpal-caregiver-services' }, tone: 'secondary' as const },
-]);
-
-const splitTagText = (value: string) => [...new Set(
-  value
-    .split(/[\n,，、]/)
-    .map((item) => item.trim())
-    .filter(Boolean),
-)];
-
-function applyProfile(profile: CaregiverProfileRecord) {
-  caregiverProfile.value = profile;
-  profileForm.intro = profile.intro || '';
-  profileForm.experienceYears = profile.experienceYears;
-  profileForm.serviceRadiusKm = profile.serviceRadiusKm;
-  profileForm.serviceCity = profile.serviceCity || '';
-  profileForm.serviceCommitment = profile.serviceCommitment || '';
-  profileForm.qualificationMaterials = [...profile.qualificationMaterials];
-  specialtyTagsText.value = profile.specialtyTags.join('，');
-  loadNotice.value = profile.auditStatus === 'APPROVED'
-    ? '资料已通过审核，可继续维护服务清单。'
-    : '资料保存后会进入审核流程。';
+function applyProfile(value: CaregiverProfileRecord) {
+  profile.value = value;
+  form.intro = value.intro || '';
+  form.experienceYears = value.experienceYears;
+  form.serviceRadiusKm = value.serviceRadiusKm;
+  form.serviceCity = value.serviceCity || '';
+  form.specialtyTagsText = value.specialtyTags.join('，');
+  form.serviceCommitment = value.serviceCommitment || '';
+  form.qualificationMaterials = [...value.qualificationMaterials];
 }
 
-async function loadProfile() {
-  if (!auth.isAuthenticated || loading.value) {
+function appendMaterial() {
+  if (!materialDraft.name.trim() || !materialDraft.url.trim()) {
+    ElMessage.warning('请先填写材料名称和链接');
     return;
   }
+  form.qualificationMaterials = [
+    ...form.qualificationMaterials,
+    {
+      fileId: `manual-${Date.now()}`,
+      url: materialDraft.url.trim(),
+      name: materialDraft.name.trim(),
+      mimeType: 'link/manual',
+      size: 0,
+      uploadedAt: new Date().toISOString(),
+    },
+  ];
+  materialDraft.name = '';
+  materialDraft.url = '';
+}
 
-  loading.value = true;
+function removeMaterial(fileId: string) {
+  form.qualificationMaterials = form.qualificationMaterials.filter((item) => item.fileId !== fileId);
+}
+
+async function loadPage() {
   try {
-    const profile = await api.petpal.caregiver.profile();
-    applyProfile(profile);
-  } catch (error: unknown) {
-    caregiverProfile.value = null;
-    profileForm.intro = '';
-    profileForm.experienceYears = 0;
-    profileForm.serviceRadiusKm = 5;
-    profileForm.serviceCity = '';
-    profileForm.serviceCommitment = '';
-    profileForm.qualificationMaterials = [];
-    specialtyTagsText.value = '';
-    loadNotice.value = getErrorMessage(error, '还没有入驻资料，继续填写后可直接保存。');
-  } finally {
-    loading.value = false;
+    const result = await api.petpal.caregiver.profile();
+    applyProfile(result);
+  } catch {
+    profile.value = null;
   }
 }
 
-function removeQualificationMaterial(fileId: string) {
-  profileForm.qualificationMaterials = profileForm.qualificationMaterials.filter((item) => item.fileId !== fileId);
-}
-
-function openQualificationFilePicker() {
-  qualificationUploadInput.value?.click();
-}
-
-function openExternalLink(url: string) {
-  window.open(url, '_blank', 'noopener');
-}
-
-async function uploadQualificationFiles(files: File[]) {
-  if (!files.length) {
-    return;
-  }
-
-  qualificationUploading.value = true;
-  qualificationUploadProgress.value = 0;
-
-  const uploaded: CaregiverQualificationMaterialRecord[] = [];
-  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-  let completedSize = 0;
-
+async function submit() {
+  submitting.value = true;
   try {
-    for (const file of files) {
-      const result = await uploadAttachmentFile(
-        file,
-        {
-          tag1: 'petpal-caregiver-qualification',
-          tag2: caregiverProfile.value?.id || 'draft',
-        },
-        (percent) => {
-          const currentBytes = Math.round((file.size * percent) / 100);
-          qualificationUploadProgress.value = Math.min(
-            99,
-            Math.round(((completedSize + currentBytes) / Math.max(totalSize, 1)) * 100),
-          );
-        },
-      );
-
-      uploaded.push({
-        fileId: result.fileId,
-        url: result.url,
-        name: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        size: file.size,
-        uploadedAt: new Date().toISOString(),
-      });
-
-      completedSize += file.size;
-      qualificationUploadProgress.value = Math.min(
-        99,
-        Math.round((completedSize / Math.max(totalSize, 1)) * 100),
-      );
-    }
-
-    profileForm.qualificationMaterials = [
-      ...profileForm.qualificationMaterials,
-      ...uploaded,
-    ].slice(0, 12);
-    qualificationUploadProgress.value = 100;
-    ElMessage.success(`已上传 ${uploaded.length} 份资质材料`);
-  } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '上传资质材料失败'));
-  } finally {
-    qualificationUploading.value = false;
-    setTimeout(() => {
-      qualificationUploadProgress.value = null;
-    }, 600);
-  }
-}
-
-async function onQualificationFilesChange(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const files = Array.from(input.files ?? []);
-  input.value = '';
-  await uploadQualificationFiles(files);
-}
-
-async function saveProfile() {
-  saving.value = true;
-  try {
-    const profile = await api.petpal.caregiver.upsertProfile({
-      intro: profileForm.intro.trim() || undefined,
-      experienceYears: profileForm.experienceYears,
-      serviceRadiusKm: profileForm.serviceRadiusKm,
-      serviceCity: profileForm.serviceCity.trim() || undefined,
-      specialtyTags: splitTagText(specialtyTagsText.value),
-      serviceCommitment: profileForm.serviceCommitment.trim() || undefined,
-      qualificationMaterials: profileForm.qualificationMaterials,
+    const result = await api.petpal.caregiver.upsertProfile({
+      intro: form.intro.trim() || undefined,
+      experienceYears: form.experienceYears,
+      serviceRadiusKm: form.serviceRadiusKm,
+      serviceCity: form.serviceCity.trim() || undefined,
+      specialtyTags: normalizePetPalTagText(form.specialtyTagsText),
+      serviceCommitment: form.serviceCommitment.trim() || undefined,
+      qualificationMaterials: form.qualificationMaterials,
     });
-    applyProfile(profile);
-    ElMessage.success('照料者档案已更新');
+    applyProfile(result);
+    ElMessage.success('照料者资料已保存');
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '保存照料者档案失败'));
+    ElMessage.error(getErrorMessage(error, '保存照料者资料失败'));
   } finally {
-    saving.value = false;
+    submitting.value = false;
   }
 }
 
 onMounted(() => {
-  if (!auth.isAuthenticated) {
-    return;
-  }
-  void loadProfile();
+  void loadPage();
 });
 </script>
 
 <style scoped lang="scss">
-.petpal-grid-span-8 {
-  grid-column: span 8;
+.petpal-material-entry {
+  align-items: end;
 }
 
-.petpal-grid-span-4 {
-  grid-column: span 4;
-}
-
-.petpal-form-grid,
-.petpal-side-stack,
-.petpal-qualification-list {
-  display: grid;
-  gap: 16px;
-}
-
-.petpal-form-grid__row,
-.petpal-card-actions,
-.petpal-inline-actions,
-.petpal-side-item__head,
-.petpal-qualification-item {
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-
-.petpal-side-item,
-.petpal-qualification-item {
-  padding: 16px;
-  border-radius: 18px;
-  background: rgba(248, 252, 251, 0.86);
-  border: 1px solid rgba(18, 53, 51, 0.08);
-}
-
-.petpal-hidden-file-input {
-  display: none;
-}
-
-.petpal-qualification-item__copy {
-  display: grid;
-  gap: 4px;
-}
-
-.petpal-qualification-item__copy span {
-  color: #6d8683;
-  font-size: 12px;
-}
-
-@media (max-width: 1080px) {
-  .petpal-grid-span-8,
-  .petpal-grid-span-4 {
-    grid-column: span 12;
-  }
-}
-
-@media (max-width: 720px) {
-  .petpal-form-grid__row {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
+.petpal-link-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
 }
 </style>

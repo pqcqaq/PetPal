@@ -4,7 +4,7 @@
       <section class="frontend-footer__intro">
         <p class="frontend-footer__eyebrow">PetPal</p>
         <strong>宠托帮</strong>
-        <small>主人 · 照料者 · 后台治理</small>
+        <small>入口只做分流，真正的操作放进各自工作台。</small>
       </section>
 
       <section class="frontend-footer__links">
@@ -25,7 +25,7 @@
 
 <script setup lang="ts">
 defineProps<{
-  navItems: Array<{ label: string; to: string; eyebrow: string }>;
+  navItems: Array<{ label: string; to: string }>;
   adminTarget: string;
   adminLabel: string;
 }>();
@@ -33,71 +33,68 @@ defineProps<{
 
 <style scoped lang="scss">
 .frontend-footer {
-  margin-top: 32px;
-  background: transparent;
+  margin-top: 12px;
 }
 
 .frontend-footer__inner {
   display: grid;
-  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1fr);
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1fr);
   gap: 18px;
-  width: min(1320px, calc(100vw - 32px));
+  width: min(1180px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 0 0 40px;
+  padding: 0 0 28px;
 }
 
 .frontend-footer__intro {
   display: grid;
   gap: 8px;
-  padding: 20px 22px;
-  border: 1px solid rgba(18, 53, 51, 0.08);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.78);
+  padding: 18px 0;
+  border-top: 1px solid rgba(44, 37, 29, 0.1);
 }
 
 .frontend-footer__eyebrow {
   margin: 0;
-  color: #6d7a80;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-}
-
-.frontend-footer__intro strong {
-  color: #143634;
-  font-size: 20px;
-}
-
-.frontend-footer__intro small {
-  color: #5f7673;
-  line-height: 1.7;
-}
-
-.frontend-footer__links {
-  display: grid;
-  gap: 20px;
-}
-
-.frontend-footer__links div {
-  display: grid;
-  gap: 10px;
-  padding: 20px 22px;
-  border: 1px solid rgba(18, 53, 51, 0.08);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.78);
-}
-
-.frontend-footer__links span {
-  color: #6d7a80;
+  color: #8f6c4f;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
+.frontend-footer__intro strong {
+  color: #2b241f;
+  font-size: 20px;
+}
+
+.frontend-footer__intro small {
+  color: #6b625a;
+  line-height: 1.7;
+}
+
+.frontend-footer__links {
+  display: grid;
+  gap: 12px;
+}
+
+.frontend-footer__links div {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 18px 0;
+  border-top: 1px solid rgba(44, 37, 29, 0.1);
+}
+
+.frontend-footer__links span {
+  color: #8f6c4f;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
 .frontend-footer__links a {
-  color: #17384a;
+  color: #2b241f;
   font-weight: 700;
 }
 

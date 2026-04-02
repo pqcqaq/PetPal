@@ -2,14 +2,14 @@
   <header class="frontend-header">
     <div class="frontend-header__inner">
       <RouterLink to="/" class="frontend-brand">
-        <span class="frontend-brand__mark">PP</span>
+        <span class="frontend-brand__mark">宠托帮</span>
         <span class="frontend-brand__copy">
-          <strong>宠托帮 PetPal</strong>
-          <small>主人 · 照料者 · 售后</small>
+          <strong>PetPal</strong>
+          <small>任务优先 · 直接办事</small>
         </span>
       </RouterLink>
 
-      <nav class="frontend-nav" aria-label="介绍页面导航">
+      <nav class="frontend-nav" aria-label="前台导航">
         <RouterLink
           v-for="item in navItems"
           :key="item.to"
@@ -35,7 +35,7 @@
 import { useRoute } from 'vue-router';
 
 defineProps<{
-  navItems: Array<{ label: string; to: string; eyebrow: string }>;
+  navItems: Array<{ label: string; to: string }>;
   adminTarget: string;
   adminLabel: string;
   userLabel: string;
@@ -47,61 +47,55 @@ const route = useRoute();
 <style scoped lang="scss">
 .frontend-header {
   position: sticky;
-  top: 12px;
+  top: 16px;
   z-index: 40;
-  backdrop-filter: blur(18px);
-  background: transparent;
-  border-bottom: 0;
 }
 
 .frontend-header__inner {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 20px;
-  width: min(1320px, calc(100vw - 32px));
+  gap: 18px;
+  width: min(1180px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 14px 18px;
-  border: 1px solid rgba(18, 53, 51, 0.1);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: 0 14px 26px rgba(12, 33, 31, 0.08);
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(44, 37, 29, 0.1);
 }
 
 .frontend-brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  color: #17384a;
+  gap: 14px;
+  color: #2b241f;
 }
 
 .frontend-brand__mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 16px;
-  background: linear-gradient(145deg, #0f766e 0%, #0b5d57 100%);
-  color: #f7fffd;
-  font-size: 15px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(44, 37, 29, 0.12);
+  color: #8f6c4f;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .frontend-brand__copy {
   display: grid;
-  gap: 2px;
+  gap: 1px;
 }
 
 .frontend-brand__copy strong {
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .frontend-brand__copy small {
-  color: #6d8683;
+  color: #7f7065;
   font-size: 11px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
@@ -116,11 +110,10 @@ const route = useRoute();
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 92px;
-  padding: 10px 14px;
-  border-radius: 16px;
-  color: #445963;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  min-height: 38px;
+  padding: 0 12px;
+  color: #685c53;
+  transition: color 0.18s ease;
 }
 
 .frontend-nav__item span {
@@ -130,9 +123,7 @@ const route = useRoute();
 
 .frontend-nav__item:hover,
 .frontend-nav__item.is-active {
-  background: rgba(15, 118, 110, 0.08);
-  color: #143634;
-  transform: translateY(-1px);
+  color: #2b241f;
 }
 
 .frontend-header__actions {
@@ -145,11 +136,10 @@ const route = useRoute();
 .frontend-user-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.66);
-  color: #445963;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(44, 37, 29, 0.1);
+  color: #6b625a;
   font-size: 12px;
   font-weight: 700;
 }
@@ -158,19 +148,19 @@ const route = useRoute();
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 42px;
-  padding: 0 18px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #0f766e 0%, #0b5d57 100%);
-  color: #f7fffd;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #fff8ef;
   font-size: 13px;
   font-weight: 700;
-  box-shadow: 0 14px 28px rgba(15, 118, 110, 0.18);
 }
 
 @media (max-width: 980px) {
   .frontend-header__inner {
     grid-template-columns: 1fr;
+    padding: 12px 0;
   }
 
   .frontend-nav {

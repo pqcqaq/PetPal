@@ -2,12 +2,13 @@
 import { reactive, ref } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
 import AppInput from '@/components/app-input/app-input.vue'
-import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
 import { LOGIN_PAGE } from '@/router/config'
 import { isPageTabbar } from '@/tabbar/store'
 import { useTokenStore } from '@/store/token'
 import { HOME_PAGE } from '@/utils'
 import { getErrorMessage } from '@/utils/error'
+import PetpalPage from '../petpal/rebuild/petpal-page.vue'
+import PetpalSection from '../petpal/rebuild/petpal-section.vue'
 
 definePage({
   style: {
@@ -93,9 +94,14 @@ function toLogin() {
 </script>
 
 <template>
-  <AppPageShell auth title="注册" description="创建账号后将直接登录当前设备。">
-    <view class="app-auth-sheet">
-      <view class="app-auth-form">
+  <PetpalPage
+    title="创建宠托帮账号"
+    subtitle="注册页只保留必要字段，完成后直接进入当前设备。"
+    eyebrow="Register"
+    back
+  >
+    <PetpalSection title="填写注册信息" subtitle="昵称、邮箱和密码都会在完成后同步到当前账号。">
+      <view class="app-auth-block">
         <AppInput v-model="form.username" label="用户名" clearable placeholder="请输入用户名" class="app-auth-input" />
         <AppInput v-model="form.nickname" label="昵称" clearable placeholder="请输入昵称" class="app-auth-input" />
         <AppInput v-model="form.email" label="邮箱" clearable placeholder="请输入邮箱" class="app-auth-input" />
@@ -108,16 +114,56 @@ function toLogin() {
           class="app-auth-input"
           @confirm="submit"
         />
+        <AppButton block size="large" :loading="submitting" @click="submit">
+          注册并进入
+        </AppButton>
       </view>
+    </PetpalSection>
 
-      <AppButton block size="large" :loading="submitting" class="app-auth-submit" @click="submit">
-        注册
-      </AppButton>
-
-      <view class="app-inline-action">
-        <text class="app-inline-action__label">已有账号？</text>
-        <text class="app-inline-action__link" @click="toLogin">去登录</text>
-      </view>
-    </view>
-  </AppPageShell>
+    <PetpalSection title="已有账号" subtitle="如果只是切换设备或回到原账号，直接登录即可。">
+      <button class="app-auth-link-row" hover-class="none" @click="toLogin">
+        <view class="app-auth-link-row__copy">
+          <text class="app-auth-link-row__title">去登录</text>
+          <text class="app-auth-link-row__meta">返回登录页继续当前任务。</text>
+        </view>
+        <text class="app-auth-link-row__value">进入</text>
+      </button>
+    </PetpalSection>
+  </PetpalPage>
 </template>
+
+<style scoped lang="scss">
+.app-auth-block {
+  display: grid;
+  gap: 20rpx;
+}
+
+.app-auth-link-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+}
+
+.app-auth-link-row__copy {
+  display: grid;
+  gap: 8rpx;
+}
+
+.app-auth-link-row__title {
+  font-size: 30rpx;
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.app-auth-link-row__meta,
+.app-auth-link-row__value {
+  font-size: 24rpx;
+  color: var(--app-text-secondary);
+}
+</style>

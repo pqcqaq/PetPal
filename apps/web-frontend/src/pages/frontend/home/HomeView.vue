@@ -1,27 +1,53 @@
 <template>
   <div class="frontend-page">
-    <HomeHero :admin-target="adminTarget" :admin-label="adminLabel" :signals="signals" />
-
-    <section class="frontend-card intro-card">
-      <span class="frontend-card__eyebrow">使用方式</span>
-      <h2>公开页看产品，主人台和后台直接办事。</h2>
-      <p>
-        公开前台只负责说明 PetPal 的业务结构和进入方式。主人服务台负责订单流，后台负责治理流，页面边界已经按真实产品拆开。
-      </p>
+    <section class="frontend-page__hero">
+      <p class="frontend-page__eyebrow">宠托帮 PetPal</p>
+      <h1>把主人、照料者和治理入口拆开，让用户直接去办事。</h1>
+      <p>首页不再承担产品宣讲，只保留进入主人服务台、照料者工作台和后台治理的最快路径。</p>
+      <div class="frontend-page__hero-actions">
+        <RouterLink class="frontend-page__button is-primary" to="/petpal">进入主人服务台</RouterLink>
+        <RouterLink class="frontend-page__button is-secondary" to="/petpal/caregiver">进入照料者工作台</RouterLink>
+        <RouterLink class="frontend-page__button is-secondary" :to="adminTarget">{{ adminLabel }}</RouterLink>
+      </div>
     </section>
 
-    <HomeCapabilityGrid :cards="cards" />
-    <HomeAdminPreview :highlights="highlights" />
+    <section class="frontend-page__section-grid">
+      <article v-for="item in signals" :key="item.label" class="frontend-card home-grid-span-4">
+        <span class="frontend-card__eyebrow">{{ item.label }}</span>
+        <h2>{{ item.value }}</h2>
+        <p>{{ item.note }}</p>
+      </article>
+    </section>
+
+    <section class="frontend-page__section-grid">
+      <article v-for="card in cards" :key="card.title" class="frontend-card home-grid-span-4">
+        <span class="frontend-card__eyebrow">{{ card.eyebrow }}</span>
+        <h2>{{ card.title }}</h2>
+        <p>{{ card.description }}</p>
+        <ul class="home-list">
+          <li v-for="item in card.bullets" :key="item">{{ item }}</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="frontend-card">
+      <span class="frontend-card__eyebrow">后台治理</span>
+      <h2>后台已经从前台说明页里抽离。</h2>
+      <div class="home-admin-strip">
+        <div v-for="item in highlights" :key="item.title" class="home-admin-strip__item">
+          <strong>{{ item.title }}</strong>
+          <p>{{ item.description }}</p>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { RouterLink } from 'vue-router';
 import { adminHighlights, capabilityCards, projectSignals } from '../frontend-content';
 import { useAuthStore } from '@/stores/auth';
-import HomeCapabilityGrid from './components/HomeCapabilityGrid.vue';
-import HomeAdminPreview from './components/HomeAdminPreview.vue';
-import HomeHero from './components/HomeHero.vue';
 
 const auth = useAuthStore();
 const signals = projectSignals.map((item) => ({ ...item }));
@@ -32,12 +58,41 @@ const adminLabel = computed(() => auth.isAuthenticated ? '进入 PetPal 后台' 
 </script>
 
 <style scoped lang="scss">
-.intro-card {
-  max-width: 820px;
+.home-grid-span-4 {
+  grid-column: span 4;
 }
 
-.intro-card h2 {
-  font-size: clamp(26px, 3vw, 38px);
-  line-height: 1.08;
+.home-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #62584f;
+  line-height: 1.8;
+}
+
+.home-admin-strip {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.home-admin-strip__item {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(44, 37, 29, 0.1);
+}
+
+.home-admin-strip__item strong {
+  color: #2b241f;
+}
+
+@media (max-width: 1080px) {
+  .home-grid-span-4 {
+    grid-column: span 12;
+  }
+
+  .home-admin-strip {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
