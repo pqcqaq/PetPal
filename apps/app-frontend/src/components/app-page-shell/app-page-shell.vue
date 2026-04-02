@@ -48,18 +48,17 @@ function handleBack() {
   <view :class="['app-page', auth ? 'app-page--auth' : '', isTabbarPage ? 'app-page--with-tabbar' : '']">
     <view :class="['app-page-shell', auth ? 'app-page-shell--auth' : '']">
       <view class="app-page-shell__nav">
-        <AppNavBar :title="title" :auth="auth" :show-back="shouldShowBack" @back="handleBack">
-          <template v-if="$slots.navRight" #right>
-            <slot name="navRight" />
-          </template>
-        </AppNavBar>
+        <view class="app-page-shell__nav-inner">
+          <AppNavBar :title="title" :auth="auth" :show-back="shouldShowBack" @back="handleBack">
+            <template v-if="$slots.navRight" #right>
+              <slot name="navRight" />
+            </template>
+          </AppNavBar>
 
-        <view v-if="description || $slots.extra" class="app-page-shell__head">
-          <view v-if="description" class="app-page-shell__desc">
-            {{ description }}
-          </view>
-          <view v-if="$slots.extra" class="app-page-shell__extra">
-            <slot name="extra" />
+          <view v-if="$slots.extra" class="app-page-shell__head">
+            <view class="app-page-shell__extra">
+              <slot name="extra" />
+            </view>
           </view>
         </view>
       </view>

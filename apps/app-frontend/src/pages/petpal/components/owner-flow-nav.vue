@@ -45,7 +45,7 @@ function openReminders() {
     <view class="owner-flow-nav__top">
       <view class="owner-flow-nav__headline">
         <AppTag type="primary">
-          当前任务
+          主人任务
         </AppTag>
         <text class="owner-flow-nav__title">{{ title }}</text>
       </view>
@@ -67,12 +67,14 @@ function openReminders() {
 <style scoped lang="scss">
 .owner-flow-nav {
   display: grid;
-  gap: 14rpx;
+  gap: 16rpx;
   margin: 0 24rpx 20rpx;
-  padding: 22rpx 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  padding: 24rpx;
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   border-radius: var(--app-shape-xl);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.14), transparent 36%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 240, 220, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
@@ -94,19 +96,20 @@ function openReminders() {
 
 .owner-flow-nav__title {
   color: var(--app-text);
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 30rpx;
-  line-height: 1.2;
+  line-height: 1.18;
   font-weight: 700;
 }
 
 .owner-flow-nav :deep(.app-choice-chip) {
-  background: var(--app-surface-soft);
-  border-color: var(--app-outline-variant);
+  background: rgba(255, 251, 246, 0.88);
+  border-color: rgba(239, 199, 159, 0.88);
 }
 
 .owner-flow-nav :deep(.app-choice-chip--active) {
-  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
-  border-color: transparent;
+  background: linear-gradient(135deg, var(--app-accent) 0%, #60a5fa 100%);
+  border-color: rgba(37, 99, 235, 0.16);
 }
 
 .owner-flow-nav__actions .app-button {

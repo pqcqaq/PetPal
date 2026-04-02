@@ -63,19 +63,20 @@ function handleSelect(value: string) {
 .app-choice-chips {
   display: flex;
   flex-wrap: wrap;
-  margin-left: -10rpx;
-  margin-bottom: -10rpx;
+  margin-left: -12rpx;
+  margin-bottom: -12rpx;
 }
 
 .app-choice-chip {
-  min-width: 140rpx;
-  margin-left: 10rpx;
-  margin-bottom: 10rpx;
+  min-width: 146rpx;
+  margin-left: 12rpx;
+  margin-bottom: 12rpx;
   padding: 20rpx 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
-  border-radius: 999rpx;
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
-  box-shadow: 0 6rpx 18rpx rgba(15, 23, 42, 0.04);
+  border: 1rpx solid rgba(239, 199, 159, 0.88);
+  border-radius: 24rpx;
+  background:
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 240, 220, 0.98) 100%);
+  box-shadow: 0 10rpx 22rpx rgba(159, 73, 14, 0.08);
   transition:
     border-color var(--app-motion-duration-medium) var(--app-motion-easing-standard),
     transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
@@ -85,13 +86,13 @@ function handleSelect(value: string) {
 
 .app-choice-chip--hover {
   transform: translateY(-2rpx);
-  box-shadow: var(--app-elevation-1);
+  box-shadow: 0 16rpx 28rpx rgba(159, 73, 14, 0.12);
 }
 
 .app-choice-chip--active {
-  border-color: transparent;
-  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
-  box-shadow: var(--app-elevation-1);
+  border-color: rgba(37, 99, 235, 0.12);
+  background: linear-gradient(135deg, var(--app-accent) 0%, #60a5fa 100%);
+  box-shadow: 0 18rpx 30rpx rgba(37, 99, 235, 0.2);
 }
 
 .app-choice-chip--disabled {
@@ -101,7 +102,7 @@ function handleSelect(value: string) {
 
 .app-choice-chip__label {
   font-size: 24rpx;
-  line-height: 1.2;
+  line-height: 1.24;
   font-weight: 700;
   color: var(--app-text);
 }
@@ -111,5 +112,10 @@ function handleSelect(value: string) {
   font-size: 20rpx;
   line-height: 1.5;
   color: var(--app-text-secondary);
+}
+
+.app-choice-chip--active .app-choice-chip__label,
+.app-choice-chip--active .app-choice-chip__description {
+  color: #eff6ff;
 }
 </style>

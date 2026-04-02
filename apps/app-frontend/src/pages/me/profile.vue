@@ -352,11 +352,11 @@ onPullDownRefresh(() => {
   gap: 16rpx;
   margin: 0 24rpx;
   padding: 26rpx 28rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   border-radius: 30rpx;
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 34%),
-    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
@@ -371,8 +371,9 @@ onPullDownRefresh(() => {
 .profile-form__title,
 .profile-row__title {
   color: var(--app-text);
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 30rpx;
-  line-height: 1.28;
+  line-height: 1.22;
   font-weight: 700;
 }
 
@@ -408,11 +409,11 @@ onPullDownRefresh(() => {
   gap: 10rpx;
   width: 220rpx;
   padding: 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   border-radius: 26rpx;
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 34%),
-    linear-gradient(180deg, var(--app-surface-container-high) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
   box-sizing: border-box;
 }
@@ -435,12 +436,12 @@ onPullDownRefresh(() => {
   display: grid;
   gap: 8rpx;
   border-radius: 24rpx;
-  background: var(--app-surface);
+  background: rgba(255, 251, 246, 0.92);
   overflow: hidden;
 }
 
 .profile-input-group :deep(.app-input) + :deep(.app-input) {
-  border-top: 1rpx solid var(--app-outline-variant);
+  border-top: 1rpx solid rgba(245, 220, 192, 0.88);
 }
 
 .profile-group {
@@ -457,13 +458,13 @@ onPullDownRefresh(() => {
 }
 
 .profile-row + .profile-row {
-  border-top: 1rpx solid var(--app-outline-variant);
+  border-top: 1rpx solid rgba(245, 220, 192, 0.88);
 }
 
 .profile-support {
   background:
-    radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 34%),
-    linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.16), transparent 34%),
+    linear-gradient(180deg, #fff0dd 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 @media (max-width: 680px) {

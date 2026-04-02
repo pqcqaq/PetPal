@@ -18,7 +18,7 @@ withDefaults(defineProps<{
         <view class="app-section__title">
           {{ title }}
         </view>
-        <view v-if="description" class="app-section__desc">
+        <view v-if="description" class="app-section__description">
           {{ description }}
         </view>
       </view>

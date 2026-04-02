@@ -157,29 +157,29 @@ function openNotifications() {
 .action-signal-card {
   display: grid;
   gap: 14rpx;
-  padding: 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  padding: 26rpx;
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   border-radius: var(--app-shape-xl);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 240, 220, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
 .action-signal-card--owner {
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.14), transparent 34%),
-    linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.18), transparent 36%),
+    linear-gradient(180deg, #eef5ff 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .action-signal-card--caregiver {
   background:
-    radial-gradient(circle at top right, rgba(181, 106, 0, 0.16), transparent 34%),
-    linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.2), transparent 36%),
+    linear-gradient(180deg, #fff1e1 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .action-signal-card--account {
   background:
-    radial-gradient(circle at top right, rgba(11, 122, 117, 0.14), transparent 34%),
-    linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(21, 128, 61, 0.14), transparent 34%),
+    linear-gradient(180deg, var(--app-success-soft) 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .action-signal-card__header,
@@ -205,8 +205,9 @@ function openNotifications() {
 
 .action-signal-card__title {
   color: var(--app-text);
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 30rpx;
-  line-height: 1.4;
+  line-height: 1.28;
   font-weight: 700;
 }
 
@@ -214,7 +215,7 @@ function openNotifications() {
 .action-signal-card__detail {
   color: var(--app-text-secondary);
   font-size: 22rpx;
-  line-height: 1.72;
+  line-height: 1.74;
 }
 
 .action-signal-card__empty,

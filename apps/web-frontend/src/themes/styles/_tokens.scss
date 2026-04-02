@@ -1,35 +1,35 @@
 :root {
-  font-family: 'Segoe UI Variable Text', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  color: #16212d;
-  background: #eef3f8;
+  font-family: 'Noto Sans SC', 'Segoe UI Variable Text', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: #133533;
+  background: #eef7f5;
   line-height: 1.5;
   font-weight: 400;
   text-rendering: optimizeLegibility;
   font-synthesis: none;
   color-scheme: light;
 
-  --app-bg: #eef2f6;
+  --app-bg: #eef7f5;
   --surface-0: #ffffff;
-  --surface-1: #f8fafc;
-  --surface-2: #eef3f8;
-  --surface-3: #d9e2ec;
-  --surface-4: #c6d2de;
-  --ink-1: #16212d;
-  --ink-2: #425464;
-  --ink-3: #748598;
-  --accent: #1f4f8d;
-  --accent-strong: #173c68;
+  --surface-1: #f7fbfa;
+  --surface-2: #edf4f2;
+  --surface-3: #d9e7e2;
+  --surface-4: #c1d4ce;
+  --ink-1: #133533;
+  --ink-2: #365957;
+  --ink-3: #6d8683;
+  --accent: #0f766e;
+  --accent-strong: #0b5d57;
   --accent-contrast: #ffffff;
-  --accent-soft: #e9f1fb;
-  --accent-rgb: 31, 79, 141;
-  --success: #1f7a53;
-  --warning: #a86908;
-  --danger: #b3484f;
-  --sidebar-bg: #0f1822;
-  --sidebar-bg-2: #15212d;
+  --accent-soft: #e3f5f2;
+  --accent-rgb: 15, 118, 110;
+  --success: #2f855a;
+  --warning: #b97118;
+  --danger: #c2413b;
+  --sidebar-bg: #102724;
+  --sidebar-bg-2: #173430;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ink: #eef3fb;
-  --sidebar-muted: #97abbe;
+  --sidebar-ink: #eefbf8;
+  --sidebar-muted: #9bb9b3;
   --shell-sidebar-bg: var(--sidebar-bg);
   --shell-sidebar-bg-2: var(--sidebar-bg-2);
   --shell-sidebar-panel-border: rgba(255, 255, 255, 0.06);
@@ -68,8 +68,8 @@
   --button-surface: color-mix(in srgb, var(--surface-0) 88%, var(--surface-1));
   --table-header-bg: color-mix(in srgb, var(--surface-2) 58%, white);
   --table-row-hover-bg: color-mix(in srgb, var(--accent) 6%, white);
-  --shadow-panel: 0 6px 16px rgba(12, 24, 36, 0.055);
-  --shadow-deep: 0 16px 30px rgba(8, 16, 27, 0.16);
+  --shadow-panel: 0 8px 18px rgba(12, 33, 31, 0.06);
+  --shadow-deep: 0 18px 32px rgba(12, 33, 31, 0.16);
   --header-height: 56px;
   --content-max-width: 1760px;
   --shell-padding-x: 12px;
@@ -236,8 +236,9 @@ body,
 body {
   color: var(--ink-1);
   background:
-    radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.08), transparent 22%),
-    linear-gradient(180deg, #f5f8fb 0%, #eef3f8 42%, #e7edf4 100%);
+    radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.1), transparent 22%),
+    radial-gradient(circle at top right, rgba(185, 113, 24, 0.07), transparent 20%),
+    linear-gradient(180deg, #f8fcfb 0%, #eef7f5 42%, #e5f0ed 100%);
   transition: background 0.42s ease, color 0.32s ease;
 }
 

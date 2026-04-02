@@ -340,7 +340,7 @@ onPullDownRefresh(() => {
   gap: 16rpx;
   margin: 0 24rpx;
   padding: 26rpx 28rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   border-radius: 30rpx;
   box-shadow: var(--app-elevation-1);
 }
@@ -348,7 +348,8 @@ onPullDownRefresh(() => {
 .notify-focus {
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.24), transparent 34%),
-    linear-gradient(145deg, #0f766e 0%, #155e75 44%, #1d4ed8 100%);
+    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.2), transparent 32%),
+    linear-gradient(145deg, #2563eb 0%, #60a5fa 44%, #f97316 100%);
 }
 
 .notify-focus__copy {
@@ -367,8 +368,9 @@ onPullDownRefresh(() => {
 .notify-focus__title,
 .notify-login__title {
   color: #eff6ff;
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 38rpx;
-  line-height: 1.18;
+  line-height: 1.14;
   font-weight: 700;
 }
 
@@ -395,18 +397,24 @@ onPullDownRefresh(() => {
   gap: 10rpx;
   width: 240rpx;
   padding: 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   border-radius: 26rpx;
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 34%),
-    linear-gradient(180deg, var(--app-surface-container-high) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
   box-sizing: border-box;
 }
 
 .notify-scope-card--active {
-  border-color: transparent;
-  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+  border-color: rgba(37, 99, 235, 0.14);
+  background: linear-gradient(135deg, var(--app-accent) 0%, #60a5fa 100%);
+}
+
+.notify-scope-card--active .notify-scope-card__label,
+.notify-scope-card--active .notify-scope-card__value,
+.notify-scope-card--active .notify-scope-card__hint {
+  color: #eff6ff;
 }
 
 .notify-scope-card__head,
@@ -427,7 +435,7 @@ onPullDownRefresh(() => {
 }
 
 .notify-scope-card__value {
-  color: var(--app-text);
+  color: var(--app-brand-strong);
   font-size: 40rpx;
   line-height: 1.08;
   font-weight: 700;
@@ -445,7 +453,7 @@ onPullDownRefresh(() => {
 .notify-list-block,
 .notify-login,
 .notify-card {
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
 }
 
 .notify-list,
@@ -467,7 +475,7 @@ onPullDownRefresh(() => {
   display: grid;
   gap: 14rpx;
   padding: 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   border-radius: 26rpx;
   box-shadow: var(--app-elevation-1);
 }
@@ -494,8 +502,8 @@ onPullDownRefresh(() => {
 
 .notify-login {
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 34%),
-    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 240, 220, 0.98) 100%);
 }
 
 .notify-login__title {

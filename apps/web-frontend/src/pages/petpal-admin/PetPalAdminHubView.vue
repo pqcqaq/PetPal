@@ -2,10 +2,7 @@
   <section class="petpal-admin-hub">
     <div class="petpal-admin-hub__hero">
       <p class="petpal-admin-hub__eyebrow">PetPal Admin</p>
-      <h1>宠托帮后台直达工作台</h1>
-      <p>
-        这套入口专门给 PetPal 后台使用，不再依赖菜单树组织路径。投诉、资质审核、回调审计和告警队列都可以直接进入。
-      </p>
+      <h1>后台总览</h1>
       <div class="petpal-admin-hub__signals">
         <article v-for="item in signalCards" :key="item.label">
           <span>{{ item.label }}</span>

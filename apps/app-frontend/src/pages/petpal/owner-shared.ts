@@ -21,6 +21,7 @@ export const PETPAL_WORKBENCH_PAGE = '/pages/petpal/workbench'
 export const PETPAL_GETTING_STARTED_PAGE = '/pages/petpal/getting-started'
 export const PETPAL_OWNER_HOME_PAGE = '/pages/petpal/owner-home'
 export const PETPAL_PETS_PAGE = '/pages/petpal/pets'
+export const PETPAL_PET_FORM_PAGE = '/pages/petpal/pet-form'
 export const PETPAL_REQUEST_PAGE = '/pages/petpal/request'
 export const PETPAL_REQUEST_DETAIL_PAGE = '/pages/petpal/request-detail'
 export const PETPAL_CHECKOUT_PAGE = '/pages/petpal/checkout'
@@ -37,6 +38,7 @@ export const PETPAL_ACCOUNT_SUPPORT_PAGE = '/pages/account/support'
 export const PETPAL_CAREGIVER_HOME_PAGE = '/pages/petpal/caregiver-home'
 export const PETPAL_CAREGIVER_PROFILE_PAGE = '/pages/petpal/caregiver-profile'
 export const PETPAL_CAREGIVER_SERVICES_PAGE = '/pages/petpal/caregiver-services'
+export const PETPAL_CAREGIVER_SERVICE_FORM_PAGE = '/pages/petpal/caregiver-service-form'
 export const PETPAL_CAREGIVER_ORDERS_PAGE = '/pages/petpal/caregiver-orders'
 export const PETPAL_CAREGIVER_EARNINGS_PAGE = '/pages/petpal/caregiver-earnings'
 export const PETPAL_MESSAGES_PAGE = '/pages/petpal/messages'
@@ -49,9 +51,25 @@ export const PETPAL_TABBAR_PAGES = [
   PETPAL_MESSAGES_PAGE,
   '/pages/me/me',
 ]
+const PETPAL_PAGE_CONTEXT_STORAGE_PREFIX = 'petpal:page-context'
 
 export type ConversationRole = 'owner' | 'caregiver'
 export type CaregiverOrderFilterValue = OrderStatus | 'ALL'
+export type OwnerOrderFilter = 'ALL' | 'ACTIVE' | 'COMPLETED' | 'AFTERSALES'
+export type AftersalesFilter = 'ALL' | 'HIGH' | 'REFUND' | 'COMPLAINT'
+
+export interface PetPalOrdersPageContext {
+  filter?: OwnerOrderFilter
+  focusOrderId?: string
+}
+
+export interface PetPalAftersalesPageContext {
+  filter?: AftersalesFilter
+  focusOrderId?: string
+}
+
+const ownerOrderFilters: OwnerOrderFilter[] = ['ALL', 'ACTIVE', 'COMPLETED', 'AFTERSALES']
+const aftersalesFilters: AftersalesFilter[] = ['ALL', 'HIGH', 'REFUND', 'COMPLAINT']
 
 export const serviceTypeLabels: Record<PetServiceType, string> = {
   BOARDING: '寄养',
@@ -209,6 +227,135 @@ export function openPetPalAction(mode: 'redirect' | 'navigate', url: string) {
     url,
     fail: () => openWithNavigate(),
   })
+}
+
+function normalizePageContextId(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function getPetPalPageContextStorageKey(page: 'orders' | 'aftersales') {
+  return `${PETPAL_PAGE_CONTEXT_STORAGE_PREFIX}:${page}`
+}
+
+export function isOwnerOrderFilter(value: string | null | undefined): value is OwnerOrderFilter {
+  return ownerOrderFilters.includes(value as OwnerOrderFilter)
+}
+
+export function isAftersalesFilter(value: string | null | undefined): value is AftersalesFilter {
+  return aftersalesFilters.includes(value as AftersalesFilter)
+}
+
+function stashPetPalPageContext(page: 'orders', context: PetPalOrdersPageContext): void
+function stashPetPalPageContext(page: 'aftersales', context: PetPalAftersalesPageContext): void
+function stashPetPalPageContext(
+  page: 'orders' | 'aftersales',
+  context: PetPalOrdersPageContext | PetPalAftersalesPageContext,
+) {
+  const hasFilter = typeof context.filter === 'string' && context.filter.length > 0
+  const focusOrderId = normalizePageContextId(context.focusOrderId)
+  const key = getPetPalPageContextStorageKey(page)
+
+  if (!hasFilter && !focusOrderId) {
+    uni.removeStorageSync(key)
+    return
+  }
+
+  uni.setStorageSync(key, {
+    ...(hasFilter ? { filter: context.filter } : {}),
+    ...(focusOrderId ? { focusOrderId } : {}),
+  })
+}
+
+export function consumePetPalOrdersPageContext(): PetPalOrdersPageContext | null {
+  const key = getPetPalPageContextStorageKey('orders')
+  const rawValue = uni.getStorageSync(key)
+  uni.removeStorageSync(key)
+
+  if (!rawValue || typeof rawValue !== 'object') {
+    return null
+  }
+
+  const record = rawValue as Record<string, unknown>
+  const filter = isOwnerOrderFilter(record.filter as string) ? record.filter as OwnerOrderFilter : undefined
+  const focusOrderId = normalizePageContextId(record.focusOrderId) || undefined
+
+  if (!filter && !focusOrderId) {
+    return null
+  }
+
+  return {
+    ...(filter ? { filter } : {}),
+    ...(focusOrderId ? { focusOrderId } : {}),
+  }
+}
+
+export function consumePetPalAftersalesPageContext(): PetPalAftersalesPageContext | null {
+  const key = getPetPalPageContextStorageKey('aftersales')
+  const rawValue = uni.getStorageSync(key)
+  uni.removeStorageSync(key)
+
+  if (!rawValue || typeof rawValue !== 'object') {
+    return null
+  }
+
+  const record = rawValue as Record<string, unknown>
+  const filter = isAftersalesFilter(record.filter as string) ? record.filter as AftersalesFilter : undefined
+  const focusOrderId = normalizePageContextId(record.focusOrderId) || undefined
+
+  if (!filter && !focusOrderId) {
+    return null
+  }
+
+  return {
+    ...(filter ? { filter } : {}),
+    ...(focusOrderId ? { focusOrderId } : {}),
+  }
+}
+
+export function openPetPalOrdersPage(params?: PetPalOrdersPageContext & { mode?: 'redirect' | 'navigate' }) {
+  const { mode = 'redirect', ...context } = params ?? {}
+  stashPetPalPageContext('orders', context)
+  openPetPalAction(mode, PETPAL_ORDERS_PAGE)
+}
+
+export function openPetPalAftersalesPage(params?: PetPalAftersalesPageContext & { mode?: 'redirect' | 'navigate' }) {
+  const { mode = 'redirect', ...context } = params ?? {}
+  stashPetPalPageContext('aftersales', context)
+  openPetPalAction(mode, PETPAL_AFTERSALES_PAGE)
+}
+
+export function openPetPalPetFormPage(options?: {
+  mode?: 'redirect' | 'navigate'
+  petId?: string
+  from?: string
+}) {
+  const mode = options?.mode || 'navigate'
+  const query = new URLSearchParams()
+  if (options?.petId) {
+    query.set('petId', options.petId)
+  }
+  if (options?.from) {
+    query.set('from', options.from)
+  }
+  const suffix = query.toString()
+  openPetPalAction(mode, `${PETPAL_PET_FORM_PAGE}${suffix ? `?${suffix}` : ''}`)
+}
+
+export function openPetPalCaregiverServiceFormPage(options?: {
+  mode?: 'redirect' | 'navigate'
+  serviceId?: string
+  from?: string
+}) {
+  const mode = options?.mode || 'navigate'
+  const query = new URLSearchParams()
+  if (options?.serviceId) {
+    query.set('serviceId', options.serviceId)
+  }
+  if (options?.from) {
+    query.set('from', options.from)
+  }
+  const suffix = query.toString()
+  openPetPalAction(mode, `${PETPAL_CAREGIVER_SERVICE_FORM_PAGE}${suffix ? `?${suffix}` : ''}`)
 }
 
 export function formatPercent(value: number | null | undefined) {
@@ -433,6 +580,18 @@ export function isOrderAftersalesTracked(
     || (order.refunds?.length ?? 0) > 0
     || Number(order.amountRefunded ?? 0) > 0
   )
+}
+
+export function getOwnerOrderFilterForOrder(
+  order: Pick<OrderRecord, 'orderStatus' | 'refunds' | 'amountRefunded'>,
+): OwnerOrderFilter {
+  if (isOrderAftersalesTracked(order)) {
+    return 'AFTERSALES'
+  }
+  if (order.orderStatus === 'COMPLETED') {
+    return 'COMPLETED'
+  }
+  return 'ACTIVE'
 }
 
 export function buildOwnerMatchQuery(params: {

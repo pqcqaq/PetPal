@@ -35,7 +35,7 @@ import {
   getOrderStatusLabel,
   getRefundProgressStageHint,
   getRefundProgressStageLabel,
-  PETPAL_AFTERSALES_PAGE,
+  openPetPalAftersalesPage,
   PETPAL_ORDER_COMPLAINT_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
@@ -369,7 +369,15 @@ function openOrderDetail(tab: 'overview' | 'chat' | 'service' | 'aftersales' = '
 }
 
 function openAftersales() {
-  uni.redirectTo({ url: PETPAL_AFTERSALES_PAGE })
+  if (order.value) {
+    openPetPalAftersalesPage({
+      filter: activeComplaint.value ? 'COMPLAINT' : hasRefundActivity.value ? 'REFUND' : 'ALL',
+      focusOrderId: order.value.id,
+    })
+    return
+  }
+
+  openPetPalAftersalesPage()
 }
 
 function openComplaintPage() {
@@ -427,7 +435,7 @@ function openSecondaryAction() {
   }
 
   if (refundStage.value === 'PENDING_REVIEW' || refundStage.value === 'APPROVED_WAITING' || refundStage.value === 'PARTIAL_SUCCESS') {
-    openOrderDetail('aftersales')
+    openAftersales()
     return
   }
 
@@ -720,7 +728,7 @@ onPullDownRefresh(() => {
 
 .refund-group {
   overflow: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
 .refund-group__head,

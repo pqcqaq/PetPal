@@ -31,9 +31,11 @@ import { useTokenStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
 import OwnerFlowNav from './components/owner-flow-nav.vue'
 import {
+  consumePetPalAftersalesPageContext,
   formatAmount,
   formatDateTime,
   formatRange,
+  type AftersalesFilter,
   getComplaintStatusLabel,
   getComplaintTypeLabel,
   getConversationUnreadCount,
@@ -63,7 +65,6 @@ definePage({
 })
 
 type AftersalesPriority = 'HIGH' | 'MEDIUM' | 'LOW'
-type AftersalesFilter = 'ALL' | 'HIGH' | 'REFUND' | 'COMPLAINT'
 type ViewTone = 'default' | 'primary' | 'success' | 'warning' | 'danger'
 
 interface AftersalesOrderEntry {
@@ -105,6 +106,7 @@ const loading = ref(false)
 const entries = ref<AftersalesOrderEntry[]>([])
 const activeFilter = ref<AftersalesFilter>('HIGH')
 const expandedOrderId = ref('')
+const preferredOrderId = ref('')
 
 const filterOptions = [
   { label: '优先', value: 'HIGH', description: '先看需要马上跟进的订单' },
@@ -124,6 +126,11 @@ const orderCards = computed<AftersalesOrderView[]>(() => entries.value
     }
   })
   .sort((left, right) => {
+    const leftIsPreferred = left.order.id === preferredOrderId.value
+    const rightIsPreferred = right.order.id === preferredOrderId.value
+    if (leftIsPreferred !== rightIsPreferred) {
+      return leftIsPreferred ? -1 : 1
+    }
     const priorityGap = getPriorityWeight(right.priority) - getPriorityWeight(left.priority)
     if (priorityGap !== 0) {
       return priorityGap
@@ -563,6 +570,19 @@ function openPrimaryAction(entry: AftersalesOrderView) {
   openOrderDetail(entry.order.id, 'aftersales')
 }
 
+function applyPendingNavigationContext() {
+  const context = consumePetPalAftersalesPageContext()
+  if (!context) {
+    return
+  }
+
+  if (context.filter) {
+    activeFilter.value = context.filter
+  }
+
+  preferredOrderId.value = context.focusOrderId || ''
+}
+
 function openOrders() {
   openPetPalAction('redirect', PETPAL_ORDERS_PAGE)
 }
@@ -620,10 +640,15 @@ async function loadPage(showError = false) {
 }
 
 onShow(() => {
+  applyPendingNavigationContext()
   if (!tokenStore.hasLogin) {
     return
   }
   void loadPage(false)
+})
+
+onHide(() => {
+  preferredOrderId.value = ''
 })
 
 onPullDownRefresh(() => {

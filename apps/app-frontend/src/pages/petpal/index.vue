@@ -211,8 +211,8 @@ onShow(() => {
 <style scoped lang="scss">
 .hub-page {
   display: grid;
-  gap: 18rpx;
-  padding-bottom: 36rpx;
+  gap: 20rpx;
+  padding-bottom: 40rpx;
 }
 
 .hub-focus,
@@ -223,25 +223,26 @@ onShow(() => {
   display: grid;
   gap: 14rpx;
   margin: 0 24rpx;
-  padding: 26rpx 28rpx;
+  padding: 28rpx;
   border-radius: var(--app-shape-xl);
-  border: 1rpx solid var(--app-outline-variant);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 32%),
-    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 240, 220, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
 .hub-focus {
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.16), transparent 34%),
-    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.22), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.18), transparent 32%),
+    linear-gradient(160deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 236, 212, 0.98) 100%);
 }
 
 .hub-focus__copy,
 .hub-launchpad__copy {
   display: grid;
-  gap: 8rpx;
+  gap: 10rpx;
 }
 
 .hub-role-grid,
@@ -252,9 +253,19 @@ onShow(() => {
   padding: 0 24rpx;
 }
 
+.hub-role-card,
+.hub-action-card {
+  transition:
+    transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
+    box-shadow var(--app-motion-duration-medium) var(--app-motion-easing-standard),
+    border-color var(--app-motion-duration-medium) var(--app-motion-easing-standard);
+}
+
 .hub-role-card--active {
-  border-color: transparent;
-  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+  border-color: rgba(37, 99, 235, 0.14);
+  background: linear-gradient(135deg, var(--app-accent) 0%, #60a5fa 100%);
+  box-shadow: 0 22rpx 40rpx rgba(37, 99, 235, 0.22);
+  transform: translateY(-2rpx);
 }
 
 .hub-focus__eyebrow {
@@ -268,8 +279,9 @@ onShow(() => {
 .hub-role-card__title,
 .hub-action-card__title {
   color: var(--app-text);
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 36rpx;
-  line-height: 1.2;
+  line-height: 1.14;
   font-weight: 700;
 }
 
@@ -286,11 +298,11 @@ onShow(() => {
 .hub-action-card__hint {
   color: var(--app-text-secondary);
   font-size: 24rpx;
-  line-height: 1.6;
+  line-height: 1.66;
 }
 
 .hub-action-card__value {
-  color: var(--app-text);
+  color: var(--app-brand-strong);
   font-size: 40rpx;
   line-height: 1.05;
   font-weight: 700;
@@ -303,6 +315,12 @@ onShow(() => {
   font-weight: 700;
 }
 
+.hub-role-card--active .hub-role-card__title,
+.hub-role-card--active .hub-role-card__meta,
+.hub-role-card--active .hub-role-card__action {
+  color: #eff6ff;
+}
+
 .hub-focus__tags,
 .hub-launchpad__actions {
   display: flex;
@@ -312,8 +330,14 @@ onShow(() => {
 
 .hub-launchpad {
   background:
-    radial-gradient(circle at top right, rgba(11, 122, 117, 0.12), transparent 34%),
-    linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.22), transparent 34%),
+    linear-gradient(160deg, #fff0dd 0%, rgba(255, 251, 246, 0.98) 100%);
+}
+
+.hub-action-card {
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 30%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 245, 231, 0.98) 100%);
 }
 
 @media (max-width: 680px) {

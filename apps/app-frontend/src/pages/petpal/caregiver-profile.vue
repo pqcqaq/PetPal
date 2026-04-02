@@ -326,8 +326,9 @@ onPullDownRefresh(() => {
 .caregiver-profile-materials {
   padding: 20rpx 24rpx;
   border-radius: 24rpx;
-  border: 1rpx solid var(--app-border);
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
 }
 
 .caregiver-profile-materials__header,

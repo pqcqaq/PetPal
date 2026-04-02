@@ -3,10 +3,8 @@
     <div class="frontend-footer__inner">
       <section class="frontend-footer__intro">
         <p class="frontend-footer__eyebrow">PetPal</p>
-        <h2>主人办事直接，后台治理也直接。</h2>
-        <p>
-          公开页负责产品说明和入口，主人服务台负责真实订单流，PetPal 后台负责投诉、审核和回调治理。
-        </p>
+        <strong>宠托帮</strong>
+        <small>主人 · 照料者 · 后台治理</small>
       </section>
 
       <section class="frontend-footer__links">
@@ -35,25 +33,26 @@ defineProps<{
 
 <style scoped lang="scss">
 .frontend-footer {
-  margin-top: 48px;
-  border-top: 1px solid rgba(39, 61, 77, 0.1);
-  background:
-    radial-gradient(circle at bottom right, rgba(43, 91, 112, 0.12), transparent 26%),
-    linear-gradient(180deg, rgba(255, 249, 242, 0.54) 0%, rgba(239, 233, 224, 0.86) 100%);
+  margin-top: 32px;
+  background: transparent;
 }
 
 .frontend-footer__inner {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
-  gap: 28px;
-  width: min(1180px, calc(100vw - 32px));
+  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1fr);
+  gap: 18px;
+  width: min(1320px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 40px 0 56px;
+  padding: 0 0 40px;
 }
 
 .frontend-footer__intro {
   display: grid;
-  gap: 12px;
+  gap: 8px;
+  padding: 20px 22px;
+  border: 1px solid rgba(18, 53, 51, 0.08);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .frontend-footer__eyebrow {
@@ -65,18 +64,14 @@ defineProps<{
   text-transform: uppercase;
 }
 
-.frontend-footer__intro h2 {
-  max-width: 680px;
-  color: #17384a;
-  font-size: clamp(24px, 3vw, 34px);
-  line-height: 1.1;
+.frontend-footer__intro strong {
+  color: #143634;
+  font-size: 20px;
 }
 
-.frontend-footer__intro p:last-child {
-  max-width: 680px;
-  margin: 0;
-  color: #51656f;
-  line-height: 1.8;
+.frontend-footer__intro small {
+  color: #5f7673;
+  line-height: 1.7;
 }
 
 .frontend-footer__links {
@@ -87,10 +82,10 @@ defineProps<{
 .frontend-footer__links div {
   display: grid;
   gap: 10px;
-  padding: 18px 20px;
-  border: 1px solid rgba(39, 61, 77, 0.08);
+  padding: 20px 22px;
+  border: 1px solid rgba(18, 53, 51, 0.08);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .frontend-footer__links span {

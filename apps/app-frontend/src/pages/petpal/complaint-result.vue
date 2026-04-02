@@ -28,7 +28,7 @@ import {
   getComplaintTypeLabel,
   getConversationUnreadCount,
   getOrderStatusLabel,
-  PETPAL_AFTERSALES_PAGE,
+  openPetPalAftersalesPage,
   PETPAL_ORDER_COMPLAINT_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
@@ -288,7 +288,15 @@ function openOrderDetail(tab: 'overview' | 'chat' | 'service' | 'aftersales' = '
 }
 
 function openAftersales() {
-  uni.redirectTo({ url: PETPAL_AFTERSALES_PAGE })
+  if (order.value) {
+    openPetPalAftersalesPage({
+      filter: hasComplaints.value ? 'COMPLAINT' : Number(order.value.amountRefunded) > 0 ? 'REFUND' : 'ALL',
+      focusOrderId: order.value.id,
+    })
+    return
+  }
+
+  openPetPalAftersalesPage()
 }
 
 function openReviewPage() {
@@ -306,7 +314,7 @@ function openPrimaryAction() {
   }
 
   if (targetComplaint.value.status === 'OPEN' || targetComplaint.value.status === 'PROCESSING') {
-    openOrderDetail('aftersales')
+    openAftersales()
     return
   }
 
@@ -335,7 +343,7 @@ function openSecondaryAction() {
   }
 
   if (targetComplaint.value.status === 'OPEN' || targetComplaint.value.status === 'PROCESSING') {
-    openOrderDetail('aftersales')
+    openAftersales()
     return
   }
 
@@ -679,7 +687,7 @@ onPullDownRefresh(() => {
 
 .complaint-group {
   overflow: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
 .complaint-group__head,

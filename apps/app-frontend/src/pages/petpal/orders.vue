@@ -24,14 +24,15 @@ import { LOGIN_PAGE } from '@/router/config'
 import { useTokenStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
 import {
+  consumePetPalOrdersPageContext,
   formatAmount,
-  formatDateTime,
   formatRange,
   getConversationHint,
   getConversationUnreadCount,
   getOrderStatusLabel,
   getOrderTone,
   getRefundProgressStageLabel,
+  type OwnerOrderFilter,
   isOrderAftersalesTracked,
   openPetPalAction,
   PETPAL_AFTERSALES_PAGE,
@@ -53,7 +54,6 @@ definePage({
   },
 })
 
-type OwnerOrderFilter = 'ALL' | 'ACTIVE' | 'COMPLETED' | 'AFTERSALES'
 type ViewTone = 'default' | 'primary' | 'success' | 'warning' | 'danger'
 type ButtonTone = 'primary' | 'info' | 'default' | 'danger'
 
@@ -83,6 +83,7 @@ const loading = ref(false)
 const orders = ref<OrderRecord[]>([])
 const activeFilter = ref<OwnerOrderFilter>('ACTIVE')
 const expandedOrderId = ref('')
+const preferredOrderId = ref('')
 
 const orderFilterOptions = [
   { label: '进行中', value: 'ACTIVE', description: '待支付、待接单和服务中的订单' },
@@ -126,6 +127,11 @@ const orderQueue = computed<OrderQueueView[]>(() => filteredOrders.value
     unreadCount: getConversationUnreadCount(order.conversation, 'owner'),
   }))
   .sort((left, right) => {
+    const leftIsPreferred = left.order.id === preferredOrderId.value
+    const rightIsPreferred = right.order.id === preferredOrderId.value
+    if (leftIsPreferred !== rightIsPreferred) {
+      return leftIsPreferred ? -1 : 1
+    }
     if (right.priority !== left.priority) {
       return right.priority - left.priority
     }
@@ -293,6 +299,19 @@ function getPrimaryAction(order: OrderRecord) {
   }
 }
 
+function applyPendingNavigationContext() {
+  const context = consumePetPalOrdersPageContext()
+  if (!context) {
+    return
+  }
+
+  if (context.filter) {
+    activeFilter.value = context.filter
+  }
+
+  preferredOrderId.value = context.focusOrderId || ''
+}
+
 function getOrderPriorityHint(order: OrderRecord) {
   const outstandingAmount = getOutstandingAmount(order)
   if (outstandingAmount > 0) {
@@ -405,10 +424,15 @@ async function loadPage(showError = false) {
 }
 
 onShow(() => {
+  applyPendingNavigationContext()
   if (!tokenStore.hasLogin) {
     return
   }
   void loadPage(false)
+})
+
+onHide(() => {
+  preferredOrderId.value = ''
 })
 
 onPullDownRefresh(() => {
@@ -621,15 +645,16 @@ onPullDownRefresh(() => {
   gap: 16rpx;
   padding: 24rpx;
   border-radius: var(--app-shape-xl);
-  border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
 .order-focus {
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.16), transparent 34%),
-    linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.18), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.14), transparent 30%),
+    linear-gradient(180deg, #eef5ff 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .order-focus__copy,
@@ -655,8 +680,9 @@ onPullDownRefresh(() => {
 .order-focus__title,
 .order-item__title {
   color: var(--app-text);
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 32rpx;
-  line-height: 1.25;
+  line-height: 1.18;
   font-weight: 700;
 }
 
@@ -689,32 +715,32 @@ onPullDownRefresh(() => {
   gap: 10rpx;
   padding: 20rpx;
   border-radius: var(--app-shape-lg);
-  border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
 }
 
 .order-focus__panel--primary,
 .order-pill--primary {
-  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+  background: linear-gradient(180deg, #eef5ff 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .order-focus__panel--success,
 .order-pill--success {
-  background: linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
+  background: linear-gradient(180deg, var(--app-success-soft) 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .order-focus__panel--warning,
 .order-pill--warning {
-  background: linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
+  background: linear-gradient(180deg, #fff0dd 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .order-focus__panel--danger,
 .order-pill--danger {
-  background: linear-gradient(180deg, var(--app-danger-soft) 0%, var(--app-surface) 100%);
+  background: linear-gradient(180deg, rgba(255, 236, 234, 0.96) 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .order-focus__panel-value {
-  color: var(--app-text);
+  color: var(--app-brand-strong);
   font-size: 30rpx;
   line-height: 1.3;
   font-weight: 700;
@@ -734,7 +760,7 @@ onPullDownRefresh(() => {
 
 .order-item--expanded {
   box-shadow: var(--app-elevation-2);
-  border-color: rgba(53, 89, 224, 0.18);
+  border-color: rgba(37, 99, 235, 0.18);
 }
 
 .order-item__overview {
@@ -761,8 +787,8 @@ onPullDownRefresh(() => {
   min-height: 68rpx;
   padding: 12rpx 22rpx;
   border-radius: 999rpx;
-  border: 1rpx solid var(--app-outline-variant);
-  background: var(--app-surface);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
+  background: rgba(255, 251, 246, 0.92);
 }
 
 .order-pill--default {

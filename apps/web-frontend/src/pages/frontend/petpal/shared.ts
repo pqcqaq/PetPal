@@ -11,6 +11,25 @@ import type {
   ServiceRequestStatus,
 } from '@rbac/api-common';
 
+export const petPalOwnerWorkspaceNav = [
+  { label: '总览', name: 'frontend-petpal' },
+  { label: '宠物档案', name: 'frontend-petpal-pets' },
+  { label: '需求队列', name: 'frontend-petpal-requests' },
+  { label: '订单队列', name: 'frontend-petpal-orders' },
+  { label: '提醒', name: 'frontend-petpal-reminders' },
+  { label: '消息', name: 'frontend-petpal-messages' },
+  { label: '售后', name: 'frontend-petpal-aftersales' },
+] as const;
+
+export const petPalCaregiverWorkspaceNav = [
+  { label: '总览', name: 'frontend-petpal-caregiver' },
+  { label: '入驻资料', name: 'frontend-petpal-caregiver-profile' },
+  { label: '服务管理', name: 'frontend-petpal-caregiver-services' },
+  { label: '履约订单', name: 'frontend-petpal-caregiver-orders' },
+  { label: '提醒', name: 'frontend-petpal-reminders' },
+  { label: '消息', name: 'frontend-petpal-messages' },
+] as const;
+
 export const getPetPalOrderStatusLabel = (status: OrderStatus) => ({
   PENDING_ACCEPT: '待接单',
   ACCEPTED: '已接单',
@@ -150,3 +169,37 @@ export const getPetPalComplaintStatusType = (
   };
   return map[status];
 };
+
+export const formatPetPalAmount = (value: number | string | null | undefined) => {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) ? amount.toFixed(2) : '0.00';
+};
+
+export const formatPetPalDate = (value: string | null | undefined) => {
+  if (!value) {
+    return '--';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '--';
+  }
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+};
+
+export const formatPetPalTime = (value: string | null | undefined) => {
+  if (!value) {
+    return '--';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '--';
+  }
+  return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
+export const formatPetPalRange = (start: string | null | undefined, end: string | null | undefined) =>
+  `${formatPetPalTime(start)} - ${formatPetPalTime(end)}`;

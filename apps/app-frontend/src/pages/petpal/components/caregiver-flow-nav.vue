@@ -45,7 +45,7 @@ function openReminders() {
     <view class="caregiver-flow-nav__top">
       <view class="caregiver-flow-nav__headline">
         <AppTag type="warning">
-          照料者
+          照料者任务
         </AppTag>
         <text class="caregiver-flow-nav__title">{{ title }}</text>
       </view>
@@ -67,12 +67,14 @@ function openReminders() {
 <style scoped lang="scss">
 .caregiver-flow-nav {
   display: grid;
-  gap: 14rpx;
+  gap: 16rpx;
   margin: 0 24rpx 20rpx;
-  padding: 22rpx 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  padding: 24rpx;
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   border-radius: var(--app-shape-xl);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  background:
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 240, 220, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
@@ -94,19 +96,20 @@ function openReminders() {
 
 .caregiver-flow-nav__title {
   color: var(--app-text);
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 30rpx;
-  line-height: 1.2;
+  line-height: 1.18;
   font-weight: 700;
 }
 
 .caregiver-flow-nav :deep(.app-choice-chip) {
-  background: var(--app-surface-soft);
-  border-color: var(--app-outline-variant);
+  background: rgba(255, 251, 246, 0.88);
+  border-color: rgba(239, 199, 159, 0.88);
 }
 
 .caregiver-flow-nav :deep(.app-choice-chip--active) {
-  background: linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
-  border-color: transparent;
+  background: linear-gradient(135deg, var(--app-brand) 0%, #fb923c 100%);
+  border-color: rgba(249, 115, 22, 0.16);
 }
 
 .caregiver-flow-nav__actions .app-button {

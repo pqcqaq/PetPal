@@ -2,9 +2,9 @@
   "globalStyle": {
     "navigationStyle": "custom",
     "navigationBarTitleText": "宠托帮 PetPal",
-    "navigationBarBackgroundColor": "#f7f7f8",
+    "navigationBarBackgroundColor": "#fff7ed",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f5f6f7"
+    "backgroundColor": "#fff7ed"
   },
   "easycom": {
     "autoscan": true,
@@ -151,6 +151,14 @@
       }
     },
     {
+      "path": "pages/petpal/caregiver-service-form",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "服务表单",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/petpal/caregiver-services",
       "type": "page",
       "style": {
@@ -211,6 +219,14 @@
       "type": "page",
       "style": {
         "navigationBarTitleText": "支付结果",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/petpal/pet-form",
+      "type": "page",
+      "style": {
+        "navigationBarTitleText": "宠物表单",
         "enablePullDownRefresh": true
       }
     },
@@ -280,11 +296,11 @@
   "subPackages": [],
   "tabBar": {
     "custom": false,
-    "color": "#8b8f97",
-    "selectedColor": "#111827",
-    "backgroundColor": "#FFFFFF",
+    "color": "#9a3412",
+    "selectedColor": "#2563EB",
+    "backgroundColor": "#FFF8EF",
     "borderStyle": "black",
-    "height": "50px",
+    "height": "54px",
     "fontSize": "10px",
     "iconWidth": "24px",
     "spacing": "3px",

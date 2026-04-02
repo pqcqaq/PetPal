@@ -2258,12 +2258,14 @@ onLoad((options: Record<string, string | undefined>) => {
   display: grid;
   gap: 10px;
   margin-bottom: 12px;
-  padding: 16px;
-  border-radius: 16px;
+  padding: 18px;
+  border-radius: 24px;
   background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 34%),
-    linear-gradient(145deg, #115e59 0%, #155e75 52%, #1d4f91 100%);
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.24), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.22), transparent 30%),
+    linear-gradient(145deg, #2563eb 0%, #60a5fa 46%, #f97316 100%);
   color: #f8fafc;
+  box-shadow: 0 20px 38px rgba(37, 99, 235, 0.18);
 }
 
 .petpal-order-overview-banner__tags {
@@ -2278,8 +2280,8 @@ onLoad((options: Record<string, string | undefined>) => {
 }
 
 .petpal-order-overview-banner__title {
-  font-size: 18px;
-  line-height: 1.2;
+  font-size: 20px;
+  line-height: 1.12;
   font-weight: 700;
 }
 
@@ -2308,17 +2310,18 @@ onLoad((options: Record<string, string | undefined>) => {
   display: grid;
   gap: 6px;
   width: 148px;
-  padding: 14px;
-  border-radius: 16px;
-  border: 1px solid #e5ebf3;
-  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid #f5dcc0;
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
+  box-shadow: 0 12px 24px rgba(159, 73, 14, 0.08);
   box-sizing: border-box;
 }
 
 .petpal-detail-tab-card--active {
-  border-color: transparent;
-  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  border-color: rgba(37, 99, 235, 0.14);
+  background: linear-gradient(135deg, #2563eb 0%, #60a5fa 100%);
+  box-shadow: 0 16px 28px rgba(37, 99, 235, 0.18);
 }
 
 .petpal-detail-tab-card__label {
@@ -2338,6 +2341,12 @@ onLoad((options: Record<string, string | undefined>) => {
   color: #6b7280;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.petpal-detail-tab-card--active .petpal-detail-tab-card__label,
+.petpal-detail-tab-card--active .petpal-detail-tab-card__metric,
+.petpal-detail-tab-card--active .petpal-detail-tab-card__hint {
+  color: #eff6ff;
 }
 
 .petpal-order-overview-banner__stats {
@@ -2373,12 +2382,12 @@ onLoad((options: Record<string, string | undefined>) => {
 .petpal-overview-focus {
   display: grid;
   gap: 12px;
-  padding: 16px;
-  border-radius: 16px;
-  border: 1px solid #dbeafe;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid #f5dcc0;
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.12), transparent 34%),
-    linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.16), transparent 34%),
+    linear-gradient(180deg, #fff0dd 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .petpal-overview-focus__copy {
@@ -2421,10 +2430,10 @@ onLoad((options: Record<string, string | undefined>) => {
   display: grid;
   gap: 8px;
   padding: 14px;
-  border-radius: 16px;
-  border: 1px solid #e5ebf3;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  border-radius: 18px;
+  border: 1px solid #f5dcc0;
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
+  box-shadow: 0 10px 22px rgba(159, 73, 14, 0.08);
 }
 
 .petpal-quick-card__title {
@@ -2450,9 +2459,9 @@ onLoad((options: Record<string, string | undefined>) => {
   display: grid;
   gap: 8px;
   padding: 14px;
-  border-radius: 16px;
-  border: 1px solid #e5ebf3;
-  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+  border-radius: 18px;
+  border: 1px solid #f5dcc0;
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   transition: transform 160ms ease, box-shadow 200ms ease, border-color 200ms ease;
 }
 
@@ -2466,22 +2475,22 @@ onLoad((options: Record<string, string | undefined>) => {
 
 .petpal-signal-card--primary {
   border-color: #dbeafe;
-  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  background: linear-gradient(180deg, #eef5ff 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .petpal-signal-card--success {
   border-color: #cce9d5;
-  background: linear-gradient(180deg, #edf9f0 0%, #ffffff 100%);
+  background: linear-gradient(180deg, #edf9f0 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .petpal-signal-card--warning {
   border-color: #fde7b3;
-  background: linear-gradient(180deg, #fff9e8 0%, #ffffff 100%);
+  background: linear-gradient(180deg, #fff0dd 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .petpal-signal-card--danger {
   border-color: #ffd0d2;
-  background: linear-gradient(180deg, #fff1f2 0%, #ffffff 100%);
+  background: linear-gradient(180deg, #fff1f2 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .petpal-signal-card__title {
@@ -2514,8 +2523,8 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 10px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid #e5ebf3;
-  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+  border: 1px solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
 .petpal-action-panel__header {
@@ -2544,29 +2553,29 @@ onLoad((options: Record<string, string | undefined>) => {
 .petpal-tab-hero {
   display: grid;
   gap: 14px;
-  padding: 16px;
-  border-radius: 20px;
-  border: 1px solid #dbe3ef;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid #f5dcc0;
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
+  box-shadow: 0 16px 30px rgba(159, 73, 14, 0.1);
 }
 
 .petpal-tab-hero--chat {
   background:
-    radial-gradient(circle at top right, rgba(34, 197, 94, 0.14), transparent 34%),
-    linear-gradient(180deg, #f2fbf6 0%, #ffffff 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.18), transparent 34%),
+    linear-gradient(180deg, #eef5ff 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .petpal-tab-hero--service {
   background:
-    radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 34%),
-    linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.18), transparent 34%),
+    linear-gradient(180deg, #eef5ff 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .petpal-tab-hero--aftersales {
   background:
-    radial-gradient(circle at top right, rgba(249, 115, 22, 0.14), transparent 34%),
-    linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.2), transparent 34%),
+    linear-gradient(180deg, #fff0dd 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .petpal-tab-hero__copy {
@@ -2610,28 +2619,28 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 6px;
   padding: 14px;
   border-radius: 16px;
-  border: 1px solid #e5ebf3;
-  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+  border: 1px solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
 .petpal-tab-summary-card--primary {
-  border-color: #dbeafe;
-  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  border-color: var(--app-accent-soft);
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
 }
 
 .petpal-tab-summary-card--success {
-  border-color: #cce9d5;
-  background: linear-gradient(180deg, #edf9f0 0%, #ffffff 100%);
+  border-color: var(--app-success-soft);
+  background: linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
 }
 
 .petpal-tab-summary-card--warning {
-  border-color: #fde7b3;
-  background: linear-gradient(180deg, #fff8e7 0%, #ffffff 100%);
+  border-color: var(--app-warning-soft);
+  background: linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
 }
 
 .petpal-tab-summary-card--danger {
-  border-color: #fecdd3;
-  background: linear-gradient(180deg, #fff1f2 0%, #ffffff 100%);
+  border-color: var(--app-danger-soft);
+  background: linear-gradient(180deg, var(--app-danger-soft) 0%, var(--app-surface) 100%);
 }
 
 .petpal-tab-summary-card__label {
@@ -2663,12 +2672,12 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 10px;
   padding: 14px;
   border-radius: 16px;
-  border: 1px solid #e5ebf3;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  border: 1px solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
 .petpal-feed-card--service {
-  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
 }
 
 .petpal-feed-card__header {
@@ -2717,18 +2726,18 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 12px;
   padding: 14px;
   border-radius: 18px;
-  border: 1px solid #e5ebf3;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  border: 1px solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
 .petpal-case-card--refund {
-  border-color: #dbeafe;
-  background: linear-gradient(180deg, #f6faff 0%, #ffffff 100%);
+  border-color: var(--app-accent-soft);
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
 }
 
 .petpal-case-card--complaint {
-  border-color: #ffd6dc;
-  background: linear-gradient(180deg, #fff6f7 0%, #ffffff 100%);
+  border-color: var(--app-danger-soft);
+  background: linear-gradient(180deg, var(--app-danger-soft) 0%, var(--app-surface) 100%);
 }
 
 .petpal-case-card__header {
@@ -2772,8 +2781,8 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 4px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid #e5ebf3;
+  background: rgba(255, 250, 244, 0.9);
+  border: 1px solid var(--app-outline-variant);
 }
 
 .petpal-inline-progress__title {
@@ -2813,14 +2822,14 @@ onLoad((options: Record<string, string | undefined>) => {
   max-width: 86%;
   padding: 12px;
   border-radius: 18px 18px 18px 8px;
-  border: 1px solid #dbe3ef;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-accent-soft) 100%);
 }
 
 .petpal-chat-row--self .petpal-chat-bubble {
   border-radius: 18px 18px 8px 18px;
-  border-color: #bfd7ff;
-  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  border-color: var(--app-accent-soft);
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
 }
 
 .petpal-chat-bubble__meta {
@@ -2846,8 +2855,8 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 12px;
   padding: 14px;
   border-radius: 18px;
-  border: 1px solid #dbe7ff;
-  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  border: 1px solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-accent-soft) 100%);
 }
 
 .petpal-chat-composer__header {
@@ -2887,10 +2896,10 @@ onLoad((options: Record<string, string | undefined>) => {
   width: 100%;
   min-height: 104px;
   padding: 12px;
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--app-outline-variant);
   border-radius: 12px;
-  background: #fff;
-  color: #1f2937;
+  background: var(--app-surface);
+  color: var(--app-text);
   line-height: 1.6;
   box-sizing: border-box;
 }
@@ -2910,7 +2919,7 @@ onLoad((options: Record<string, string | undefined>) => {
   justify-content: space-between;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid #e4e4e4;
+  border-bottom: 1px solid var(--app-outline-variant);
 
   &:last-child {
     border-bottom: none;
@@ -2918,13 +2927,13 @@ onLoad((options: Record<string, string | undefined>) => {
 }
 
 .petpal-info-label {
-  color: #999;
+  color: var(--app-text-muted);
   font-size: 12px;
   font-weight: 500;
 }
 
 .petpal-info-value {
-  color: #333;
+  color: var(--app-text);
   font-size: 14px;
 }
 
@@ -2939,24 +2948,24 @@ onLoad((options: Record<string, string | undefined>) => {
   flex-direction: column;
   gap: 4px;
   padding: 12px;
-  background: #f9f9f9;
+  background: var(--app-surface-container);
   border-radius: 4px;
   text-align: center;
 }
 
 .petpal-amount-label {
-  color: #999;
+  color: var(--app-text-muted);
   font-size: 12px;
   font-weight: 500;
 }
 
 .petpal-amount-value {
-  color: #333;
+  color: var(--app-text);
   font-size: 16px;
   font-weight: 600;
 
   &.is-paid {
-    color: #52c41a;
+    color: var(--app-success);
   }
 }
 
@@ -3000,8 +3009,8 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 4px;
   padding: 12px;
   border-radius: 12px;
-  background: linear-gradient(180deg, #fff 0%, #f6f9ff 100%);
-  border: 1px solid #e5ebf3;
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+  border: 1px solid var(--app-outline-variant);
 }
 
 .petpal-refund-progress__stat-label {
@@ -3020,8 +3029,8 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 8px;
   padding: 12px;
   border-radius: 12px;
-  background: #f8fbff;
-  border: 1px solid #dbe7ff;
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+  border: 1px solid var(--app-outline-variant);
 }
 
 .petpal-refund-progress__actions {
@@ -3057,8 +3066,8 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 10px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid #e5ebf3;
-  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+  border: 1px solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
 .petpal-complaint-card__header {
@@ -3094,9 +3103,9 @@ onLoad((options: Record<string, string | undefined>) => {
   display: grid;
   gap: 4px;
   padding: 10px 12px;
-  border-left: 3px solid #dbeafe;
+  border-left: 3px solid var(--app-accent);
   border-radius: 0 10px 10px 0;
-  background: #f9fbff;
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
 }
 
 .petpal-complaint-progress__title {
@@ -3148,8 +3157,8 @@ onLoad((options: Record<string, string | undefined>) => {
 .petpal-message-panel__badge {
   padding: 6px 10px;
   border-radius: 999px;
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--app-danger-soft);
+  color: var(--app-danger);
   font-size: 12px;
 }
 
@@ -3163,13 +3172,13 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 8px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid #e5ebf3;
-  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+  border: 1px solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
 .petpal-message-card.is-self {
-  border-color: #bfd7ff;
-  background: linear-gradient(180deg, #f4f8ff 0%, #eef5ff 100%);
+  border-color: var(--app-accent-soft);
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
 }
 
 .petpal-message-card__header {
@@ -3205,8 +3214,8 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 10px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid #dbe7ff;
-  background: linear-gradient(180deg, #fff 0%, #f7fbff 100%);
+  border: 1px solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-accent-soft) 100%);
 }
 
 .petpal-message-attachment-list {
@@ -3219,8 +3228,8 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 8px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid #e5ebf3;
-  background: #fff;
+  border: 1px solid var(--app-outline-variant);
+  background: var(--app-surface);
 }
 
 .petpal-message-attachment-item__copy {
@@ -3395,8 +3404,8 @@ onLoad((options: Record<string, string | undefined>) => {
   gap: 6px;
   padding: 10px;
   border-radius: 12px;
-  background: #fff;
-  border: 1px solid #e5ebf3;
+  background: var(--app-surface);
+  border: 1px solid var(--app-outline-variant);
 }
 
 .petpal-service-log-media-image,
@@ -3407,7 +3416,7 @@ onLoad((options: Record<string, string | undefined>) => {
 }
 
 .petpal-service-log-media-image {
-  background: #eef4fb;
+  background: var(--app-accent-soft);
 }
 
 .petpal-service-log-media-file {
@@ -3415,8 +3424,8 @@ onLoad((options: Record<string, string | undefined>) => {
   align-items: center;
   justify-content: center;
   padding: 12px;
-  background: linear-gradient(135deg, #f6f8fb 0%, #edf4ff 100%);
-  color: #2f4668;
+  background: linear-gradient(135deg, var(--app-surface) 0%, var(--app-accent-soft) 100%);
+  color: var(--app-text);
   font-size: 12px;
   line-height: 1.5;
   text-align: center;
@@ -3437,9 +3446,9 @@ onLoad((options: Record<string, string | undefined>) => {
 .petpal-empty--soft {
   padding: 24px 16px;
   border-radius: 16px;
-  border: 1px dashed #dbe3ef;
-  background: #f8fafc;
-  color: #667085;
+  border: 1px dashed var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  color: var(--app-text-secondary);
 }
 
 .petpal-order-actions {

@@ -4,7 +4,6 @@
       <div class="petpal-admin-shell__brand">
         <p class="petpal-admin-shell__eyebrow">PetPal Admin</p>
         <h1>{{ currentTitle }}</h1>
-        <p>{{ currentDescription }}</p>
       </div>
 
       <div class="petpal-admin-shell__actions">
@@ -28,11 +27,7 @@
         <div class="petpal-admin-nav__icon">
           <UnoIcon :name="item.icon" :size="18" />
         </div>
-        <div class="petpal-admin-nav__copy">
-          <small>{{ item.caption }}</small>
-          <strong>{{ item.title }}</strong>
-          <span>{{ item.description }}</span>
-        </div>
+        <strong class="petpal-admin-nav__title">{{ item.title }}</strong>
       </RouterLink>
     </nav>
 
@@ -64,9 +59,6 @@ const visibleNavItems = computed(() => petpalAdminNavItems.filter((item) => (
 )));
 
 const currentTitle = computed(() => String(route.meta.title ?? '宠托帮后台'));
-const currentDescription = computed(() => String(
-  route.meta.description ?? '从根路径直接进入投诉、审核与回调治理页面，不依赖菜单树配置。',
-));
 
 const handleLogout = async () => {
   try {
@@ -83,31 +75,31 @@ const handleLogout = async () => {
 <style scoped lang="scss">
 .petpal-admin-shell {
   min-height: 100vh;
-  padding: 24px;
-  color: #183e39;
+  padding: 20px;
+  color: #163835;
   background:
-    radial-gradient(circle at top left, rgba(242, 255, 250, 0.78), transparent 26%),
-    radial-gradient(circle at bottom right, rgba(221, 238, 231, 0.48), transparent 24%),
-    linear-gradient(180deg, #f4faf7 0%, #eef5f1 44%, #e7efea 100%);
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.1), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(185, 113, 24, 0.06), transparent 20%),
+    linear-gradient(180deg, #f8fcfb 0%, #eef6f3 44%, #e6f0ed 100%);
 }
 
 .petpal-admin-shell__header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 20px;
+  gap: 16px;
   width: min(1320px, 100%);
-  margin: 0 auto 20px;
-  padding: 28px;
+  margin: 0 auto 16px;
+  padding: 20px 22px;
   border: 1px solid rgba(24, 62, 57, 0.1);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 28px 64px rgba(24, 62, 57, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 16px 34px rgba(24, 62, 57, 0.08);
 }
 
 .petpal-admin-shell__brand {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .petpal-admin-shell__eyebrow {
@@ -121,15 +113,8 @@ const handleLogout = async () => {
 
 .petpal-admin-shell__brand h1 {
   margin: 0;
-  font-size: clamp(32px, 4vw, 50px);
-  line-height: 0.98;
-}
-
-.petpal-admin-shell__brand p {
-  max-width: 760px;
-  margin: 0;
-  color: #5e776f;
-  line-height: 1.8;
+  font-size: clamp(26px, 4vw, 38px);
+  line-height: 1.04;
 }
 
 .petpal-admin-shell__actions {
@@ -153,21 +138,21 @@ const handleLogout = async () => {
 
 .petpal-admin-shell__nav {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   width: min(1320px, 100%);
-  margin: 0 auto 20px;
+  margin: 0 auto 16px;
 }
 
 .petpal-admin-nav {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 14px;
-  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
   border: 1px solid rgba(24, 62, 57, 0.08);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow: 0 20px 48px rgba(24, 62, 57, 0.06);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 12px 24px rgba(24, 62, 57, 0.05);
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
@@ -187,41 +172,15 @@ const handleLogout = async () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   background: rgba(24, 62, 57, 0.1);
 }
 
-.petpal-admin-nav.is-active .petpal-admin-nav__icon {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.petpal-admin-nav__copy {
-  display: grid;
-  gap: 6px;
-}
-
-.petpal-admin-nav__copy small {
-  color: #6b847c;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.petpal-admin-nav.is-active .petpal-admin-nav__copy small,
-.petpal-admin-nav.is-active .petpal-admin-nav__copy span {
-  color: rgba(238, 250, 244, 0.8);
-}
-
-.petpal-admin-nav__copy strong {
-  font-size: 18px;
-}
-
-.petpal-admin-nav__copy span {
-  color: #5c746c;
-  line-height: 1.65;
+.petpal-admin-nav__title {
+  font-size: 15px;
+  line-height: 1.35;
 }
 
 .petpal-admin-shell__main {

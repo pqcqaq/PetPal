@@ -1,42 +1,33 @@
 <script lang="ts" setup>
 /**
  * UX Blueprint
- * User: 已登录照料者，需要快速上架、修改或停用服务
- * Entry: 首页点击服务配置、审核通过后首次上架、订单稀少时回看服务组合
- * First screen: 先确认当前可售服务和城市覆盖，再就地编辑价格与状态
- * Primary action: 新增服务、更新配置、快速上下架
- * Secondary actions: 去完善入驻资料、切换服务筛选
- * States: 未登录、未建档、无服务、编辑中、保存中、已上架/已停用
+ * User: 已入驻或准备接单的照料者，需要先看服务组合，再决定新建或编辑
+ * Entry: 照料者首页、入驻资料保存后、订单稀少时回看报价
+ * First screen: 在售数量、停用数量、服务覆盖情况
+ * Primary action: 新增服务，或进入独立服务表单页编辑
+ * Secondary actions: 快速上下架、回入驻中心
+ * States: 未登录、未建档、加载中、空态、列表可用
  */
-import type {
-  CaregiverProfileRecord,
-  CaregiverServiceRecord,
-  PetServiceType,
-  PetSpecies,
-  UpsertCaregiverServicePayload,
-} from '@rbac/api-common'
-import { computed, reactive, ref } from 'vue'
+import type { CaregiverProfileRecord, CaregiverServiceRecord } from '@rbac/api-common'
+import { computed, ref } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
 import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
-import AppInput from '@/components/app-input/app-input.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
 import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
-import { createCaregiverService, getCaregiverProfile, listCaregiverServices, updateCaregiverService } from '@/api/petpal'
+import { getCaregiverProfile, listCaregiverServices, updateCaregiverService } from '@/api/petpal'
 import { LOGIN_PAGE } from '@/router/config'
 import { useTokenStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
 import CaregiverFlowNav from './components/caregiver-flow-nav.vue'
 import {
+  formatAmount,
+  openPetPalCaregiverServiceFormPage,
   PETPAL_CAREGIVER_PROFILE_PAGE,
   PETPAL_CAREGIVER_SERVICES_PAGE,
-  formatAmount,
   serviceTypeLabels,
-  serviceTypeOptions,
   speciesLabels,
-  speciesOptions,
-  yesNoOptions,
 } from './owner-shared'
 
 defineOptions({
@@ -50,62 +41,25 @@ definePage({
   },
 })
 
-type YesNoChoice = 'YES' | 'NO'
 type ServiceFilter = 'ACTIVE' | 'INACTIVE' | 'ALL'
 
 const tokenStore = useTokenStore()
 
 const loading = ref(false)
-const saving = ref(false)
 const serviceActionLoadingKey = ref('')
 const caregiverProfile = ref<CaregiverProfileRecord | null>(null)
 const caregiverServices = ref<CaregiverServiceRecord[]>([])
-const editingServiceId = ref('')
 const serviceFilter = ref<ServiceFilter>('ACTIVE')
 
-const serviceForm = reactive({
-  serviceType: 'BOARDING' as PetServiceType,
-  petSpecies: 'DOG' as PetSpecies,
-  pricePerUnit: '60',
-  unitType: '小时',
-  minNoticeHours: '2',
-  serviceCity: '',
-  isActive: 'YES' as YesNoChoice,
-})
+const serviceFilterOptions = [
+  { label: '在售', value: 'ACTIVE' },
+  { label: '全部', value: 'ALL' },
+  { label: '停用', value: 'INACTIVE' },
+]
 
 const activeServiceCount = computed(() => caregiverServices.value.filter(item => item.isActive).length)
 const inactiveServiceCount = computed(() => caregiverServices.value.filter(item => !item.isActive).length)
 const coveredCityCount = computed(() => new Set(caregiverServices.value.map(item => item.serviceCity).filter(Boolean)).size)
-const focusAction = computed(() => {
-  if (!caregiverProfile.value) {
-    return {
-      label: '先补入驻资料',
-      hint: '先确认城市、经验和资质，再上架服务更稳妥。',
-      action: openProfile,
-    }
-  }
-  if (!caregiverServices.value.length) {
-    return {
-      label: '新增第一个服务',
-      hint: '先放一个可售服务，让主人能开始筛选你。',
-      action: resetServiceForm,
-    }
-  }
-  if (!activeServiceCount.value) {
-    return {
-      label: '恢复可售服务',
-      hint: '当前所有服务都处于停用状态，先恢复一个可售项。',
-      action: () => {
-        serviceFilter.value = 'INACTIVE'
-      },
-    }
-  }
-  return {
-    label: '继续调价格',
-    hint: `${activeServiceCount.value} 个服务在售，可继续调整报价、提前量和覆盖城市。`,
-    action: resetServiceForm,
-  }
-})
 
 const filteredServices = computed(() => caregiverServices.value.filter((item) => {
   if (serviceFilter.value === 'ALL') {
@@ -117,58 +71,77 @@ const filteredServices = computed(() => caregiverServices.value.filter((item) =>
   return item.isActive
 }))
 
-const serviceFilterOptions = [
-  { label: '在售', value: 'ACTIVE' },
-  { label: '全部', value: 'ALL' },
-  { label: '停用', value: 'INACTIVE' },
-]
+const summaryCards = computed(() => [
+  {
+    label: '在售服务',
+    value: String(activeServiceCount.value),
+    hint: activeServiceCount.value ? '当前可以继续接单' : '先恢复或新增一项',
+  },
+  {
+    label: '停用服务',
+    value: String(inactiveServiceCount.value),
+    hint: inactiveServiceCount.value ? '可按需恢复' : '暂无停用项',
+  },
+  {
+    label: '覆盖城市',
+    value: String(coveredCityCount.value),
+    hint: coveredCityCount.value ? '城市信息已形成组合' : '建议至少补一个服务城市',
+  },
+])
 
-function resetServiceForm() {
-  editingServiceId.value = ''
-  serviceForm.serviceType = 'BOARDING'
-  serviceForm.petSpecies = 'DOG'
-  serviceForm.pricePerUnit = '60'
-  serviceForm.unitType = '小时'
-  serviceForm.minNoticeHours = '2'
-  serviceForm.serviceCity = caregiverProfile.value?.serviceCity || ''
-  serviceForm.isActive = 'YES'
+function openCreateForm() {
+  openPetPalCaregiverServiceFormPage({
+    mode: 'navigate',
+    from: PETPAL_CAREGIVER_SERVICES_PAGE,
+  })
 }
 
-function startEditService(service: CaregiverServiceRecord) {
-  editingServiceId.value = service.id
-  serviceForm.serviceType = service.serviceType
-  serviceForm.petSpecies = service.petSpecies
-  serviceForm.pricePerUnit = String(service.pricePerUnit)
-  serviceForm.unitType = service.unitType
-  serviceForm.minNoticeHours = String(service.minNoticeHours)
-  serviceForm.serviceCity = service.serviceCity || ''
-  serviceForm.isActive = service.isActive ? 'YES' : 'NO'
+function openEditForm(serviceId: string) {
+  openPetPalCaregiverServiceFormPage({
+    mode: 'navigate',
+    serviceId,
+    from: PETPAL_CAREGIVER_SERVICES_PAGE,
+  })
 }
 
-function buildServicePayload(source: CaregiverServiceRecord): UpsertCaregiverServicePayload {
-  const serviceLat = source.serviceLat == null ? undefined : Number(source.serviceLat)
-  const serviceLng = source.serviceLng == null ? undefined : Number(source.serviceLng)
-
-  return {
-    serviceType: source.serviceType,
-    petSpecies: source.petSpecies,
-    pricePerUnit: Number(source.pricePerUnit),
-    unitType: source.unitType,
-    minNoticeHours: source.minNoticeHours,
-    serviceCity: source.serviceCity || undefined,
-    serviceLat: Number.isFinite(serviceLat) ? serviceLat : undefined,
-    serviceLng: Number.isFinite(serviceLng) ? serviceLng : undefined,
-    availableSlots: source.availableSlots,
-    isActive: source.isActive,
-  }
+function openProfile() {
+  uni.navigateTo({ url: PETPAL_CAREGIVER_PROFILE_PAGE })
 }
 
 function goToLogin() {
   uni.navigateTo({ url: LOGIN_PAGE })
 }
 
-function openProfile() {
-  uni.redirectTo({ url: PETPAL_CAREGIVER_PROFILE_PAGE })
+async function toggleService(service: CaregiverServiceRecord) {
+  serviceActionLoadingKey.value = `toggle:${service.id}`
+  try {
+    await updateCaregiverService(service.id, {
+      serviceType: service.serviceType,
+      petSpecies: service.petSpecies,
+      pricePerUnit: Number(service.pricePerUnit),
+      unitType: service.unitType,
+      minNoticeHours: service.minNoticeHours,
+      serviceCity: service.serviceCity || undefined,
+      serviceLat: service.serviceLat == null ? undefined : Number(service.serviceLat),
+      serviceLng: service.serviceLng == null ? undefined : Number(service.serviceLng),
+      availableSlots: service.availableSlots,
+      isActive: !service.isActive,
+    })
+    uni.showToast({
+      title: service.isActive ? '已停用' : '已恢复上架',
+      icon: 'none',
+    })
+    await loadPage(false)
+  }
+  catch (error: unknown) {
+    uni.showToast({
+      title: getErrorMessage(error, '切换服务状态失败'),
+      icon: 'none',
+    })
+  }
+  finally {
+    serviceActionLoadingKey.value = ''
+  }
 }
 
 async function loadPage(showError = false) {
@@ -183,17 +156,15 @@ async function loadPage(showError = false) {
       getCaregiverProfile(),
       listCaregiverServices(),
     ])
-
     caregiverProfile.value = profileResult.status === 'fulfilled' ? profileResult.value : null
     caregiverServices.value = servicesResult.status === 'fulfilled' ? servicesResult.value : []
-    if (!editingServiceId.value && !serviceForm.serviceCity.trim()) {
-      serviceForm.serviceCity = caregiverProfile.value?.serviceCity || ''
-    }
   }
   catch (error: unknown) {
+    caregiverProfile.value = null
+    caregiverServices.value = []
     if (showError) {
       uni.showToast({
-        title: getErrorMessage(error, '加载服务管理页失败'),
+        title: getErrorMessage(error, '加载服务管理失败'),
         icon: 'none',
       })
     }
@@ -201,69 +172,6 @@ async function loadPage(showError = false) {
   finally {
     loading.value = false
     uni.stopPullDownRefresh()
-  }
-}
-
-async function saveService() {
-  const price = Number(serviceForm.pricePerUnit || 0)
-  if (!Number.isFinite(price) || price <= 0) {
-    uni.showToast({ title: '请填写有效的服务价格', icon: 'none' })
-    return
-  }
-  if (!serviceForm.unitType.trim()) {
-    uni.showToast({ title: '请填写计价单位', icon: 'none' })
-    return
-  }
-
-  saving.value = true
-  try {
-    const payload = {
-      serviceType: serviceForm.serviceType,
-      petSpecies: serviceForm.petSpecies,
-      pricePerUnit: price,
-      unitType: serviceForm.unitType.trim(),
-      minNoticeHours: Number(serviceForm.minNoticeHours || 0) || 0,
-      serviceCity: serviceForm.serviceCity.trim() || undefined,
-      isActive: serviceForm.isActive === 'YES',
-      availableSlots: [],
-    }
-
-    if (editingServiceId.value) {
-      await updateCaregiverService(editingServiceId.value, payload)
-      uni.showToast({ title: '服务已更新', icon: 'none' })
-    }
-    else {
-      await createCaregiverService(payload)
-      uni.showToast({ title: '服务已创建', icon: 'none' })
-    }
-
-    resetServiceForm()
-    await loadPage(false)
-  }
-  catch (error: unknown) {
-    uni.showToast({ title: getErrorMessage(error, '保存服务失败'), icon: 'none' })
-  }
-  finally {
-    saving.value = false
-  }
-}
-
-async function toggleService(service: CaregiverServiceRecord) {
-  const nextActive = !service.isActive
-  serviceActionLoadingKey.value = `toggle:${service.id}`
-  try {
-    await updateCaregiverService(service.id, {
-      ...buildServicePayload(service),
-      isActive: nextActive,
-    })
-    uni.showToast({ title: nextActive ? '已恢复上架' : '已停用', icon: 'none' })
-    await loadPage(false)
-  }
-  catch (error: unknown) {
-    uni.showToast({ title: getErrorMessage(error, '切换服务状态失败'), icon: 'none' })
-  }
-  finally {
-    serviceActionLoadingKey.value = ''
   }
 }
 
@@ -287,107 +195,112 @@ onPullDownRefresh(() => {
         title="服务管理"
       />
 
-      <AppSection title="先安排这个">
-        <view class="caregiver-service-focus">
-          <view class="caregiver-service-focus__copy">
-            <view class="caregiver-service-focus__tags">
-              <AppTag :type="activeServiceCount > 0 ? 'success' : 'default'">
-                在售 {{ activeServiceCount }}
-              </AppTag>
-              <AppTag :type="inactiveServiceCount > 0 ? 'warning' : 'default'">
-                停用 {{ inactiveServiceCount }}
-              </AppTag>
-              <AppTag type="primary">
-                覆盖 {{ coveredCityCount }} 城市
+      <AppSection title="先确认服务盘子">
+        <view class="service-list-hero">
+          <view class="service-list-hero__copy">
+            <view class="service-list-hero__tags">
+              <AppTag type="warning">照料者</AppTag>
+              <AppTag :type="caregiverProfile ? 'success' : 'warning'">
+                {{ caregiverProfile ? '已建档' : '先补入驻资料' }}
               </AppTag>
             </view>
-            <text class="caregiver-service-focus__hint">{{ focusAction.hint }}</text>
+            <text class="service-list-hero__title">列表页只负责查看组合和切换状态</text>
+            <text class="service-list-hero__summary">新增和编辑统一进入独立表单页，不再把报价、筛选和大表单堆在一页里。</text>
           </view>
-          <view class="caregiver-service-toolbar">
-            <AppButton size="medium" @click="focusAction.action">{{ focusAction.label }}</AppButton>
+          <view class="service-list-hero__actions">
+            <AppButton size="medium" @click="openCreateForm">新增服务</AppButton>
             <AppButton size="medium" type="info" @click="openProfile">入驻资料</AppButton>
           </view>
         </view>
-      </AppSection>
 
-      <AppSection title="就地编辑">
-        <view class="caregiver-service-form">
-          <view v-if="!caregiverProfile" class="caregiver-service-note">
-            <text class="caregiver-service-note__text">先把入驻资料补齐，再继续上架服务。</text>
-            <AppButton size="medium" type="info" @click="openProfile">去完善</AppButton>
-          </view>
-
-          <view class="caregiver-service-form__group">
-            <text class="caregiver-service-form__label">服务类型</text>
-            <AppChoiceChips v-model="serviceForm.serviceType" :options="serviceTypeOptions" />
-          </view>
-
-          <view class="caregiver-service-form__group">
-            <text class="caregiver-service-form__label">适配宠物</text>
-            <AppChoiceChips v-model="serviceForm.petSpecies" :options="speciesOptions" />
-          </view>
-
-          <AppInput v-model="serviceForm.pricePerUnit" label="报价" placeholder="例如 60" type="digit" />
-          <AppInput v-model="serviceForm.unitType" label="计价单位" placeholder="例如 小时 / 次" />
-          <AppInput v-model="serviceForm.minNoticeHours" label="最短提前量（小时）" placeholder="例如 2" type="digit" />
-          <AppInput v-model="serviceForm.serviceCity" label="服务城市" placeholder="例如 杭州" />
-
-          <view class="caregiver-service-form__group">
-            <text class="caregiver-service-form__label">是否上架</text>
-            <AppChoiceChips v-model="serviceForm.isActive" :options="yesNoOptions" />
-          </view>
-
-          <view class="caregiver-service-toolbar">
-            <AppButton v-if="editingServiceId" size="medium" type="info" @click="resetServiceForm">取消编辑</AppButton>
-            <AppButton size="medium" :loading="saving" @click="saveService">
-              {{ editingServiceId ? '更新服务' : '新增服务' }}
-            </AppButton>
+        <view class="service-list-summary">
+          <view v-for="item in summaryCards" :key="item.label" class="service-list-summary__card">
+            <text class="service-list-summary__label">{{ item.label }}</text>
+            <text class="service-list-summary__value">{{ item.value }}</text>
+            <text class="service-list-summary__hint">{{ item.hint }}</text>
           </view>
         </view>
       </AppSection>
 
-      <AppSection :title="filteredServices.length ? `服务列表 (${filteredServices.length})` : '服务列表'">
-        <view class="caregiver-service-toolbar caregiver-service-toolbar--top">
-          <AppChoiceChips v-model="serviceFilter" :options="serviceFilterOptions" />
-          <AppButton size="medium" type="info" @click="resetServiceForm">新建一项</AppButton>
-        </view>
+      <AppSection title="服务队列">
+        <template v-if="loading">
+          <view class="service-list-empty">
+            <AppStatus mode="loading" text="正在同步服务管理数据" />
+          </view>
+        </template>
 
-        <view v-if="filteredServices.length" class="caregiver-service-list">
-          <view v-for="service in filteredServices" :key="service.id" class="caregiver-service-card">
-            <view class="caregiver-service-card__header">
-              <view class="caregiver-service-card__copy">
-                <text class="caregiver-service-card__title">{{ serviceTypeLabels[service.serviceType] }} · {{ speciesLabels[service.petSpecies] }}</text>
-                <text class="caregiver-service-card__meta">{{ service.serviceCity || '城市待补充' }} · 提前 {{ service.minNoticeHours }} 小时</text>
-                <text class="caregiver-service-card__meta">¥{{ formatAmount(service.pricePerUnit) }}/{{ service.unitType }}</text>
+        <template v-else-if="!caregiverProfile">
+          <view class="service-list-empty">
+            <AppStatus text="请先完成照料者入驻资料，再继续上架服务。" />
+            <AppButton size="medium" type="info" @click="openProfile">去完善资料</AppButton>
+          </view>
+        </template>
+
+        <template v-else>
+          <view class="service-filter-row">
+            <AppChoiceChips v-model="serviceFilter" :options="serviceFilterOptions" />
+            <AppButton size="medium" type="info" @click="openCreateForm">新建一项</AppButton>
+          </view>
+
+          <template v-if="filteredServices.length">
+            <view class="service-card-list">
+              <view v-for="service in filteredServices" :key="service.id" class="service-card">
+                <view class="service-card__head">
+                  <view class="service-card__headline">
+                    <text class="service-card__title">{{ serviceTypeLabels[service.serviceType] }} · {{ speciesLabels[service.petSpecies] }}</text>
+                    <text class="service-card__meta">
+                      {{ service.serviceCity || caregiverProfile.serviceCity || '城市待补充' }} · 提前 {{ service.minNoticeHours }} 小时
+                    </text>
+                  </view>
+                  <AppTag :type="service.isActive ? 'success' : 'warning'">
+                    {{ service.isActive ? '在售' : '停用' }}
+                  </AppTag>
+                </view>
+
+                <view class="service-card__grid">
+                  <view class="service-card__metric">
+                    <text class="service-card__metric-label">报价</text>
+                    <text class="service-card__metric-value">¥{{ formatAmount(service.pricePerUnit) }}/{{ service.unitType }}</text>
+                  </view>
+                  <view class="service-card__metric">
+                    <text class="service-card__metric-label">服务城市</text>
+                    <text class="service-card__metric-value">{{ service.serviceCity || '待补充' }}</text>
+                  </view>
+                  <view class="service-card__metric">
+                    <text class="service-card__metric-label">状态</text>
+                    <text class="service-card__metric-value">{{ service.isActive ? '可接单' : '暂不展示' }}</text>
+                  </view>
+                </view>
+
+                <view class="service-card__actions">
+                  <AppButton size="medium" type="info" @click="openEditForm(service.id)">编辑服务</AppButton>
+                  <AppButton
+                    size="medium"
+                    :type="service.isActive ? 'danger' : 'primary'"
+                    :loading="serviceActionLoadingKey === `toggle:${service.id}`"
+                    @click="toggleService(service)"
+                  >
+                    {{ service.isActive ? '停用' : '恢复上架' }}
+                  </AppButton>
+                </view>
               </view>
-              <AppTag :type="service.isActive ? 'success' : 'warning'">
-                {{ service.isActive ? '在售' : '停用' }}
-              </AppTag>
             </view>
+          </template>
 
-            <view class="caregiver-service-toolbar">
-              <AppButton size="medium" type="info" @click="startEditService(service)">编辑</AppButton>
-              <AppButton
-                size="medium"
-                :type="service.isActive ? 'danger' : 'primary'"
-                :loading="serviceActionLoadingKey === `toggle:${service.id}`"
-                @click="toggleService(service)"
-              >
-                {{ service.isActive ? '停用' : '恢复上架' }}
-              </AppButton>
+          <template v-else>
+            <view class="service-list-empty">
+              <AppStatus text="当前筛选下没有服务，直接新增一项即可。" />
+              <AppButton size="medium" @click="openCreateForm">新增服务</AppButton>
             </view>
-          </view>
-        </view>
-        <view v-else class="caregiver-service-empty">
-          <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步服务配置' : '当前筛选下没有服务'" />
-        </view>
+          </template>
+        </template>
       </AppSection>
     </template>
 
     <template v-else>
-      <AppSection title="登录后管理服务">
-        <view class="caregiver-service-empty caregiver-service-empty--login">
-          <AppStatus text="登录后即可新增、修改和上下架照料服务。" />
+      <AppSection title="登录后继续">
+        <view class="service-list-empty">
+          <AppStatus text="登录后查看服务组合并进入独立表单页编辑。" />
         </view>
         <AppButton block @click="goToLogin">去登录</AppButton>
       </AppSection>
@@ -396,83 +309,106 @@ onPullDownRefresh(() => {
 </template>
 
 <style scoped lang="scss">
-.caregiver-service-focus,
-.caregiver-service-form,
-.caregiver-service-card,
-.caregiver-service-note {
-  display: grid;
+.service-list-hero,
+.service-list-hero__actions,
+.service-list-hero__tags,
+.service-card__head,
+.service-card__actions,
+.service-filter-row {
+  display: flex;
   gap: 16rpx;
-  padding: 24rpx;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.service-list-hero {
+  margin: 0 24rpx;
+  padding: 28rpx;
+  border-radius: var(--app-shape-xl);
+  border: 1rpx solid var(--app-outline-variant);
+  background:
+    radial-gradient(circle at top right, rgba(181, 106, 0, 0.16), transparent 34%),
+    linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
+  box-shadow: var(--app-elevation-1);
+}
+
+.service-list-hero__copy,
+.service-card,
+.service-card__headline,
+.service-card__metric,
+.service-list-empty {
+  display: grid;
+  gap: 12rpx;
+}
+
+.service-list-hero__title,
+.service-card__title {
+  color: var(--app-text);
+  font-size: 34rpx;
+  line-height: 1.16;
+  font-weight: 700;
+}
+
+.service-list-hero__summary,
+.service-list-summary__hint,
+.service-card__meta,
+.service-card__metric-label {
+  color: var(--app-text-secondary);
+  font-size: 22rpx;
+  line-height: 1.64;
+}
+
+.service-list-summary,
+.service-card__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16rpx;
+  padding: 18rpx 24rpx 0;
+}
+
+.service-list-summary__card,
+.service-card,
+.service-card__metric {
+  padding: 22rpx;
   border-radius: var(--app-shape-xl);
   border: 1rpx solid var(--app-outline-variant);
   background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
-.caregiver-service-focus {
-  background:
-    radial-gradient(circle at top right, rgba(181, 106, 0, 0.16), transparent 34%),
-    linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
-}
-
-.caregiver-service-focus__copy {
-  display: grid;
-  gap: 12rpx;
-}
-
-.caregiver-service-focus__tags,
-.caregiver-service-toolbar {
-  display: flex;
-  gap: 12rpx;
-  flex-wrap: wrap;
-}
-
-.caregiver-service-focus__hint,
-.caregiver-service-card__meta,
-.caregiver-service-form__label,
-.caregiver-service-note__text {
-  color: var(--app-text-secondary);
+.service-list-summary__label {
+  color: var(--app-text-muted);
   font-size: 22rpx;
-  line-height: 1.6;
 }
 
-.caregiver-service-form__group,
-.caregiver-service-list {
-  display: grid;
-  gap: 12rpx;
-}
-
-.caregiver-service-card__header {
-  display: flex;
-  gap: 16rpx;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.caregiver-service-card__copy {
-  display: grid;
-  gap: 6rpx;
-  min-width: 0;
-}
-
-.caregiver-service-card__title {
+.service-list-summary__value,
+.service-card__metric-value {
   color: var(--app-text);
   font-size: 30rpx;
-  line-height: 1.3;
+  line-height: 1.18;
   font-weight: 700;
 }
 
-.caregiver-service-empty {
-  padding: 8rpx 0;
+.service-filter-row,
+.service-card-list,
+.service-list-empty {
+  padding: 0 24rpx;
 }
 
-.caregiver-service-empty--login {
-  padding-bottom: 28rpx;
+.service-card-list {
+  display: grid;
+  gap: 16rpx;
+}
+
+.service-card__grid {
+  padding: 0;
 }
 
 @media (max-width: 680px) {
-  .caregiver-service-card__header {
-    flex-direction: column;
+  .service-list-summary,
+  .service-card__grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

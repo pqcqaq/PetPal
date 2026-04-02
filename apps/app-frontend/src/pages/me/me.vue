@@ -525,8 +525,8 @@ onPullDownRefresh(() => {
 <style scoped lang="scss">
 .me-page {
   display: grid;
-  gap: 20rpx;
-  padding-bottom: 36rpx;
+  gap: 22rpx;
+  padding-bottom: 40rpx;
 }
 
 .me-hero,
@@ -534,7 +534,7 @@ onPullDownRefresh(() => {
 .me-group,
 .me-guest {
   margin: 0 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   border-radius: 30rpx;
   box-shadow: var(--app-elevation-1);
 }
@@ -545,8 +545,9 @@ onPullDownRefresh(() => {
   gap: 20rpx;
   padding: 28rpx;
   background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.2), transparent 34%),
-    linear-gradient(145deg, #1d4ed8 0%, #2563eb 44%, #0f766e 100%);
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.2), transparent 34%),
+    linear-gradient(145deg, #2563eb 0%, #60a5fa 44%, #f97316 100%);
 }
 
 .me-hero__body,
@@ -560,8 +561,9 @@ onPullDownRefresh(() => {
 
 .me-hero__name {
   color: #eff6ff;
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 38rpx;
-  line-height: 1.18;
+  line-height: 1.14;
   font-weight: 700;
 }
 
@@ -595,19 +597,19 @@ onPullDownRefresh(() => {
   gap: 10rpx;
   width: 240rpx;
   padding: 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   border-radius: 26rpx;
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 34%),
-    linear-gradient(180deg, var(--app-surface-container-high) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
   box-sizing: border-box;
 }
 
 .me-quick-card--alert {
   background:
-    radial-gradient(circle at top right, rgba(186, 26, 26, 0.14), transparent 34%),
-    linear-gradient(180deg, var(--app-danger-soft) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(220, 38, 38, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(255, 236, 234, 0.96) 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .me-quick-card__title,
@@ -620,7 +622,7 @@ onPullDownRefresh(() => {
 
 .me-quick-card__value,
 .me-signal-pill__value {
-  color: var(--app-text);
+  color: var(--app-brand-strong);
   font-size: 40rpx;
   line-height: 1.05;
   font-weight: 700;
@@ -640,8 +642,8 @@ onPullDownRefresh(() => {
   gap: 18rpx;
   padding: 26rpx 28rpx;
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.14), transparent 36%),
-    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.18), transparent 36%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 240, 220, 0.98) 100%);
 }
 
 .me-focus__title,
@@ -649,8 +651,9 @@ onPullDownRefresh(() => {
 .me-cell__title,
 .me-guest__title {
   color: var(--app-text);
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 30rpx;
-  line-height: 1.28;
+  line-height: 1.22;
   font-weight: 700;
 }
 
@@ -666,12 +669,15 @@ onPullDownRefresh(() => {
   gap: 8rpx;
   padding: 20rpx;
   border-radius: 22rpx;
-  background: var(--app-surface-container);
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 30%),
+    rgba(255, 248, 239, 0.9);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
 }
 
 .me-group {
   overflow: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
 }
 
 .me-group__head {
@@ -695,7 +701,7 @@ onPullDownRefresh(() => {
 }
 
 .me-cell + .me-cell {
-  border-top: 1rpx solid var(--app-outline-variant);
+  border-top: 1rpx solid rgba(245, 220, 192, 0.88);
 }
 
 .me-cell__copy {
@@ -721,8 +727,8 @@ onPullDownRefresh(() => {
 .me-cell__arrow {
   width: 16rpx;
   height: 16rpx;
-  border-top: 2rpx solid var(--app-text-muted);
-  border-right: 2rpx solid var(--app-text-muted);
+  border-top: 3rpx solid var(--app-brand-strong);
+  border-right: 3rpx solid var(--app-brand-strong);
   transform: rotate(45deg);
 }
 
@@ -736,8 +742,8 @@ onPullDownRefresh(() => {
   gap: 20rpx;
   padding: 28rpx;
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 36%),
-    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.14), transparent 36%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 240, 220, 0.98) 100%);
 }
 
 .me-guest__actions {

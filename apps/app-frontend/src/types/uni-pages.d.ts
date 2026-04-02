@@ -21,6 +21,7 @@ type _LocationUrl =
   "/pages/petpal/caregiver-home" |
   "/pages/petpal/caregiver-orders" |
   "/pages/petpal/caregiver-profile" |
+  "/pages/petpal/caregiver-service-form" |
   "/pages/petpal/caregiver-services" |
   "/pages/petpal/checkout" |
   "/pages/petpal/complaint-result" |
@@ -29,6 +30,7 @@ type _LocationUrl =
   "/pages/petpal/messages" |
   "/pages/petpal/orders" |
   "/pages/petpal/payment-result" |
+  "/pages/petpal/pet-form" |
   "/pages/petpal/pets" |
   "/pages/petpal/refund-result" |
   "/pages/petpal/reminders" |

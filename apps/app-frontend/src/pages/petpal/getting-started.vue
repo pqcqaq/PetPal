@@ -545,7 +545,7 @@ onPullDownRefresh(() => {
   border-radius: var(--app-shape-xl);
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.24), transparent 34%),
-    linear-gradient(145deg, #0b7a75 0%, #155e75 50%, var(--app-accent) 100%);
+    linear-gradient(145deg, var(--app-brand-strong) 0%, var(--app-brand) 52%, var(--app-accent) 100%);
   box-shadow: var(--app-elevation-3);
 }
 

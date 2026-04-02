@@ -5,7 +5,7 @@
         <span class="frontend-brand__mark">PP</span>
         <span class="frontend-brand__copy">
           <strong>宠托帮 PetPal</strong>
-          <small>Trusted Pet Care</small>
+          <small>主人 · 照料者 · 售后</small>
         </span>
       </RouterLink>
 
@@ -47,11 +47,11 @@ const route = useRoute();
 <style scoped lang="scss">
 .frontend-header {
   position: sticky;
-  top: 0;
+  top: 12px;
   z-index: 40;
   backdrop-filter: blur(18px);
-  background: rgba(247, 243, 236, 0.72);
-  border-bottom: 1px solid rgba(39, 61, 77, 0.08);
+  background: transparent;
+  border-bottom: 0;
 }
 
 .frontend-header__inner {
@@ -59,9 +59,13 @@ const route = useRoute();
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 20px;
-  width: min(1180px, calc(100vw - 32px));
+  width: min(1320px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 18px 0;
+  padding: 14px 18px;
+  border: 1px solid rgba(18, 53, 51, 0.1);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 14px 26px rgba(12, 33, 31, 0.08);
 }
 
 .frontend-brand {
@@ -77,9 +81,9 @@ const route = useRoute();
   justify-content: center;
   width: 42px;
   height: 42px;
-  border-radius: 14px;
-  background: linear-gradient(145deg, #17384a 0%, #2e5d76 100%);
-  color: #f7f3ec;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #0f766e 0%, #0b5d57 100%);
+  color: #f7fffd;
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -95,9 +99,9 @@ const route = useRoute();
 }
 
 .frontend-brand__copy small {
-  color: #6c7d86;
+  color: #6d8683;
   font-size: 11px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
@@ -126,8 +130,8 @@ const route = useRoute();
 
 .frontend-nav__item:hover,
 .frontend-nav__item.is-active {
-  background: rgba(23, 56, 74, 0.08);
-  color: #17384a;
+  background: rgba(15, 118, 110, 0.08);
+  color: #143634;
   transform: translateY(-1px);
 }
 
@@ -157,11 +161,11 @@ const route = useRoute();
   min-height: 42px;
   padding: 0 18px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #17384a 0%, #2d627b 100%);
-  color: #f8f4ed;
+  background: linear-gradient(135deg, #0f766e 0%, #0b5d57 100%);
+  color: #f7fffd;
   font-size: 13px;
   font-weight: 700;
-  box-shadow: 0 18px 36px rgba(23, 56, 74, 0.18);
+  box-shadow: 0 14px 28px rgba(15, 118, 110, 0.18);
 }
 
 @media (max-width: 980px) {

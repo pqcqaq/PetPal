@@ -431,10 +431,11 @@ onPullDownRefresh(() => {
   gap: 16rpx;
   padding: 26rpx 28rpx;
   border-radius: var(--app-shape-xl);
-  border: 1rpx solid var(--app-outline-variant);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   background:
-    radial-gradient(circle at top right, rgba(181, 106, 0, 0.16), transparent 34%),
-    linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.22), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(37, 99, 235, 0.12), transparent 30%),
+    linear-gradient(180deg, #fff0dd 0%, rgba(255, 251, 246, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
@@ -446,8 +447,9 @@ onPullDownRefresh(() => {
 
 .caregiver-focus__title {
   color: var(--app-text);
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 38rpx;
-  line-height: 1.2;
+  line-height: 1.14;
   font-weight: 700;
 }
 
@@ -476,8 +478,10 @@ onPullDownRefresh(() => {
   gap: 14rpx;
   padding: 24rpx;
   border-radius: var(--app-shape-xl);
-  border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 32%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
@@ -497,7 +501,7 @@ onPullDownRefresh(() => {
 .caregiver-order-row__title {
   color: var(--app-text);
   font-size: 30rpx;
-  line-height: 1.3;
+  line-height: 1.24;
   font-weight: 700;
 }
 

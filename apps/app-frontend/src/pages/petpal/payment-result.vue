@@ -23,11 +23,11 @@ import {
   formatDateTime,
   formatRange,
   getConversationUnreadCount,
+  getOwnerOrderFilterForOrder,
   getOrderStatusLabel,
   getOrderTone,
-  openPetPalAction,
+  openPetPalOrdersPage,
   PETPAL_CHECKOUT_PAGE,
-  PETPAL_ORDERS_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
   PETPAL_REVIEW_RESULT_PAGE,
@@ -285,7 +285,15 @@ function openOrderDetail(tab: 'overview' | 'chat' | 'service' | 'aftersales' = '
 }
 
 function openOrders() {
-  openPetPalAction('redirect', PETPAL_ORDERS_PAGE)
+  if (order.value) {
+    openPetPalOrdersPage({
+      filter: getOwnerOrderFilterForOrder(order.value),
+      focusOrderId: order.value.id,
+    })
+    return
+  }
+
+  openPetPalOrdersPage()
 }
 
 function openCheckout() {
@@ -592,7 +600,7 @@ onPullDownRefresh(() => {
 
 .pay-group {
   overflow: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
 .pay-group__head,

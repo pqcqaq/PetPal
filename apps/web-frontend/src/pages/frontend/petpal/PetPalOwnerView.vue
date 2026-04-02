@@ -1,727 +1,204 @@
 <!--
 UX Blueprint
-User: 主人端 Web 用户
-Entry: 登录后进入工作台、从订单/售后回到首页
-First screen: 直接看到订单、需求、消息和售后状态
-Primary action: 去订单、去售后、去需求
-Secondary actions: 消息、提醒、身份切换
+User: 已登录主人，需要先判断现在该继续哪条交易任务
+Entry: Web 前台主人入口、消息/提醒/售后回流
+First screen: 当前优先任务、宠物/需求/订单状态摘要、直接进入对应列表页
+Primary action: 去宠物建档、去需求队列或去订单队列
+Secondary actions: 去消息、售后、照料者工作台
+States: 未登录、加载失败、空态、可继续办事
 -->
 <template>
   <div class="frontend-page">
-    <section class="frontend-page__hero">
-      <p class="frontend-page__eyebrow">主人工作台</p>
-      <h1>宠托帮主人首页</h1>
-      <div class="frontend-page__hero-actions">
-        <el-button type="primary" :loading="pageLoading" @click="reloadAll">刷新</el-button>
-        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-aftersales' }">
-          售后
-        </RouterLink>
-        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-reminders' }">
-          提醒
-        </RouterLink>
-        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-messages' }">
-          消息
-        </RouterLink>
-        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-caregiver' }">
-          照料者
-        </RouterLink>
-      </div>
-    </section>
+    <PetPalWorkspaceHero
+      eyebrow="主人工作区"
+      title="主人任务总览"
+      summary="总览页只回答现在该做什么。建档、发需求、跟单和售后都拆去各自页面，不再把表单和队列堆在这里。"
+      :nav-items="petPalOwnerWorkspaceNav"
+      active-name="frontend-petpal"
+      :stats="heroStats"
+      :primary-action="heroPrimaryAction"
+      :actions="heroActions"
+    />
 
     <template v-if="auth.isAuthenticated">
       <section v-if="pageLoadState === 'error'" class="frontend-card">
         <PetPalStatePanel
-          eyebrow="主人服务台"
-          title="主人工作台加载失败"
+          eyebrow="主人工作区"
+          title="主人总览加载失败"
           :description="pageLoadErrorMessage"
           tone="danger"
         >
           <template #actions>
-            <el-button size="small" type="primary" :loading="pageLoading" @click="reloadAll">重试加载</el-button>
-            <RouterLink :to="{ name: 'frontend-petpal-legacy' }">
-              <el-button size="small">去兼容入口</el-button>
+            <el-button size="small" type="primary" :loading="loading" @click="loadPage">重试加载</el-button>
+            <RouterLink :to="{ name: 'frontend-petpal-orders' }">
+              <el-button size="small">先看订单队列</el-button>
             </RouterLink>
           </template>
         </PetPalStatePanel>
       </section>
 
       <template v-else>
-        <section v-if="partialLoadNotice" class="frontend-card">
-          <PetPalStatePanel
-            eyebrow="加载提示"
-            title="主人工作台部分数据未完整加载"
-            :description="partialLoadNotice"
-            tone="warning"
-          >
-            <template #actions>
-              <el-button size="small" type="primary" :loading="pageLoading" @click="reloadAll">重新加载</el-button>
-              <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
-                <el-button size="small">先看提醒中心</el-button>
+        <section class="frontend-page__section-grid">
+          <article class="frontend-card petpal-grid-span-6">
+            <span class="frontend-card__eyebrow">现在先做这个</span>
+            <div class="petpal-focus-card">
+              <div class="petpal-focus-card__copy">
+                <h3>{{ primaryTask.title }}</h3>
+                <p>{{ primaryTask.hint }}</p>
+              </div>
+              <RouterLink class="frontend-page__button is-primary" :to="primaryTask.to">
+                {{ primaryTask.actionLabel }}
               </RouterLink>
-            </template>
-          </PetPalStatePanel>
+            </div>
+          </article>
+
+          <article class="frontend-card petpal-grid-span-6">
+            <span class="frontend-card__eyebrow">交易状态</span>
+            <div class="petpal-queue-list">
+              <div class="petpal-queue-item">
+                <div>
+                  <strong>待支付 / 待确认</strong>
+                  <p>{{ paymentAndCompletionHint }}</p>
+                </div>
+                <RouterLink :to="{ name: 'frontend-petpal-orders' }">去订单队列</RouterLink>
+              </div>
+              <div class="petpal-queue-item">
+                <div>
+                  <strong>售后事项</strong>
+                  <p>{{ aftersalesHint }}</p>
+                </div>
+                <RouterLink :to="{ name: 'frontend-petpal-aftersales' }">去售后中心</RouterLink>
+              </div>
+              <div class="petpal-queue-item">
+                <div>
+                  <strong>消息与提醒</strong>
+                  <p>跨订单沟通和待办已拆成独立页面，避免再回大工作台里翻找。</p>
+                </div>
+                <div class="petpal-inline-actions">
+                  <RouterLink :to="{ name: 'frontend-petpal-messages' }">消息</RouterLink>
+                  <RouterLink :to="{ name: 'frontend-petpal-reminders' }">提醒</RouterLink>
+                </div>
+              </div>
+            </div>
+          </article>
         </section>
 
         <section class="frontend-page__section-grid">
-      <article class="frontend-card petpal-grid-span-8">
-        <span class="frontend-card__eyebrow">今日看板</span>
-        <div class="petpal-section-heading">
-          <div class="petpal-section-heading__meta">
-            <h3>先看订单和售后</h3>
-          </div>
-        </div>
+          <article class="frontend-card petpal-grid-span-4">
+            <span class="frontend-card__eyebrow">宠物档案</span>
+            <div class="petpal-section-head">
+              <h3>先确定可用宠物</h3>
+              <RouterLink :to="{ name: 'frontend-petpal-pets' }">查看全部</RouterLink>
+            </div>
 
-        <div class="petpal-summary-grid">
-          <div class="petpal-summary-card">
-            <span>宠物档案</span>
-            <strong>{{ pets.length }}</strong>
-            <p>{{ pets.length ? '可直接下单' : '先去建档' }}</p>
-          </div>
-          <div class="petpal-summary-card">
-            <span>当前需求</span>
-            <strong>{{ requests.length }}</strong>
-            <p>{{ requests.length ? '继续跟进' : '新建需求' }}</p>
-          </div>
-          <div class="petpal-summary-card">
-            <span>订单跟进</span>
-            <strong>{{ orders.length }}</strong>
-            <p>{{ orders.length ? '直接处理订单' : '暂无订单' }}</p>
-          </div>
-          <div class="petpal-summary-card">
-            <span>待读消息</span>
-            <strong>{{ unreadOwnerConversationCount }}</strong>
-            <p>{{ unreadOwnerConversationCount ? '先去沟通' : '当前已读' }}</p>
-          </div>
-        </div>
-      </article>
+            <div v-if="pets.length" class="petpal-card-stack">
+              <div v-for="pet in pets.slice(0, 3)" :key="pet.id" class="petpal-compact-card">
+                <div class="petpal-compact-card__head">
+                  <strong>{{ pet.name }}</strong>
+                  <span>{{ pet.species }}</span>
+                </div>
+                <p>{{ pet.breed || '品种待补充' }}</p>
+                <div class="petpal-inline-actions">
+                  <RouterLink :to="{ name: 'frontend-petpal-pet-edit', params: { id: pet.id } }">编辑</RouterLink>
+                  <RouterLink :to="{ name: 'frontend-petpal-request-create', query: { petId: pet.id } }">用它发需求</RouterLink>
+                </div>
+              </div>
+            </div>
+            <PetPalStatePanel
+              v-else
+              eyebrow="宠物档案"
+              title="还没有宠物档案"
+              description="先建第一只宠物，再去需求页提交时间、地点和预算。"
+            >
+              <template #actions>
+                <RouterLink :to="{ name: 'frontend-petpal-pet-create' }">
+                  <el-button size="small" type="primary">去建档</el-button>
+                </RouterLink>
+              </template>
+            </PetPalStatePanel>
+          </article>
 
-      <article class="frontend-card petpal-grid-span-4">
-        <span class="frontend-card__eyebrow">快捷入口</span>
-        <h3>直接操作</h3>
-        <div class="petpal-side-actions">
-          <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-caregiver' }">
-            照料者工作台
-          </RouterLink>
-          <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-messages' }">
-            消息中心
-          </RouterLink>
-          <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-reminders' }">
-            提醒中心
-          </RouterLink>
-          <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" :to="{ name: 'frontend-petpal-aftersales' }">
-            售后中心
-          </RouterLink>
-          <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" to="/petpal-admin">
-            后台工作区
-          </RouterLink>
-          <RouterLink class="frontend-page__button is-secondary petpal-side-actions__button" to="/login">
-            {{ auth.isAuthenticated ? '切换账号' : '登录后提交数据' }}
-          </RouterLink>
-        </div>
-      </article>
-    </section>
+          <article class="frontend-card petpal-grid-span-4">
+            <span class="frontend-card__eyebrow">需求队列</span>
+            <div class="petpal-section-head">
+              <h3>看活跃需求</h3>
+              <RouterLink :to="{ name: 'frontend-petpal-requests' }">查看全部</RouterLink>
+            </div>
 
-    <section class="frontend-page__section-grid">
-      <article class="frontend-card petpal-grid-span-4">
-        <span class="frontend-card__eyebrow">宠物档案</span>
-        <h3>{{ editingPetId ? '编辑宠物' : '新增宠物' }}</h3>
-        <el-form :model="petForm" label-position="top" size="small">
-          <el-form-item label="宠物名">
-            <el-input v-model="petForm.name" placeholder="例如：可乐" />
-          </el-form-item>
-          <el-form-item label="物种">
-            <el-select v-model="petForm.species" style="width: 100%">
-              <el-option label="犬" value="DOG" />
-              <el-option label="猫" value="CAT" />
-              <el-option label="其他" value="OTHER" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="品种">
-            <el-input v-model="petForm.breed" placeholder="可选" />
-          </el-form-item>
-          <el-form-item label="生日">
-            <el-date-picker
-              v-model="petForm.birthday"
-              type="date"
-              value-format="YYYY-MM-DD"
-              placeholder="可选"
-              style="width: 100%"
+            <div v-if="requests.length" class="petpal-card-stack">
+              <div v-for="request in requests.slice(0, 3)" :key="request.id" class="petpal-compact-card">
+                <div class="petpal-compact-card__head">
+                  <strong>{{ getPetPalServiceTypeLabel(request.serviceType) }}</strong>
+                  <span>{{ getPetPalServiceRequestStatusLabel(request.status) }}</span>
+                </div>
+                <p>{{ formatPetPalRange(request.startTime, request.endTime) }}</p>
+                <p>{{ request.locationText }}</p>
+                <div class="petpal-inline-actions">
+                  <RouterLink :to="{ name: 'frontend-petpal-requests' }">继续处理</RouterLink>
+                  <RouterLink v-if="request.matchedCaregiverId" :to="{ name: 'frontend-petpal-orders' }">去结算</RouterLink>
+                </div>
+              </div>
+            </div>
+            <PetPalStatePanel
+              v-else
+              eyebrow="需求队列"
+              title="当前没有活跃需求"
+              description="需求发布已经独立成表单页，创建后再回队列里看匹配和下单。"
+            >
+              <template #actions>
+                <RouterLink :to="{ name: 'frontend-petpal-request-create' }">
+                  <el-button size="small" type="primary">新建需求</el-button>
+                </RouterLink>
+              </template>
+            </PetPalStatePanel>
+          </article>
+
+          <article class="frontend-card petpal-grid-span-4">
+            <span class="frontend-card__eyebrow">订单队列</span>
+            <div class="petpal-section-head">
+              <h3>看当前交易</h3>
+              <RouterLink :to="{ name: 'frontend-petpal-orders' }">查看全部</RouterLink>
+            </div>
+
+            <div v-if="orders.length" class="petpal-card-stack">
+              <div v-for="order in recentOrders" :key="order.id" class="petpal-compact-card">
+                <div class="petpal-compact-card__head">
+                  <strong>{{ order.orderNo }}</strong>
+                  <span>{{ getPetPalOrderStatusLabel(order.orderStatus) }}</span>
+                </div>
+                <p>{{ getPetPalServiceTypeLabel(order.serviceType) }} · {{ formatPetPalRange(order.appointmentStart, order.appointmentEnd) }}</p>
+                <p>总额 ¥{{ formatPetPalAmount(Number(order.amountTotal) + Number(order.amountAdjusted)) }}</p>
+                <div class="petpal-inline-actions">
+                  <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: order.id } }">查看详情</RouterLink>
+                  <RouterLink
+                    v-if="isOrderOutstanding(order)"
+                    :to="{ name: 'frontend-petpal-payment-result', params: { id: order.id } }"
+                  >
+                    看支付状态
+                  </RouterLink>
+                </div>
+              </div>
+            </div>
+            <PetPalStatePanel
+              v-else
+              eyebrow="订单队列"
+              title="当前没有订单"
+              description="新的订单、支付和售后都从各自队列页继续处理，不再压在总览页里。"
             />
-          </el-form-item>
-          <el-form-item label="性别">
-            <el-select v-model="petForm.gender" style="width: 100%">
-              <el-option label="公" value="MALE" />
-              <el-option label="母" value="FEMALE" />
-              <el-option label="未知" value="UNKNOWN" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="体重(kg)">
-            <el-input-number v-model="petForm.weightKg" :min="0.1" :max="120" :precision="1" style="width: 100%" />
-          </el-form-item>
-          <el-form-item label="性格标签">
-            <el-input v-model="petTemperamentTagsText" placeholder="例如：亲人，活泼，胆小" />
-          </el-form-item>
-          <el-form-item label="喂养备注">
-            <el-input v-model="petForm.feedingNote" type="textarea" :rows="2" placeholder="例如：早晚各一次，换粮要慢" />
-          </el-form-item>
-          <el-form-item label="过敏提醒">
-            <el-input v-model="petForm.allergyNote" type="textarea" :rows="2" placeholder="例如：对鸡肉冻干过敏" />
-          </el-form-item>
-          <el-form-item label="健康备注">
-            <el-input v-model="petForm.medicalNote" type="textarea" :rows="3" placeholder="例如：近期体检结果、常用药、就诊史" />
-          </el-form-item>
-          <el-form-item label="紧急联系人">
-            <el-space direction="vertical" fill style="width: 100%">
-              <el-input v-model="petForm.emergencyContact.name" placeholder="联系人姓名" />
-              <el-input v-model="petForm.emergencyContact.phone" placeholder="联系电话" />
-              <el-input v-model="petForm.emergencyContact.relation" placeholder="关系，可选" />
-            </el-space>
-          </el-form-item>
-          <el-form-item>
-            <el-space>
-              <el-button type="primary" :loading="petSaving" @click="createPet">
-                {{ editingPetId ? '更新宠物档案' : '保存宠物' }}
-              </el-button>
-              <el-button v-if="editingPetId" @click="resetPetForm">取消编辑</el-button>
-            </el-space>
-          </el-form-item>
-        </el-form>
-      </article>
-
-      <article class="frontend-card petpal-grid-span-8">
-        <span class="frontend-card__eyebrow">宠物列表</span>
-        <h3>我的宠物</h3>
-        <PetPalStatePanel
-          v-if="petsLoadState === 'error'"
-          eyebrow="宠物列表"
-          title="宠物列表加载失败"
-          :description="petsLoadErrorMessage"
-          tone="danger"
-        >
-          <template #actions>
-            <el-button size="small" type="primary" :loading="sectionReloadingKey === 'pets'" @click="retryPetsSection">重试宠物列表</el-button>
-          </template>
-        </PetPalStatePanel>
-
-        <template v-else>
-          <el-table :data="pets" size="small" v-loading="petsLoading">
-            <el-table-column prop="name" label="名称" min-width="120" />
-            <el-table-column prop="species" label="物种" min-width="100" />
-            <el-table-column prop="breed" label="品种" min-width="120" />
-            <el-table-column prop="birthday" label="生日" min-width="120">
-              <template #default="scope">
-                {{ scope.row.birthday ? scope.row.birthday.slice(0, 10) : '-' }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="weightKg" label="体重" min-width="100">
-              <template #default="scope">
-                {{ scope.row.weightKg ?? '-' }}
-              </template>
-            </el-table-column>
-            <el-table-column label="性格标签" min-width="180" show-overflow-tooltip>
-              <template #default="scope">
-                {{ formatPetTagSummary(scope.row.temperamentTags) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="喂养/健康" min-width="260" show-overflow-tooltip>
-              <template #default="scope">
-                {{ [scope.row.feedingNote, scope.row.allergyNote, scope.row.medicalNote].filter(Boolean).join(' ｜ ') || '-' }}
-              </template>
-            </el-table-column>
-            <el-table-column label="紧急联系人" min-width="220" show-overflow-tooltip>
-              <template #default="scope">
-                {{ formatEmergencyContact(scope.row.emergencyContact) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="createdAt" label="创建时间" min-width="170">
-              <template #default="scope">
-                {{ formatTime(scope.row.createdAt) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" min-width="120" fixed="right">
-              <template #default="scope">
-                <el-space>
-                  <el-button link type="primary" size="small" @click="startEditPet(scope.row)">编辑</el-button>
-                  <el-button link type="success" size="small" @click="requestForm.petId = scope.row.id">选中</el-button>
-                </el-space>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <PetPalStatePanel
-            v-if="!petsLoading && pets.length === 0"
-            eyebrow="宠物列表"
-            title="还没有宠物档案"
-            description="主人主流程建议从宠物建档开始。先补齐第一只宠物的基础信息、喂养备注和紧急联系人，再继续发布需求。"
-          >
-            <template #actions>
-              <el-button size="small" type="primary" @click="resetPetForm">开始建档</el-button>
-              <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
-                <el-button size="small">看提醒中心</el-button>
-              </RouterLink>
-            </template>
-          </PetPalStatePanel>
-        </template>
-      </article>
-        </section>
-
-        <section class="frontend-page__section-grid">
-      <article class="frontend-card petpal-grid-span-5">
-        <span class="frontend-card__eyebrow">服务需求</span>
-        <h3>发布需求</h3>
-        <el-form :model="requestForm" label-position="top" size="small">
-          <el-form-item label="宠物">
-            <el-select v-model="requestForm.petId" style="width: 100%" placeholder="先创建宠物后再发布需求">
-              <el-option v-for="pet in pets" :key="pet.id" :label="`${pet.name}(${pet.species})`" :value="pet.id" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="服务类型">
-            <el-select v-model="requestForm.serviceType" style="width: 100%">
-              <el-option label="寄养" value="BOARDING" />
-              <el-option label="遛宠" value="WALKING" />
-              <el-option label="喂养" value="FEEDING" />
-              <el-option label="上门" value="DOOR_VISIT" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="开始时间">
-            <el-date-picker v-model="requestForm.startTime" type="datetime" style="width: 100%" />
-          </el-form-item>
-          <el-form-item label="结束时间">
-            <el-date-picker v-model="requestForm.endTime" type="datetime" style="width: 100%" />
-          </el-form-item>
-          <el-form-item label="地点描述">
-            <el-input v-model="requestForm.locationText" placeholder="例如：上海市静安区" />
-          </el-form-item>
-          <el-form-item label="预算(元)">
-            <el-input-number v-model="requestForm.budgetAmount" :min="1" :max="20000" style="width: 100%" />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" :loading="requestSaving" @click="createRequest">发布需求</el-button>
-          </el-form-item>
-        </el-form>
-      </article>
-
-      <article class="frontend-card petpal-grid-span-7">
-        <span class="frontend-card__eyebrow">当前业务进展</span>
-        <div class="petpal-section-heading">
-          <div class="petpal-section-heading__meta">
-            <h3>需求与订单</h3>
-            <p>主人页已经直接承接订单导出、退款导出和确认完成动作；`legacy` 只保留旧书签兼容与任务分发。</p>
-            <p v-if="auth.isAuthenticated" class="petpal-section-heading__hint">
-              退款导出默认覆盖最近一年，可按退款日期、退款状态、投诉状态、投诉类型与投诉对象等收窄范围。
-            </p>
-          </div>
-          <div v-if="auth.isAuthenticated" class="petpal-export-toolbar">
-            <el-space wrap :size="10">
-              <el-date-picker
-                v-model="ownerRefundExportDateRange"
-                type="daterange"
-                unlink-panels
-                clearable
-                range-separator="至"
-                start-placeholder="退款开始日期"
-                end-placeholder="退款结束日期"
-                size="small"
-                style="width: min(100%, 320px)"
-              />
-              <el-select
-                v-model="ownerRefundExportType"
-                clearable
-                placeholder="退款类型"
-                size="small"
-                style="width: 140px"
-              >
-                <el-option
-                  v-for="option in refundTypeOptions"
-                  :key="option.value"
-                  :label="option.label"
-                  :value="option.value"
-                />
-              </el-select>
-              <el-select
-                v-model="ownerRefundExportStatus"
-                clearable
-                placeholder="退款状态"
-                size="small"
-                style="width: 140px"
-              >
-                <el-option
-                  v-for="option in refundStatusOptions"
-                  :key="option.value"
-                  :label="option.label"
-                  :value="option.value"
-                />
-              </el-select>
-              <el-select
-                v-model="ownerRefundExportComplaintStatus"
-                clearable
-                placeholder="投诉状态"
-                size="small"
-                style="width: 140px"
-              >
-                <el-option
-                  v-for="option in complaintStatusOptions"
-                  :key="option.value"
-                  :label="option.label"
-                  :value="option.value"
-                />
-              </el-select>
-              <el-select
-                v-model="ownerRefundExportComplaintType"
-                clearable
-                placeholder="投诉类型"
-                size="small"
-                style="width: 140px"
-              >
-                <el-option
-                  v-for="option in complaintTypeOptions"
-                  :key="option.value"
-                  :label="option.label"
-                  :value="option.value"
-                />
-              </el-select>
-              <el-select
-                v-model="ownerRefundExportComplaintTargetRole"
-                clearable
-                placeholder="投诉对象"
-                size="small"
-                style="width: 140px"
-              >
-                <el-option
-                  v-for="option in complaintTargetRoleOptions"
-                  :key="option.value"
-                  :label="option.label"
-                  :value="option.value"
-                />
-              </el-select>
-              <el-select
-                v-model="ownerRefundExportServiceType"
-                clearable
-                placeholder="服务类型"
-                size="small"
-                style="width: 140px"
-              >
-                <el-option
-                  v-for="option in refundExportServiceTypeOptions"
-                  :key="option.value"
-                  :label="option.label"
-                  :value="option.value"
-                />
-              </el-select>
-              <el-input
-                v-model="ownerRefundExportOrderNoKeyword"
-                clearable
-                maxlength="64"
-                placeholder="订单号关键词"
-                size="small"
-                style="width: min(100%, 180px)"
-              />
-            </el-space>
-            <el-space wrap>
-              <el-select
-                v-model="selectedOwnerRefundExportTemplateId"
-                clearable
-                placeholder="常用筛选模板"
-                size="small"
-                style="width: 180px"
-              >
-                <el-option
-                  v-for="template in ownerRefundExportTemplates"
-                  :key="template.id"
-                  :label="template.name"
-                  :value="template.id"
-                />
-              </el-select>
-              <el-button
-                plain
-                size="small"
-                :disabled="!selectedOwnerRefundExportTemplateId"
-                @click="applySelectedOwnerRefundExportTemplate"
-              >
-                应用模板
-              </el-button>
-              <el-button
-                plain
-                size="small"
-                @click="saveCurrentOwnerRefundExportTemplate"
-              >
-                保存为模板
-              </el-button>
-              <el-button
-                plain
-                size="small"
-                :disabled="!selectedOwnerRefundExportTemplateId"
-                @click="deleteSelectedOwnerRefundExportTemplate"
-              >
-                删除模板
-              </el-button>
-              <el-button
-                plain
-                size="small"
-                :disabled="!hasStoredOwnerRefundExportFilters"
-                @click="restoreStoredOwnerRefundExportFilters"
-              >
-                恢复上次筛选
-              </el-button>
-              <el-button
-                plain
-                size="small"
-                @click="clearOwnerRefundExportFilters"
-              >
-                清空筛选
-              </el-button>
-              <ListExportButton
-                :request="buildOwnerTransactionExportRequest"
-                label="导出近一年交易"
-                pending-label="导出中"
-                error-message="导出交易记录失败"
-              />
-              <ListExportButton
-                :request="buildOwnerRefundExportRequest"
-                label="导出退款明细"
-                pending-label="导出中"
-                error-message="导出退款明细失败"
-              />
-              <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-legacy' }">
-                兼容混合视图
-              </RouterLink>
-            </el-space>
-          </div>
-          <RouterLink v-else class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-legacy' }">
-            兼容混合视图
-          </RouterLink>
-        </div>
-
-        <div class="petpal-request-list">
-          <div class="petpal-mini-panel">
-            <h4>近期需求</h4>
-            <PetPalStatePanel
-              v-if="requestsLoadState === 'error'"
-              eyebrow="近期需求"
-              title="主人需求列表加载失败"
-              :description="requestsLoadErrorMessage"
-              tone="danger"
-            >
-              <template #actions>
-                <el-button size="small" type="primary" :loading="sectionReloadingKey === 'requests'" @click="retryRequestsSection">重试需求列表</el-button>
-              </template>
-            </PetPalStatePanel>
-
-            <template v-else>
-              <el-table :data="requests" size="small" v-loading="requestsLoading">
-                <el-table-column label="宠物" min-width="120">
-                  <template #default="scope">
-                    {{ scope.row.pet?.name || '-' }}
-                  </template>
-                </el-table-column>
-                <el-table-column prop="serviceType" label="服务" min-width="100" />
-                <el-table-column prop="locationText" label="地点" min-width="140" show-overflow-tooltip />
-                <el-table-column prop="budgetAmount" label="预算" min-width="100" />
-                <el-table-column prop="status" label="状态" min-width="120" />
-                <el-table-column prop="startTime" label="开始时间" min-width="170">
-                  <template #default="scope">
-                    {{ formatTime(scope.row.startTime) }}
-                  </template>
-                </el-table-column>
-              </el-table>
-
-              <PetPalStatePanel
-                v-if="!requestsLoading && requests.length === 0"
-                eyebrow="近期需求"
-                title="当前还没有主人需求"
-                description="可以直接在左侧发布第一条真实照料需求，或先去宠物档案补充更多信息再回来发布。"
-              >
-                <template #actions>
-                  <el-button size="small" type="primary" :loading="sectionReloadingKey === 'requests'" @click="retryRequestsSection">刷新需求区</el-button>
-                  <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
-                    <el-button size="small">看提醒中心</el-button>
-                  </RouterLink>
-                </template>
-              </PetPalStatePanel>
-            </template>
-          </div>
-
-          <div class="petpal-mini-panel">
-            <h4>订单跟进</h4>
-            <PetPalStatePanel
-              v-if="ordersLoadState === 'error'"
-              eyebrow="订单跟进"
-              title="主人订单列表加载失败"
-              :description="ordersLoadErrorMessage"
-              tone="danger"
-            >
-              <template #actions>
-                <el-button size="small" type="primary" :loading="sectionReloadingKey === 'orders'" @click="retryOrdersSection">重试订单列表</el-button>
-              </template>
-            </PetPalStatePanel>
-
-            <template v-else>
-              <el-table :data="orders" size="small" v-loading="ordersLoading">
-                <el-table-column prop="orderNo" label="订单号" min-width="160" />
-                <el-table-column prop="orderStatus" label="状态" min-width="120">
-                  <template #default="scope">
-                    {{ getOrderStatusLabel(scope.row.orderStatus) }}
-                  </template>
-                </el-table-column>
-                <el-table-column prop="amountTotal" label="总额" min-width="100" />
-                <el-table-column prop="amountPaid" label="已付" min-width="100" />
-                <el-table-column prop="amountRefunded" label="已退" min-width="100" />
-                <el-table-column label="订单沟通" min-width="280">
-                  <template #default="scope">
-                    <div class="petpal-conversation-cell">
-                      <div class="petpal-conversation-cell__copy">
-                        <p class="petpal-conversation-cell__preview">
-                          {{ formatConversationPreview(scope.row.conversation) }}
-                        </p>
-                        <p class="petpal-conversation-cell__meta">
-                          {{ formatConversationMeta(scope.row.conversation, 'owner') }}
-                        </p>
-                      </div>
-                      <el-tag
-                        v-if="getConversationUnreadCount(scope.row.conversation, 'owner') > 0"
-                        type="danger"
-                        size="small"
-                      >
-                        待读 {{ getConversationUnreadCount(scope.row.conversation, 'owner') }}
-                      </el-tag>
-                    </div>
-                  </template>
-                </el-table-column>
-                <el-table-column label="操作" min-width="190" fixed="right">
-                  <template #default="scope">
-                    <el-space>
-                      <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: scope.row.id } }">
-                        <el-button link type="primary" size="small">详情</el-button>
-                      </RouterLink>
-                      <el-button
-                        v-if="scope.row.orderStatus === 'SERVING'"
-                        link
-                        type="success"
-                        size="small"
-                        :loading="ownerActionLoadingKey === `confirm:${scope.row.id}`"
-                        @click="confirmOrderComplete(scope.row.id)"
-                      >
-                        确认完成
-                      </el-button>
-                    </el-space>
-                  </template>
-                </el-table-column>
-              </el-table>
-
-              <PetPalStatePanel
-                v-if="!ordersLoading && orders.length === 0"
-                eyebrow="订单跟进"
-                title="当前还没有主人订单"
-                description="订单会在需求匹配和下单完成后出现在这里。你可以继续发布需求，或先去匹配列表看是否有合适照料者。"
-              >
-                <template #actions>
-                  <el-button size="small" type="primary" :loading="sectionReloadingKey === 'orders'" @click="retryOrdersSection">刷新订单区</el-button>
-                  <RouterLink :to="{ name: 'frontend-petpal-reminders' }">
-                    <el-button size="small">看提醒中心</el-button>
-                  </RouterLink>
-                </template>
-              </PetPalStatePanel>
-            </template>
-          </div>
-        </div>
-      </article>
-        </section>
-
-        <section class="frontend-card">
-      <span class="frontend-card__eyebrow">匹配照料者</span>
-      <div class="petpal-section-heading">
-        <div class="petpal-section-heading__meta">
-          <h3>按服务类型和宠物种类快速筛选</h3>
-          <p>如果你要切换为照料者视角维护报价、入驻和履约，请进入独立照料者工作台。</p>
-        </div>
-        <RouterLink class="frontend-page__button is-secondary" :to="{ name: 'frontend-petpal-caregiver' }">
-          切到照料者页
-        </RouterLink>
-      </div>
-
-      <el-form :inline="true" :model="matchQuery" size="small" class="petpal-match-form">
-        <el-form-item label="服务">
-          <el-select v-model="matchQuery.serviceType" style="width: 140px">
-            <el-option label="寄养" value="BOARDING" />
-            <el-option label="遛宠" value="WALKING" />
-            <el-option label="喂养" value="FEEDING" />
-            <el-option label="上门" value="DOOR_VISIT" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="宠物种类">
-          <el-select v-model="matchQuery.petSpecies" style="width: 120px">
-            <el-option label="犬" value="DOG" />
-            <el-option label="猫" value="CAT" />
-            <el-option label="其他" value="OTHER" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="城市">
-          <el-input v-model="matchQuery.city" placeholder="可选" style="width: 180px" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="matchLoading" @click="refreshMatches">开始匹配</el-button>
-        </el-form-item>
-      </el-form>
-
-      <PetPalStatePanel
-        v-if="matchesLoadState === 'error'"
-        eyebrow="匹配结果"
-        title="照料者匹配加载失败"
-        :description="matchesLoadErrorMessage"
-        tone="danger"
-      >
-        <template #actions>
-          <el-button size="small" type="primary" :loading="sectionReloadingKey === 'matches'" @click="retryMatchesSection">重试匹配区</el-button>
-          <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
-            <el-button size="small">查看照料者工作台</el-button>
-          </RouterLink>
-        </template>
-      </PetPalStatePanel>
-
-      <template v-else>
-        <el-table :data="matchItems" size="small" v-loading="matchLoading">
-          <el-table-column prop="caregiverName" label="照料者" min-width="140" />
-          <el-table-column prop="city" label="城市" min-width="120" />
-          <el-table-column prop="pricePerUnit" label="价格" min-width="100" />
-          <el-table-column prop="unitType" label="计价单位" min-width="120" />
-          <el-table-column prop="ratingAvg" label="评分" min-width="100" />
-          <el-table-column prop="distanceKm" label="距离(km)" min-width="120">
-            <template #default="scope">
-              {{ scope.row.distanceKm ?? '-' }}
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <PetPalStatePanel
-          v-if="!matchLoading && matchItems.length === 0"
-          eyebrow="匹配结果"
-          title="当前筛选下没有合适照料者"
-          description="可以尝试放宽城市或服务类型筛选，或者先进入提醒中心和消息中心处理已在推进中的订单。"
-        >
-          <template #actions>
-            <el-button size="small" type="primary" :loading="sectionReloadingKey === 'matches'" @click="retryMatchesSection">重新匹配</el-button>
-            <RouterLink :to="{ name: 'frontend-petpal-caregiver' }">
-              <el-button size="small">查看照料者工作台</el-button>
-            </RouterLink>
-          </template>
-        </PetPalStatePanel>
-      </template>
+          </article>
         </section>
       </template>
     </template>
 
     <section v-else class="frontend-card">
       <PetPalStatePanel
-        eyebrow="开始使用"
-        title="登录后进入主人服务台"
-        description="主人服务台会集中展示宠物建档、需求发布、订单跟进、匹配照料者和导出相关能力。未登录时不加载任何主人业务数据。"
+        eyebrow="主人工作区"
+        title="登录后继续主人任务"
+        description="登录后从总览页直接进入宠物、需求、订单和售后的独立页面。"
       >
         <template #actions>
           <RouterLink to="/login">
             <el-button size="small" type="primary">去登录</el-button>
-          </RouterLink>
-          <RouterLink :to="{ name: 'frontend-petpal-legacy' }">
-            <el-button size="small">看兼容入口</el-button>
           </RouterLink>
         </template>
       </PetPalStatePanel>
@@ -730,1062 +207,181 @@ Secondary actions: 消息、提醒、身份切换
 </template>
 
 <script setup lang="ts">
-import type {
-  ComplaintTargetRole,
-  ComplaintStatus,
-  ComplaintType,
-  CreatePetPayload,
-  CreateServiceRequestPayload,
-  MatchCaregiverQuery,
-  MatchedCaregiverRecord,
-  OrderRecord,
-  OwnerRefundExportQuery,
-  OrderStatus,
-  PetGender,
-  PetProfileRecord,
-  PetServiceType,
-  PetSpecies,
-  RefundStatus,
-  RefundType,
-  ServiceRequestRecord,
-} from '@rbac/api-common';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import type { OrderRecord, PetProfileRecord, ServiceRequestRecord } from '@rbac/api-common';
+import { computed, onMounted, ref } from 'vue';
+import { ElButton } from 'element-plus';
+import { RouterLink } from 'vue-router';
 import { api } from '@/api/client';
-import ListExportButton from '@/components/download/ListExportButton.vue';
+import PetPalStatePanel from '@/pages/frontend/petpal/PetPalStatePanel.vue';
+import PetPalWorkspaceHero from '@/pages/frontend/petpal/components/PetPalWorkspaceHero.vue';
 import { useAuthStore } from '@/stores/auth';
-import { useWorkbenchStore } from '@/stores/workbench';
 import { getErrorMessage } from '@/utils/errors';
-import PetPalStatePanel from './PetPalStatePanel.vue';
 import {
-  mergePetPalPageNotice,
-  runPetPalSectionRetry,
-  type PetPalSectionLoadState,
-} from './recovery';
-
-defineOptions({
-  name: 'PetPalOwnerView',
-});
-
-type PageLoadState = 'idle' | 'ready' | 'error';
-
-type PetFormState = {
-  name: string;
-  species: PetSpecies;
-  gender: PetGender;
-  breed: string;
-  birthday: string;
-  weightKg: number;
-  neutered: boolean;
-  temperamentTags: string[];
-  feedingNote: string;
-  allergyNote: string;
-  medicalNote: string;
-  emergencyContact: {
-    name: string;
-    phone: string;
-    relation: string;
-  };
-};
+  formatPetPalAmount,
+  formatPetPalRange,
+  getPetPalOrderStatusLabel,
+  getPetPalServiceRequestStatusLabel,
+  getPetPalServiceTypeLabel,
+  petPalOwnerWorkspaceNav,
+} from './shared';
 
 const auth = useAuthStore();
-const workbench = useWorkbenchStore();
+
+const loading = ref(false);
+const pageLoadState = ref<'idle' | 'ready' | 'error'>('idle');
+const pageLoadErrorMessage = ref('');
 
 const pets = ref<PetProfileRecord[]>([]);
 const requests = ref<ServiceRequestRecord[]>([]);
 const orders = ref<OrderRecord[]>([]);
-const matchItems = ref<MatchedCaregiverRecord[]>([]);
-const editingPetId = ref('');
-const petTemperamentTagsText = ref('');
 
-const petsLoading = ref(false);
-const requestsLoading = ref(false);
-const ordersLoading = ref(false);
-const matchLoading = ref(false);
-const petSaving = ref(false);
-const requestSaving = ref(false);
-const ownerActionLoadingKey = ref('');
-const pageLoadState = ref<PageLoadState>('idle');
-const pageLoadErrorMessage = ref('');
-const partialLoadNotice = ref('');
-const petsLoadState = ref<PetPalSectionLoadState>('idle');
-const requestsLoadState = ref<PetPalSectionLoadState>('idle');
-const ordersLoadState = ref<PetPalSectionLoadState>('idle');
-const matchesLoadState = ref<PetPalSectionLoadState>('idle');
-const petsLoadErrorMessage = ref('');
-const requestsLoadErrorMessage = ref('');
-const ordersLoadErrorMessage = ref('');
-const matchesLoadErrorMessage = ref('');
-const sectionReloadingKey = ref<'' | 'pets' | 'requests' | 'orders' | 'matches'>('');
+const activeRequests = computed(() => requests.value.filter((item) => ['OPEN', 'MATCHED', 'MATCHING'].includes(item.status)));
+const activeOrders = computed(() => orders.value.filter((item) => ['PENDING_ACCEPT', 'ACCEPTED', 'SERVING'].includes(item.orderStatus)));
+const aftersalesOrders = computed(() => orders.value.filter((item) => ['DISPUTED', 'PARTIAL_REFUNDED', 'REFUNDED'].includes(item.orderStatus)));
+const outstandingOrders = computed(() => orders.value.filter(isOrderOutstanding));
+const recentOrders = computed(() => [...orders.value].slice(0, 3));
 
-const petForm = reactive<PetFormState>({
-  name: '',
-  species: 'DOG',
-  gender: 'UNKNOWN',
-  breed: '',
-  birthday: '',
-  weightKg: 5,
-  neutered: false,
-  temperamentTags: [],
-  feedingNote: '',
-  allergyNote: '',
-  medicalNote: '',
-  emergencyContact: {
-    name: '',
-    phone: '',
-    relation: '',
+const heroStats = computed(() => [
+  {
+    label: '宠物档案',
+    value: String(pets.value.length),
+    hint: pets.value.length ? '可直接带入需求' : '先建第一只宠物',
   },
-});
+  {
+    label: '活跃需求',
+    value: String(activeRequests.value.length),
+    hint: activeRequests.value.length ? '去队列里继续匹配' : '当前可新建需求',
+  },
+  {
+    label: '进行中订单',
+    value: String(activeOrders.value.length),
+    hint: activeOrders.value.length ? '优先看订单状态' : '当前没有履约中订单',
+  },
+  {
+    label: '售后事项',
+    value: String(aftersalesOrders.value.length),
+    hint: aftersalesOrders.value.length ? '售后中心有待处理事项' : '当前没有售后积压',
+  },
+]);
 
-const requestForm = reactive<{
-  petId: string;
-  serviceType: CreateServiceRequestPayload['serviceType'];
-  startTime: Date;
-  endTime: Date;
-  locationText: string;
-  budgetAmount: number;
-}>({
-  petId: '',
-  serviceType: 'BOARDING',
-  startTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
-  endTime: new Date(Date.now() + 48 * 60 * 60 * 1000),
-  locationText: '',
-  budgetAmount: 200,
-});
-
-const matchQuery = reactive<MatchCaregiverQuery>({
-  serviceType: 'BOARDING',
-  petSpecies: 'DOG',
-  city: '',
-  page: 1,
-  pageSize: 10,
-});
-
-const refundStatusOptions: Array<{ label: string; value: RefundStatus }> = [
-  { label: '待审核', value: 'PENDING' },
-  { label: '已审核', value: 'APPROVED' },
-  { label: '已驳回', value: 'REJECTED' },
-  { label: '退款成功', value: 'SUCCESS' },
-  { label: '退款失败', value: 'FAILED' },
-];
-
-const refundTypeOptions: Array<{ label: string; value: RefundType }> = [
-  { label: '全额退款', value: 'FULL' },
-  { label: '部分退款', value: 'PARTIAL' },
-];
-
-const complaintStatusOptions: Array<{ label: string; value: ComplaintStatus }> = [
-  { label: '待处理', value: 'OPEN' },
-  { label: '处理中', value: 'PROCESSING' },
-  { label: '已解决', value: 'RESOLVED' },
-  { label: '已驳回', value: 'REJECTED' },
-];
-
-const complaintTypeOptions: Array<{ label: string; value: ComplaintType }> = [
-  { label: '安全问题', value: 'SAFETY' },
-  { label: '费用争议', value: 'FEE' },
-  { label: '服务质量', value: 'SERVICE' },
-  { label: '欺诈风险', value: 'FRAUD' },
-  { label: '其他问题', value: 'OTHER' },
-];
-
-const complaintTargetRoleOptions: Array<{ label: string; value: ComplaintTargetRole }> = [
-  { label: '照料者', value: 'CAREGIVER' },
-  { label: '平台', value: 'PLATFORM' },
-];
-
-const refundExportServiceTypeOptions: Array<{ label: string; value: PetServiceType }> = [
-  { label: '寄养', value: 'BOARDING' },
-  { label: '遛宠', value: 'WALKING' },
-  { label: '喂养', value: 'FEEDING' },
-  { label: '上门陪伴', value: 'DOOR_VISIT' },
-];
-
-const OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY = 'page:petpal:owner-refund-export-filters';
-const OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY = 'petpal-owner-refund-export-filters-v2';
-const OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY = 'petpal-owner-refund-export-filters-v1';
-const OWNER_REFUND_EXPORT_TEMPLATE_LIMIT = 5;
-
-type OwnerRefundExportFilterSnapshot = {
-  ownerUserId: string;
-  dateRange: [string, string] | null;
-  refundType: RefundType | '';
-  refundStatus: RefundStatus | '';
-  complaintStatus: ComplaintStatus | '';
-  complaintType: ComplaintType | '';
-  complaintTargetRole: ComplaintTargetRole | '';
-  serviceType: PetServiceType | '';
-  orderNoKeyword: string;
-};
-
-type OwnerRefundExportFilterTemplate = {
-  id: string;
-  name: string;
-  snapshot: OwnerRefundExportFilterSnapshot;
-  updatedAt: string;
-};
-
-type OwnerRefundExportFilterStorageEntry = {
-  lastUsed: OwnerRefundExportFilterSnapshot | null;
-  templates: OwnerRefundExportFilterTemplate[];
-};
-
-type OwnerRefundExportFilterStorage = {
-  version: 2;
-  users: Record<string, OwnerRefundExportFilterStorageEntry>;
-};
-
-const ownerRefundExportDateRange = ref<[Date, Date] | null>(null);
-const ownerRefundExportType = ref<RefundType | ''>('');
-const ownerRefundExportStatus = ref<RefundStatus | ''>('');
-const ownerRefundExportComplaintStatus = ref<ComplaintStatus | ''>('');
-const ownerRefundExportComplaintType = ref<ComplaintType | ''>('');
-const ownerRefundExportComplaintTargetRole = ref<ComplaintTargetRole | ''>('');
-const ownerRefundExportServiceType = ref<PetServiceType | ''>('');
-const ownerRefundExportOrderNoKeyword = ref('');
-const hasStoredOwnerRefundExportFilters = ref(false);
-const ownerRefundExportTemplates = ref<OwnerRefundExportFilterTemplate[]>([]);
-const selectedOwnerRefundExportTemplateId = ref('');
-
-const pageLoading = computed(() => (
-  petsLoading.value
-  || requestsLoading.value
-  || ordersLoading.value
-  || matchLoading.value
-  || petSaving.value
-  || requestSaving.value
-  || Boolean(ownerActionLoadingKey.value)
-));
-
-const unreadOwnerConversationCount = computed(() => orders.value.reduce((total, item) => (
-  total + getConversationUnreadCount(item.conversation, 'owner')
-), 0));
-
-const formatTime = (value: string) => new Date(value).toLocaleString();
-
-const toDayBoundaryIsoString = (value: Date, boundary: 'start' | 'end') => {
-  const next = new Date(value);
-  if (boundary === 'start') {
-    next.setHours(0, 0, 0, 0);
-  } else {
-    next.setHours(23, 59, 59, 999);
-  }
-  return next.toISOString();
-};
-
-const getOrderStatusLabel = (status: OrderStatus) => ({
-  PENDING_ACCEPT: '待接单',
-  ACCEPTED: '已接单',
-  SERVING: '服务中',
-  COMPLETED: '已完成',
-  CANCELLED: '已取消',
-  DISPUTED: '纠纷中',
-  PARTIAL_REFUNDED: '部分退款',
-  REFUNDED: '已退款',
-}[status] ?? status);
-
-const getConversationUnreadCount = (
-  conversation: OrderRecord['conversation'] | null | undefined,
-  role: 'owner' | 'caregiver',
-) => {
-  if (!conversation) {
-    return 0;
-  }
-  return role === 'owner' ? conversation.ownerUnreadCount : conversation.caregiverUnreadCount;
-};
-
-const formatConversationPreview = (conversation: OrderRecord['conversation'] | null | undefined) => {
-  const preview = conversation?.lastMessagePreview?.trim();
-  if (preview) {
-    return preview;
-  }
-  if (conversation?.lastMessageAt) {
-    return '最近更新了一条附件或简短消息';
-  }
-  return '暂未开始订单沟通，可进入详情页发送消息。';
-};
-
-const formatConversationMeta = (
-  conversation: OrderRecord['conversation'] | null | undefined,
-  role: 'owner' | 'caregiver',
-) => {
-  const unreadCount = getConversationUnreadCount(conversation, role);
-  const unreadText = unreadCount > 0 ? `${unreadCount} 条未读` : '已读完';
-  if (conversation?.lastMessageAt) {
-    return `${formatTime(conversation.lastMessageAt)} · ${unreadText}`;
-  }
-  return unreadCount > 0 ? unreadText : '暂无沟通记录';
-};
-
-const splitTagText = (value: string) => [...new Set(
-  value
-    .split(/[\n,，、]/)
-    .map(item => item.trim())
-    .filter(Boolean),
-)];
-
-const joinTagText = (tags?: string[]) => (tags ?? []).join('，');
-
-const resetOwnerRefundExportFilters = () => {
-  ownerRefundExportDateRange.value = null;
-  ownerRefundExportType.value = '';
-  ownerRefundExportStatus.value = '';
-  ownerRefundExportComplaintStatus.value = '';
-  ownerRefundExportComplaintType.value = '';
-  ownerRefundExportComplaintTargetRole.value = '';
-  ownerRefundExportServiceType.value = '';
-  ownerRefundExportOrderNoKeyword.value = '';
-};
-
-const createEmptyOwnerRefundExportFilterStorageEntry = (): OwnerRefundExportFilterStorageEntry => ({
-  lastUsed: null,
-  templates: [],
-});
-
-const createEmptyOwnerRefundExportFilterStorage = (): OwnerRefundExportFilterStorage => ({
-  version: 2,
-  users: {},
-});
-
-const normalizeOwnerRefundExportDateRange = (value: unknown): [string, string] | null => {
-  if (!Array.isArray(value) || value.length !== 2) {
-    return null;
-  }
-
-  const [start, end] = value;
-  return typeof start === 'string' && typeof end === 'string' ? [start, end] : null;
-};
-
-const normalizeOwnerRefundExportFilterSnapshot = (
-  value: Partial<OwnerRefundExportFilterSnapshot>,
-): OwnerRefundExportFilterSnapshot | null => {
-  if (typeof value.ownerUserId !== 'string' || value.ownerUserId.length === 0) {
-    return null;
-  }
-
-  return {
-    ownerUserId: value.ownerUserId,
-    dateRange: normalizeOwnerRefundExportDateRange(value.dateRange),
-    refundType: value.refundType === 'FULL' || value.refundType === 'PARTIAL' ? value.refundType : '',
-    refundStatus: value.refundStatus === 'PENDING'
-      || value.refundStatus === 'APPROVED'
-      || value.refundStatus === 'REJECTED'
-      || value.refundStatus === 'SUCCESS'
-      || value.refundStatus === 'FAILED'
-      ? value.refundStatus
-      : '',
-    complaintStatus: value.complaintStatus === 'OPEN'
-      || value.complaintStatus === 'PROCESSING'
-      || value.complaintStatus === 'RESOLVED'
-      || value.complaintStatus === 'REJECTED'
-      ? value.complaintStatus
-      : '',
-    complaintType: value.complaintType === 'SAFETY'
-      || value.complaintType === 'FEE'
-      || value.complaintType === 'SERVICE'
-      || value.complaintType === 'FRAUD'
-      || value.complaintType === 'OTHER'
-      ? value.complaintType
-      : '',
-    complaintTargetRole: value.complaintTargetRole === 'CAREGIVER' || value.complaintTargetRole === 'PLATFORM'
-      ? value.complaintTargetRole
-      : '',
-    serviceType: value.serviceType === 'BOARDING'
-      || value.serviceType === 'WALKING'
-      || value.serviceType === 'FEEDING'
-      || value.serviceType === 'DOOR_VISIT'
-      ? value.serviceType
-      : '',
-    orderNoKeyword: typeof value.orderNoKeyword === 'string' ? value.orderNoKeyword.trim() : '',
-  };
-};
-
-const normalizeOwnerRefundExportFilterTemplate = (
-  value: Partial<OwnerRefundExportFilterTemplate>,
-): OwnerRefundExportFilterTemplate | null => {
-  const snapshot = normalizeOwnerRefundExportFilterSnapshot(value.snapshot ?? {});
-  const name = typeof value.name === 'string' ? value.name.trim() : '';
-  if (!snapshot || typeof value.id !== 'string' || value.id.length === 0 || name.length === 0) {
-    return null;
-  }
-
-  return {
-    id: value.id,
-    name: name.slice(0, 20),
-    snapshot,
-    updatedAt: typeof value.updatedAt === 'string' && value.updatedAt.length > 0
-      ? value.updatedAt
-      : new Date().toISOString(),
-  };
-};
-
-const normalizeOwnerRefundExportFilterStorage = (value: unknown): OwnerRefundExportFilterStorage => {
-  if (!value || typeof value !== 'object' || !('users' in value) || typeof value.users !== 'object' || !value.users) {
-    return createEmptyOwnerRefundExportFilterStorage();
-  }
-
-  const parsedUsers = value.users as Record<string, Partial<OwnerRefundExportFilterStorageEntry>>;
-  const users = Object.fromEntries(
-    Object.entries(parsedUsers).map(([ownerUserId, entry]) => {
-      const lastUsed = normalizeOwnerRefundExportFilterSnapshot(entry.lastUsed ?? {});
-      const templates = Array.isArray(entry.templates)
-        ? entry.templates
-          .map(item => normalizeOwnerRefundExportFilterTemplate(item as Partial<OwnerRefundExportFilterTemplate>))
-          .filter((item): item is OwnerRefundExportFilterTemplate => Boolean(item))
-        : [];
-
-      return [
-        ownerUserId,
-        {
-          lastUsed,
-          templates,
-        } satisfies OwnerRefundExportFilterStorageEntry,
-      ];
-    }),
-  );
-
-  return {
-    version: 2,
-    users,
-  };
-};
-
-const buildOwnerRefundExportFilterSnapshot = (): OwnerRefundExportFilterSnapshot | null => {
-  const ownerUserId = auth.user?.id;
-  if (!ownerUserId) {
-    return null;
-  }
-
-  return {
-    ownerUserId,
-    dateRange: ownerRefundExportDateRange.value
-      ? [
-          ownerRefundExportDateRange.value[0].toISOString(),
-          ownerRefundExportDateRange.value[1].toISOString(),
-        ]
-      : null,
-    refundType: ownerRefundExportType.value,
-    refundStatus: ownerRefundExportStatus.value,
-    complaintStatus: ownerRefundExportComplaintStatus.value,
-    complaintType: ownerRefundExportComplaintType.value,
-    complaintTargetRole: ownerRefundExportComplaintTargetRole.value,
-    serviceType: ownerRefundExportServiceType.value,
-    orderNoKeyword: ownerRefundExportOrderNoKeyword.value.trim(),
-  };
-};
-
-const clearLegacyOwnerRefundExportFilterStorage = () => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.localStorage.removeItem(OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY);
-  window.localStorage.removeItem(OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY);
-};
-
-const readStoredOwnerRefundExportFilterStorage = (): OwnerRefundExportFilterStorage => {
-  const storedPageState = workbench.getPageState<OwnerRefundExportFilterStorage>(OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY);
-  if (storedPageState) {
-    return normalizeOwnerRefundExportFilterStorage(storedPageState);
-  }
-
-  if (typeof window === 'undefined') {
-    return createEmptyOwnerRefundExportFilterStorage();
-  }
-
-  try {
-    const raw = window.localStorage.getItem(OWNER_REFUND_EXPORT_FILTER_STORAGE_KEY);
-    if (raw) {
-      const storage = normalizeOwnerRefundExportFilterStorage(JSON.parse(raw));
-      workbench.setPageState(OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY, storage);
-      clearLegacyOwnerRefundExportFilterStorage();
-      return storage;
-    }
-
-    const legacyRaw = window.localStorage.getItem(OWNER_REFUND_EXPORT_FILTER_LEGACY_STORAGE_KEY);
-    if (!legacyRaw) {
-      return createEmptyOwnerRefundExportFilterStorage();
-    }
-
-    const legacySnapshot = normalizeOwnerRefundExportFilterSnapshot(
-      JSON.parse(legacyRaw) as Partial<OwnerRefundExportFilterSnapshot>,
-    );
-    if (!legacySnapshot) {
-      return createEmptyOwnerRefundExportFilterStorage();
-    }
-
-    const storage: OwnerRefundExportFilterStorage = {
-      version: 2,
-      users: {
-        [legacySnapshot.ownerUserId]: {
-          lastUsed: legacySnapshot,
-          templates: [],
-        },
-      },
+const heroPrimaryAction = computed(() => {
+  if (!pets.value.length) {
+    return {
+      label: '先建宠物档案',
+      to: { name: 'frontend-petpal-pet-create' },
     };
-    workbench.setPageState(OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY, storage);
-    clearLegacyOwnerRefundExportFilterStorage();
-    return storage;
-  } catch {
-    return createEmptyOwnerRefundExportFilterStorage();
   }
-};
-
-const writeStoredOwnerRefundExportFilterStorage = (storage: OwnerRefundExportFilterStorage) => {
-  workbench.setPageState(OWNER_REFUND_EXPORT_FILTER_PAGE_STATE_KEY, storage);
-  clearLegacyOwnerRefundExportFilterStorage();
-};
-
-const applyOwnerRefundExportFilterSnapshot = (snapshot: OwnerRefundExportFilterSnapshot) => {
-  ownerRefundExportDateRange.value = snapshot.dateRange
-    ? [new Date(snapshot.dateRange[0]), new Date(snapshot.dateRange[1])]
-    : null;
-  ownerRefundExportType.value = snapshot.refundType;
-  ownerRefundExportStatus.value = snapshot.refundStatus;
-  ownerRefundExportComplaintStatus.value = snapshot.complaintStatus;
-  ownerRefundExportComplaintType.value = snapshot.complaintType;
-  ownerRefundExportComplaintTargetRole.value = snapshot.complaintTargetRole;
-  ownerRefundExportServiceType.value = snapshot.serviceType;
-  ownerRefundExportOrderNoKeyword.value = snapshot.orderNoKeyword;
-};
-
-const syncOwnerRefundExportFilterState = () => {
-  const ownerUserId = auth.user?.id;
-  if (!ownerUserId) {
-    hasStoredOwnerRefundExportFilters.value = false;
-    ownerRefundExportTemplates.value = [];
-    selectedOwnerRefundExportTemplateId.value = '';
-    return createEmptyOwnerRefundExportFilterStorageEntry();
-  }
-
-  const storage = readStoredOwnerRefundExportFilterStorage();
-  const entry = storage.users[ownerUserId] ?? createEmptyOwnerRefundExportFilterStorageEntry();
-  hasStoredOwnerRefundExportFilters.value = Boolean(entry.lastUsed);
-  ownerRefundExportTemplates.value = [...entry.templates].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-  if (!ownerRefundExportTemplates.value.some(item => item.id === selectedOwnerRefundExportTemplateId.value)) {
-    selectedOwnerRefundExportTemplateId.value = '';
-  }
-  return entry;
-};
-
-const updateCurrentOwnerRefundExportFilterStorage = (
-  updater: (entry: OwnerRefundExportFilterStorageEntry) => OwnerRefundExportFilterStorageEntry,
-) => {
-  const ownerUserId = auth.user?.id;
-  if (!ownerUserId) {
-    return null;
-  }
-
-  const storage = readStoredOwnerRefundExportFilterStorage();
-  const currentEntry = storage.users[ownerUserId] ?? createEmptyOwnerRefundExportFilterStorageEntry();
-  const nextEntry = updater({
-    lastUsed: currentEntry.lastUsed,
-    templates: [...currentEntry.templates],
-  });
-  storage.users[ownerUserId] = nextEntry;
-  writeStoredOwnerRefundExportFilterStorage(storage);
-  syncOwnerRefundExportFilterState();
-  return nextEntry;
-};
-
-const persistOwnerRefundExportFilters = () => {
-  const snapshot = buildOwnerRefundExportFilterSnapshot();
-  if (!snapshot) {
-    return;
-  }
-
-  updateCurrentOwnerRefundExportFilterStorage(entry => ({
-    ...entry,
-    lastUsed: snapshot,
-  }));
-};
-
-const restoreStoredOwnerRefundExportFilters = () => {
-  const entry = syncOwnerRefundExportFilterState();
-  if (!entry.lastUsed) {
-    ElMessage.info('暂无可恢复的上次退款导出筛选');
-    return;
-  }
-
-  applyOwnerRefundExportFilterSnapshot(entry.lastUsed);
-  ElMessage.success('已恢复上次退款导出筛选');
-};
-
-const clearOwnerRefundExportFilters = () => {
-  resetOwnerRefundExportFilters();
-  updateCurrentOwnerRefundExportFilterStorage(entry => ({
-    ...entry,
-    lastUsed: null,
-  }));
-  ElMessage.success('已清空退款导出筛选');
-};
-
-const findSelectedOwnerRefundExportTemplate = () => ownerRefundExportTemplates.value
-  .find(item => item.id === selectedOwnerRefundExportTemplateId.value) ?? null;
-
-const applySelectedOwnerRefundExportTemplate = () => {
-  const template = findSelectedOwnerRefundExportTemplate();
-  if (!template) {
-    ElMessage.info('请先选择要应用的常用模板');
-    return;
-  }
-
-  applyOwnerRefundExportFilterSnapshot(template.snapshot);
-  ElMessage.success(`已应用模板：${template.name}`);
-};
-
-const saveCurrentOwnerRefundExportTemplate = async () => {
-  const snapshot = buildOwnerRefundExportFilterSnapshot();
-  if (!snapshot) {
-    ElMessage.info('登录后才可保存常用筛选模板');
-    return;
-  }
-
-  try {
-    const { value } = await ElMessageBox.prompt(
-      '输入模板名称，便于后续快速复用当前退款导出筛选',
-      '保存常用筛选模板',
-      {
-        inputPlaceholder: '例如：平台责任退款',
-        inputValidator: (inputValue) => {
-          const name = inputValue.trim();
-          if (!name) {
-            return '模板名称不能为空';
-          }
-          if (name.length > 20) {
-            return '模板名称最多 20 个字符';
-          }
-          return true;
-        },
-      },
-    );
-
-    const templateName = value.trim();
-    const existingTemplate = ownerRefundExportTemplates.value.find(item => item.name === templateName) ?? null;
-    if (!existingTemplate && ownerRefundExportTemplates.value.length >= OWNER_REFUND_EXPORT_TEMPLATE_LIMIT) {
-      ElMessage.warning(`最多保存 ${OWNER_REFUND_EXPORT_TEMPLATE_LIMIT} 个常用模板，请先删除旧模板`);
-      return;
-    }
-
-    const nextTemplate: OwnerRefundExportFilterTemplate = {
-      id: existingTemplate?.id ?? `refund-template-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-      name: templateName,
-      snapshot,
-      updatedAt: new Date().toISOString(),
-    };
-
-    updateCurrentOwnerRefundExportFilterStorage(entry => ({
-      ...entry,
-      templates: existingTemplate
-        ? entry.templates.map(item => (item.id === existingTemplate.id ? nextTemplate : item))
-        : [nextTemplate, ...entry.templates],
-    }));
-    selectedOwnerRefundExportTemplateId.value = nextTemplate.id;
-    ElMessage.success(existingTemplate ? `已更新模板：${templateName}` : `已保存模板：${templateName}`);
-  } catch (error: unknown) {
-    if (error === 'cancel' || error === 'close') {
-      return;
-    }
-    throw error;
-  }
-};
-
-const deleteSelectedOwnerRefundExportTemplate = async () => {
-  const template = findSelectedOwnerRefundExportTemplate();
-  if (!template) {
-    ElMessage.info('请先选择要删除的常用模板');
-    return;
-  }
-
-  try {
-    await ElMessageBox.confirm(`确认删除模板“${template.name}”吗？`, '删除常用筛选模板', {
-      type: 'warning',
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-    });
-    updateCurrentOwnerRefundExportFilterStorage(entry => ({
-      ...entry,
-      templates: entry.templates.filter(item => item.id !== template.id),
-    }));
-    selectedOwnerRefundExportTemplateId.value = '';
-    ElMessage.success(`已删除模板：${template.name}`);
-  } catch (error: unknown) {
-    if (error === 'cancel' || error === 'close') {
-      return;
-    }
-    throw error;
-  }
-};
-
-const buildOwnerTransactionExportRequest = () => api.petpal.orders.exportTransactions();
-
-const buildOwnerRefundExportQuery = (): OwnerRefundExportQuery => ({
-  startDate: ownerRefundExportDateRange.value?.[0]
-    ? toDayBoundaryIsoString(ownerRefundExportDateRange.value[0], 'start')
-    : undefined,
-  endDate: ownerRefundExportDateRange.value?.[1]
-    ? toDayBoundaryIsoString(ownerRefundExportDateRange.value[1], 'end')
-    : undefined,
-  refundType: ownerRefundExportType.value || undefined,
-  refundStatus: ownerRefundExportStatus.value || undefined,
-  complaintStatus: ownerRefundExportComplaintStatus.value || undefined,
-  complaintType: ownerRefundExportComplaintType.value || undefined,
-  complaintTargetRole: ownerRefundExportComplaintTargetRole.value || undefined,
-  serviceType: ownerRefundExportServiceType.value || undefined,
-  orderNoKeyword: ownerRefundExportOrderNoKeyword.value.trim() || undefined,
+  return {
+    label: '新建需求',
+    to: { name: 'frontend-petpal-request-create' },
+  };
 });
 
-const buildOwnerRefundExportRequest = () => {
-  persistOwnerRefundExportFilters();
-  return api.petpal.orders.exportRefundDetails(buildOwnerRefundExportQuery());
-};
+const heroActions = computed(() => [
+  { label: '宠物档案', to: { name: 'frontend-petpal-pets' }, tone: 'secondary' as const },
+  { label: '订单队列', to: { name: 'frontend-petpal-orders' }, tone: 'secondary' as const },
+  { label: '照料者工作区', to: { name: 'frontend-petpal-caregiver' }, tone: 'secondary' as const },
+]);
 
-const formatPetTagSummary = (tags?: string[]) => {
-  const normalized = tags ?? [];
-  return normalized.length ? normalized.join(' / ') : '-';
-};
-
-const formatEmergencyContact = (contact: PetProfileRecord['emergencyContact']) => {
-  if (!contact) {
-    return '-';
+const primaryTask = computed(() => {
+  if (!pets.value.length) {
+    return {
+      title: '先建立第一只宠物档案',
+      hint: '没有宠物档案时，需求表单和后续下单都无法稳定复用资料。',
+      actionLabel: '去建档',
+      to: { name: 'frontend-petpal-pet-create' },
+    };
   }
-  return [contact.name, contact.phone, contact.relation].filter(Boolean).join(' · ');
-};
 
-const resetPetForm = () => {
-  editingPetId.value = '';
-  petForm.name = '';
-  petForm.species = 'DOG';
-  petForm.gender = 'UNKNOWN';
-  petForm.breed = '';
-  petForm.birthday = '';
-  petForm.weightKg = 5;
-  petForm.neutered = false;
-  petForm.temperamentTags = [];
-  petTemperamentTagsText.value = '';
-  petForm.feedingNote = '';
-  petForm.allergyNote = '';
-  petForm.medicalNote = '';
-  petForm.emergencyContact = {
-    name: '',
-    phone: '',
-    relation: '',
+  if (outstandingOrders.value.length) {
+    return {
+      title: '先回订单队列处理待支付',
+      hint: `当前还有 ${outstandingOrders.value.length} 笔订单未完成支付或金额未结清。`,
+      actionLabel: '去订单队列',
+      to: { name: 'frontend-petpal-orders' },
+    };
+  }
+
+  if (activeRequests.value.length) {
+    return {
+      title: '继续活跃需求',
+      hint: `当前有 ${activeRequests.value.length} 条需求在匹配或待确认，建议直接看需求队列。`,
+      actionLabel: '去需求队列',
+      to: { name: 'frontend-petpal-requests' },
+    };
+  }
+
+  if (aftersalesOrders.value.length) {
+    return {
+      title: '优先处理售后事项',
+      hint: `当前有 ${aftersalesOrders.value.length} 笔订单处在退款或投诉链路中。`,
+      actionLabel: '去售后中心',
+      to: { name: 'frontend-petpal-aftersales' },
+    };
+  }
+
+  return {
+    title: '继续创建新的照料需求',
+    hint: '宠物档案已经就绪，可以直接进入需求表单开始下一次下单。',
+    actionLabel: '去新建需求',
+    to: { name: 'frontend-petpal-request-create' },
   };
-};
+});
 
-const startEditPet = (pet: PetProfileRecord) => {
-  editingPetId.value = pet.id;
-  requestForm.petId = pet.id;
-  petForm.name = pet.name;
-  petForm.species = pet.species;
-  petForm.gender = pet.gender;
-  petForm.breed = pet.breed || '';
-  petForm.birthday = pet.birthday ? pet.birthday.slice(0, 10) : '';
-  petForm.weightKg = Number(pet.weightKg ?? 0) || 0;
-  petForm.neutered = pet.neutered;
-  petTemperamentTagsText.value = joinTagText(pet.temperamentTags);
-  petForm.feedingNote = pet.feedingNote || '';
-  petForm.allergyNote = pet.allergyNote || '';
-  petForm.medicalNote = pet.medicalNote || '';
-  petForm.emergencyContact = {
-    name: pet.emergencyContact?.name || '',
-    phone: pet.emergencyContact?.phone || '',
-    relation: pet.emergencyContact?.relation || '',
-  };
-};
-
-const loadPets = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
-  try {
-    petsLoading.value = true;
-    petsLoadState.value = 'idle';
-    petsLoadErrorMessage.value = '';
-    pets.value = await api.petpal.pets.list();
-    if (!requestForm.petId && pets.value.length > 0) {
-      requestForm.petId = pets.value[0].id;
-    }
-    petsLoadState.value = 'ready';
-    return null;
-  } catch (error: unknown) {
-    pets.value = [];
-    const message = getErrorMessage(error, '加载宠物失败');
-    petsLoadState.value = 'error';
-    petsLoadErrorMessage.value = message;
-    if (showFeedback) {
-      ElMessage.error(message);
-    }
-    return message;
-  } finally {
-    petsLoading.value = false;
+const paymentAndCompletionHint = computed(() => {
+  if (outstandingOrders.value.length) {
+    return `${outstandingOrders.value.length} 笔订单还有待支付金额，建议优先处理。`;
   }
-};
+  const awaitingCompletion = orders.value.filter((item) => item.orderStatus === 'COMPLETED').length;
+  return awaitingCompletion ? `${awaitingCompletion} 笔订单已完成，可继续评价或回看。` : '当前没有待支付或待确认的交易。';
+});
 
-const loadRequests = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
-  try {
-    requestsLoading.value = true;
-    requestsLoadState.value = 'idle';
-    requestsLoadErrorMessage.value = '';
-    requests.value = await api.petpal.requests.list();
-    requestsLoadState.value = 'ready';
-    return null;
-  } catch (error: unknown) {
-    requests.value = [];
-    const message = getErrorMessage(error, '加载需求失败');
-    requestsLoadState.value = 'error';
-    requestsLoadErrorMessage.value = message;
-    if (showFeedback) {
-      ElMessage.error(message);
-    }
-    return message;
-  } finally {
-    requestsLoading.value = false;
-  }
-};
+const aftersalesHint = computed(() => aftersalesOrders.value.length
+  ? `${aftersalesOrders.value.length} 笔订单在售后链路中，退款和投诉已拆去独立队列页。`
+  : '当前没有需要优先处理的退款或投诉事项。');
 
-const loadOrders = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
-  try {
-    ordersLoading.value = true;
-    ordersLoadState.value = 'idle';
-    ordersLoadErrorMessage.value = '';
-    orders.value = await api.petpal.orders.list();
-    ordersLoadState.value = 'ready';
-    return null;
-  } catch (error: unknown) {
-    orders.value = [];
-    const message = getErrorMessage(error, '加载订单失败');
-    ordersLoadState.value = 'error';
-    ordersLoadErrorMessage.value = message;
-    if (showFeedback) {
-      ElMessage.error(message);
-    }
-    return message;
-  } finally {
-    ordersLoading.value = false;
-  }
-};
+function isOrderOutstanding(order: Pick<OrderRecord, 'amountTotal' | 'amountAdjusted' | 'amountPaid'>) {
+  const total = Number(order.amountTotal) + Number(order.amountAdjusted);
+  const paid = Number(order.amountPaid);
+  return total - paid > 0.01;
+}
 
-const loadMatches = async ({ showFeedback = true }: { showFeedback?: boolean } = {}) => {
-  try {
-    matchLoading.value = true;
-    matchesLoadState.value = 'idle';
-    matchesLoadErrorMessage.value = '';
-    const page = await api.petpal.match.caregivers({
-      ...matchQuery,
-      city: matchQuery.city || undefined,
-    });
-    matchItems.value = page.items;
-    matchesLoadState.value = 'ready';
-    return null;
-  } catch (error: unknown) {
-    matchItems.value = [];
-    const message = getErrorMessage(error, '匹配照料者失败');
-    matchesLoadState.value = 'error';
-    matchesLoadErrorMessage.value = message;
-    if (showFeedback) {
-      ElMessage.error(message);
-    }
-    return message;
-  } finally {
-    matchLoading.value = false;
-  }
-};
-
-const refreshMatches = () => {
-  void loadMatches();
-};
-
-const retryPetsSection = async () => {
-  await runPetPalSectionRetry({
-    key: 'pets',
-    sectionReloadingKey,
-    reload: () => loadPets({ showFeedback: false }),
-    getState: () => petsLoadState.value,
-    successMessage: '宠物列表已刷新',
-  });
-};
-
-const retryRequestsSection = async () => {
-  await runPetPalSectionRetry({
-    key: 'requests',
-    sectionReloadingKey,
-    reload: () => loadRequests({ showFeedback: false }),
-    getState: () => requestsLoadState.value,
-    successMessage: '主人需求已刷新',
-  });
-};
-
-const retryOrdersSection = async () => {
-  await runPetPalSectionRetry({
-    key: 'orders',
-    sectionReloadingKey,
-    reload: () => loadOrders({ showFeedback: false }),
-    getState: () => ordersLoadState.value,
-    successMessage: '主人订单已刷新',
-  });
-};
-
-const retryMatchesSection = async () => {
-  await runPetPalSectionRetry({
-    key: 'matches',
-    sectionReloadingKey,
-    reload: () => loadMatches({ showFeedback: false }),
-    getState: () => matchesLoadState.value,
-    successMessage: '照料者匹配结果已刷新',
-  });
-};
-
-const withOwnerOrderAction = async (
-  key: string,
-  successMessage: string,
-  action: () => Promise<void>,
-) => {
-  try {
-    ownerActionLoadingKey.value = key;
-    await action();
-    ElMessage.success(successMessage);
-    await loadOrders();
-  } catch (error: unknown) {
-    if (error === 'cancel' || error === 'close') {
-      return;
-    }
-    ElMessage.error(getErrorMessage(error, '订单动作执行失败'));
-  } finally {
-    ownerActionLoadingKey.value = '';
-  }
-};
-
-const reloadAll = async () => {
-  if (!auth.isAuthenticated) {
-    ElMessage.info('登录后可加载主人业务数据');
+async function loadPage() {
+  if (!auth.isAuthenticated || loading.value) {
     return;
   }
 
+  loading.value = true;
   pageLoadState.value = 'idle';
   pageLoadErrorMessage.value = '';
-  partialLoadNotice.value = '';
 
-  const notices = (await Promise.all([
-    loadPets({ showFeedback: false }),
-    loadRequests({ showFeedback: false }),
-    loadOrders({ showFeedback: false }),
-    loadMatches({ showFeedback: false }),
-  ])).filter((item): item is string => Boolean(item));
+  try {
+    const [petsResult, requestsResult, ordersResult] = await Promise.all([
+      api.petpal.pets.list(),
+      api.petpal.requests.list(),
+      api.petpal.orders.list(),
+    ]);
 
-  if (notices.length === 4) {
+    pets.value = petsResult;
+    requests.value = requestsResult;
+    orders.value = ordersResult;
+    pageLoadState.value = 'ready';
+  } catch (error: unknown) {
+    pets.value = [];
+    requests.value = [];
+    orders.value = [];
     pageLoadState.value = 'error';
-    pageLoadErrorMessage.value = mergePetPalPageNotice(notices) || '主人服务台暂时不可用，请稍后重试。';
-    return;
-  }
-
-  pageLoadState.value = 'ready';
-  partialLoadNotice.value = mergePetPalPageNotice(notices);
-};
-
-const createPet = async () => {
-  if (!petForm.name.trim()) {
-    ElMessage.warning('请先填写宠物名称');
-    return;
-  }
-
-  try {
-    petSaving.value = true;
-    const payload: CreatePetPayload = {
-      ...petForm,
-      breed: petForm.breed.trim() || undefined,
-      birthday: typeof petForm.birthday === 'string' && petForm.birthday
-        ? petForm.birthday
-        : undefined,
-      weightKg: Number(petForm.weightKg || 0) > 0 ? Number(petForm.weightKg) : undefined,
-      temperamentTags: splitTagText(petTemperamentTagsText.value),
-      feedingNote: petForm.feedingNote.trim() || undefined,
-      allergyNote: petForm.allergyNote.trim() || undefined,
-      medicalNote: petForm.medicalNote.trim() || undefined,
-      emergencyContact: petForm.emergencyContact?.name?.trim() && petForm.emergencyContact?.phone?.trim()
-        ? {
-            name: petForm.emergencyContact.name.trim(),
-            phone: petForm.emergencyContact.phone.trim(),
-            relation: petForm.emergencyContact.relation.trim() || undefined,
-          }
-        : undefined,
-    };
-
-    if (editingPetId.value) {
-      await api.petpal.pets.update(editingPetId.value, payload);
-      ElMessage.success('宠物档案已更新');
-    } else {
-      await api.petpal.pets.create(payload);
-      ElMessage.success('宠物档案已创建');
-    }
-
-    resetPetForm();
-    await loadPets();
-  } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, editingPetId.value ? '更新宠物失败' : '创建宠物失败'));
+    pageLoadErrorMessage.value = getErrorMessage(error, '加载主人总览失败');
   } finally {
-    petSaving.value = false;
+    loading.value = false;
   }
-};
-
-const confirmOrderComplete = async (orderId: string) => withOwnerOrderAction(
-  `confirm:${orderId}`,
-  '订单已确认完成',
-  async () => {
-    await api.petpal.orders.confirmComplete(orderId);
-  },
-);
-
-const createRequest = async () => {
-  if (!requestForm.petId) {
-    ElMessage.warning('请先选择宠物');
-    return;
-  }
-  if (!requestForm.locationText.trim()) {
-    ElMessage.warning('请填写地点描述');
-    return;
-  }
-  if (requestForm.endTime <= requestForm.startTime) {
-    ElMessage.warning('结束时间必须晚于开始时间');
-    return;
-  }
-
-  try {
-    requestSaving.value = true;
-    await api.petpal.requests.create({
-      petId: requestForm.petId,
-      serviceType: requestForm.serviceType,
-      startTime: requestForm.startTime.toISOString(),
-      endTime: requestForm.endTime.toISOString(),
-      locationText: requestForm.locationText.trim(),
-      budgetAmount: requestForm.budgetAmount,
-    });
-    ElMessage.success('需求已发布');
-    await Promise.all([loadRequests(), loadOrders()]);
-  } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '发布需求失败'));
-  } finally {
-    requestSaving.value = false;
-  }
-};
-
-watch(() => auth.user?.id, (ownerUserId) => {
-  const entry = syncOwnerRefundExportFilterState();
-  if (ownerUserId && entry.lastUsed) {
-    applyOwnerRefundExportFilterSnapshot(entry.lastUsed);
-    return;
-  }
-
-  resetOwnerRefundExportFilters();
-});
+}
 
 onMounted(() => {
-  const entry = syncOwnerRefundExportFilterState();
-  if (entry.lastUsed && entry.lastUsed.ownerUserId === auth.user?.id) {
-    applyOwnerRefundExportFilterSnapshot(entry.lastUsed);
-  }
-
   if (!auth.isAuthenticated) {
     return;
   }
-  void reloadAll();
+  void loadPage();
 });
 </script>
 
@@ -1794,178 +390,67 @@ onMounted(() => {
   grid-column: span 4;
 }
 
-.petpal-grid-span-5 {
-  grid-column: span 5;
+.petpal-grid-span-6 {
+  grid-column: span 6;
 }
 
-.petpal-grid-span-7 {
-  grid-column: span 7;
-}
-
-.petpal-grid-span-8 {
-  grid-column: span 8;
-}
-
-.petpal-section-heading {
+.petpal-focus-card,
+.petpal-focus-card__copy,
+.petpal-card-stack,
+.petpal-compact-card,
+.petpal-compact-card__head,
+.petpal-queue-list,
+.petpal-queue-item,
+.petpal-section-head,
+.petpal-inline-actions {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.petpal-section-heading__meta {
-  display: grid;
-  gap: 8px;
-}
-
-.petpal-section-heading h3 {
-  margin: 0;
-}
-
-.petpal-section-heading__meta p {
-  margin: 0;
-  color: var(--frontend-color-muted);
-  line-height: 1.7;
-}
-
-.petpal-section-heading__hint {
-  margin: 0;
-  color: #6b7280;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.petpal-switch-links {
-  display: flex;
-  flex-wrap: wrap;
   gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
-.petpal-switch-links a {
-  color: var(--frontend-color-primary);
-  font-weight: 600;
+.petpal-focus-card__copy,
+.petpal-card-stack,
+.petpal-compact-card,
+.petpal-queue-list {
+  display: grid;
+}
+
+.petpal-section-head {
+  margin-bottom: 4px;
+}
+
+.petpal-section-head a,
+.petpal-inline-actions a,
+.petpal-queue-item a {
+  color: #0f766e;
+  font-weight: 700;
   text-decoration: none;
 }
 
-.petpal-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.petpal-summary-card {
-  display: grid;
-  gap: 8px;
-  padding: 16px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-}
-
-.petpal-summary-card span {
-  color: var(--frontend-color-muted);
-  font-size: 13px;
-}
-
-.petpal-summary-card strong {
-  font-size: 30px;
-  line-height: 1.1;
-}
-
-.petpal-summary-card p {
-  margin: 0;
-  color: var(--frontend-color-muted);
-  line-height: 1.6;
-}
-
-.petpal-side-actions {
-  display: grid;
-  gap: 12px;
-}
-
-.petpal-side-actions__button {
-  justify-content: center;
-}
-
-.petpal-export-toolbar {
-  display: grid;
-  gap: 10px;
-  justify-items: end;
-}
-
-.petpal-request-list {
-  display: grid;
-  gap: 18px;
-}
-
-.petpal-mini-panel {
-  display: grid;
+.petpal-queue-list,
+.petpal-card-stack {
   gap: 14px;
 }
 
-.petpal-mini-panel h4 {
-  margin: 0;
-  font-size: 16px;
+.petpal-queue-item,
+.petpal-compact-card {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(18, 53, 51, 0.08);
+  background: rgba(248, 252, 251, 0.86);
 }
 
-.petpal-conversation-cell {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.petpal-conversation-cell__copy {
-  min-width: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.petpal-conversation-cell__preview,
-.petpal-conversation-cell__meta {
-  margin: 0;
-  line-height: 1.6;
-}
-
-.petpal-conversation-cell__preview {
-  color: #0f172a;
-}
-
-.petpal-conversation-cell__meta {
-  color: var(--frontend-color-muted);
+.petpal-compact-card__head span {
+  color: #6d8683;
   font-size: 12px;
 }
 
-.petpal-match-form {
-  margin-bottom: 16px;
-}
-
-@media (max-width: 1200px) {
+@media (max-width: 1080px) {
   .petpal-grid-span-4,
-  .petpal-grid-span-5,
-  .petpal-grid-span-7,
-  .petpal-grid-span-8 {
+  .petpal-grid-span-6 {
     grid-column: span 12;
-  }
-
-  .petpal-summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 720px) {
-  .petpal-section-heading {
-    flex-direction: column;
-  }
-
-  .petpal-export-toolbar {
-    width: 100%;
-    justify-items: start;
-  }
-
-  .petpal-summary-grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>

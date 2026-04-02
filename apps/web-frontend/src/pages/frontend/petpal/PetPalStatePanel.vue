@@ -1,9 +1,9 @@
 <template>
   <div class="petpal-state-panel" :class="`is-${tone}`">
     <div class="petpal-state-panel__copy">
-      <span class="frontend-card__eyebrow">{{ eyebrow }}</span>
+      <span v-if="eyebrow" class="frontend-card__eyebrow">{{ eyebrow }}</span>
       <h3>{{ title }}</h3>
-      <p>{{ description }}</p>
+      <p v-if="description">{{ description }}</p>
     </div>
     <div v-if="$slots.actions" class="petpal-state-panel__actions">
       <slot name="actions" />
@@ -26,11 +26,11 @@ withDefaults(defineProps<{
 <style scoped lang="scss">
 .petpal-state-panel {
   display: grid;
-  gap: 16px;
-  padding: 18px 20px;
-  border-radius: 20px;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.76);
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .petpal-state-panel.is-info {
@@ -63,7 +63,11 @@ withDefaults(defineProps<{
 
 .petpal-state-panel__copy p {
   color: var(--frontend-color-muted);
-  line-height: 1.7;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .petpal-state-panel__actions {

@@ -66,8 +66,12 @@ function handleError() {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: linear-gradient(180deg, #eef2f6 0%, #e4e9f0 100%);
-  color: var(--app-text-secondary);
+  background:
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.24), transparent 32%),
+    linear-gradient(135deg, #dbeafe 0%, #fff1de 100%);
+  color: var(--app-text);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
+  box-shadow: 0 12rpx 24rpx rgba(159, 73, 14, 0.08);
   box-sizing: border-box;
 }
 
@@ -98,7 +102,7 @@ function handleError() {
 .app-avatar__text {
   font-size: 28rpx;
   line-height: 1;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.04em;
 }
 

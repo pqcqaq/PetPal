@@ -80,7 +80,7 @@ function handleClick() {
 .app-list-item__body {
   display: flex;
   align-items: flex-start;
-  padding: 28rpx 32rpx;
+  padding: 30rpx 32rpx;
 }
 
 .app-list-item__meta {
@@ -97,7 +97,7 @@ function handleClick() {
   flex: 1;
   min-width: 0;
   font-size: 28rpx;
-  line-height: 1.48;
+  line-height: 1.42;
   font-weight: 600;
   color: var(--app-text);
 }
@@ -114,14 +114,14 @@ function handleClick() {
 
 .app-list-item__value--emphasis {
   color: var(--app-text);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .app-list-item__label {
   margin-top: 8rpx;
   font-size: 22rpx;
-  line-height: 1.64;
-  color: var(--app-text-muted);
+  line-height: 1.68;
+  color: var(--app-text-secondary);
   display: block;
 }
 
@@ -130,14 +130,14 @@ function handleClick() {
   height: 18rpx;
   margin-top: 8rpx;
   margin-left: 20rpx;
-  border-top: 2rpx solid var(--app-text-muted);
-  border-right: 2rpx solid var(--app-text-muted);
+  border-top: 3rpx solid var(--app-brand-strong);
+  border-right: 3rpx solid var(--app-brand-strong);
   transform: rotate(45deg);
   flex-shrink: 0;
 }
 
 .app-list-item--hover {
-  background: var(--app-surface-container-high);
+  background: rgba(255, 242, 223, 0.86);
   transform: translateY(-1rpx);
 }
 </style>

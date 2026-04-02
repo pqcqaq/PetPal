@@ -245,7 +245,7 @@ onShow(() => {
   gap: 16rpx;
   margin: 0 24rpx;
   padding: 26rpx 28rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   border-radius: 30rpx;
   box-shadow: var(--app-elevation-1);
 }
@@ -253,7 +253,8 @@ onShow(() => {
 .help-focus {
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 34%),
-    linear-gradient(145deg, #1d4ed8 0%, #2563eb 44%, #0f766e 100%);
+    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.2), transparent 34%),
+    linear-gradient(145deg, #2563eb 0%, #60a5fa 44%, #f97316 100%);
 }
 
 .help-focus__copy {
@@ -270,8 +271,9 @@ onShow(() => {
 
 .help-focus__title {
   color: #eff6ff;
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 38rpx;
-  line-height: 1.18;
+  line-height: 1.14;
   font-weight: 700;
 }
 
@@ -292,11 +294,11 @@ onShow(() => {
   display: grid;
   gap: 12rpx;
   padding: 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   border-radius: 28rpx;
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 34%),
-    linear-gradient(180deg, var(--app-surface-container-high) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
@@ -324,7 +326,7 @@ onShow(() => {
 }
 
 .help-support {
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
 }
 
 .help-support__head,
@@ -345,7 +347,7 @@ onShow(() => {
 }
 
 .help-row + .help-row {
-  border-top: 1rpx solid var(--app-outline-variant);
+  border-top: 1rpx solid rgba(245, 220, 192, 0.88);
 }
 
 .help-row__copy {
@@ -364,15 +366,15 @@ onShow(() => {
 .help-row__arrow {
   width: 16rpx;
   height: 16rpx;
-  border-top: 2rpx solid var(--app-text-muted);
-  border-right: 2rpx solid var(--app-text-muted);
+  border-top: 3rpx solid var(--app-brand-strong);
+  border-right: 3rpx solid var(--app-brand-strong);
   transform: rotate(45deg);
 }
 
 .help-login-tip {
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 34%),
-    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 240, 220, 0.98) 100%);
 }
 
 @media (max-width: 680px) {

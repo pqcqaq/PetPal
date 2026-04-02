@@ -711,7 +711,8 @@ onPullDownRefresh(() => {
   border-radius: var(--app-shape-xl);
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 36%),
-    linear-gradient(145deg, var(--app-accent) 0%, var(--app-accent-pressed) 52%, var(--app-warning) 100%);
+    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.2), transparent 34%),
+    linear-gradient(145deg, #2563eb 0%, #60a5fa 48%, #f97316 100%);
   box-shadow: var(--app-elevation-3);
 }
 
@@ -722,8 +723,9 @@ onPullDownRefresh(() => {
 
 .reminder-hero__title {
   color: #eff6ff;
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 40rpx;
-  line-height: 1.15;
+  line-height: 1.12;
   font-weight: 700;
 }
 
@@ -755,8 +757,8 @@ onPullDownRefresh(() => {
   gap: 12rpx;
   padding: 24rpx;
   border-radius: var(--app-shape-xl);
-  border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
   transition:
     transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
@@ -765,8 +767,8 @@ onPullDownRefresh(() => {
 
 .reminder-card--priority {
   background:
-    radial-gradient(circle at top right, rgba(186, 26, 26, 0.1), transparent 36%),
-    linear-gradient(180deg, var(--app-danger-soft) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(220, 38, 38, 0.12), transparent 36%),
+    linear-gradient(180deg, rgba(255, 236, 234, 0.96) 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .reminder-summary-card__label {
@@ -775,7 +777,7 @@ onPullDownRefresh(() => {
 }
 
 .reminder-summary-card__value {
-  color: var(--app-text);
+  color: var(--app-brand-strong);
   font-size: 40rpx;
   line-height: 1.05;
   font-weight: 700;

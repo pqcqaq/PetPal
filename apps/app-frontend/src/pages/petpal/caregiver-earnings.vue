@@ -620,10 +620,10 @@ onPullDownRefresh(() => {
   display: grid;
   gap: 12rpx;
   padding: 24rpx;
-  border: 1rpx solid var(--app-border);
+  border: 1rpx solid var(--app-outline-variant);
   border-radius: 26rpx;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
-  box-shadow: 0 12rpx 30rpx rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
 }
 
 .earnings-metric-card__label,

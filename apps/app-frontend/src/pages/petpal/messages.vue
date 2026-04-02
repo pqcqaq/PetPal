@@ -440,20 +440,22 @@ onPullDownRefresh(() => {
 <style scoped lang="scss">
 .message-page {
   display: grid;
-  gap: 20rpx;
-  padding-bottom: 36rpx;
+  gap: 22rpx;
+  padding-bottom: 40rpx;
 }
 
 .message-focus {
   display: grid;
   gap: 18rpx;
   margin: 0 24rpx;
-  padding: 28rpx;
-  border-radius: 30rpx;
+  padding: 30rpx;
+  border-radius: 32rpx;
   background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.26), transparent 34%),
-    linear-gradient(145deg, #1d4ed8 0%, #0f766e 48%, #155e75 100%);
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.24), transparent 32%),
+    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.22), transparent 32%),
+    linear-gradient(145deg, #2563eb 0%, #60a5fa 44%, #f97316 100%);
   color: #eff6ff;
+  box-shadow: 0 24rpx 44rpx rgba(37, 99, 235, 0.18);
 }
 
 .message-focus__copy {
@@ -480,8 +482,8 @@ onPullDownRefresh(() => {
 .message-login {
   display: grid;
   gap: 12rpx;
-  border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
@@ -493,8 +495,15 @@ onPullDownRefresh(() => {
 }
 
 .message-role-card--active {
-  border-color: transparent;
-  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+  border-color: rgba(37, 99, 235, 0.14);
+  background: linear-gradient(135deg, var(--app-accent) 0%, #60a5fa 100%);
+  box-shadow: 0 18rpx 30rpx rgba(37, 99, 235, 0.18);
+}
+
+.message-role-card--active .message-role-card__label,
+.message-role-card--active .message-role-card__value,
+.message-role-card--active .message-role-card__hint {
+  color: #eff6ff;
 }
 
 .message-role-card__head {
@@ -520,7 +529,7 @@ onPullDownRefresh(() => {
 }
 
 .message-role-card__value {
-  color: var(--app-text);
+  color: var(--app-brand-strong);
   font-size: 40rpx;
   line-height: 1.08;
   font-weight: 700;
@@ -528,8 +537,9 @@ onPullDownRefresh(() => {
 
 .message-focus__title {
   color: #eff6ff;
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
   font-size: 40rpx;
-  line-height: 1.15;
+  line-height: 1.12;
   font-weight: 700;
 }
 
@@ -586,8 +596,8 @@ onPullDownRefresh(() => {
 
 .message-priority {
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.12), transparent 36%),
-    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.14), transparent 36%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(238, 245, 255, 0.98) 100%);
 }
 
 .message-priority__hint,
@@ -608,7 +618,7 @@ onPullDownRefresh(() => {
 .message-card__conversation {
   padding: 18rpx;
   border-radius: 22rpx;
-  background: #eef7ff;
+  background: linear-gradient(180deg, #fff5e7 0%, #eef5ff 100%);
 }
 
 .message-card__preview {
@@ -618,7 +628,7 @@ onPullDownRefresh(() => {
 }
 
 .message-card__amount {
-  color: #0f766e;
+  color: var(--app-brand-strong);
   font-size: 24rpx;
   line-height: 1.6;
   font-weight: 700;

@@ -24,13 +24,13 @@ import {
   formatDateTime,
   formatRange,
   getConversationUnreadCount,
+  getOwnerOrderFilterForOrder,
   getOrderStatusLabel,
   isOrderAftersalesTracked,
-  openPetPalAction,
-  PETPAL_AFTERSALES_PAGE,
+  openPetPalAftersalesPage,
+  openPetPalOrdersPage,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
-  PETPAL_ORDERS_PAGE,
   serviceTypeLabels,
 } from './owner-shared'
 
@@ -252,11 +252,27 @@ function openOrderDetail(tab: 'overview' | 'chat' | 'service' | 'aftersales' = '
 }
 
 function openOrders() {
-  openPetPalAction('redirect', PETPAL_ORDERS_PAGE)
+  if (order.value) {
+    openPetPalOrdersPage({
+      filter: getOwnerOrderFilterForOrder(order.value),
+      focusOrderId: order.value.id,
+    })
+    return
+  }
+
+  openPetPalOrdersPage()
 }
 
 function openAftersales() {
-  uni.redirectTo({ url: PETPAL_AFTERSALES_PAGE })
+  if (order.value) {
+    openPetPalAftersalesPage({
+      filter: order.value.orderStatus === 'DISPUTED' ? 'COMPLAINT' : 'REFUND',
+      focusOrderId: order.value.id,
+    })
+    return
+  }
+
+  openPetPalAftersalesPage()
 }
 
 function openReviewPage() {
@@ -550,7 +566,7 @@ onPullDownRefresh(() => {
 
 .review-group {
   overflow: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
 .review-group__head,

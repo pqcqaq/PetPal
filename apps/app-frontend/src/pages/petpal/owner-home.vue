@@ -543,40 +543,41 @@ onPullDownRefresh(() => {
 <style scoped lang="scss">
 .owner-home {
   display: grid;
-  gap: 20rpx;
-  padding-bottom: 36rpx;
+  gap: 22rpx;
+  padding-bottom: 40rpx;
 }
 
 .owner-focus {
   display: grid;
   gap: 18rpx;
   margin: 0 24rpx;
-  padding: 28rpx;
+  padding: 30rpx;
   border-radius: 32rpx;
-  border: 1rpx solid var(--app-outline-variant);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.16), transparent 36%),
-    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.2), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.16), transparent 34%),
+    linear-gradient(160deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 238, 214, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
 .owner-focus--request,
 .owner-focus--fresh {
   background:
-    radial-gradient(circle at top right, rgba(11, 122, 117, 0.18), transparent 36%),
-    linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.22), transparent 36%),
+    linear-gradient(180deg, #fff0dd 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .owner-focus--order {
   background:
-    radial-gradient(circle at top right, rgba(181, 106, 0, 0.18), transparent 36%),
-    linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(234, 88, 12, 0.22), transparent 36%),
+    linear-gradient(180deg, #fff2de 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .owner-focus--danger {
   background:
-    radial-gradient(circle at top right, rgba(186, 26, 26, 0.16), transparent 36%),
-    linear-gradient(180deg, rgba(248, 221, 221, 0.9) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(220, 38, 38, 0.18), transparent 36%),
+    linear-gradient(180deg, rgba(255, 236, 234, 0.96) 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .owner-focus__copy {
@@ -595,15 +596,16 @@ onPullDownRefresh(() => {
 
 .owner-focus__title {
   color: var(--app-text);
-  font-size: 38rpx;
-  line-height: 1.24;
+  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
+  font-size: 40rpx;
+  line-height: 1.16;
   font-weight: 700;
 }
 
 .owner-focus__hint {
   color: var(--app-text-secondary);
   font-size: 23rpx;
-  line-height: 1.68;
+  line-height: 1.72;
 }
 
 .owner-focus__tags,
@@ -631,10 +633,9 @@ onPullDownRefresh(() => {
 .owner-agenda-tile,
 .owner-trust-card,
 .owner-pet-chip,
-.owner-focus-panel,
-.owner-stack-row {
-  border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container-high) 100%);
+.owner-focus-panel {
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
@@ -644,11 +645,14 @@ onPullDownRefresh(() => {
   gap: 8rpx;
   padding: 22rpx 24rpx;
   border-radius: 28rpx;
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 32%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-sizing: border-box;
 }
 
 .owner-metric-tile__value {
-  color: var(--app-text);
+  color: var(--app-brand-strong);
   font-size: 40rpx;
   line-height: 1.1;
   font-weight: 700;
@@ -664,8 +668,7 @@ onPullDownRefresh(() => {
 }
 
 .owner-agenda-tile,
-.owner-focus-panel,
-.owner-stack-row {
+.owner-focus-panel {
   margin: 0 24rpx;
   padding: 22rpx 24rpx;
   border-radius: 30rpx;
@@ -674,16 +677,18 @@ onPullDownRefresh(() => {
 .owner-agenda-tile {
   display: grid;
   gap: 10rpx;
+  background:
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
 }
 
 .owner-agenda-tile__title,
 .owner-trust-card__title,
 .owner-pet-chip__name,
-.owner-focus-panel__title,
-.owner-stack-row__title {
+.owner-focus-panel__title {
   color: var(--app-text);
   font-size: 28rpx;
-  line-height: 1.42;
+  line-height: 1.36;
   font-weight: 700;
 }
 
@@ -691,11 +696,10 @@ onPullDownRefresh(() => {
 .owner-agenda-tile__action,
 .owner-trust-card__meta,
 .owner-pet-chip__meta,
-.owner-focus-panel__meta,
-.owner-stack-row__meta {
+.owner-focus-panel__meta {
   color: var(--app-text-secondary);
   font-size: 22rpx;
-  line-height: 1.62;
+  line-height: 1.68;
 }
 
 .owner-agenda-tile__action {
@@ -709,6 +713,9 @@ onPullDownRefresh(() => {
   gap: 8rpx;
   padding: 22rpx 24rpx;
   border-radius: 28rpx;
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-sizing: border-box;
 }
 
@@ -718,46 +725,40 @@ onPullDownRefresh(() => {
   gap: 6rpx;
   padding: 18rpx 20rpx;
   border-radius: 24rpx;
+  background:
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-sizing: border-box;
 }
 
 .owner-pet-chip--active {
-  border-color: transparent;
-  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+  border-color: rgba(37, 99, 235, 0.14);
+  background: linear-gradient(135deg, var(--app-accent) 0%, #60a5fa 100%);
+  box-shadow: 0 18rpx 30rpx rgba(37, 99, 235, 0.18);
+}
+
+.owner-pet-chip--active .owner-pet-chip__name,
+.owner-pet-chip--active .owner-pet-chip__meta {
+  color: #eff6ff;
 }
 
 .owner-focus-panel--request {
   background:
-    radial-gradient(circle at top right, rgba(11, 122, 117, 0.18), transparent 34%),
-    linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.2), transparent 34%),
+    linear-gradient(180deg, #fff0dd 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .owner-focus-panel--order {
   background:
-    radial-gradient(circle at top right, rgba(181, 106, 0, 0.18), transparent 34%),
-    linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
-}
-
-.owner-stack-row {
-  display: flex;
-  gap: 12rpx;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.owner-stack-row__copy {
-  display: grid;
-  gap: 6rpx;
-  min-width: 0;
-  flex: 1;
+    radial-gradient(circle at top right, rgba(234, 88, 12, 0.22), transparent 34%),
+    linear-gradient(180deg, #fff2de 0%, rgba(255, 251, 246, 0.98) 100%);
 }
 
 .owner-empty {
   margin: 0 24rpx;
   padding: 24rpx;
   border-radius: 30rpx;
-  border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container-high) 100%);
+  border: 1rpx solid rgba(245, 220, 192, 0.88);
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
   box-shadow: var(--app-elevation-1);
 }
 

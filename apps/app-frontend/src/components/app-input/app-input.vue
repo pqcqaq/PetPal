@@ -90,7 +90,7 @@ function togglePasswordVisible() {
         :type="inputType"
         :password="usePassword"
         :placeholder="placeholder"
-        placeholder-style="color: #9aa3ad;"
+        placeholder-style="color: #b45309;"
         :confirm-type="confirmType"
         :disabled="disabled"
         :cursor-spacing="24"
@@ -123,7 +123,7 @@ function togglePasswordVisible() {
   display: flex;
   align-items: center;
   min-height: 96rpx;
-  padding: 0 24rpx;
+  padding: 0 26rpx;
   background: transparent;
   box-sizing: border-box;
 }
@@ -164,7 +164,8 @@ function togglePasswordVisible() {
 .app-input__action-text {
   font-size: 24rpx;
   line-height: 1.4;
-  color: var(--app-text-muted);
+  color: var(--app-brand-strong);
+  font-weight: 700;
 }
 
 .app-input__action-text + .app-input__action-text {
