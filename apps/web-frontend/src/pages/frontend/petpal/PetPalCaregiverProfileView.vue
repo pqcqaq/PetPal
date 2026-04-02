@@ -8,8 +8,28 @@
     :actions="[{ label: '返回照料者总览', to: { name: 'frontend-petpal-caregiver' }, tone: 'secondary' }]"
     :stats="heroStats"
   >
+    <template v-if="pageNotice" #notice>
+      <PetPalDeskNotice eyebrow="Handoff" :title="pageNotice.title" :description="pageNotice.description" :tone="pageNotice.tone">
+        <template #actions>
+          <el-button
+            v-if="profileState === 'error'"
+            :loading="sectionReloadingKey === 'profile'"
+            @click="retryProfile"
+          >
+            重试资料页
+          </el-button>
+        </template>
+      </PetPalDeskNotice>
+    </template>
+
     <PetPalDeskSection eyebrow="Profile" title="基础资料" description="城市、半径、经验和专长直接影响主人匹配结果。">
-      <el-form label-position="top" class="petpal-field-grid">
+      <PetPalDeskEmpty
+        v-if="profileState === 'error'"
+        title="入驻资料暂未刷新完成"
+        description="可以先重试资料页，恢复后再继续维护城市、经验和资质材料。"
+      />
+
+      <el-form v-else label-position="top" class="petpal-field-grid">
         <el-form-item label="服务城市">
           <el-input v-model="form.serviceCity" maxlength="30" placeholder="例如：杭州" />
         </el-form-item>
@@ -31,7 +51,12 @@
       </el-form>
     </PetPalDeskSection>
 
-    <PetPalDeskSection eyebrow="Materials" title="资质材料" description="为了简化流程，这里改成手动维护材料条目，不再堆叠上传卡片。">
+    <PetPalDeskSection
+      v-if="profileState !== 'error'"
+      eyebrow="Materials"
+      title="资质材料"
+      description="为了简化流程，这里改成手动维护材料条目，不再堆叠上传卡片。"
+    >
       <div class="petpal-field-grid petpal-material-entry">
         <el-form-item label="材料名称">
           <el-input v-model="materialDraft.name" maxlength="40" placeholder="例如：宠物护理证书" />
@@ -65,7 +90,12 @@
       </div>
     </PetPalDeskSection>
 
-    <PetPalDeskSection eyebrow="Submit" title="保存资料" description="资料保存后仍可继续调整，审核状态会自动刷新。">
+    <PetPalDeskSection
+      v-if="profileState !== 'error'"
+      eyebrow="Submit"
+      title="保存资料"
+      description="保存后会回到照料者工作台继续查看审核状态和后续动作。"
+    >
       <div class="petpal-actions">
         <el-button type="primary" :loading="submitting" @click="submit">保存资料</el-button>
       </div>
@@ -76,15 +106,29 @@
 <script setup lang="ts">
 import type { CaregiverProfileRecord, CaregiverQualificationMaterialRecord } from '@rbac/api-common';
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import {
+  buildPetPalDeskHandoffQuery,
+  getPetPalQueryString,
+  mergePetPalPageNotice,
+  runPetPalSectionRetry,
+  type PetPalSectionLoadState,
+} from './recovery';
 import { getPetPalCaregiverAuditLabel, normalizePetPalTagText, petPalCaregiverWorkspaceNav } from './shared';
 
+const route = useRoute();
+const router = useRouter();
+
 const profile = ref<CaregiverProfileRecord | null>(null);
+const profileState = ref<PetPalSectionLoadState>('idle');
+const sectionReloadingKey = ref<'' | 'profile'>('');
 const submitting = ref(false);
 
 const form = reactive({
@@ -102,12 +146,43 @@ const materialDraft = reactive({
   url: '',
 });
 
+const pageNotice = computed(() => {
+  const description = mergePetPalPageNotice([
+    getPetPalQueryString(route.query, 'notice'),
+    profileState.value === 'error' ? '入驻资料暂未刷新完成，可先重试当前页' : '',
+  ]);
+  if (!description) {
+    return null;
+  }
+  return {
+    title: profileState.value === 'error' ? '入驻资料暂未刷新完整' : '已进入入驻资料页',
+    description,
+    tone: profileState.value === 'error' ? 'warning' as const : 'accent' as const,
+  };
+});
+
 const heroStats = computed(() => [
   { label: '审核状态', value: profile.value ? getPetPalCaregiverAuditLabel(profile.value.auditStatus) : '待提交', hint: '保存后平台可继续审核' },
   { label: '材料数量', value: String(form.qualificationMaterials.length), hint: '条目越清晰越方便审核' },
   { label: '服务城市', value: form.serviceCity || '待填写', hint: '会影响主人筛选' },
   { label: '服务半径', value: `${form.serviceRadiusKm} km`, hint: '建议按真实接单范围填写' },
 ]);
+
+const hasStatus = (error: unknown): error is { status: number } =>
+  typeof error === 'object'
+  && error !== null
+  && typeof Reflect.get(error, 'status') === 'number';
+
+function resetForm() {
+  profile.value = null;
+  form.intro = '';
+  form.experienceYears = 0;
+  form.serviceRadiusKm = 5;
+  form.serviceCity = '';
+  form.specialtyTagsText = '';
+  form.serviceCommitment = '';
+  form.qualificationMaterials = [];
+}
 
 function applyProfile(value: CaregiverProfileRecord) {
   profile.value = value;
@@ -144,18 +219,35 @@ function removeMaterial(fileId: string) {
   form.qualificationMaterials = form.qualificationMaterials.filter((item) => item.fileId !== fileId);
 }
 
-async function loadPage() {
+async function loadProfile() {
+  profileState.value = 'idle';
   try {
     const result = await api.petpal.caregiver.profile();
     applyProfile(result);
-  } catch {
-    profile.value = null;
+    profileState.value = 'ready';
+  } catch (error) {
+    if (hasStatus(error) && error.status === 404) {
+      resetForm();
+      profileState.value = 'ready';
+      return;
+    }
+    profileState.value = 'error';
+    throw error;
+  }
+}
+
+async function loadPage() {
+  try {
+    await loadProfile();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '加载照料者资料失败'));
   }
 }
 
 async function submit() {
   submitting.value = true;
   try {
+    const hadProfile = Boolean(profile.value);
     const result = await api.petpal.caregiver.upsertProfile({
       intro: form.intro.trim() || undefined,
       experienceYears: form.experienceYears,
@@ -166,12 +258,31 @@ async function submit() {
       qualificationMaterials: form.qualificationMaterials,
     });
     applyProfile(result);
-    ElMessage.success('照料者资料已保存');
+    ElMessage.success(hadProfile ? '照料者资料已更新' : '照料者资料已保存');
+    await router.push({
+      name: 'frontend-petpal-caregiver',
+      query: buildPetPalDeskHandoffQuery({
+        notice: hadProfile
+          ? '入驻资料已更新，可继续查看审核状态或维护服务。'
+          : '入驻资料已保存，可继续查看审核状态并开始维护服务。',
+      }),
+    });
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '保存照料者资料失败'));
   } finally {
     submitting.value = false;
   }
+}
+
+async function retryProfile() {
+  await runPetPalSectionRetry({
+    key: 'profile',
+    sectionReloadingKey,
+    reload: loadProfile,
+    getState: () => profileState.value,
+    successMessage: '入驻资料已刷新',
+    swallowError: true,
+  });
 }
 
 onMounted(() => {
