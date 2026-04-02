@@ -7245,6 +7245,57 @@ flowchart TD
 2. 继续评估是否围绕退款敞口和售后风险补更偏经营复盘的专项导出视角。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.165 2026-04-03（P3-M1 Slice 165）
+
+**概述**：延续照料者收益导出能力，本轮继续把经营明细补到“能直接做售后风险复盘”的层面，新增只导出退款风险单的专项视角，并把布尔查询参数收口为精确的 `true / false` 解析，避免筛选条件被字符串误判。
+
+已完成：
+
+- 照料者收益导出补退款风险筛选：
+  - `packages/api-common/src/types/petpal.ts`
+    - 照料者经营导出查询契约新增 `riskOnly`，统一 Web 与后端导出参数。
+  - `apps/backend/src/routes/petpal.ts`
+    - 照料者收益导出查询新增 `riskOnly`。
+    - 导出查询与投诉后台查询里的布尔参数改为精确解析 `true / false`，不再把字符串 `'false'` 误识别成真值。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 照料者经营导出筛选新增 `riskOnly`。
+    - 当 `riskOnly=true` 时，导出只保留当前照料者名下、已完成且发生退款的订单，继续保留服务类型与完成时间区间筛选。
+- Web 收益页补风险导出入口：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 导出筛选条新增“仅导出退款风险单”复选框。
+    - 最近一次导出条件和常用模板现在都会一并记住 `riskOnly`，切换模板时不会丢专项筛选。
+    - 导出说明文案已明确这是“只影响经营明细导出，不改变摘要和趋势口径”的专项视角。
+- 定向集成测试补齐：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增风险导出用例，验证 `riskOnly=true` 时只导出当前照料者的退款完成单。
+    - 同一用例继续验证 `riskOnly=false` 字符串查询不会被误判为真值，普通完成单仍会导出。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 --test-name-pattern "filters caregiver earnings export by refunded risk only" test/integration/petpal-api.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮后端导出仍严格限定在“当前照料者 + 已完成订单”范围内，`riskOnly` 只是进一步把经营明细收窄到已退款订单，没有扩大数据暴露面。
+- 已确认 `riskOnly` 会随最近一次筛选和命名模板一起持久化，风险复盘场景不需要反复手动重配筛选条件。
+- 已确认查询层对 `'false'` 的解析已收口，避免把显式关闭的筛选条件误判成开启状态。
+
+风险与缓解：
+
+- 风险：当前风险专项导出仍只提供单一退款口径，尚未继续细分为投诉中、部分退款、全额退款等更深的经营复盘维度。
+- 缓解：下一轮如继续扩收益分析，可在保持现有导出契约稳定的前提下，再按售后阶段补更细的风险标签或模板预设。
+
+下一步（1-3）：
+
+1. 继续评估是否围绕退款类型、投诉状态和时间窗补更细的经营风险导出维度。
+2. 继续评估是否把主人端与照料者端的导出筛选能力抽成共用工具条和共享模板基础设施。
+3. 在收益与售后视角继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
+
 ### 14.163 2026-04-03（P3-M1 Slice 163）
 
 **概述**：延续上一轮的收益导出筛选，本轮继续把照料者收益页的导出体验做成“可重复使用”的工作台能力，先补快捷时间窗和最近一次筛选持久化，避免每次回到页面都重新选范围。

@@ -254,6 +254,7 @@ type CaregiverEarningsExportFilters = {
   startDate?: Date;
   endDate?: Date;
   serviceType?: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+  riskOnly?: boolean;
 };
 
 type ComplaintAdminScopeFilters = {
@@ -433,7 +434,10 @@ const normalizeCaregiverEarningsExportFilters = (
     }
   }
 
-  return filters;
+  return {
+    ...filters,
+    riskOnly: Boolean(filters.riskOnly),
+  };
 };
 
 type CallbackFailureAlertPayload = {
@@ -1960,6 +1964,13 @@ export const petpalService = {
         ...(normalizedFilters.serviceType
           ? {
               serviceType: normalizedFilters.serviceType,
+            }
+          : {}),
+        ...(normalizedFilters.riskOnly
+          ? {
+              amountRefunded: {
+                gt: 0,
+              },
             }
           : {}),
         ...(normalizedFilters.startDate || normalizedFilters.endDate

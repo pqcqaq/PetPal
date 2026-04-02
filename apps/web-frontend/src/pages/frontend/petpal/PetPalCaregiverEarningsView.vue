@@ -154,12 +154,15 @@
                 :value="item.value"
               />
             </el-select>
+            <el-checkbox v-model="exportRiskOnly">
+              仅导出退款风险单
+            </el-checkbox>
             <el-button v-if="hasExportFilters" text @click="clearExportFilters">
               清空导出筛选
             </el-button>
           </div>
           <p class="petpal-export-toolbar__hint">
-            导出筛选只影响经营明细，不改变当前摘要和趋势口径；系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
+            导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外只导出已发生退款的风险单，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
           </p>
         </div>
 
@@ -448,6 +451,7 @@ type CaregiverEarningsExportFilterSnapshot = {
   endDate: string;
   serviceType: PetServiceType | '';
   datePreset: EarningsExportDatePreset;
+  riskOnly: boolean;
 };
 type CaregiverEarningsExportTemplate = CaregiverEarningsExportFilterSnapshot & {
   name: string;
@@ -472,6 +476,7 @@ const { state: exportPageState } = usePageState<CaregiverEarningsExportPageState
     endDate: '',
     serviceType: '',
     datePreset: '',
+    riskOnly: false,
     templates: [],
   },
 );
@@ -539,12 +544,14 @@ const applyExportFilterSnapshot = (snapshot: CaregiverEarningsExportFilterSnapsh
   exportPageState.endDate = snapshot.endDate;
   exportPageState.serviceType = snapshot.serviceType;
   exportPageState.datePreset = snapshot.datePreset;
+  exportPageState.riskOnly = snapshot.riskOnly;
 };
 const buildCurrentExportFilterSnapshot = (): CaregiverEarningsExportFilterSnapshot => ({
   startDate: exportPageState.startDate,
   endDate: exportPageState.endDate,
   serviceType: exportPageState.serviceType,
   datePreset: exportPageState.datePreset,
+  riskOnly: exportPageState.riskOnly,
 });
 const clearCurrentExportFilters = () => {
   applyExportFilterSnapshot({
@@ -552,6 +559,7 @@ const clearCurrentExportFilters = () => {
     endDate: '',
     serviceType: '',
     datePreset: '',
+    riskOnly: false,
   });
 };
 const setExportDateRange = (value: [Date, Date] | null, datePreset: EarningsExportDatePreset = '') => {
@@ -607,6 +615,12 @@ const exportServiceType = computed<PetServiceType | ''>({
     exportPageState.serviceType = value || '';
   },
 });
+const exportRiskOnly = computed<boolean>({
+  get: () => exportPageState.riskOnly,
+  set: (value) => {
+    exportPageState.riskOnly = value;
+  },
+});
 const exportTemplates = computed(() => exportPageState.templates);
 const selectedExportTemplate = computed(
   () => exportTemplates.value.find((item) => item.name === selectedExportTemplateName.value) ?? null,
@@ -645,7 +659,11 @@ const trendGroups = computed(() =>
 );
 const hasTrendData = computed(() => totals.value.completedOrderCount > 0);
 const activeExportPreset = computed(() => exportPageState.datePreset);
-const hasExportFilters = computed(() => Boolean(exportDateRange.value || exportServiceType.value));
+const hasExportFilters = computed(() => Boolean(
+  exportDateRange.value
+  || exportServiceType.value
+  || exportRiskOnly.value,
+));
 const revenueCards = computed(() => [
   {
     label: '累计收入',
@@ -865,6 +883,7 @@ function buildEarningsExportRequest() {
     startDate: exportDateRange.value?.[0]?.toISOString(),
     endDate: exportDateRange.value?.[1]?.toISOString(),
     serviceType: exportServiceType.value || undefined,
+    riskOnly: exportRiskOnly.value || undefined,
   });
 }
 

@@ -556,6 +556,7 @@ export interface CaregiverEarningsExportQuery {
   startDate?: string;
   endDate?: string;
   serviceType?: PetServiceType;
+  riskOnly?: boolean;
 }
 
 export interface MatchCaregiverQuery {

@@ -1269,6 +1269,225 @@ describe('PetPal API integration', () => {
     assert.equal(completedRow.getCell(11).value, '100');
   });
 
+  it('filters caregiver earnings export by refunded risk only', async () => {
+    const { app, prisma } = context;
+    const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
+    const ownerSession = await loginAs(app, 'user', 'User123!');
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+
+    const caregiverProfileResponse = await request(app)
+      .get('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    await prisma.caregiverProfile.update({
+      where: {
+        id: caregiverProfileResponse.body.data.id,
+      },
+      data: {
+        auditStatus: 'APPROVED',
+      },
+    });
+
+    const ownerPet = await prisma.petProfile.findFirst({
+      where: {
+        ownerId: ownerSession.user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    assert.ok(ownerPet);
+
+    const suffix = Date.now().toString(36);
+    const refundedRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-risk-hit-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-05T09:00:00.000Z'),
+        endTime: new Date('2026-04-05T18:00:00.000Z'),
+        locationText: '杭州市滨江区导出-风险命中',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 188,
+        demandTags: ['export-risk-hit'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const safeRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-risk-safe-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-05T19:00:00.000Z'),
+        endTime: new Date('2026-04-05T22:00:00.000Z'),
+        locationText: '杭州市滨江区导出-无退款',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 166,
+        demandTags: ['export-risk-safe'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const existingForeignCaregiverProfile = await prisma.caregiverProfile.findFirst({
+      where: {
+        userId: adminSession.user.id,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const foreignCaregiverProfile =
+      existingForeignCaregiverProfile ??
+      (await prisma.caregiverProfile.create({
+        data: {
+          id: `caregiver-export-risk-foreign-${suffix}`,
+          userId: adminSession.user.id,
+          experienceYears: 2,
+          serviceRadiusKm: 5,
+          serviceCity: '杭州',
+          auditStatus: 'APPROVED',
+        },
+        select: {
+          id: true,
+        },
+      }));
+
+    const foreignRiskRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-risk-foreign-${suffix}`,
+        ownerId: adminSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-05T10:00:00.000Z'),
+        endTime: new Date('2026-04-05T17:00:00.000Z'),
+        locationText: '杭州市滨江区导出-外部风险单',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 199,
+        demandTags: ['export-risk-foreign'],
+        status: 'MATCHED',
+        matchedCaregiverId: foreignCaregiverProfile.id,
+      },
+    });
+
+    const refundedOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-risk-hit-${suffix}`,
+        orderNo: `PP-EARN-RISK-HIT-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: refundedRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: refundedRequest.startTime,
+        appointmentEnd: refundedRequest.endTime,
+        amountTotal: 188,
+        amountAdjusted: 0,
+        amountPaid: 188,
+        amountRefunded: 38,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-05T18:15:00.000Z'),
+      },
+    });
+
+    const safeOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-risk-safe-${suffix}`,
+        orderNo: `PP-EARN-RISK-SAFE-${Date.now() + 1}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: safeRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: safeRequest.startTime,
+        appointmentEnd: safeRequest.endTime,
+        amountTotal: 166,
+        amountAdjusted: 0,
+        amountPaid: 166,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-05T22:10:00.000Z'),
+      },
+    });
+
+    const foreignRiskOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-risk-foreign-${suffix}`,
+        orderNo: `PP-EARN-RISK-FOREIGN-${Date.now() + 2}`,
+        ownerId: adminSession.user.id,
+        caregiverId: foreignCaregiverProfile.id,
+        serviceRequestId: foreignRiskRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: foreignRiskRequest.startTime,
+        appointmentEnd: foreignRiskRequest.endTime,
+        amountTotal: 199,
+        amountAdjusted: 0,
+        amountPaid: 199,
+        amountRefunded: 49,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-05T17:15:00.000Z'),
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings/export')
+      .query({
+        startDate: '2026-04-05T00:00:00.000Z',
+        endDate: '2026-04-06T00:00:00.000Z',
+        serviceType: 'BOARDING',
+        riskOnly: true,
+      })
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    const exportedOrderNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(exportedOrderNos, [refundedOrder.orderNo]);
+    assert.ok(!exportedOrderNos.includes(safeOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(foreignRiskOrder.orderNo));
+
+    const refundedRow = worksheet.getRow(2);
+    assert.equal(refundedRow.getCell(10).value, '38');
+    assert.equal(refundedRow.getCell(11).value, '150');
+
+    const fullExportResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings/export')
+      .query({
+        startDate: '2026-04-05T00:00:00.000Z',
+        endDate: '2026-04-06T00:00:00.000Z',
+        serviceType: 'BOARDING',
+        riskOnly: 'false',
+      })
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const fullWorksheet = await loadWorksheet(fullExportResponse.body as Buffer);
+    const fullExportedOrderNos = Array.from(
+      { length: Math.max(0, fullWorksheet.rowCount - 1) },
+      (_, index) => String(fullWorksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(fullExportedOrderNos, [safeOrder.orderNo, refundedOrder.orderNo]);
+    assert.ok(!fullExportedOrderNos.includes(foreignRiskOrder.orderNo));
+  });
+
   it('supports caregiver fulfillment actions and owner completion workflow', async () => {
     const { app, prisma, ownerSession, caregiverSession, caregiverProfile, order } =
       await createFulfillmentScenario();

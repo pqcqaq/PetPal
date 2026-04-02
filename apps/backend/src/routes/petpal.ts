@@ -69,6 +69,23 @@ const matchQuerySchema = z.object({
   lng: z.coerce.number().min(-180).max(180).optional(),
 });
 
+const optionalBooleanQuerySchema = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    const normalizedValue = value.trim().toLowerCase();
+    if (normalizedValue === '') {
+      return undefined;
+    }
+    if (normalizedValue === 'true') {
+      return true;
+    }
+    if (normalizedValue === 'false') {
+      return false;
+    }
+  }
+
+  return value;
+}, z.boolean().optional());
+
 const qualificationMaterialSchema = z.object({
   fileId: z.string().trim().min(1).max(64),
   url: z.string().trim().url().max(1000),
@@ -177,6 +194,7 @@ const caregiverEarningsExportQuerySchema = z.object({
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
   serviceType: z.enum(['BOARDING', 'WALKING', 'FEEDING', 'DOOR_VISIT']).optional(),
+  riskOnly: optionalBooleanQuerySchema,
 });
 
 const adminComplaintQuerySchema = z.object({
@@ -187,7 +205,7 @@ const adminComplaintQuerySchema = z.object({
   targetRole: z.enum(['CAREGIVER', 'PLATFORM']).optional(),
   slaStatus: z.enum(['NORMAL', 'DUE_SOON', 'OVERDUE']).optional(),
   assignedAdminId: z.string().trim().min(1).max(64).optional(),
-  unassignedOnly: z.coerce.boolean().optional(),
+  unassignedOnly: optionalBooleanQuerySchema,
   keyword: z.string().trim().max(100).optional(),
 });
 
