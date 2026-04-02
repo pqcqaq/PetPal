@@ -94,53 +94,47 @@ onLoad((options) => {
     </template>
 
     <template v-else>
-      <PetpalSection title="投诉对象">
-        <view class="petpal-chip-row">
+      <PetpalSection tone="danger" title="先确认投诉方向" subtitle="先选投诉对象，再确定问题类型，避免说明和诉求写散。">
+        <view class="petpal-choice-grid petpal-choice-grid--two">
           <button
             v-for="item in complaintTargetOptions"
             :key="item.value"
-            :class="['petpal-chip', form.targetRole === item.value ? 'petpal-chip--active' : '']"
+            :class="['petpal-choice-tile', form.targetRole === item.value ? 'petpal-choice-tile--active' : '']"
             hover-class="none"
             @click="form.targetRole = item.value"
           >
-            {{ item.label }}
+            <text class="petpal-choice-tile__eyebrow">Target</text>
+            <text class="petpal-choice-tile__title">{{ item.label }}</text>
+            <text class="petpal-choice-tile__hint">{{ form.targetRole === item.value ? '当前投诉对象' : '切换到该投诉对象' }}</text>
           </button>
         </view>
-      </PetpalSection>
-
-      <PetpalSection title="问题类型">
-        <view class="petpal-chip-row">
+        <view class="petpal-choice-grid">
           <button
             v-for="item in complaintTypeOptions"
             :key="item.value"
-            :class="['petpal-chip', form.complaintType === item.value ? 'petpal-chip--active' : '']"
+            :class="['petpal-choice-tile', form.complaintType === item.value ? 'petpal-choice-tile--active' : '']"
             hover-class="none"
             @click="form.complaintType = item.value"
           >
-            {{ item.label }}
+            <text class="petpal-choice-tile__eyebrow">Type</text>
+            <text class="petpal-choice-tile__title">{{ item.label }}</text>
           </button>
         </view>
       </PetpalSection>
 
-      <PetpalSection title="详细说明">
+      <PetpalSection title="说明问题经过" subtitle="请按时间顺序描述问题、影响和你的诉求。">
         <textarea v-model="form.description" class="petpal-textarea" :maxlength="360" placeholder="请尽量按时间顺序描述问题、影响和你的诉求" />
       </PetpalSection>
 
-      <PetpalSection title="证据材料" subtitle="最多 3 张图，直接进入投诉结果页同步查看。">
+      <PetpalSection title="证据材料" subtitle="最多 3 张图，提交后会直接进入投诉结果页同步查看。">
         <template v-if="form.evidenceUrls.length">
-          <button
-            v-for="(item, index) in form.evidenceUrls"
-            :key="item"
-            class="petpal-row-btn"
-            hover-class="none"
-            @click="form.evidenceUrls = form.evidenceUrls.filter((_, currentIndex) => currentIndex !== index)"
-          >
-            <view class="petpal-row__copy">
-              <text class="petpal-row__title">证据 {{ index + 1 }}</text>
-              <text class="petpal-row__hint">{{ item }}</text>
+          <view v-for="(item, index) in form.evidenceUrls" :key="item" class="petpal-sheet">
+            <text class="petpal-banner__eyebrow">Evidence {{ index + 1 }}</text>
+            <text class="petpal-note">{{ item }}</text>
+            <view class="petpal-action-row">
+              <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="form.evidenceUrls = form.evidenceUrls.filter((_, currentIndex) => currentIndex !== index)">移除材料</button>
             </view>
-            <text class="petpal-row__value">移除</text>
-          </button>
+          </view>
         </template>
         <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="uploadEvidence">
           {{ upload.uploading ? '上传中...' : '上传截图或照片' }}
@@ -148,6 +142,7 @@ onLoad((options) => {
       </PetpalSection>
 
       <view class="petpal-bottom-bar">
+        <text class="petpal-note">投诉提交后会进入独立结果页，后续处理不再和当前表单混在一起。</text>
         <view class="petpal-action-row">
           <button class="petpal-btn petpal-btn--danger" hover-class="none" :disabled="submitting" @click="submitComplaint">
             {{ submitting ? '提交中...' : '提交投诉' }}

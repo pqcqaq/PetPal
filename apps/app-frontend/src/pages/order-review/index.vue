@@ -83,21 +83,23 @@ onLoad((options) => {
     </template>
 
     <template v-else>
-      <PetpalSection title="评分">
-        <view class="petpal-chip-row">
+      <PetpalSection tone="accent" title="先给这次服务一个总体判断" subtitle="评分决定整体印象，标签和补充说明再往下细化。">
+        <view class="petpal-choice-grid petpal-choice-grid--two">
           <button
             v-for="score in [5, 4, 3, 2, 1]"
             :key="score"
-            :class="['petpal-chip', form.rating === score ? 'petpal-chip--active' : '']"
+            :class="['petpal-choice-tile', form.rating === score ? 'petpal-choice-tile--active' : '']"
             hover-class="none"
             @click="form.rating = score"
           >
-            {{ score }} 星
+            <text class="petpal-choice-tile__eyebrow">Rating</text>
+            <text class="petpal-choice-tile__title">{{ score }} 星</text>
+            <text class="petpal-choice-tile__hint">{{ form.rating === score ? '当前评分' : '选择这个评分' }}</text>
           </button>
         </view>
       </PetpalSection>
 
-      <PetpalSection title="标签">
+      <PetpalSection title="评价标签" subtitle="只选真正影响复购判断的标签，不堆冗余标签墙。">
         <view class="petpal-chip-row">
           <button
             v-for="tag in reviewTagOptions"
@@ -111,18 +113,23 @@ onLoad((options) => {
         </view>
       </PetpalSection>
 
-      <PetpalSection title="补充评价">
+      <PetpalSection title="补充说明" subtitle="补充沟通体验、照料过程和是否愿意再次预约。">
         <textarea v-model="form.content" class="petpal-textarea" :maxlength="220" placeholder="可以补充照料过程、沟通体验和是否愿意再次预约" />
-        <button
-          :class="['petpal-chip', form.isAnonymous ? 'petpal-chip--active' : '']"
-          hover-class="none"
-          @click="form.isAnonymous = !form.isAnonymous"
-        >
-          {{ form.isAnonymous ? '匿名评价中' : '切换为匿名评价' }}
-        </button>
+        <view class="petpal-choice-grid">
+          <button
+            :class="['petpal-choice-tile', form.isAnonymous ? 'petpal-choice-tile--active' : '']"
+            hover-class="none"
+            @click="form.isAnonymous = !form.isAnonymous"
+          >
+            <text class="petpal-choice-tile__eyebrow">Privacy</text>
+            <text class="petpal-choice-tile__title">{{ form.isAnonymous ? '匿名评价' : '实名评价' }}</text>
+            <text class="petpal-choice-tile__hint">{{ form.isAnonymous ? '评价结果中不会展示你的身份' : '评价会关联当前账号身份' }}</text>
+          </button>
+        </view>
       </PetpalSection>
 
       <view class="petpal-bottom-bar">
+        <text class="petpal-note">提交后会进入独立结果页，不会在当前页继续叠加订单和售后动作。</text>
         <view class="petpal-action-row">
           <button class="petpal-btn petpal-btn--primary" hover-class="none" :disabled="submitting" @click="submitReview">
             {{ submitting ? '提交中...' : '提交评价' }}

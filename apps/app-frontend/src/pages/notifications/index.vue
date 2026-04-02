@@ -18,6 +18,7 @@ const filter = ref<FilterValue>('UNREAD')
 const visibleRows = computed(() => {
   return notificationStore.items.filter(item => filter.value === 'ALL' || !notificationStore.isRead(item))
 })
+const unreadRows = computed(() => notificationStore.items.filter(item => !notificationStore.isRead(item)))
 
 async function loadPage() {
   if (!tokenStore.hasLogin || loading.value) {
@@ -61,6 +62,21 @@ onPullDownRefresh(() => {
     </template>
 
     <template v-else>
+      <PetpalSection tone="accent" title="通知总览" :subtitle="unreadRows.length ? `当前还有 ${unreadRows.length} 条未读通知` : '当前没有未读通知'">
+        <view class="petpal-stat-row">
+          <view class="petpal-stat">
+            <text class="petpal-stat__label">未读</text>
+            <text class="petpal-stat__value">{{ unreadRows.length }}</text>
+            <text class="petpal-stat__meta">等待处理</text>
+          </view>
+          <view class="petpal-stat">
+            <text class="petpal-stat__label">全部</text>
+            <text class="petpal-stat__value">{{ notificationStore.items.length }}</text>
+            <text class="petpal-stat__meta">已归档</text>
+          </view>
+        </view>
+      </PetpalSection>
+
       <PetpalSection title="筛选通知">
         <PetpalSegmented
           v-model="filter"
@@ -71,27 +87,22 @@ onPullDownRefresh(() => {
         />
       </PetpalSection>
 
-      <PetpalSection title="通知列表">
-        <template #trailing>
-          <button class="petpal-icon-btn" hover-class="none" @click="notificationStore.markAllAsRead()">全部已读</button>
-        </template>
+      <PetpalSection title="通知列表" subtitle="每条通知只保留内容和入口，不再叠加额外说明。">
         <template v-if="visibleRows.length">
-          <button
-            v-for="item in visibleRows"
-            :key="item.id"
-            class="petpal-row-btn"
-            hover-class="none"
-            @click="openItem(item.id)"
-          >
-            <view class="petpal-row__copy">
-              <text class="petpal-row__title">{{ item.title }}</text>
-              <text class="petpal-row__meta">{{ item.summary }}</text>
-              <text class="petpal-row__hint">{{ item.detail }}</text>
+          <view v-for="item in visibleRows" :key="item.id" class="petpal-sheet">
+            <text class="petpal-banner__eyebrow">{{ notificationStore.isRead(item) ? 'Read' : 'Unread' }}</text>
+            <text class="petpal-banner__title">{{ item.title }}</text>
+            <text class="petpal-banner__meta">{{ item.summary }}</text>
+            <text class="petpal-note">{{ item.detail }}</text>
+            <view class="petpal-action-row">
+              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openItem(item.id)">{{ notificationStore.isRead(item) ? '再次打开' : item.actionLabel }}</button>
             </view>
-            <text class="petpal-row__value">{{ notificationStore.isRead(item) ? '已读' : item.actionLabel }}</text>
-          </button>
+          </view>
         </template>
         <PetpalEmpty v-else title="没有更多通知" description="当前筛选下没有新的待处理项。"/>
+        <view class="petpal-action-row">
+          <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="notificationStore.markAllAsRead()">全部设为已读</button>
+        </view>
       </PetpalSection>
     </template>
   </PetpalPage>

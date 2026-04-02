@@ -88,10 +88,10 @@ onShow(() => {
     </template>
 
     <template v-else>
-      <PetpalSection tone="accent" title="头像与基础身份">
+      <PetpalSection tone="accent" title="基础身份" subtitle="头像、昵称和账号信息只在这一页维护。">
         <view class="petpal-inline">
           <view class="petpal-avatar-badge">{{ initials(userStore.userInfo.nickname || userStore.userInfo.username) }}</view>
-          <view class="petpal-stack" style="gap: 6rpx;">
+          <view class="petpal-stack petpal-stack--tight">
             <text class="petpal-banner__title">{{ userStore.userInfo.nickname || userStore.userInfo.username }}</text>
             <text class="petpal-note">{{ userStore.userInfo.username }}</text>
           </view>
@@ -102,7 +102,7 @@ onShow(() => {
         </view>
       </PetpalSection>
 
-      <PetpalSection title="编辑资料">
+      <PetpalSection title="编辑资料" subtitle="这里只改昵称和邮箱，不再掺杂设置与通知逻辑。">
         <view class="petpal-form">
           <view class="petpal-field">
             <text class="petpal-field__label">昵称</text>
@@ -115,24 +115,23 @@ onShow(() => {
         </view>
       </PetpalSection>
 
-      <PetpalSection title="快捷跳转">
-        <button class="petpal-row-btn" hover-class="none" @click="openSettings">
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">体验设置</text>
-            <text class="petpal-row__hint">调整主题、密度和动效。</text>
-          </view>
-          <text class="petpal-row__value">进入</text>
-        </button>
-        <button class="petpal-row-btn" hover-class="none" @click="openNotifications">
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">通知中心</text>
-            <text class="petpal-row__hint">看资料补全和新任务提醒。</text>
-          </view>
-          <text class="petpal-row__value">进入</text>
-        </button>
+      <PetpalSection title="跳转其他页面" subtitle="设置和通知保留独立入口，不再和资料编辑混写。">
+        <view class="petpal-choice-grid">
+          <button class="petpal-choice-tile" hover-class="none" @click="openSettings">
+            <text class="petpal-choice-tile__eyebrow">Settings</text>
+            <text class="petpal-choice-tile__title">体验设置</text>
+            <text class="petpal-choice-tile__hint">调整主题、密度和动效。</text>
+          </button>
+          <button class="petpal-choice-tile" hover-class="none" @click="openNotifications">
+            <text class="petpal-choice-tile__eyebrow">Notifications</text>
+            <text class="petpal-choice-tile__title">通知中心</text>
+            <text class="petpal-choice-tile__hint">看资料补全和新任务提醒。</text>
+          </button>
+        </view>
       </PetpalSection>
 
       <view class="petpal-bottom-bar">
+        <text class="petpal-note">保存资料后会直接回写当前账号信息，不需要在这页继续处理设置和通知。</text>
         <view class="petpal-action-row">
           <button class="petpal-btn petpal-btn--primary" hover-class="none" :disabled="saving" @click="saveProfile">
             {{ saving ? '保存中...' : '保存资料' }}

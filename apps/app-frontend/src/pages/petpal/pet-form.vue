@@ -140,74 +140,74 @@ onLoad((options) => {
     </template>
 
     <template v-else>
-      <PetpalSection title="基础信息" subtitle="名字、品类和身体信息单独一组。">
-        <view class="petpal-form">
+      <PetpalSection tone="accent" title="先确认这只宠物是谁" subtitle="名字、种类和性别先明确，后续照料说明再补充。">
+        <view class="petpal-field">
+          <text class="petpal-field__label">宠物名字</text>
+          <input v-model="form.name" class="petpal-input" :maxlength="20" placeholder="例如：团子" />
+        </view>
+        <view class="petpal-choice-grid petpal-choice-grid--two">
+          <button
+            v-for="item in speciesOptions"
+            :key="item.value"
+            :class="['petpal-choice-tile', form.species === item.value ? 'petpal-choice-tile--active' : '']"
+            hover-class="none"
+            @click="form.species = item.value"
+          >
+            <text class="petpal-choice-tile__eyebrow">Species</text>
+            <text class="petpal-choice-tile__title">{{ item.label }}</text>
+            <text class="petpal-choice-tile__hint">{{ form.species === item.value ? '当前品类' : '切换到该品类' }}</text>
+          </button>
+        </view>
+        <view class="petpal-choice-grid petpal-choice-grid--two">
+          <button
+            v-for="item in genderOptions"
+            :key="item.value"
+            :class="['petpal-choice-tile', form.gender === item.value ? 'petpal-choice-tile--active' : '']"
+            hover-class="none"
+            @click="form.gender = item.value"
+          >
+            <text class="petpal-choice-tile__eyebrow">Gender</text>
+            <text class="petpal-choice-tile__title">{{ item.label }}</text>
+            <text class="petpal-choice-tile__hint">{{ form.gender === item.value ? '当前性别' : '切换到该性别' }}</text>
+          </button>
+        </view>
+      </PetpalSection>
+
+      <PetpalSection title="基础资料" subtitle="品种、生日和体重只保留必要输入。">
+        <view class="petpal-grid--two">
           <view class="petpal-field">
-            <text class="petpal-field__label">宠物名字</text>
-            <input v-model="form.name" class="petpal-input" :maxlength="20" placeholder="例如：团子" />
+            <text class="petpal-field__label">品种</text>
+            <input v-model="form.breed" class="petpal-input" :maxlength="30" placeholder="可留空" />
           </view>
           <view class="petpal-field">
-            <text class="petpal-field__label">宠物种类</text>
-            <view class="petpal-chip-row">
-              <button
-                v-for="item in speciesOptions"
-                :key="item.value"
-                :class="['petpal-chip', form.species === item.value ? 'petpal-chip--active' : '']"
-                hover-class="none"
-                @click="form.species = item.value"
-              >
-                {{ item.label }}
-              </button>
-            </view>
+            <text class="petpal-field__label">生日</text>
+            <input v-model="form.birthday" class="petpal-input" placeholder="YYYY-MM-DD" />
           </view>
-          <view class="petpal-grid--two">
-            <view class="petpal-field">
-              <text class="petpal-field__label">品种</text>
-              <input v-model="form.breed" class="petpal-input" :maxlength="30" placeholder="可留空" />
-            </view>
-            <view class="petpal-field">
-              <text class="petpal-field__label">性别</text>
-              <view class="petpal-chip-row">
-                <button
-                  v-for="item in genderOptions"
-                  :key="item.value"
-                  :class="['petpal-chip', form.gender === item.value ? 'petpal-chip--active' : '']"
-                  hover-class="none"
-                  @click="form.gender = item.value"
-                >
-                  {{ item.label }}
-                </button>
-              </view>
-            </view>
-          </view>
-          <view class="petpal-grid--two">
-            <view class="petpal-field">
-              <text class="petpal-field__label">生日</text>
-              <input v-model="form.birthday" class="petpal-input" placeholder="YYYY-MM-DD" />
-            </view>
-            <view class="petpal-field">
-              <text class="petpal-field__label">体重（kg）</text>
-              <input v-model="form.weightKg" class="petpal-input" type="digit" placeholder="例如 4.5" />
-            </view>
+        </view>
+        <view class="petpal-grid--two">
+          <view class="petpal-field">
+            <text class="petpal-field__label">体重（kg）</text>
+            <input v-model="form.weightKg" class="petpal-input" type="digit" placeholder="例如 4.5" />
           </view>
           <view class="petpal-field">
             <text class="petpal-field__label">是否绝育</text>
-            <view class="petpal-chip-row">
+            <view class="petpal-choice-grid">
               <button
                 v-for="item in yesNoOptions"
                 :key="item.value"
-                :class="['petpal-chip', form.neutered === item.value ? 'petpal-chip--active' : '']"
+                :class="['petpal-choice-tile', form.neutered === item.value ? 'petpal-choice-tile--active' : '']"
                 hover-class="none"
                 @click="form.neutered = item.value"
               >
-                {{ item.label }}
+                <text class="petpal-choice-tile__eyebrow">Neutered</text>
+                <text class="petpal-choice-tile__title">{{ item.label }}</text>
               </button>
             </view>
           </view>
         </view>
       </PetpalSection>
 
-      <PetpalSection title="照料偏好" subtitle="真正影响服务的说明单独收纳。">
+      <PetpalSection title="照料说明" subtitle="真正影响服务的说明单独集中，方便后续直接复用。">
         <view class="petpal-form">
           <view class="petpal-field">
             <text class="petpal-field__label">性格标签</text>
@@ -228,7 +228,7 @@ onLoad((options) => {
         </view>
       </PetpalSection>
 
-      <PetpalSection title="紧急联系人" subtitle="紧急联系人从宠物基础资料中拆出来，查看更直接。">
+      <PetpalSection title="紧急联系人" subtitle="联系人信息独立收口，便于紧急情况快速查看。">
         <view class="petpal-grid--two">
           <view class="petpal-field">
             <text class="petpal-field__label">联系人</text>
@@ -246,6 +246,7 @@ onLoad((options) => {
       </PetpalSection>
 
       <view class="petpal-bottom-bar">
+        <text class="petpal-note">保存后返回宠物档案列表，需求创建不会再和资料编辑混在同一页。</text>
         <view class="petpal-action-row">
           <button class="petpal-btn petpal-btn--primary" hover-class="none" :disabled="saving" @click="savePet">
             {{ saving ? '保存中...' : (petId ? '保存修改' : '创建宠物') }}

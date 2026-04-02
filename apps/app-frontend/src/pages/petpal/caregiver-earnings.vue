@@ -18,6 +18,7 @@ const orders = ref<OrderRecord[]>([])
 const completedOrders = computed(() => orders.value.filter(item => item.orderStatus === 'COMPLETED'))
 const totalIncome = computed(() => completedOrders.value.reduce((total, item) => total + Number(item.amountPaid || 0), 0))
 const averageIncome = computed(() => completedOrders.value.length ? totalIncome.value / completedOrders.value.length : 0)
+const activeServiceCount = computed(() => services.value.filter(item => item.isActive).length)
 
 async function loadPage() {
   if (!tokenStore.hasLogin || loading.value) {
@@ -61,7 +62,7 @@ onPullDownRefresh(() => {
     </template>
 
     <template v-else>
-      <PetpalSection tone="accent" title="核心表现">
+      <PetpalSection tone="accent" title="收益总览" :subtitle="completedOrders.length ? `当前已完成 ${completedOrders.length} 笔订单` : '完成第一笔订单后，这里会开始累计收益'">
         <view class="petpal-stat-row">
           <view class="petpal-stat">
             <text class="petpal-stat__label">累计收入</text>
@@ -76,7 +77,7 @@ onPullDownRefresh(() => {
         </view>
       </PetpalSection>
 
-      <PetpalSection title="档案与服务">
+      <PetpalSection title="档案与服务" subtitle="收益页只看表现，不混入履约动作。">
         <view class="petpal-grid--two">
           <view class="petpal-stat">
             <text class="petpal-stat__label">评分</text>
@@ -85,27 +86,22 @@ onPullDownRefresh(() => {
           </view>
           <view class="petpal-stat">
             <text class="petpal-stat__label">上架服务</text>
-            <text class="petpal-stat__value">{{ services.filter(item => item.isActive).length }}</text>
+            <text class="petpal-stat__value">{{ activeServiceCount }}</text>
             <text class="petpal-stat__meta">全部服务 {{ services.length }}</text>
           </view>
         </view>
       </PetpalSection>
 
-      <PetpalSection title="最近完成的订单">
+      <PetpalSection title="最近完成的订单" subtitle="只保留已经形成收益的订单。">
         <template v-if="completedOrders.length">
-          <button
-            v-for="item in completedOrders.slice(0, 6)"
-            :key="item.id"
-            class="petpal-row-btn"
-            hover-class="none"
-            @click="openOrderDetailPage(item.id)"
-          >
-            <view class="petpal-row__copy">
-              <text class="petpal-row__title">{{ item.orderNo }}</text>
-              <text class="petpal-row__meta">{{ helpers.formatMoney(item.amountPaid) }} · {{ helpers.formatRange(item.appointmentStart, item.appointmentEnd) }}</text>
+          <view v-for="item in completedOrders.slice(0, 6)" :key="item.id" class="petpal-sheet">
+            <text class="petpal-banner__eyebrow">Completed Order</text>
+            <text class="petpal-banner__title">{{ item.orderNo }}</text>
+            <text class="petpal-banner__meta">{{ helpers.formatMoney(item.amountPaid) }} · {{ helpers.formatRange(item.appointmentStart, item.appointmentEnd) }}</text>
+            <view class="petpal-action-row">
+              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(item.id)">查看订单</button>
             </view>
-            <text class="petpal-row__value">查看</text>
-          </button>
+          </view>
         </template>
         <PetpalEmpty v-else title="还没有完成订单" description="完成第一笔订单后，这里会开始累计你的收益表现。"/>
       </PetpalSection>
