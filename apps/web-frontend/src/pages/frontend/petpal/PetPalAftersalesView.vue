@@ -24,20 +24,23 @@
     </template>
 
     <PetPalDeskSection eyebrow="Export" title="导出与售后清单" description="左侧看售后订单，右侧只看当前选中订单的退款和投诉摘要。">
-      <div class="petpal-export-toolbar">
-        <PetPalExportTemplateActions
-          v-model="selectedExportTemplateName"
-          :templates="exportTemplates"
-          placeholder="选择退款导出模板"
-          :apply-disabled="!selectedExportTemplate"
-          :save-disabled="!hasExportFilters"
-          :can-remove="!!selectedExportTemplate"
-          @apply="applySelectedExportTemplate"
-          @save="saveCurrentExportTemplate"
-          @remove="deleteSelectedExportTemplate"
-        />
-
-        <div class="petpal-export-toolbar__filters">
+      <PetPalExportToolbar
+        hint="退款导出只影响当前导出文件，不改变左侧售后订单选择；系统会记住最近一次退款筛选，并可保存最多 5 套常用模板。"
+      >
+        <template #template-actions>
+          <PetPalExportTemplateActions
+            v-model="selectedExportTemplateName"
+            :templates="exportTemplates"
+            placeholder="选择退款导出模板"
+            :apply-disabled="!selectedExportTemplate"
+            :save-disabled="!hasExportFilters"
+            :can-remove="!!selectedExportTemplate"
+            @apply="applySelectedExportTemplate"
+            @save="saveCurrentExportTemplate"
+            @remove="deleteSelectedExportTemplate"
+          />
+        </template>
+        <template #filters>
           <el-date-picker
             v-model="exportDateRange"
             type="daterange"
@@ -138,12 +141,8 @@
             label="导出退款明细"
             pending-label="导出中"
           />
-        </div>
-
-        <p class="petpal-export-toolbar__hint">
-          退款导出只影响当前导出文件，不改变左侧售后订单选择；系统会记住最近一次退款筛选，并可保存最多 5 套常用模板。
-        </p>
-      </div>
+        </template>
+      </PetPalExportToolbar>
     </PetPalDeskSection>
 
     <div class="petpal-split-grid">
@@ -249,6 +248,7 @@ import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalExportTemplateActions from './rebuild/petpal-export-template-actions.vue';
+import PetPalExportToolbar from './rebuild/petpal-export-toolbar.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
   PETPAL_EXPORT_TEMPLATE_LIMIT,
@@ -623,26 +623,8 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-.petpal-export-toolbar {
-  display: grid;
-  gap: 12px;
-}
-
-.petpal-export-toolbar__filters {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
 .petpal-export-toolbar__control {
   width: 220px;
-}
-
-.petpal-export-toolbar__hint {
-  margin: 0;
-  color: #6b625a;
-  font-size: 13px;
-  line-height: 1.6;
 }
 
 .petpal-aftersales-row {
@@ -675,10 +657,6 @@ onMounted(() => {
 }
 
 @media (max-width: 720px) {
-  .petpal-export-toolbar__filters {
-    align-items: stretch;
-  }
-
   .petpal-export-toolbar__control {
     width: 100%;
   }

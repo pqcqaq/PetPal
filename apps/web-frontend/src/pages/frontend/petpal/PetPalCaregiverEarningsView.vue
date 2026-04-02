@@ -90,31 +90,38 @@
       </PetPalDeskEmpty>
 
       <template v-else>
-        <div class="petpal-export-toolbar">
-          <div class="petpal-export-toolbar__presets">
-            <span class="petpal-export-toolbar__label">快捷时间窗</span>
-            <el-button
-              v-for="preset in exportPresetOptions"
-              :key="preset.value"
-              size="small"
-              :type="activeExportPreset === preset.value ? 'primary' : 'default'"
-              @click="applyExportPreset(preset.value)"
-            >
-              {{ preset.label }}
-            </el-button>
-          </div>
-          <PetPalExportTemplateActions
-            v-model="selectedExportTemplateName"
-            :templates="exportTemplates"
-            placeholder="选择常用导出模板"
-            :apply-disabled="!selectedExportTemplate"
-            :save-disabled="!hasExportFilters"
-            :can-remove="!!selectedExportTemplate"
-            @apply="applySelectedExportTemplate"
-            @save="saveCurrentExportTemplate"
-            @remove="deleteSelectedExportTemplate"
-          />
-          <div class="petpal-export-toolbar__filters">
+        <PetPalExportToolbar
+          class="petpal-export-toolbar"
+          hint="导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按订单号关键词、退款类型、退款状态、退款原因关键词、退款风险单、投诉状态、投诉类型、投诉摘要关键词或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。"
+        >
+          <template #presets>
+            <div class="petpal-export-toolbar__presets">
+              <span class="petpal-export-toolbar__label">快捷时间窗</span>
+              <el-button
+                v-for="preset in exportPresetOptions"
+                :key="preset.value"
+                size="small"
+                :type="activeExportPreset === preset.value ? 'primary' : 'default'"
+                @click="applyExportPreset(preset.value)"
+              >
+                {{ preset.label }}
+              </el-button>
+            </div>
+          </template>
+          <template #template-actions>
+            <PetPalExportTemplateActions
+              v-model="selectedExportTemplateName"
+              :templates="exportTemplates"
+              placeholder="选择常用导出模板"
+              :apply-disabled="!selectedExportTemplate"
+              :save-disabled="!hasExportFilters"
+              :can-remove="!!selectedExportTemplate"
+              @apply="applySelectedExportTemplate"
+              @save="saveCurrentExportTemplate"
+              @remove="deleteSelectedExportTemplate"
+            />
+          </template>
+          <template #filters>
             <el-date-picker
               v-model="exportDateRange"
               type="daterange"
@@ -225,11 +232,8 @@
             <el-button v-if="hasExportFilters" text @click="clearExportFilters">
               清空导出筛选
             </el-button>
-          </div>
-          <p class="petpal-export-toolbar__hint">
-            导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按订单号关键词、退款类型、退款状态、退款原因关键词、退款风险单、投诉状态、投诉类型、投诉摘要关键词或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
-          </p>
-        </div>
+          </template>
+        </PetPalExportToolbar>
 
         <div class="petpal-metric-grid">
           <article v-for="item in revenueCards" :key="item.label" class="petpal-metric-card">
@@ -495,6 +499,7 @@ import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalExportTemplateActions from './rebuild/petpal-export-template-actions.vue';
+import PetPalExportToolbar from './rebuild/petpal-export-toolbar.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
   buildPetPalPageNotice,
@@ -1192,13 +1197,10 @@ onMounted(() => {
 }
 
 .petpal-export-toolbar {
-  display: grid;
-  gap: 12px;
   margin-bottom: 16px;
 }
 
-.petpal-export-toolbar__presets,
-.petpal-export-toolbar__filters {
+.petpal-export-toolbar__presets {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -1215,13 +1217,6 @@ onMounted(() => {
 
 .petpal-export-toolbar__service {
   width: 220px;
-}
-
-.petpal-export-toolbar__hint {
-  margin: 0;
-  color: #6b625a;
-  font-size: 13px;
-  line-height: 1.6;
 }
 
 .petpal-metric-grid--compact {
@@ -1450,8 +1445,7 @@ onMounted(() => {
     align-items: stretch;
   }
 
-  .petpal-export-toolbar__presets,
-  .petpal-export-toolbar__filters {
+  .petpal-export-toolbar__presets {
     align-items: stretch;
   }
 
