@@ -194,6 +194,7 @@ const caregiverEarningsExportQuerySchema = z.object({
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
   serviceType: z.enum(['BOARDING', 'WALKING', 'FEEDING', 'DOOR_VISIT']).optional(),
+  orderNoKeyword: z.string().trim().min(1).max(64).optional(),
   refundType: z.enum(['FULL', 'PARTIAL']).optional(),
   refundStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'SUCCESS', 'FAILED']).optional(),
   refundReasonKeyword: z.string().trim().min(1).max(100).optional(),

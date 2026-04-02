@@ -3697,6 +3697,240 @@ describe('PetPal API integration', () => {
     assert.equal(complaintKeywordFilteredRow.getCell(5).value, '杭州市滨江区导出-投诉摘要命中');
   });
 
+  it('filters caregiver earnings export by order number keyword', async () => {
+    const { app, prisma } = context;
+    const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
+    const ownerSession = await loginAs(app, 'user', 'User123!');
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+
+    const caregiverProfileResponse = await request(app)
+      .get('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    await prisma.caregiverProfile.update({
+      where: {
+        id: caregiverProfileResponse.body.data.id,
+      },
+      data: {
+        auditStatus: 'APPROVED',
+      },
+    });
+
+    const ownerPet = await prisma.petProfile.findFirst({
+      where: {
+        ownerId: ownerSession.user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    assert.ok(ownerPet);
+
+    const suffix = Date.now().toString(36);
+    const matchedRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-order-keyword-hit-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-10T09:00:00.000Z'),
+        endTime: new Date('2026-04-10T18:00:00.000Z'),
+        locationText: '杭州市滨江区导出-订单号命中',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 208,
+        demandTags: ['export-order-keyword-hit'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const nonMatchingRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-order-keyword-miss-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-10T12:00:00.000Z'),
+        endTime: new Date('2026-04-10T21:00:00.000Z'),
+        locationText: '杭州市滨江区导出-订单号未命中',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 188,
+        demandTags: ['export-order-keyword-miss'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const activeRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-order-keyword-active-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-10T22:00:00.000Z'),
+        endTime: new Date('2026-04-10T23:00:00.000Z'),
+        locationText: '杭州市滨江区导出-订单号活跃单',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 168,
+        demandTags: ['export-order-keyword-active'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const existingForeignCaregiverProfile = await prisma.caregiverProfile.findFirst({
+      where: {
+        userId: adminSession.user.id,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const foreignCaregiverProfile =
+      existingForeignCaregiverProfile ??
+      (await prisma.caregiverProfile.create({
+        data: {
+          id: `caregiver-export-order-keyword-foreign-${suffix}`,
+          userId: adminSession.user.id,
+          experienceYears: 2,
+          serviceRadiusKm: 5,
+          serviceCity: '杭州',
+          auditStatus: 'APPROVED',
+        },
+        select: {
+          id: true,
+        },
+      }));
+
+    const foreignRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-order-keyword-foreign-${suffix}`,
+        ownerId: adminSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-10T08:00:00.000Z'),
+        endTime: new Date('2026-04-10T19:00:00.000Z'),
+        locationText: '杭州市滨江区导出-外部订单号命中',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 218,
+        demandTags: ['export-order-keyword-foreign'],
+        status: 'MATCHED',
+        matchedCaregiverId: foreignCaregiverProfile.id,
+      },
+    });
+
+    const matchedOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-order-keyword-hit-${suffix}`,
+        orderNo: `PP-EARN-ORDER-FOCUS-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: matchedRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: matchedRequest.startTime,
+        appointmentEnd: matchedRequest.endTime,
+        amountTotal: 208,
+        amountAdjusted: 0,
+        amountPaid: 208,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-10T18:10:00.000Z'),
+      },
+    });
+
+    const nonMatchingOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-order-keyword-miss-${suffix}`,
+        orderNo: `PP-EARN-ORDER-OTHER-${Date.now() + 1}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: nonMatchingRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: nonMatchingRequest.startTime,
+        appointmentEnd: nonMatchingRequest.endTime,
+        amountTotal: 188,
+        amountAdjusted: 0,
+        amountPaid: 188,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-10T21:10:00.000Z'),
+      },
+    });
+
+    const activeOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-order-keyword-active-${suffix}`,
+        orderNo: `PP-EARN-ORDER-FOCUS-ACTIVE-${Date.now() + 2}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: activeRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: activeRequest.startTime,
+        appointmentEnd: activeRequest.endTime,
+        amountTotal: 168,
+        amountAdjusted: 0,
+        amountPaid: 168,
+        amountRefunded: 0,
+        orderStatus: 'SERVING',
+      },
+    });
+
+    const foreignOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-order-keyword-foreign-${suffix}`,
+        orderNo: `PP-EARN-ORDER-FOCUS-FOREIGN-${Date.now() + 3}`,
+        ownerId: adminSession.user.id,
+        caregiverId: foreignCaregiverProfile.id,
+        serviceRequestId: foreignRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: foreignRequest.startTime,
+        appointmentEnd: foreignRequest.endTime,
+        amountTotal: 218,
+        amountAdjusted: 0,
+        amountPaid: 218,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-10T19:10:00.000Z'),
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings/export')
+      .query({
+        startDate: '2026-04-10T00:00:00.000Z',
+        endDate: '2026-04-11T23:59:59.999Z',
+        serviceType: 'BOARDING',
+        orderNoKeyword: 'order-focus',
+      })
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    const exportedOrderNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(exportedOrderNos, [matchedOrder.orderNo]);
+    assert.ok(!exportedOrderNos.includes(nonMatchingOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(activeOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(foreignOrder.orderNo));
+
+    const orderKeywordFilteredRow = worksheet.getRow(2);
+    assert.equal(orderKeywordFilteredRow.getCell(1).value, matchedOrder.orderNo);
+    assert.equal(orderKeywordFilteredRow.getCell(5).value, '杭州市滨江区导出-订单号命中');
+  });
+
   it('supports caregiver fulfillment actions and owner completion workflow', async () => {
     const { app, prisma, ownerSession, caregiverSession, caregiverProfile, order } =
       await createFulfillmentScenario();

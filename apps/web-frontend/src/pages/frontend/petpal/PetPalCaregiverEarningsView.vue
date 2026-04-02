@@ -154,6 +154,12 @@
                 :value="item.value"
               />
             </el-select>
+            <el-input
+              v-model="exportOrderNoKeyword"
+              clearable
+              placeholder="订单号关键词"
+              class="petpal-export-toolbar__service"
+            />
             <el-select
               v-model="exportRefundType"
               clearable
@@ -239,7 +245,7 @@
             </el-button>
           </div>
           <p class="petpal-export-toolbar__hint">
-            导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按退款类型、退款状态、退款原因关键词、退款风险单、投诉状态、投诉类型、投诉摘要关键词或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
+            导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按订单号关键词、退款类型、退款状态、退款原因关键词、退款风险单、投诉状态、投诉类型、投诉摘要关键词或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
           </p>
         </div>
 
@@ -537,6 +543,7 @@ type CaregiverEarningsExportFilterSnapshot = {
   startDate: string;
   endDate: string;
   serviceType: PetServiceType | '';
+  orderNoKeyword: string;
   refundType: RefundType | '';
   refundStatus: RefundStatus | '';
   refundReasonKeyword: string;
@@ -569,6 +576,7 @@ const { state: exportPageState } = usePageState<CaregiverEarningsExportPageState
     startDate: '',
     endDate: '',
     serviceType: '',
+    orderNoKeyword: '',
     refundType: '',
     refundStatus: '',
     refundReasonKeyword: '',
@@ -644,6 +652,7 @@ const applyExportFilterSnapshot = (snapshot: CaregiverEarningsExportFilterSnapsh
   exportPageState.startDate = snapshot.startDate;
   exportPageState.endDate = snapshot.endDate;
   exportPageState.serviceType = snapshot.serviceType;
+  exportPageState.orderNoKeyword = snapshot.orderNoKeyword ?? '';
   exportPageState.refundType = snapshot.refundType;
   exportPageState.refundStatus = snapshot.refundStatus;
   exportPageState.refundReasonKeyword = snapshot.refundReasonKeyword;
@@ -658,6 +667,7 @@ const buildCurrentExportFilterSnapshot = (): CaregiverEarningsExportFilterSnapsh
   startDate: exportPageState.startDate,
   endDate: exportPageState.endDate,
   serviceType: exportPageState.serviceType,
+  orderNoKeyword: exportPageState.orderNoKeyword,
   refundType: exportPageState.refundType,
   refundStatus: exportPageState.refundStatus,
   refundReasonKeyword: exportPageState.refundReasonKeyword,
@@ -673,6 +683,7 @@ const clearCurrentExportFilters = () => {
     startDate: '',
     endDate: '',
     serviceType: '',
+    orderNoKeyword: '',
     refundType: '',
     refundStatus: '',
     refundReasonKeyword: '',
@@ -735,6 +746,12 @@ const exportServiceType = computed<PetServiceType | ''>({
   get: () => exportPageState.serviceType,
   set: (value) => {
     exportPageState.serviceType = value || '';
+  },
+});
+const exportOrderNoKeyword = computed<string>({
+  get: () => exportPageState.orderNoKeyword || '',
+  set: (value) => {
+    exportPageState.orderNoKeyword = value.trimStart();
   },
 });
 const exportRefundType = computed<RefundType | ''>({
@@ -826,6 +843,7 @@ const activeExportPreset = computed(() => exportPageState.datePreset);
 const hasExportFilters = computed(() => Boolean(
   exportDateRange.value
   || exportServiceType.value
+  || exportOrderNoKeyword.value.trim()
   || exportRefundType.value
   || exportRefundStatus.value
   || exportRefundReasonKeyword.value.trim()
@@ -1054,6 +1072,7 @@ function buildEarningsExportRequest() {
     startDate: exportDateRange.value?.[0]?.toISOString(),
     endDate: exportDateRange.value?.[1]?.toISOString(),
     serviceType: exportServiceType.value || undefined,
+    orderNoKeyword: exportOrderNoKeyword.value.trim() || undefined,
     refundType: exportRefundType.value || undefined,
     refundStatus: exportRefundStatus.value || undefined,
     refundReasonKeyword: exportRefundReasonKeyword.value.trim() || undefined,

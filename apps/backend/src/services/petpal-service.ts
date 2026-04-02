@@ -254,6 +254,7 @@ type CaregiverEarningsExportFilters = {
   startDate?: Date;
   endDate?: Date;
   serviceType?: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+  orderNoKeyword?: string;
   refundType?: 'FULL' | 'PARTIAL';
   refundStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
   refundReasonKeyword?: string;
@@ -443,6 +444,7 @@ const normalizeCaregiverEarningsExportFilters = (
 
   return {
     ...filters,
+    orderNoKeyword: filters.orderNoKeyword?.trim() || undefined,
     refundReasonKeyword: filters.refundReasonKeyword?.trim() || undefined,
     complaintKeyword: filters.complaintKeyword?.trim() || undefined,
     riskOnly: Boolean(filters.riskOnly),
@@ -1973,6 +1975,14 @@ export const petpalService = {
         ...(normalizedFilters.serviceType
           ? {
               serviceType: normalizedFilters.serviceType,
+            }
+          : {}),
+        ...(normalizedFilters.orderNoKeyword
+          ? {
+              orderNo: {
+                contains: normalizedFilters.orderNoKeyword,
+                mode: 'insensitive' as const,
+              },
             }
           : {}),
         ...(normalizedFilters.riskOnly
