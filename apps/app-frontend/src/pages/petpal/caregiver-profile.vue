@@ -1,145 +1,53 @@
-<script lang="ts" setup>
-import type {
-  CaregiverProfileRecord,
-  CaregiverQualificationMaterialRecord,
-} from '@rbac/api-common'
-import { computed, reactive, ref } from 'vue'
-import AppButton from '@/components/app-button/app-button.vue'
-import AppInput from '@/components/app-input/app-input.vue'
-import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppSection from '@/components/app-section/app-section.vue'
-import AppStatus from '@/components/app-status/app-status.vue'
-import AppTag from '@/components/app-tag/app-tag.vue'
+<script setup lang="ts">
+import type { CaregiverProfileRecord } from '@rbac/api-common'
+import { reactive, ref } from 'vue'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import { getCaregiverProfile, upsertCaregiverProfile } from '@/api/petpal'
 import { useManagedAttachmentUpload } from '@/composables/useManagedAttachmentUpload'
-import { LOGIN_PAGE } from '@/router/config'
 import { useTokenStore } from '@/store'
-import { getErrorMessage } from '@/utils/error'
-import CaregiverFlowNav from './components/caregiver-flow-nav.vue'
-import {
-  formatAmount,
-  getCaregiverAuditHint,
-  getCaregiverAuditLabel,
-  joinTagText,
-  PETPAL_CAREGIVER_PROFILE_PAGE,
-  splitTagText,
-} from './owner-shared'
-
-defineOptions({
-  name: 'PetPalCaregiverProfilePage',
-})
-
-definePage({
-  style: {
-    navigationBarTitleText: '入驻中心',
-    enablePullDownRefresh: true,
-  },
-})
+import PetpalPage from './rebuild/petpal-page.vue'
+import PetpalSection from './rebuild/petpal-section.vue'
+import { getErrorMessage, helpers, openLoginPage, PETPAL_CAREGIVER_HOME_PAGE, splitTagText, toast } from './rebuild/shared'
 
 const tokenStore = useTokenStore()
+const upload = useManagedAttachmentUpload({ maxCount: 3, maxSizeMb: 8 })
 
 const loading = ref(false)
 const saving = ref(false)
-const caregiverProfile = ref<CaregiverProfileRecord | null>(null)
+const profile = ref<CaregiverProfileRecord | null>(null)
 
-const profileForm = reactive({
+const form = reactive({
   intro: '',
   experienceYears: '0',
   serviceRadiusKm: '5',
   serviceCity: '',
   specialtyTagsText: '',
   serviceCommitment: '',
-  qualificationMaterials: [] as CaregiverQualificationMaterialRecord[],
+  qualificationMaterials: [] as CaregiverProfileRecord['qualificationMaterials'],
 })
 
-const {
-  uploading: qualificationUploading,
-  selectAndUploadAttachments,
-} = useManagedAttachmentUpload({
-  maxCount: 3,
-  maxSizeMb: 8,
-})
-
-const pageDescription = computed(() => (
-  tokenStore.hasLogin
-    ? '把照料者介绍、经验、服务承诺和资质材料集中在入驻中心维护。'
-    : '登录后即可进入照料者入驻中心。'
-))
-
-function getAuditTagType() {
-  if (!caregiverProfile.value) {
-    return 'default'
-  }
-  if (caregiverProfile.value.auditStatus === 'APPROVED') {
-    return 'success'
-  }
-  if (caregiverProfile.value.auditStatus === 'REJECTED') {
-    return 'danger'
-  }
-  return 'warning'
+function hydrateForm(next: CaregiverProfileRecord | null) {
+  profile.value = next
+  form.intro = next?.intro || ''
+  form.experienceYears = next ? String(next.experienceYears) : '0'
+  form.serviceRadiusKm = next ? String(next.serviceRadiusKm) : '5'
+  form.serviceCity = next?.serviceCity || ''
+  form.specialtyTagsText = next?.specialtyTags?.join('，') || ''
+  form.serviceCommitment = next?.serviceCommitment || ''
+  form.qualificationMaterials = next ? [...next.qualificationMaterials] : []
 }
 
-function hydrateProfile(profile: CaregiverProfileRecord | null) {
-  caregiverProfile.value = profile
-  profileForm.intro = profile?.intro || ''
-  profileForm.experienceYears = profile ? String(profile.experienceYears) : '0'
-  profileForm.serviceRadiusKm = profile ? String(profile.serviceRadiusKm) : '5'
-  profileForm.serviceCity = profile?.serviceCity || ''
-  profileForm.specialtyTagsText = joinTagText(profile?.specialtyTags)
-  profileForm.serviceCommitment = profile?.serviceCommitment || ''
-  profileForm.qualificationMaterials = profile ? [...profile.qualificationMaterials] : []
-}
-
-function removeQualificationMaterial(fileId: string) {
-  profileForm.qualificationMaterials = profileForm.qualificationMaterials
-    .filter(item => item.fileId !== fileId)
-}
-
-async function uploadQualificationMaterials() {
-  if (!caregiverProfile.value) {
-    uni.showToast({ title: '请先保存一次档案后再上传', icon: 'none' })
-    return
-  }
-
-  try {
-    const uploaded = await selectAndUploadAttachments({
-      tag1: 'petpal-caregiver-qualification',
-      tag2: caregiverProfile.value.id,
-    })
-    profileForm.qualificationMaterials = [
-      ...profileForm.qualificationMaterials,
-      ...uploaded,
-    ].slice(0, 12)
-    uni.showToast({ title: `已上传 ${uploaded.length} 份材料`, icon: 'none' })
-  }
-  catch (error: unknown) {
-    uni.showToast({ title: getErrorMessage(error, '上传资质材料失败'), icon: 'none' })
-  }
-}
-
-function goToLogin() {
-  uni.navigateTo({ url: LOGIN_PAGE })
-}
-
-async function loadPage(showError = false) {
+async function loadPage() {
   if (!tokenStore.hasLogin || loading.value) {
-    uni.stopPullDownRefresh()
     return
   }
-
   loading.value = true
   try {
-    const profile = await getCaregiverProfile()
-    hydrateProfile(profile)
+    const next = await getCaregiverProfile()
+    hydrateForm(next)
   }
-  catch (error: unknown) {
-    hydrateProfile(null)
-    if (showError) {
-      uni.showToast({
-        title: getErrorMessage(error, '加载照料者档案失败'),
-        icon: 'none',
-      })
-    }
+  catch {
+    hydrateForm(null)
   }
   finally {
     loading.value = false
@@ -147,23 +55,38 @@ async function loadPage(showError = false) {
   }
 }
 
-async function saveProfile() {
-  saving.value = true
+async function uploadMaterials() {
   try {
-    const profile = await upsertCaregiverProfile({
-      intro: profileForm.intro.trim() || undefined,
-      experienceYears: Number(profileForm.experienceYears || 0),
-      serviceRadiusKm: Number(profileForm.serviceRadiusKm || 0),
-      serviceCity: profileForm.serviceCity.trim() || undefined,
-      specialtyTags: splitTagText(profileForm.specialtyTagsText),
-      serviceCommitment: profileForm.serviceCommitment.trim() || undefined,
-      qualificationMaterials: profileForm.qualificationMaterials,
-    })
-    hydrateProfile(profile)
-    uni.showToast({ title: '入驻资料已保存', icon: 'none' })
+    const files = await upload.selectAndUploadAttachments({ tag1: 'petpal', tag2: 'qualification' })
+    form.qualificationMaterials = [...form.qualificationMaterials, ...files].slice(0, 12)
+    toast('材料已添加', 'success')
   }
   catch (error: unknown) {
-    uni.showToast({ title: getErrorMessage(error, '保存入驻资料失败'), icon: 'none' })
+    toast(getErrorMessage(error, '上传失败'))
+  }
+}
+
+async function saveProfile() {
+  if (!tokenStore.hasLogin || saving.value) {
+    return
+  }
+
+  saving.value = true
+  try {
+    const next = await upsertCaregiverProfile({
+      intro: form.intro.trim() || undefined,
+      experienceYears: Number(form.experienceYears || 0),
+      serviceRadiusKm: Number(form.serviceRadiusKm || 0),
+      serviceCity: form.serviceCity.trim() || undefined,
+      specialtyTags: splitTagText(form.specialtyTagsText),
+      serviceCommitment: form.serviceCommitment.trim() || undefined,
+      qualificationMaterials: form.qualificationMaterials,
+    })
+    hydrateForm(next)
+    toast('照料者档案已保存', 'success')
+  }
+  catch (error: unknown) {
+    toast(getErrorMessage(error, '保存失败'))
   }
   finally {
     saving.value = false
@@ -171,210 +94,86 @@ async function saveProfile() {
 }
 
 onShow(() => {
-  if (!tokenStore.hasLogin) {
-    return
-  }
-  void loadPage(false)
+  void loadPage()
 })
 
 onPullDownRefresh(() => {
-  void loadPage(true)
+  void loadPage()
 })
 </script>
 
 <template>
-  <AppPageShell title="入驻中心" :description="pageDescription">
-    <template v-if="tokenStore.hasLogin">
-      <CaregiverFlowNav
-        :current-path="PETPAL_CAREGIVER_PROFILE_PAGE"
-        title="照料者入驻中心"
-        description="照料介绍、经验、服务承诺和资质材料统一维护，审核状态也在这里集中反馈。"
-      />
-
-      <AppSection title="审核状态" description="优先确认当前审核状态和需要补齐的信息。">
-        <view class="caregiver-profile-status">
-          <AppTag :type="getAuditTagType()">
-            {{ caregiverProfile ? getCaregiverAuditLabel(caregiverProfile.auditStatus) : '待创建档案' }}
-          </AppTag>
-          <text class="caregiver-profile-status__title">
-            {{ caregiverProfile ? getCaregiverAuditHint(caregiverProfile.auditStatus) : '先补齐介绍、城市和资质材料，平台才会进入审核。' }}
-          </text>
-          <text v-if="caregiverProfile" class="caregiver-profile-status__meta">
-            当前评分 {{ formatAmount(caregiverProfile.ratingAvg) }} · 已上传 {{ caregiverProfile.qualificationMaterials.length }} 份材料
-          </text>
-        </view>
-      </AppSection>
-
-      <AppSection title="入驻资料" description="资料越完整，越容易通过审核并被主人筛选命中。">
-        <view class="caregiver-profile-form">
-          <AppInput v-model="profileForm.experienceYears" label="照料经验（年）" placeholder="例如：3" type="digit" />
-          <AppInput v-model="profileForm.serviceRadiusKm" label="服务半径（km）" placeholder="例如：8" type="digit" />
-          <AppInput v-model="profileForm.serviceCity" label="服务城市" placeholder="例如：杭州" />
-          <AppInput v-model="profileForm.specialtyTagsText" label="专长标签" placeholder="例如：幼宠，猫咪，异宠" />
-
-          <textarea
-            v-model="profileForm.intro"
-            class="caregiver-profile-textarea"
-            :maxlength="240"
-            auto-height
-            placeholder="介绍你的照料经验、擅长宠物类型和服务风格"
-          />
-          <textarea
-            v-model="profileForm.serviceCommitment"
-            class="caregiver-profile-textarea"
-            :maxlength="180"
-            auto-height
-            placeholder="说明你的服务承诺，例如图文反馈频率、紧急响应方式"
-          />
-
-          <view class="caregiver-profile-materials">
-            <view class="caregiver-profile-materials__header">
-              <text class="caregiver-profile-materials__title">资质材料</text>
-              <text class="caregiver-profile-materials__meta">{{ profileForm.qualificationMaterials.length }}/12 份</text>
-            </view>
-
-            <view class="caregiver-profile-action-row">
-              <AppButton
-                size="medium"
-                type="info"
-                :loading="qualificationUploading"
-                :disabled="profileForm.qualificationMaterials.length >= 12"
-                @click="uploadQualificationMaterials"
-              >
-                上传资质图片
-              </AppButton>
-            </view>
-
-            <view v-if="profileForm.qualificationMaterials.length" class="caregiver-profile-material-list">
-              <view
-                v-for="item in profileForm.qualificationMaterials"
-                :key="item.fileId"
-                class="caregiver-profile-material-item"
-              >
-                <view class="caregiver-profile-material-item__copy">
-                  <text>{{ item.name }}</text>
-                  <text>{{ item.mimeType }} · {{ Math.max(1, Math.round(item.size / 1024)) }}KB</text>
-                </view>
-                <AppButton size="medium" type="danger" @click="removeQualificationMaterial(item.fileId)">移除</AppButton>
-              </view>
-            </view>
-            <view v-else class="caregiver-profile-empty">
-              <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步入驻资料' : '至少上传一份身份证明或培训资质图片'" />
-            </view>
-          </view>
-
-          <view class="caregiver-profile-action-row">
-            <AppButton size="medium" :loading="saving" @click="saveProfile">保存入驻资料</AppButton>
-          </view>
-        </view>
-      </AppSection>
+  <PetpalPage title="入驻中心" subtitle="档案、资质、承诺单独维护，不再和订单混在一起。" eyebrow="Caregiver Profile" back :back-url="PETPAL_CAREGIVER_HOME_PAGE">
+    <template v-if="!tokenStore.hasLogin">
+      <PetpalSection title="需要登录">
+        <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openLoginPage">去登录</button>
+      </PetpalSection>
     </template>
 
     <template v-else>
-      <AppSection title="开始进入入驻中心">
-        <view class="caregiver-profile-empty caregiver-profile-empty--login">
-          <AppStatus text="登录后即可维护照料者入驻资料。" />
+      <PetpalSection tone="accent" title="审核状态" :subtitle="helpers.getCaregiverAuditLabel(profile?.auditStatus || 'PENDING')">
+        <text class="petpal-paragraph">{{ helpers.getCaregiverAuditHint(profile?.auditStatus) }}</text>
+      </PetpalSection>
+
+      <PetpalSection title="基础档案">
+        <view class="petpal-form">
+          <view class="petpal-grid--two">
+            <view class="petpal-field">
+              <text class="petpal-field__label">经验（年）</text>
+              <input v-model="form.experienceYears" class="petpal-input" type="digit" placeholder="例如 3" />
+            </view>
+            <view class="petpal-field">
+              <text class="petpal-field__label">服务半径（km）</text>
+              <input v-model="form.serviceRadiusKm" class="petpal-input" type="digit" placeholder="例如 8" />
+            </view>
+          </view>
+          <view class="petpal-field">
+            <text class="petpal-field__label">服务城市</text>
+            <input v-model="form.serviceCity" class="petpal-input" :maxlength="30" placeholder="例如 杭州" />
+          </view>
+          <view class="petpal-field">
+            <text class="petpal-field__label">擅长标签</text>
+            <input v-model="form.specialtyTagsText" class="petpal-input" placeholder="例如 幼宠、猫咪、异宠、夜间托管" />
+          </view>
+          <view class="petpal-field">
+            <text class="petpal-field__label">个人介绍</text>
+            <textarea v-model="form.intro" class="petpal-textarea" :maxlength="240" placeholder="介绍你的照料风格、经验和适合服务的宠物类型" />
+          </view>
+          <view class="petpal-field">
+            <text class="petpal-field__label">服务承诺</text>
+            <textarea v-model="form.serviceCommitment" class="petpal-textarea" :maxlength="220" placeholder="例如：最晚 2 小时内回复、每日回传至少 3 次照片" />
+          </view>
         </view>
-        <AppButton block @click="goToLogin">去登录</AppButton>
-      </AppSection>
+      </PetpalSection>
+
+      <PetpalSection title="资质材料" :subtitle="`${form.qualificationMaterials.length}/12 份`">
+        <template v-if="form.qualificationMaterials.length">
+          <button
+            v-for="item in form.qualificationMaterials"
+            :key="item.fileId"
+            class="petpal-row-btn"
+            hover-class="none"
+            @click="form.qualificationMaterials = form.qualificationMaterials.filter(current => current.fileId !== item.fileId)"
+          >
+            <view class="petpal-row__copy">
+              <text class="petpal-row__title">{{ item.name }}</text>
+              <text class="petpal-row__hint">{{ item.url }}</text>
+            </view>
+            <text class="petpal-row__value">移除</text>
+          </button>
+        </template>
+        <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="uploadMaterials">
+          {{ upload.uploading ? '上传中...' : '添加材料' }}
+        </button>
+      </PetpalSection>
+
+      <view class="petpal-bottom-bar">
+        <view class="petpal-action-row">
+          <button class="petpal-btn petpal-btn--primary" hover-class="none" :disabled="saving" @click="saveProfile">
+            {{ saving ? '保存中...' : '保存档案' }}
+          </button>
+        </view>
+      </view>
     </template>
-  </AppPageShell>
+  </PetpalPage>
 </template>
-
-<style scoped lang="scss">
-.caregiver-profile-status,
-.caregiver-profile-form,
-.caregiver-profile-materials,
-.caregiver-profile-material-list {
-  display: grid;
-  gap: 16rpx;
-}
-
-.caregiver-profile-status {
-  padding: 24rpx;
-  border-radius: 26rpx;
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.2), transparent 34%),
-    linear-gradient(145deg, #7c2d12 0%, #9a3412 42%, #b45309 100%);
-  color: #fff7ed;
-}
-
-.caregiver-profile-status__title {
-  font-size: 28rpx;
-  line-height: 1.7;
-  font-weight: 700;
-}
-
-.caregiver-profile-status__meta {
-  font-size: 22rpx;
-  line-height: 1.7;
-  color: rgba(255, 247, 237, 0.88);
-}
-
-.caregiver-profile-textarea {
-  width: 100%;
-  min-height: 150rpx;
-  padding: 24rpx;
-  border-radius: 22rpx;
-  border: 1rpx solid var(--app-border);
-  background: var(--app-surface);
-  color: var(--app-text);
-  box-sizing: border-box;
-  line-height: 1.7;
-}
-
-.caregiver-profile-materials {
-  padding: 20rpx 24rpx;
-  border-radius: 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
-  box-shadow: var(--app-elevation-1);
-}
-
-.caregiver-profile-materials__header,
-.caregiver-profile-material-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 16rpx;
-  align-items: flex-start;
-}
-
-.caregiver-profile-materials__title {
-  color: var(--app-text);
-  font-size: 28rpx;
-  font-weight: 700;
-}
-
-.caregiver-profile-materials__meta,
-.caregiver-profile-material-item__copy text:last-child {
-  color: var(--app-text-secondary);
-  font-size: 22rpx;
-  line-height: 1.7;
-}
-
-.caregiver-profile-material-item__copy {
-  display: grid;
-  gap: 6rpx;
-}
-
-.caregiver-profile-action-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-}
-
-.caregiver-profile-empty {
-  padding: 8rpx 0;
-}
-
-.caregiver-profile-empty--login {
-  padding-bottom: 28rpx;
-}
-
-@media (max-width: 680px) {
-  .caregiver-profile-materials__header,
-  .caregiver-profile-material-item {
-    flex-direction: column;
-  }
-}
-</style>

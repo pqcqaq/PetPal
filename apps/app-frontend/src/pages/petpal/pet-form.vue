@@ -1,75 +1,28 @@
-<script lang="ts" setup>
-/**
- * UX Blueprint
- * User: 已决定新增或编辑某只宠物，只想专注填写档案
- * Entry: 宠物列表页、需求页需要补档案时
- * First screen: 当前是新增还是编辑、正在填写哪个分区
- * Primary action: 保存当前宠物档案
- * Secondary actions: 切换分区、返回宠物列表
- * States: 未登录、加载中、无目标宠物、可编辑
- */
-import type { PetGender, PetProfileRecord, PetSpecies } from '@rbac/api-common'
+<script setup lang="ts">
+import type { PetProfileRecord } from '@rbac/api-common'
 import { computed, reactive, ref } from 'vue'
-import AppButton from '@/components/app-button/app-button.vue'
-import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
-import AppInput from '@/components/app-input/app-input.vue'
-import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppSection from '@/components/app-section/app-section.vue'
-import AppStatus from '@/components/app-status/app-status.vue'
-import AppTag from '@/components/app-tag/app-tag.vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { createPet, listPets, updatePet } from '@/api/petpal'
-import { LOGIN_PAGE } from '@/router/config'
 import { useTokenStore } from '@/store'
-import { getErrorMessage } from '@/utils/error'
-import {
-  genderOptions,
-  joinTagText,
-  openPetPalAction,
-  PETPAL_PETS_PAGE,
-  splitTagText,
-  speciesOptions,
-  yesNoOptions,
-} from './owner-shared'
-
-defineOptions({
-  name: 'PetPalPetFormPage',
-})
-
-definePage({
-  style: {
-    navigationBarTitleText: '宠物表单',
-    enablePullDownRefresh: true,
-  },
-})
-
-type YesNoChoice = 'YES' | 'NO'
-type PetEditorSection = 'PROFILE' | 'CARE' | 'HEALTH' | 'EMERGENCY'
-
-const sectionOptions = [
-  { label: '基础', value: 'PROFILE' },
-  { label: '照料', value: 'CARE' },
-  { label: '健康', value: 'HEALTH' },
-  { label: '紧急', value: 'EMERGENCY' },
-]
+import PetpalPage from './rebuild/petpal-page.vue'
+import PetpalSection from './rebuild/petpal-section.vue'
+import { genderOptions, getErrorMessage, openLoginPage, PETPAL_PETS_PAGE, speciesOptions, splitTagText, toast, yesNoOptions } from './rebuild/shared'
 
 const tokenStore = useTokenStore()
-
 const loading = ref(false)
 const saving = ref(false)
 const petId = ref('')
-const returnTo = ref(PETPAL_PETS_PAGE)
-const section = ref<PetEditorSection>('PROFILE')
-const tagText = ref('')
-const currentPet = ref<PetProfileRecord | null>(null)
+const pageTitle = computed(() => (petId.value ? '编辑宠物档案' : '新建宠物档案'))
 
-const petForm = reactive({
+const form = reactive({
   name: '',
-  species: 'DOG' as PetSpecies,
-  gender: 'UNKNOWN' as PetGender,
+  species: 'DOG',
   breed: '',
+  gender: 'UNKNOWN',
   birthday: '',
-  weightKg: '5',
-  neutered: 'NO' as YesNoChoice,
+  weightKg: '',
+  neutered: 'NO',
+  temperamentTagsText: '',
   feedingNote: '',
   allergyNote: '',
   medicalNote: '',
@@ -78,125 +31,66 @@ const petForm = reactive({
   emergencyRelation: '',
 })
 
-const isCreateMode = computed(() => !petId.value)
-const completedSectionCount = computed(() => {
-  const checks = [
-    Boolean(petForm.name.trim()),
-    Boolean(tagText.value.trim() || petForm.feedingNote.trim()),
-    Boolean(petForm.allergyNote.trim() || petForm.medicalNote.trim()),
-    Boolean(petForm.emergencyName.trim() && petForm.emergencyPhone.trim()),
-  ]
-  return checks.filter(Boolean).length
-})
-
-const heroTitle = computed(() => isCreateMode.value ? '新建宠物档案' : `编辑 ${petForm.name || '宠物档案'}`)
-const heroSummary = computed(() => isCreateMode.value
-  ? '表单页只负责填写，不再夹带宠物切换和列表操作。'
-  : '修改后会回到宠物清单，继续从列表里选择下一步。')
-
-function resetForm() {
-  currentPet.value = null
-  petForm.name = ''
-  petForm.species = 'DOG'
-  petForm.gender = 'UNKNOWN'
-  petForm.breed = ''
-  petForm.birthday = ''
-  petForm.weightKg = '5'
-  petForm.neutered = 'NO'
-  petForm.feedingNote = ''
-  petForm.allergyNote = ''
-  petForm.medicalNote = ''
-  petForm.emergencyName = ''
-  petForm.emergencyPhone = ''
-  petForm.emergencyRelation = ''
-  tagText.value = ''
+function hydrateForm(pet: PetProfileRecord | null) {
+  form.name = pet?.name || ''
+  form.species = pet?.species || 'DOG'
+  form.breed = pet?.breed || ''
+  form.gender = pet?.gender || 'UNKNOWN'
+  form.birthday = pet?.birthday || ''
+  form.weightKg = pet?.weightKg ? String(pet.weightKg) : ''
+  form.neutered = pet?.neutered ? 'YES' : 'NO'
+  form.temperamentTagsText = pet?.temperamentTags?.join('，') || ''
+  form.feedingNote = pet?.feedingNote || ''
+  form.allergyNote = pet?.allergyNote || ''
+  form.medicalNote = pet?.medicalNote || ''
+  form.emergencyName = pet?.emergencyContact?.name || ''
+  form.emergencyPhone = pet?.emergencyContact?.phone || ''
+  form.emergencyRelation = pet?.emergencyContact?.relation || ''
 }
 
-function applyPet(pet: PetProfileRecord) {
-  currentPet.value = pet
-  petForm.name = pet.name
-  petForm.species = pet.species
-  petForm.gender = pet.gender
-  petForm.breed = pet.breed || ''
-  petForm.birthday = pet.birthday ? pet.birthday.slice(0, 10) : ''
-  petForm.weightKg = pet.weightKg ? String(pet.weightKg) : '5'
-  petForm.neutered = pet.neutered ? 'YES' : 'NO'
-  petForm.feedingNote = pet.feedingNote || ''
-  petForm.allergyNote = pet.allergyNote || ''
-  petForm.medicalNote = pet.medicalNote || ''
-  petForm.emergencyName = pet.emergencyContact?.name || ''
-  petForm.emergencyPhone = pet.emergencyContact?.phone || ''
-  petForm.emergencyRelation = pet.emergencyContact?.relation || ''
-  tagText.value = joinTagText(pet.temperamentTags)
-}
-
-function backToList() {
-  openPetPalAction('redirect', returnTo.value || PETPAL_PETS_PAGE)
-}
-
-async function loadPage(showError = false) {
-  if (!tokenStore.hasLogin || loading.value) {
-    uni.stopPullDownRefresh()
-    return
-  }
-
-  if (!petId.value) {
-    resetForm()
-    uni.stopPullDownRefresh()
+async function loadDetail() {
+  if (!petId.value || !tokenStore.hasLogin || loading.value) {
     return
   }
 
   loading.value = true
   try {
     const pets = await listPets()
-    const targetPet = pets.find(item => item.id === petId.value) ?? null
-    if (!targetPet) {
-      throw new Error('未找到要编辑的宠物')
-    }
-    applyPet(targetPet)
-  }
-  catch (error: unknown) {
-    resetForm()
-    currentPet.value = null
-    if (showError) {
-      uni.showToast({
-        title: getErrorMessage(error, '加载宠物表单失败'),
-        icon: 'none',
-      })
-    }
+    hydrateForm(pets.find(item => item.id === petId.value) ?? null)
   }
   finally {
     loading.value = false
-    uni.stopPullDownRefresh()
   }
 }
 
-async function submitPet() {
-  if (!petForm.name.trim()) {
-    uni.showToast({ title: '请先填写宠物名称', icon: 'none' })
-    section.value = 'PROFILE'
+async function savePet() {
+  if (!tokenStore.hasLogin || saving.value) {
+    return
+  }
+  if (!form.name.trim()) {
+    toast('请填写宠物名称')
     return
   }
 
   saving.value = true
   try {
     const payload = {
-      name: petForm.name.trim(),
-      species: petForm.species,
-      gender: petForm.gender,
-      breed: petForm.breed.trim() || undefined,
-      birthday: petForm.birthday || undefined,
-      weightKg: Number(petForm.weightKg || 0) || undefined,
-      neutered: petForm.neutered === 'YES',
-      temperamentTags: splitTagText(tagText.value),
-      feedingNote: petForm.feedingNote.trim() || undefined,
-      allergyNote: petForm.allergyNote.trim() || undefined,
-      medicalNote: petForm.medicalNote.trim() || undefined,
-      emergencyContact: petForm.emergencyName.trim() && petForm.emergencyPhone.trim()
+      name: form.name.trim(),
+      species: form.species as 'DOG' | 'CAT' | 'OTHER',
+      breed: form.breed.trim() || undefined,
+      gender: form.gender as 'MALE' | 'FEMALE' | 'UNKNOWN',
+      birthday: form.birthday.trim() || undefined,
+      weightKg: form.weightKg ? Number(form.weightKg) : undefined,
+      neutered: form.neutered === 'YES',
+      temperamentTags: splitTagText(form.temperamentTagsText),
+      feedingNote: form.feedingNote.trim() || undefined,
+      allergyNote: form.allergyNote.trim() || undefined,
+      medicalNote: form.medicalNote.trim() || undefined,
+      emergencyContact: form.emergencyName.trim() && form.emergencyPhone.trim()
         ? {
-            name: petForm.emergencyName.trim(),
-            phone: petForm.emergencyPhone.trim(),
-            relation: petForm.emergencyRelation.trim() || undefined,
+            name: form.emergencyName.trim(),
+            phone: form.emergencyPhone.trim(),
+            relation: form.emergencyRelation.trim() || undefined,
           }
         : undefined,
     }
@@ -208,246 +102,157 @@ async function submitPet() {
       await createPet(payload)
     }
 
-    uni.showToast({
-      title: petId.value ? '宠物档案已更新' : '宠物档案已创建',
-      icon: 'none',
-    })
+    toast(petId.value ? '宠物档案已更新' : '宠物档案已创建', 'success')
     backToList()
   }
   catch (error: unknown) {
-    uni.showToast({
-      title: getErrorMessage(error, petId.value ? '更新宠物失败' : '创建宠物失败'),
-      icon: 'none',
-    })
+    toast(getErrorMessage(error, petId.value ? '更新失败' : '创建失败'))
   }
   finally {
     saving.value = false
   }
 }
 
-function goToLogin() {
-  uni.navigateTo({ url: LOGIN_PAGE })
+function backToList() {
+  uni.redirectTo({ url: PETPAL_PETS_PAGE })
 }
 
-onLoad((options: Record<string, string | undefined>) => {
-  petId.value = options.petId || ''
-  returnTo.value = options.from || PETPAL_PETS_PAGE
-})
-
-onShow(() => {
-  if (!tokenStore.hasLogin) {
-    return
+onLoad((options) => {
+  petId.value = options?.petId || ''
+  if (petId.value) {
+    void loadDetail()
   }
-  void loadPage(false)
-})
-
-onPullDownRefresh(() => {
-  void loadPage(true)
 })
 </script>
 
 <template>
-  <AppPageShell title="宠物表单">
-    <template v-if="tokenStore.hasLogin">
-      <AppSection title="当前编辑">
-        <view class="pet-form-hero">
-          <view class="pet-form-hero__copy">
-            <view class="pet-form-hero__tags">
-              <AppTag type="primary">{{ isCreateMode ? '新增' : '编辑' }}</AppTag>
-              <AppTag :type="completedSectionCount >= 3 ? 'success' : 'warning'">
-                完成度 {{ completedSectionCount }}/4
-              </AppTag>
-            </view>
-            <text class="pet-form-hero__title">{{ heroTitle }}</text>
-            <text class="pet-form-hero__summary">{{ heroSummary }}</text>
-          </view>
-          <view class="pet-form-hero__actions">
-            <AppButton size="medium" type="info" @click="backToList">返回清单</AppButton>
-          </view>
-        </view>
-      </AppSection>
-
-      <template v-if="loading">
-        <AppSection title="同步表单">
-          <view class="pet-form-empty">
-            <AppStatus mode="loading" text="正在加载宠物表单" />
-          </view>
-        </AppSection>
-      </template>
-
-      <template v-else-if="!isCreateMode && !currentPet">
-        <AppSection title="无法继续编辑">
-          <view class="pet-form-empty">
-            <AppStatus text="没有找到对应的宠物，请返回清单重新选择。" />
-            <AppButton size="medium" type="info" @click="backToList">返回清单</AppButton>
-          </view>
-        </AppSection>
-      </template>
-
-      <template v-else>
-        <AppSection title="填写分区">
-          <view class="pet-form-shell">
-            <AppChoiceChips v-model="section" :options="sectionOptions" />
-
-            <template v-if="section === 'PROFILE'">
-              <view class="pet-form-group">
-                <AppInput v-model="petForm.name" label="宠物名" placeholder="例如：可乐" />
-                <AppInput v-model="petForm.breed" label="品种" placeholder="例如：柴犬 / 英短" />
-                <AppInput v-model="petForm.birthday" label="生日" placeholder="例如：2024-05-06" />
-                <AppInput v-model="petForm.weightKg" label="体重" placeholder="例如：5" type="digit" />
-
-                <view class="pet-form-chips">
-                  <text class="pet-form-label">宠物种类</text>
-                  <AppChoiceChips v-model="petForm.species" :options="speciesOptions" />
-                </view>
-
-                <view class="pet-form-chips">
-                  <text class="pet-form-label">性别</text>
-                  <AppChoiceChips v-model="petForm.gender" :options="genderOptions" />
-                </view>
-
-                <view class="pet-form-chips">
-                  <text class="pet-form-label">是否绝育</text>
-                  <AppChoiceChips v-model="petForm.neutered" :options="yesNoOptions" />
-                </view>
-              </view>
-            </template>
-
-            <template v-else-if="section === 'CARE'">
-              <view class="pet-form-group">
-                <AppInput v-model="tagText" label="习性标签" placeholder="例如：怕生，亲人，喜欢零食" />
-                <view class="pet-form-block">
-                  <text class="pet-form-label">喂养提醒</text>
-                  <textarea
-                    v-model="petForm.feedingNote"
-                    class="pet-form-textarea"
-                    auto-height
-                    :maxlength="240"
-                    placeholder="记录喂食频率、忌口和安抚方式"
-                  />
-                </view>
-              </view>
-            </template>
-
-            <template v-else-if="section === 'HEALTH'">
-              <view class="pet-form-group">
-                <view class="pet-form-block">
-                  <text class="pet-form-label">过敏与禁忌</text>
-                  <textarea
-                    v-model="petForm.allergyNote"
-                    class="pet-form-textarea"
-                    auto-height
-                    :maxlength="180"
-                    placeholder="记录过敏源、禁用食物或环境注意事项"
-                  />
-                </view>
-                <view class="pet-form-block">
-                  <text class="pet-form-label">健康观察</text>
-                  <textarea
-                    v-model="petForm.medicalNote"
-                    class="pet-form-textarea"
-                    auto-height
-                    :maxlength="240"
-                    placeholder="记录疾病史、用药提醒和重点观察点"
-                  />
-                </view>
-              </view>
-            </template>
-
-            <template v-else>
-              <view class="pet-form-group">
-                <AppInput v-model="petForm.emergencyName" label="紧急联系人" placeholder="例如：张三" />
-                <AppInput v-model="petForm.emergencyPhone" label="紧急电话" placeholder="例如：13800000000" />
-                <AppInput v-model="petForm.emergencyRelation" label="关系说明" placeholder="例如：家人 / 宠物医院" />
-              </view>
-            </template>
-          </view>
-        </AppSection>
-
-        <view class="pet-form-actions">
-          <AppButton block size="large" type="info" @click="backToList">取消</AppButton>
-          <AppButton block size="large" :loading="saving" @click="submitPet">
-            {{ isCreateMode ? '保存宠物档案' : '保存修改' }}
-          </AppButton>
-        </view>
-      </template>
+  <PetpalPage
+    :title="pageTitle"
+    subtitle="资料维护单独成页，不再和宠物列表、需求创建混在一起。"
+    eyebrow="Pet Form"
+    back
+    :back-url="PETPAL_PETS_PAGE"
+  >
+    <template v-if="!tokenStore.hasLogin">
+      <PetpalSection title="需要登录">
+        <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openLoginPage">去登录</button>
+      </PetpalSection>
     </template>
 
     <template v-else>
-      <AppSection title="登录后继续">
-        <view class="pet-form-empty">
-          <AppStatus text="登录后新增或编辑宠物档案。" />
+      <PetpalSection title="基础信息" subtitle="名字、品类和身体信息单独一组。">
+        <view class="petpal-form">
+          <view class="petpal-field">
+            <text class="petpal-field__label">宠物名字</text>
+            <input v-model="form.name" class="petpal-input" :maxlength="20" placeholder="例如：团子" />
+          </view>
+          <view class="petpal-field">
+            <text class="petpal-field__label">宠物种类</text>
+            <view class="petpal-chip-row">
+              <button
+                v-for="item in speciesOptions"
+                :key="item.value"
+                :class="['petpal-chip', form.species === item.value ? 'petpal-chip--active' : '']"
+                hover-class="none"
+                @click="form.species = item.value"
+              >
+                {{ item.label }}
+              </button>
+            </view>
+          </view>
+          <view class="petpal-grid--two">
+            <view class="petpal-field">
+              <text class="petpal-field__label">品种</text>
+              <input v-model="form.breed" class="petpal-input" :maxlength="30" placeholder="可留空" />
+            </view>
+            <view class="petpal-field">
+              <text class="petpal-field__label">性别</text>
+              <view class="petpal-chip-row">
+                <button
+                  v-for="item in genderOptions"
+                  :key="item.value"
+                  :class="['petpal-chip', form.gender === item.value ? 'petpal-chip--active' : '']"
+                  hover-class="none"
+                  @click="form.gender = item.value"
+                >
+                  {{ item.label }}
+                </button>
+              </view>
+            </view>
+          </view>
+          <view class="petpal-grid--two">
+            <view class="petpal-field">
+              <text class="petpal-field__label">生日</text>
+              <input v-model="form.birthday" class="petpal-input" placeholder="YYYY-MM-DD" />
+            </view>
+            <view class="petpal-field">
+              <text class="petpal-field__label">体重（kg）</text>
+              <input v-model="form.weightKg" class="petpal-input" type="digit" placeholder="例如 4.5" />
+            </view>
+          </view>
+          <view class="petpal-field">
+            <text class="petpal-field__label">是否绝育</text>
+            <view class="petpal-chip-row">
+              <button
+                v-for="item in yesNoOptions"
+                :key="item.value"
+                :class="['petpal-chip', form.neutered === item.value ? 'petpal-chip--active' : '']"
+                hover-class="none"
+                @click="form.neutered = item.value"
+              >
+                {{ item.label }}
+              </button>
+            </view>
+          </view>
         </view>
-        <AppButton block @click="goToLogin">去登录</AppButton>
-      </AppSection>
+      </PetpalSection>
+
+      <PetpalSection title="照料偏好" subtitle="真正影响服务的说明单独收纳。">
+        <view class="petpal-form">
+          <view class="petpal-field">
+            <text class="petpal-field__label">性格标签</text>
+            <input v-model="form.temperamentTagsText" class="petpal-input" placeholder="例如：粘人、怕生、爱玩球" />
+          </view>
+          <view class="petpal-field">
+            <text class="petpal-field__label">喂养说明</text>
+            <textarea v-model="form.feedingNote" class="petpal-textarea" :maxlength="200" placeholder="喂食时间、份量、需要提醒的细节" />
+          </view>
+          <view class="petpal-field">
+            <text class="petpal-field__label">过敏或禁忌</text>
+            <textarea v-model="form.allergyNote" class="petpal-textarea" :maxlength="160" placeholder="食物、药物或环境禁忌" />
+          </view>
+          <view class="petpal-field">
+            <text class="petpal-field__label">健康备注</text>
+            <textarea v-model="form.medicalNote" class="petpal-textarea" :maxlength="160" placeholder="慢病、药物、术后恢复等" />
+          </view>
+        </view>
+      </PetpalSection>
+
+      <PetpalSection title="紧急联系人" subtitle="紧急联系人从宠物基础资料中拆出来，查看更直接。">
+        <view class="petpal-grid--two">
+          <view class="petpal-field">
+            <text class="petpal-field__label">联系人</text>
+            <input v-model="form.emergencyName" class="petpal-input" :maxlength="20" placeholder="例如：家人" />
+          </view>
+          <view class="petpal-field">
+            <text class="petpal-field__label">电话</text>
+            <input v-model="form.emergencyPhone" class="petpal-input" type="number" :maxlength="20" placeholder="请填写联系电话" />
+          </view>
+        </view>
+        <view class="petpal-field">
+          <text class="petpal-field__label">关系</text>
+          <input v-model="form.emergencyRelation" class="petpal-input" :maxlength="20" placeholder="例如：配偶、朋友、邻居" />
+        </view>
+      </PetpalSection>
+
+      <view class="petpal-bottom-bar">
+        <view class="petpal-action-row">
+          <button class="petpal-btn petpal-btn--primary" hover-class="none" :disabled="saving" @click="savePet">
+            {{ saving ? '保存中...' : (petId ? '保存修改' : '创建宠物') }}
+          </button>
+          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="backToList">返回列表</button>
+        </view>
+      </view>
     </template>
-  </AppPageShell>
+  </PetpalPage>
 </template>
-
-<style scoped lang="scss">
-.pet-form-hero,
-.pet-form-hero__actions,
-.pet-form-hero__tags,
-.pet-form-actions {
-  display: flex;
-  gap: 16rpx;
-  justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-
-.pet-form-hero {
-  margin: 0 24rpx;
-  padding: 28rpx;
-  border-radius: var(--app-shape-xl);
-  border: 1rpx solid var(--app-outline-variant);
-  background:
-    radial-gradient(circle at top right, rgba(34, 197, 94, 0.14), transparent 34%),
-    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
-  box-shadow: var(--app-elevation-1);
-}
-
-.pet-form-hero__copy,
-.pet-form-shell,
-.pet-form-group,
-.pet-form-chips,
-.pet-form-block,
-.pet-form-empty {
-  display: grid;
-  gap: 14rpx;
-}
-
-.pet-form-hero__title {
-  color: var(--app-text);
-  font-size: 34rpx;
-  line-height: 1.16;
-  font-weight: 700;
-}
-
-.pet-form-hero__summary,
-.pet-form-label {
-  color: var(--app-text-secondary);
-  font-size: 22rpx;
-  line-height: 1.64;
-}
-
-.pet-form-textarea {
-  width: 100%;
-  min-height: 172rpx;
-  padding: 24rpx;
-  border-radius: 24rpx;
-  border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
-  color: var(--app-text);
-  box-sizing: border-box;
-  line-height: 1.7;
-}
-
-.pet-form-actions {
-  padding: 0 32rpx 12rpx;
-}
-
-.pet-form-actions .app-button + .app-button {
-  margin-top: 16rpx;
-}
-</style>

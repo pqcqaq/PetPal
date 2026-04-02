@@ -63,54 +63,48 @@ function handleSelect(value: string) {
 .app-choice-chips {
   display: flex;
   flex-wrap: wrap;
-  margin-left: -12rpx;
-  margin-bottom: -12rpx;
+  margin-left: -10rpx;
+  margin-bottom: -10rpx;
 }
 
 .app-choice-chip {
-  min-width: 146rpx;
-  margin-left: 12rpx;
-  margin-bottom: 12rpx;
-  padding: 20rpx 24rpx;
-  border: 1rpx solid rgba(239, 199, 159, 0.88);
-  border-radius: 24rpx;
-  background:
-    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 240, 220, 0.98) 100%);
-  box-shadow: 0 10rpx 22rpx rgba(159, 73, 14, 0.08);
+  min-width: 128rpx;
+  margin-left: 10rpx;
+  margin-bottom: 10rpx;
+  padding: 16rpx 20rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  border-radius: 999rpx;
+  background: rgba(255, 253, 250, 0.9);
   transition:
     border-color var(--app-motion-duration-medium) var(--app-motion-easing-standard),
     transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
-    background-color var(--app-motion-duration-medium) var(--app-motion-easing-standard),
-    box-shadow var(--app-motion-duration-medium) var(--app-motion-easing-standard);
+    background-color var(--app-motion-duration-medium) var(--app-motion-easing-standard);
 }
 
 .app-choice-chip--hover {
-  transform: translateY(-2rpx);
-  box-shadow: 0 16rpx 28rpx rgba(159, 73, 14, 0.12);
+  transform: translateY(-1rpx);
 }
 
 .app-choice-chip--active {
-  border-color: rgba(37, 99, 235, 0.12);
-  background: linear-gradient(135deg, var(--app-accent) 0%, #60a5fa 100%);
-  box-shadow: 0 18rpx 30rpx rgba(37, 99, 235, 0.2);
+  border-color: rgba(36, 84, 211, 0.16);
+  background: var(--app-accent);
 }
 
 .app-choice-chip--disabled {
   opacity: 0.56;
-  box-shadow: none;
 }
 
 .app-choice-chip__label {
-  font-size: 24rpx;
+  font-size: 23rpx;
   line-height: 1.24;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--app-text);
 }
 
 .app-choice-chip__description {
-  margin-top: 8rpx;
+  margin-top: 6rpx;
   font-size: 20rpx;
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--app-text-secondary);
 }
 

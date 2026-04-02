@@ -35,12 +35,11 @@ const classes = computed(() => [
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48rpx;
-  padding: 0 18rpx;
-  border: 1rpx solid rgba(239, 199, 159, 0.68);
-  background: rgba(255, 255, 255, 0.64);
+  min-height: 44rpx;
+  padding: 0 16rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  background: rgba(255, 253, 250, 0.88);
   color: var(--app-text-secondary);
-  box-shadow: 0 8rpx 18rpx rgba(159, 73, 14, 0.08);
   box-sizing: border-box;
 }
 
@@ -49,15 +48,15 @@ const classes = computed(() => [
 }
 
 .app-tag--default {
-  border-color: rgba(239, 199, 159, 0.88);
-  background: rgba(255, 251, 246, 0.88);
+  border-color: var(--app-outline-variant);
+  background: rgba(255, 253, 250, 0.9);
   color: var(--app-text-secondary);
 }
 
 .app-tag--primary {
-  border-color: rgba(249, 115, 22, 0.16);
-  background: var(--app-brand-soft);
-  color: var(--app-brand-strong);
+  border-color: rgba(36, 84, 211, 0.14);
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
 }
 
 .app-tag--success {
@@ -80,8 +79,8 @@ const classes = computed(() => [
 
 .app-tag__text {
   font-size: 22rpx;
-  line-height: 44rpx;
-  font-weight: 700;
+  line-height: 40rpx;
+  font-weight: 600;
   white-space: nowrap;
 }
 </style>

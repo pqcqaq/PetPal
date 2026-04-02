@@ -1,345 +1,83 @@
-<script lang="ts" setup>
-/**
- * UX Blueprint
- * User: 已登录主人
- * Entry: 从角色入口进入、从订单/售后返回首页、打开 App 后继续上次任务
- * First screen: 先看到“今天最该做什么”和最近订单，不先看产品说明
- * Primary action: 根据当前状态直接去建档、发需求、跟单或售后
- * Secondary actions: 消息、提醒、宠物档案
- * States: 未登录、无宠物、无订单、有进行中订单、有售后、有未读消息
- */
-import type {
-  MatchedCaregiverRecord,
-  OrderRecord,
-  PetProfileRecord,
-  ServiceRequestRecord,
-} from '@rbac/api-common'
-import { computed, ref } from 'vue'
-import AppButton from '@/components/app-button/app-button.vue'
-import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppStatus from '@/components/app-status/app-status.vue'
-import AppTag from '@/components/app-tag/app-tag.vue'
+<script setup lang="ts">
+import type { MatchedCaregiverRecord, OrderRecord, PetProfileRecord, ServiceRequestRecord } from '@rbac/api-common'
+import { computed, ref, watch } from 'vue'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
+import { storeToRefs } from 'pinia'
 import { listOrders, listPets, listServiceRequests, matchCaregivers } from '@/api/petpal'
-import { LOGIN_PAGE } from '@/router/config'
 import { useNotificationStore, useTokenStore, useUserStore } from '@/store'
-import { getErrorMessage } from '@/utils/error'
-import ActionSignalCard from './components/action-signal-card.vue'
+import PetpalEmpty from './rebuild/petpal-empty.vue'
+import PetpalPage from './rebuild/petpal-page.vue'
+import PetpalSection from './rebuild/petpal-section.vue'
 import {
   buildOwnerMatchQuery,
-  formatAmount,
-  formatCaregiverExperience,
-  formatCaregiverNoticeHours,
-  formatCaregiverRadius,
-  formatDistanceKm,
-  formatPetTagSummary,
-  formatRange,
-  getConversationHint,
-  getConversationPreview,
-  getConversationUnreadCount,
-  getOrderStatusLabel,
-  getRequestStatusLabel,
-  isRequestActive,
-  isOrderAftersalesTracked,
+  describeCaregiverCapability,
+  describeCaregiverMatch,
+  describeConversation,
+  describeOrder,
+  describePet,
+  describePetCare,
+  helpers,
+  initials,
+  openLoginPage,
+  openOrderDetailPage,
   PETPAL_AFTERSALES_PAGE,
   PETPAL_MESSAGES_PAGE,
-  PETPAL_ORDER_DETAIL_PAGE,
-  PETPAL_ORDERS_PAGE,
+  PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_PETS_PAGE,
   PETPAL_REQUEST_DETAIL_PAGE,
   PETPAL_REQUEST_PAGE,
-  openPetPalAction,
-  serviceTypeLabels,
-  speciesLabels,
-} from './owner-shared'
-
-defineOptions({
-  name: 'PetPalOwnerHomePage',
-})
-
-definePage({
-  type: 'home',
-  style: {
-    navigationBarTitleText: 'PetPal 主人首页',
-    enablePullDownRefresh: true,
-  },
-})
+  stopPullDown,
+} from './rebuild/shared'
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const notificationStore = useNotificationStore()
+const { userInfo } = storeToRefs(userStore)
 
 const loading = ref(false)
-const selectedPetId = ref('')
 const pets = ref<PetProfileRecord[]>([])
 const requests = ref<ServiceRequestRecord[]>([])
 const orders = ref<OrderRecord[]>([])
-const caregivers = ref<MatchedCaregiverRecord[]>([])
+const matchRows = ref<MatchedCaregiverRecord[]>([])
+const selectedPetId = ref('')
 
-const displayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || 'PetPal 用户')
-const readyPetCount = computed(() => pets.value.filter(item => (
-  Boolean(item.feedingNote?.trim())
-  && Boolean(item.emergencyContact?.name?.trim())
-  && Boolean(item.emergencyContact?.phone?.trim())
-)).length)
-const activeOrderCount = computed(() => orders.value.filter(item => (
-  item.orderStatus === 'PENDING_ACCEPT'
-  || item.orderStatus === 'ACCEPTED'
-  || item.orderStatus === 'SERVING'
-)).length)
-const aftersaleCount = computed(() => orders.value.filter(item => isOrderAftersalesTracked(item)).length)
-const activeRequestCount = computed(() => requests.value.filter(item => (
-  item.status === 'OPEN'
-  || item.status === 'MATCHED'
-)).length)
-const unreadConversationCount = computed(() => orders.value.reduce((total, item) => (
-  total + getConversationUnreadCount(item.conversation, 'owner')
-), 0))
-
-const latestOrders = computed(() => [...orders.value]
-  .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
-  .slice(0, 3))
-const latestActiveRequest = computed(() => [...requests.value]
-  .filter(item => isRequestActive(item.status))
-  .sort((left, right) => {
-    const leftRank = left.status === 'MATCHED' ? 0 : 1
-    const rightRank = right.status === 'MATCHED' ? 0 : 1
-    if (leftRank !== rightRank) {
-      return leftRank - rightRank
-    }
-    return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
-  })[0] ?? null)
-const latestRequests = computed(() => [...requests.value]
-  .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
-  .slice(0, 2))
-const caregiverHighlights = computed(() => caregivers.value.slice(0, 2))
-const focusPet = computed(() => {
-  if (selectedPetId.value) {
-    return pets.value.find(item => item.id === selectedPetId.value) ?? null
-  }
-  return pets.value[0] ?? null
+const displayName = computed(() => userInfo.value.nickname || userInfo.value.username || '主人')
+const selectedPet = computed(() => pets.value.find(item => item.id === selectedPetId.value) ?? pets.value[0] ?? null)
+const activeRequest = computed(() => {
+  return [...requests.value]
+    .filter(item => ['OPEN', 'MATCHED', 'MATCHING', 'CONFIRMED'].includes(item.status))
+    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())[0] ?? null
 })
-const focusOrder = computed(() => [...orders.value]
-  .sort((left, right) => {
-    const leftRank = isOrderAftersalesTracked(left)
-      ? 0
-      : left.orderStatus === 'SERVING'
-        ? 1
-        : left.orderStatus === 'ACCEPTED'
-          ? 2
-          : left.orderStatus === 'PENDING_ACCEPT'
-            ? 3
-            : 4
-    const rightRank = isOrderAftersalesTracked(right)
-      ? 0
-      : right.orderStatus === 'SERVING'
-        ? 1
-        : right.orderStatus === 'ACCEPTED'
-          ? 2
-          : right.orderStatus === 'PENDING_ACCEPT'
-            ? 3
-            : 4
-    if (leftRank !== rightRank) {
-      return leftRank - rightRank
-    }
-    return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
-  })[0] ?? null)
-
-const heroTags = computed(() => [
-  { label: `${pets.value.length} 只宠物`, type: 'primary' as const },
-  { label: `${activeRequestCount.value} 条需求`, type: activeRequestCount.value > 0 ? 'warning' as const : 'default' as const },
-  { label: `${activeOrderCount.value} 笔进行中`, type: activeOrderCount.value > 0 ? 'warning' as const : 'default' as const },
-  { label: unreadConversationCount.value > 0 ? `${unreadConversationCount.value} 条未读` : '消息已读完', type: unreadConversationCount.value > 0 ? 'danger' as const : 'default' as const },
-])
-
-const metricTiles = computed(() => [
-  {
-    label: '宠物',
-    value: String(pets.value.length),
-    helper: readyPetCount.value ? `${readyPetCount.value} 只可直接复用` : '先补第一只',
-    action: openPets,
-  },
-  {
-    label: '需求',
-    value: String(activeRequestCount.value),
-    helper: activeRequestCount.value ? '继续推进' : '现在可新建',
-    action: activeRequestCount.value ? openLatestRequest : () => openRequests(focusPet.value?.id),
-  },
-  {
-    label: '订单',
-    value: String(activeOrderCount.value),
-    helper: activeOrderCount.value ? '直接跟单' : '当前空闲',
-    action: openOrders,
-  },
-  {
-    label: '售后',
-    value: String(aftersaleCount.value),
-    helper: aftersaleCount.value ? '优先处理' : '当前平稳',
-    action: openAftersales,
-  },
-])
-
-const agendaTiles = computed(() => {
-  const items: Array<{
-    eyebrow: string
-    title: string
-    meta: string
-    actionLabel: string
-    action: () => void
-  }> = []
-
-  if (!pets.value.length) {
-    items.push({
-      eyebrow: '宠物',
-      title: '补第一只宠物档案',
-      meta: '名字、照料偏好和紧急联系人先录进去。',
-      actionLabel: '去建档',
-      action: openPets,
-    })
-  }
-  else if (focusPet.value) {
-    items.push({
-      eyebrow: '宠物',
-      title: focusPet.value.name,
-      meta: `${speciesLabels[focusPet.value.species]}${focusPet.value.breed ? ` · ${focusPet.value.breed}` : ''}`,
-      actionLabel: '用它发需求',
-      action: () => openRequests(focusPet.value!.id),
-    })
-  }
-
-  if (latestActiveRequest.value) {
-    items.push({
-      eyebrow: '需求',
-      title: `${latestActiveRequest.value.pet?.name || '宠物'} · ${serviceTypeLabels[latestActiveRequest.value.serviceType]}`,
-      meta: `${getRequestStatusLabel(latestActiveRequest.value.status)} · ${formatRange(latestActiveRequest.value.startTime, latestActiveRequest.value.endTime)}`,
-      actionLabel: '继续处理',
-      action: openLatestRequest,
-    })
-  }
-
-  if (focusOrder.value) {
-    items.push({
-      eyebrow: '订单',
-      title: focusOrder.value.orderNo,
-      meta: `${getOrderStatusLabel(focusOrder.value.orderStatus)} · ${getConversationHint(focusOrder.value.conversation, 'owner')}`,
-      actionLabel: isOrderAftersalesTracked(focusOrder.value) ? '看售后' : '看订单',
-      action: isOrderAftersalesTracked(focusOrder.value)
-        ? () => openOrderDetail(focusOrder.value!.id, 'aftersales')
-        : () => openOrderDetail(focusOrder.value!.id, 'overview'),
-    })
-  }
-
-  if (!items.length) {
-    items.push({
-      eyebrow: '现在',
-      title: '今天可以直接发新需求',
-      meta: '先选宠物，再补时间地点，然后继续筛人下单。',
-      actionLabel: '发需求',
-      action: openRequests,
-    })
-  }
-
-  return items.slice(0, 3)
+const upcomingOrders = computed(() => {
+  return [...orders.value]
+    .filter(item => ['PENDING_ACCEPT', 'ACCEPTED', 'SERVING'].includes(item.orderStatus))
+    .sort((left, right) => new Date(left.appointmentStart).getTime() - new Date(right.appointmentStart).getTime())
 })
+const aftersalesCount = computed(() => orders.value.filter(item => ['DISPUTED', 'PARTIAL_REFUNDED', 'REFUNDED'].includes(item.orderStatus)).length)
 
-const primaryAction = computed(() => {
-  if (!pets.value.length) {
-    return {
-      tone: 'pet',
-      title: '先把第一只宠物建好',
-      label: '先建宠物档案',
-      hint: '档案建好后，发需求和跟单都会更顺。',
-      meta: '档案建好后，发需求和跟单都会更顺。',
-      action: openPets,
-    }
-  }
-  if (aftersaleCount.value > 0) {
-    return {
-      tone: 'danger',
-      title: '先处理售后',
-      label: '处理售后',
-      hint: `${aftersaleCount.value} 笔订单涉及退款或投诉，优先处理。`,
-      meta: `${aftersaleCount.value} 笔订单涉及退款或投诉，优先处理。`,
-      action: openAftersales,
-    }
-  }
-  if (focusOrder.value) {
-    return {
-      tone: 'order',
-      title: `继续跟进 ${getOrderStatusLabel(focusOrder.value.orderStatus)}`,
-      label: '查看进行中订单',
-      hint: `${focusOrder.value.orderNo} · ${formatRange(focusOrder.value.appointmentStart, focusOrder.value.appointmentEnd)}`,
-      meta: `${focusOrder.value.orderNo} · ${formatRange(focusOrder.value.appointmentStart, focusOrder.value.appointmentEnd)}`,
-      action: () => openOrderDetail(focusOrder.value!.id, 'overview'),
-    }
-  }
-  if (activeRequestCount.value > 0) {
-    return {
-      tone: 'request',
-      title: '继续当前需求',
-      label: '继续当前需求',
-      hint: `${activeRequestCount.value} 条需求还在推进。`,
-      meta: `${activeRequestCount.value} 条需求还在推进。`,
-      action: openLatestRequest,
-    }
-  }
-  return {
-    tone: 'fresh',
-    title: '直接发一个新需求',
-    label: '新建照料需求',
-    hint: '今天还没有进行中的订单，可以直接开始新需求。',
-    meta: '今天还没有进行中的订单，可以直接开始新需求。',
-    action: openRequests,
-  }
-})
-
-function goToLogin() {
-  uni.navigateTo({ url: LOGIN_PAGE })
-}
-
-function selectPet(petId: string) {
-  selectedPetId.value = petId
-}
-
-function openPets() {
-  openPetPalAction('redirect', PETPAL_PETS_PAGE)
-}
-
-function openRequests(petId?: string) {
-  const query = petId ? `?petId=${petId}` : ''
-  openPetPalAction('redirect', `${PETPAL_REQUEST_PAGE}${query}`)
-}
-
-function openLatestRequest() {
-  if (latestActiveRequest.value) {
-    openPetPalAction('redirect', `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${latestActiveRequest.value.id}`)
+async function loadMatches() {
+  if (!tokenStore.hasLogin || !selectedPet.value) {
+    matchRows.value = []
     return
   }
-  openRequests()
+
+  try {
+    const page = await matchCaregivers(buildOwnerMatchQuery({
+      petSpecies: selectedPet.value.species,
+      serviceType: activeRequest.value?.serviceType || 'BOARDING',
+      city: activeRequest.value?.locationText || undefined,
+      pageSize: 4,
+    }))
+    matchRows.value = page.items
+  }
+  catch {
+    matchRows.value = []
+  }
 }
 
-function openOrders() {
-  openPetPalAction('redirect', PETPAL_ORDERS_PAGE)
-}
-
-function openAftersales() {
-  openPetPalAction('redirect', PETPAL_AFTERSALES_PAGE)
-}
-
-function openMessages() {
-  openPetPalAction('navigate', PETPAL_MESSAGES_PAGE)
-}
-
-function openOrderDetail(orderId: string, tab: 'overview' | 'chat' | 'aftersales' = 'overview') {
-  uni.navigateTo({ url: `${PETPAL_ORDER_DETAIL_PAGE}?id=${orderId}&tab=${tab}` })
-}
-
-function openRequestDetail(requestId: string) {
-  uni.navigateTo({ url: `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${requestId}` })
-}
-
-async function loadPage(showError = false) {
+async function loadPage() {
   if (!tokenStore.hasLogin || loading.value) {
-    uni.stopPullDownRefresh()
+    stopPullDown()
     return
   }
 
@@ -348,427 +86,217 @@ async function loadPage(showError = false) {
     await Promise.all([
       tokenStore.bootstrap(),
       userStore.fetchUserInfo().catch(() => undefined),
+      notificationStore.refreshNotifications().catch(() => undefined),
     ])
 
-    const [petRows, requestRows, orderRows] = await Promise.all([
+    const [petsResult, requestsResult, ordersResult] = await Promise.allSettled([
       listPets(),
       listServiceRequests(),
       listOrders(),
     ])
 
-    pets.value = petRows
-    requests.value = requestRows
-    orders.value = orderRows
+    pets.value = petsResult.status === 'fulfilled' ? petsResult.value : []
+    requests.value = requestsResult.status === 'fulfilled' ? requestsResult.value : []
+    orders.value = ordersResult.status === 'fulfilled' ? ordersResult.value : []
 
-    const latestPetId = selectedPetId.value && petRows.some(item => item.id === selectedPetId.value)
-      ? selectedPetId.value
-      : requestRows[0]?.petId || petRows[0]?.id || ''
-    selectedPetId.value = latestPetId
-
-    const latestPet = petRows.find(item => item.id === latestPetId) || petRows[0]
-    const latestRequest = requestRows[0]
-    caregivers.value = latestPet
-      ? (await matchCaregivers(buildOwnerMatchQuery({
-          petSpecies: latestPet.species,
-          serviceType: latestRequest?.serviceType,
-          pageSize: 4,
-        }))).items
-      : []
-  }
-  catch (error: unknown) {
-    caregivers.value = []
-    if (showError) {
-      uni.showToast({
-        title: getErrorMessage(error, '加载主人首页失败'),
-        icon: 'none',
-      })
+    if (!selectedPetId.value || !pets.value.some(item => item.id === selectedPetId.value)) {
+      selectedPetId.value = activeRequest.value?.petId || pets.value[0]?.id || ''
     }
+
+    await loadMatches()
   }
   finally {
     loading.value = false
-    uni.stopPullDownRefresh()
+    stopPullDown()
   }
 }
 
+function openNotifications() {
+  uni.navigateTo({ url: PETPAL_NOTIFICATIONS_PAGE })
+}
+
+function openPets() {
+  uni.navigateTo({ url: PETPAL_PETS_PAGE })
+}
+
+function openCreateRequest(petId?: string) {
+  const suffix = petId ? `?petId=${petId}` : ''
+  uni.navigateTo({ url: `${PETPAL_REQUEST_PAGE}${suffix}` })
+}
+
+function openRequestDetail(requestId: string) {
+  uni.navigateTo({ url: `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${requestId}` })
+}
+
+function openMessages() {
+  uni.switchTab({ url: PETPAL_MESSAGES_PAGE })
+}
+
+function openAftersales() {
+  uni.navigateTo({ url: PETPAL_AFTERSALES_PAGE })
+}
+
+function openPay(orderId: string) {
+  uni.navigateTo({ url: `/pages/petpal/checkout?orderId=${orderId}` })
+}
+
+watch(selectedPetId, () => {
+  void loadMatches()
+})
+
 onShow(() => {
-  if (!tokenStore.hasLogin) {
-    return
-  }
-  void loadPage(false)
-  void notificationStore.refreshNotifications()
+  void loadPage()
 })
 
 onPullDownRefresh(() => {
-  void loadPage(true)
+  void loadPage()
 })
 </script>
 
 <template>
-  <AppPageShell title="主人首页">
-    <template v-if="tokenStore.hasLogin">
-      <view class="owner-home">
-        <view class="owner-focus" :class="`owner-focus--${primaryAction.tone}`">
-          <view class="owner-focus__copy">
-            <text class="owner-focus__eyebrow">{{ displayName }}</text>
-            <text class="owner-focus__title">{{ primaryAction.title }}</text>
-            <text class="owner-focus__hint">{{ primaryAction.meta }}</text>
-          </view>
-          <view class="owner-focus__tags">
-            <AppTag v-for="item in heroTags" :key="item.label" :type="item.type">{{ item.label }}</AppTag>
-          </view>
-          <view class="owner-focus__actions">
-            <AppButton size="medium" @click="primaryAction.action">{{ primaryAction.label }}</AppButton>
-            <AppButton size="medium" type="info" @click="openPets">宠物</AppButton>
-            <AppButton size="medium" type="info" @click="openMessages">消息</AppButton>
-          </view>
-        </view>
+  <PetpalPage
+    title="主人首页"
+    :subtitle="tokenStore.hasLogin ? '先确认宠物，再新建需求；需求、订单、售后全部独立分流。' : '登录后才能查看宠物、需求和订单。'"
+    eyebrow="Owner"
+    :with-tabbar="true"
+  >
+    <template #bar>
+      <button
+        v-if="tokenStore.hasLogin"
+        class="petpal-icon-btn"
+        hover-class="none"
+        @click="openNotifications"
+      >
+        通知 {{ notificationStore.unreadCount }}
+      </button>
+    </template>
 
-        <scroll-view class="owner-metric-scroll" :scroll-x="true" :show-scrollbar="false">
-          <view class="owner-metric-track">
-            <view
-              v-for="item in metricTiles"
-              :key="item.label"
-              class="owner-metric-tile"
-              hover-class="owner-metric-tile--hover"
-              :hover-stay-time="80"
-              @click="item.action"
-            >
-              <text class="owner-metric-tile__label">{{ item.label }}</text>
-              <text class="owner-metric-tile__value">{{ item.value }}</text>
-              <text class="owner-metric-tile__helper">{{ item.helper }}</text>
-            </view>
-          </view>
-        </scroll-view>
-
-        <ActionSignalCard title="当前优先" scope="OWNER" empty-text="当前没有新的高优先事项，可以继续宠物、需求或订单主流程。" />
-
-        <view class="owner-agenda-grid">
-          <view
-            v-for="item in agendaTiles"
-            :key="`${item.eyebrow}-${item.title}`"
-            class="owner-agenda-tile"
-            hover-class="owner-agenda-tile--hover"
-            :hover-stay-time="80"
-            @click="item.action"
-          >
-            <text class="owner-agenda-tile__eyebrow">{{ item.eyebrow }}</text>
-            <text class="owner-agenda-tile__title">{{ item.title }}</text>
-            <text class="owner-agenda-tile__meta">{{ item.meta }}</text>
-            <text class="owner-agenda-tile__action">{{ item.actionLabel }}</text>
-          </view>
-        </view>
-
-        <view v-if="latestActiveRequest" class="owner-focus-panel owner-focus-panel--request">
-          <text class="owner-focus-panel__title">{{ latestActiveRequest.pet?.name || '宠物' }} · {{ serviceTypeLabels[latestActiveRequest.serviceType] }}</text>
-          <text class="owner-focus-panel__meta">{{ getRequestStatusLabel(latestActiveRequest.status) }} · {{ formatRange(latestActiveRequest.startTime, latestActiveRequest.endTime) }}</text>
-          <text class="owner-focus-panel__meta">{{ latestActiveRequest.locationText }}</text>
-          <view class="owner-focus__actions">
-            <AppButton size="medium" @click="openLatestRequest">继续处理</AppButton>
-            <AppButton size="medium" type="info" @click="openRequests(latestActiveRequest.petId)">新开一条</AppButton>
-          </view>
-        </view>
-
-        <template v-if="pets.length && focusPet">
-          <scroll-view class="owner-card-scroll" :scroll-x="true" :show-scrollbar="false">
-            <view class="owner-pet-strip">
-              <view
-                v-for="pet in pets"
-                :key="pet.id"
-                class="owner-pet-chip"
-                :class="pet.id === focusPet.id ? 'owner-pet-chip--active' : ''"
-                @click="selectPet(pet.id)"
-              >
-                <text class="owner-pet-chip__name">{{ pet.name }}</text>
-                <text class="owner-pet-chip__meta">{{ speciesLabels[pet.species] }}</text>
-              </view>
-            </view>
-          </scroll-view>
-          <view class="owner-focus-panel">
-            <text class="owner-focus-panel__title">{{ focusPet.name }}</text>
-            <text class="owner-focus-panel__meta">{{ speciesLabels[focusPet.species] }}{{ focusPet.breed ? ` · ${focusPet.breed}` : '' }}</text>
-            <text class="owner-focus-panel__meta">{{ formatPetTagSummary(focusPet.temperamentTags) }}</text>
-            <text class="owner-focus-panel__meta">{{ focusPet.feedingNote || '喂养说明待补充' }}</text>
-            <text class="owner-focus-panel__meta">{{ focusPet.emergencyContact ? `${focusPet.emergencyContact.name} · ${focusPet.emergencyContact.phone}` : '紧急联系人待补充' }}</text>
-            <view class="owner-focus__actions">
-              <AppButton size="medium" @click="openRequests(focusPet.id)">用它发需求</AppButton>
-              <AppButton size="medium" type="info" @click="openPets">编辑档案</AppButton>
-            </view>
-          </view>
-        </template>
-        <view v-else class="owner-empty">
-          <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步宠物资料' : '还没有宠物档案'" />
-          <AppButton block @click="openPets">去建档</AppButton>
-        </view>
-
-        <view v-if="focusOrder" class="owner-focus-panel owner-focus-panel--order">
-          <text class="owner-focus-panel__title">{{ focusOrder.orderNo }}</text>
-          <text class="owner-focus-panel__meta">{{ getOrderStatusLabel(focusOrder.orderStatus) }} · {{ formatRange(focusOrder.appointmentStart, focusOrder.appointmentEnd) }}</text>
-          <text class="owner-focus-panel__meta">实付 ¥{{ formatAmount(focusOrder.amountPaid) }} · 已退 ¥{{ formatAmount(focusOrder.amountRefunded) }}</text>
-          <text class="owner-focus-panel__meta">{{ getConversationPreview(focusOrder.conversation) }}</text>
-          <view class="owner-focus__actions">
-            <AppButton size="medium" type="info" @click="openMessages">消息</AppButton>
-            <AppButton size="medium" @click="openOrders">去订单</AppButton>
-            <AppButton size="medium" type="info" @click="openOrderDetail(focusOrder.id, 'aftersales')">售后</AppButton>
-          </view>
-        </view>
-
-        <scroll-view v-if="caregiverHighlights.length" class="owner-card-scroll" :scroll-x="true" :show-scrollbar="false">
-          <view class="owner-card-track">
-            <view v-for="item in caregiverHighlights" :key="item.serviceId" class="owner-trust-card" @click="openLatestRequest">
-              <text class="owner-trust-card__title">{{ item.caregiverName }}</text>
-              <text class="owner-trust-card__meta">¥{{ formatAmount(item.pricePerUnit) }}/{{ item.unitType }} · {{ formatDistanceKm(item.distanceKm) }}</text>
-              <text class="owner-trust-card__meta">{{ formatCaregiverExperience(item.experienceYears) }} · {{ formatCaregiverRadius(item.serviceRadiusKm) }}</text>
-              <text class="owner-trust-card__meta">{{ formatCaregiverNoticeHours(item.minNoticeHours) }}</text>
-            </view>
-          </view>
-        </scroll-view>
-      </view>
+    <template v-if="!tokenStore.hasLogin">
+      <PetpalSection title="需要登录">
+        <PetpalEmpty title="还没有主人数据" description="登录后会自动拉取宠物档案、需求和订单。">
+          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openLoginPage">去登录</button>
+        </PetpalEmpty>
+      </PetpalSection>
     </template>
 
     <template v-else>
-      <view class="owner-home">
-        <view class="owner-focus owner-focus--guest">
-          <view class="owner-focus__copy">
-            <text class="owner-focus__eyebrow">PetPal</text>
-            <text class="owner-focus__title">登录后开始照料主流程</text>
-            <text class="owner-focus__hint">建档、发需求、跟单和售后都会从这里继续。</text>
+      <PetpalSection tone="accent">
+        <view class="petpal-inline">
+          <view class="petpal-inline" style="justify-content: flex-start;">
+            <view class="petpal-avatar-badge">{{ initials(displayName) }}</view>
+            <view class="petpal-stack" style="gap: 6rpx;">
+              <text class="petpal-banner__title">{{ displayName }}</text>
+              <text class="petpal-note">今天先处理一件事：维护宠物档案，或直接发需求。</text>
+            </view>
           </view>
-          <AppButton block @click="goToLogin">去登录</AppButton>
+          <button class="petpal-icon-btn" hover-class="none" @click="openMessages">消息</button>
+        </view>
+        <view class="petpal-action-row">
+          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openCreateRequest(selectedPet?.id)">新建需求</button>
+          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openPets">宠物档案</button>
+        </view>
+      </PetpalSection>
+
+      <PetpalSection title="先选宠物" subtitle="只显示你现在要操作的宠物，避免列表过长。">
+        <template v-if="pets.length">
+          <view class="petpal-chip-row">
+            <button
+              v-for="pet in pets"
+              :key="pet.id"
+              :class="['petpal-chip', selectedPetId === pet.id ? 'petpal-chip--active' : '']"
+              hover-class="none"
+              @click="selectedPetId = pet.id"
+            >
+              {{ pet.name }}
+            </button>
+          </view>
+          <view v-if="selectedPet" class="petpal-banner">
+            <text class="petpal-banner__title">{{ selectedPet.name }}</text>
+            <text class="petpal-banner__meta">{{ describePet(selectedPet) }}</text>
+            <text class="petpal-note">{{ describePetCare(selectedPet) }}</text>
+          </view>
+        </template>
+        <PetpalEmpty v-else title="还没有宠物档案" description="先补一只宠物，后续所有需求都能直接复用。">
+          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openPets">去建档</button>
+        </PetpalEmpty>
+      </PetpalSection>
+
+      <PetpalSection title="正在流转的需求" subtitle="需求单独成页，避免和订单混在一起。">
+        <template v-if="activeRequest">
+          <button class="petpal-row-btn" hover-class="none" @click="openRequestDetail(activeRequest.id)">
+            <view class="petpal-row__copy">
+              <text class="petpal-row__title">{{ helpers.serviceTypeLabels[activeRequest.serviceType] }} · {{ activeRequest.pet?.name || '宠物' }}</text>
+              <text class="petpal-row__meta">{{ helpers.getRequestStatusLabel(activeRequest.status) }} · {{ helpers.formatRange(activeRequest.startTime, activeRequest.endTime) }}</text>
+              <text class="petpal-row__hint">{{ activeRequest.locationText }} · 预算 {{ helpers.formatMoney(activeRequest.budgetAmount) }}</text>
+            </view>
+            <text class="petpal-row__value">查看</text>
+          </button>
+        </template>
+        <PetpalEmpty v-else title="没有进行中的需求" description="发起新需求后，匹配和下单会拆到后续页面继续处理。">
+          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openCreateRequest(selectedPet?.id)">现在新建</button>
+        </PetpalEmpty>
+      </PetpalSection>
+
+      <PetpalSection title="接下来要看的订单" :subtitle="aftersalesCount ? `另有 ${aftersalesCount} 笔售后单已从普通订单中分流` : '订单里只保留履约本身，售后另进售后中心。'">
+        <template v-if="upcomingOrders.length">
+          <button
+            v-for="item in upcomingOrders.slice(0, 3)"
+            :key="item.id"
+            class="petpal-row-btn"
+            hover-class="none"
+            @click="openOrderDetailPage(item.id)"
+          >
+            <view class="petpal-row__copy">
+              <text class="petpal-row__title">{{ item.orderNo }}</text>
+              <text class="petpal-row__meta">{{ describeOrder(item) }}</text>
+              <text class="petpal-row__hint">{{ describeConversation(item, 'owner').meta }}</text>
+            </view>
+            <text class="petpal-row__value">{{ describeConversation(item, 'owner').unread ? `${describeConversation(item, 'owner').unread} 未读` : '进入' }}</text>
+          </button>
+        </template>
+        <PetpalEmpty v-else title="暂时没有待处理订单" description="成单后才会出现在这里；需要售后时请直接进入售后中心。">
+          <view class="petpal-action-row">
+            <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openAftersales">售后中心</button>
+          </view>
+        </PetpalEmpty>
+      </PetpalSection>
+
+      <PetpalSection title="可直接下单的照料者" subtitle="不堆叠大卡片，只保留最关键的价格、距离和能力。">
+        <template v-if="matchRows.length">
+          <button
+            v-for="item in matchRows"
+            :key="item.serviceId"
+            class="petpal-row-btn"
+            hover-class="none"
+            @click="activeRequest ? openRequestDetail(activeRequest.id) : openCreateRequest(selectedPet?.id)"
+          >
+            <view class="petpal-row__copy">
+              <text class="petpal-row__title">{{ item.caregiverName }}</text>
+              <text class="petpal-row__meta">{{ describeCaregiverMatch(item) }}</text>
+              <text class="petpal-row__hint">{{ describeCaregiverCapability(item) }}</text>
+            </view>
+            <text class="petpal-row__value">{{ helpers.formatScore(item.ratingAvg) }}</text>
+          </button>
+        </template>
+        <PetpalEmpty v-else title="当前没有匹配建议" description="补齐宠物和时间后，系统会给你更准确的照料者列表。">
+          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openCreateRequest(selectedPet?.id)">去补需求</button>
+        </PetpalEmpty>
+      </PetpalSection>
+
+      <view class="petpal-bottom-bar">
+        <view class="petpal-action-row">
+          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openCreateRequest(selectedPet?.id)">新建需求</button>
+          <button
+            v-if="upcomingOrders[0] && upcomingOrders[0].orderStatus === 'PENDING_ACCEPT'"
+            class="petpal-btn petpal-btn--ghost"
+            hover-class="none"
+            @click="openPay(upcomingOrders[0].id)"
+          >
+            继续支付
+          </button>
+          <button v-else class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openMessages">回消息</button>
         </view>
       </view>
     </template>
-  </AppPageShell>
+  </PetpalPage>
 </template>
-
-<style scoped lang="scss">
-.owner-home {
-  display: grid;
-  gap: 22rpx;
-  padding-bottom: 40rpx;
-}
-
-.owner-focus {
-  display: grid;
-  gap: 18rpx;
-  margin: 0 24rpx;
-  padding: 30rpx;
-  border-radius: 32rpx;
-  border: 1rpx solid rgba(245, 220, 192, 0.88);
-  background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.2), transparent 34%),
-    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.16), transparent 34%),
-    linear-gradient(160deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 238, 214, 0.98) 100%);
-  box-shadow: var(--app-elevation-1);
-}
-
-.owner-focus--request,
-.owner-focus--fresh {
-  background:
-    radial-gradient(circle at top right, rgba(249, 115, 22, 0.22), transparent 36%),
-    linear-gradient(180deg, #fff0dd 0%, rgba(255, 251, 246, 0.98) 100%);
-}
-
-.owner-focus--order {
-  background:
-    radial-gradient(circle at top right, rgba(234, 88, 12, 0.22), transparent 36%),
-    linear-gradient(180deg, #fff2de 0%, rgba(255, 251, 246, 0.98) 100%);
-}
-
-.owner-focus--danger {
-  background:
-    radial-gradient(circle at top right, rgba(220, 38, 38, 0.18), transparent 36%),
-    linear-gradient(180deg, rgba(255, 236, 234, 0.96) 0%, rgba(255, 251, 246, 0.98) 100%);
-}
-
-.owner-focus__copy {
-  display: grid;
-  gap: 10rpx;
-}
-
-.owner-focus__eyebrow,
-.owner-agenda-tile__eyebrow,
-.owner-metric-tile__label,
-.owner-metric-tile__helper {
-  color: var(--app-text-muted);
-  font-size: 22rpx;
-  line-height: 1.5;
-}
-
-.owner-focus__title {
-  color: var(--app-text);
-  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
-  font-size: 40rpx;
-  line-height: 1.16;
-  font-weight: 700;
-}
-
-.owner-focus__hint {
-  color: var(--app-text-secondary);
-  font-size: 23rpx;
-  line-height: 1.72;
-}
-
-.owner-focus__tags,
-.owner-focus__actions {
-  display: flex;
-  gap: 12rpx;
-  flex-wrap: wrap;
-}
-
-.owner-metric-scroll,
-.owner-card-scroll {
-  white-space: nowrap;
-}
-
-.owner-metric-track,
-.owner-card-track,
-.owner-pet-strip {
-  display: inline-flex;
-  gap: 16rpx;
-  padding: 0 24rpx;
-  box-sizing: border-box;
-}
-
-.owner-metric-tile,
-.owner-agenda-tile,
-.owner-trust-card,
-.owner-pet-chip,
-.owner-focus-panel {
-  border: 1rpx solid rgba(245, 220, 192, 0.88);
-  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
-  box-shadow: var(--app-elevation-1);
-}
-
-.owner-metric-tile {
-  width: 210rpx;
-  display: grid;
-  gap: 8rpx;
-  padding: 22rpx 24rpx;
-  border-radius: 28rpx;
-  background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 32%),
-    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
-  box-sizing: border-box;
-}
-
-.owner-metric-tile__value {
-  color: var(--app-brand-strong);
-  font-size: 40rpx;
-  line-height: 1.1;
-  font-weight: 700;
-}
-
-.owner-agenda-grid {
-  display: grid;
-  gap: 16rpx;
-}
-
-.owner-agenda-grid {
-  padding: 0 24rpx;
-}
-
-.owner-agenda-tile,
-.owner-focus-panel {
-  margin: 0 24rpx;
-  padding: 22rpx 24rpx;
-  border-radius: 30rpx;
-}
-
-.owner-agenda-tile {
-  display: grid;
-  gap: 10rpx;
-  background:
-    radial-gradient(circle at top right, rgba(249, 115, 22, 0.12), transparent 32%),
-    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
-}
-
-.owner-agenda-tile__title,
-.owner-trust-card__title,
-.owner-pet-chip__name,
-.owner-focus-panel__title {
-  color: var(--app-text);
-  font-size: 28rpx;
-  line-height: 1.36;
-  font-weight: 700;
-}
-
-.owner-agenda-tile__meta,
-.owner-agenda-tile__action,
-.owner-trust-card__meta,
-.owner-pet-chip__meta,
-.owner-focus-panel__meta {
-  color: var(--app-text-secondary);
-  font-size: 22rpx;
-  line-height: 1.68;
-}
-
-.owner-agenda-tile__action {
-  color: var(--app-accent);
-  font-weight: 700;
-}
-
-.owner-trust-card {
-  width: 400rpx;
-  display: grid;
-  gap: 8rpx;
-  padding: 22rpx 24rpx;
-  border-radius: 28rpx;
-  background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 34%),
-    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
-  box-sizing: border-box;
-}
-
-.owner-pet-chip {
-  width: 170rpx;
-  display: grid;
-  gap: 6rpx;
-  padding: 18rpx 20rpx;
-  border-radius: 24rpx;
-  background:
-    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
-  box-sizing: border-box;
-}
-
-.owner-pet-chip--active {
-  border-color: rgba(37, 99, 235, 0.14);
-  background: linear-gradient(135deg, var(--app-accent) 0%, #60a5fa 100%);
-  box-shadow: 0 18rpx 30rpx rgba(37, 99, 235, 0.18);
-}
-
-.owner-pet-chip--active .owner-pet-chip__name,
-.owner-pet-chip--active .owner-pet-chip__meta {
-  color: #eff6ff;
-}
-
-.owner-focus-panel--request {
-  background:
-    radial-gradient(circle at top right, rgba(249, 115, 22, 0.2), transparent 34%),
-    linear-gradient(180deg, #fff0dd 0%, rgba(255, 251, 246, 0.98) 100%);
-}
-
-.owner-focus-panel--order {
-  background:
-    radial-gradient(circle at top right, rgba(234, 88, 12, 0.22), transparent 34%),
-    linear-gradient(180deg, #fff2de 0%, rgba(255, 251, 246, 0.98) 100%);
-}
-
-.owner-empty {
-  margin: 0 24rpx;
-  padding: 24rpx;
-  border-radius: 30rpx;
-  border: 1rpx solid rgba(245, 220, 192, 0.88);
-  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 242, 225, 0.98) 100%);
-  box-shadow: var(--app-elevation-1);
-}
-
-@media (max-width: 680px) {
-  .owner-metric-tile {
-    width: 198rpx;
-  }
-
-  .owner-trust-card {
-    width: 360rpx;
-  }
-}
-</style>

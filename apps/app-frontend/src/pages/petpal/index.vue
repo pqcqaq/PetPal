@@ -1,349 +1,212 @@
-<script lang="ts" setup>
-/**
- * UX Blueprint
- * User: 已登录并需要快速进入主人或照料者工作状态的用户
- * Entry: 打开 App、切换身份、从其他页返回角色中枢
- * First screen: 先在两个身份卡片里确认“我此刻要以谁的身份做事”
- * Primary action: 进入当前身份首页
- * Secondary actions: 直接去消息、提醒和当前身份的三个高频任务
- * States: 未登录、已登录无待办、已登录有未读提醒
- */
+<script setup lang="ts">
+import type { CaregiverProfileRecord, CaregiverServiceRecord, OrderRecord, PetProfileRecord, ServiceRequestRecord } from '@rbac/api-common'
 import { computed, ref } from 'vue'
-import AppButton from '@/components/app-button/app-button.vue'
-import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppStatus from '@/components/app-status/app-status.vue'
-import AppTag from '@/components/app-tag/app-tag.vue'
-import { LOGIN_PAGE } from '@/router/config'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
+import { storeToRefs } from 'pinia'
+import { getCaregiverProfile, listCaregiverOrders, listCaregiverServices, listOrders, listPets, listServiceRequests } from '@/api/petpal'
 import { useNotificationStore, useTokenStore, useUserStore } from '@/store'
-import {
-  PETPAL_AFTERSALES_PAGE,
-  PETPAL_CAREGIVER_EARNINGS_PAGE,
-  PETPAL_CAREGIVER_HOME_PAGE,
-  PETPAL_CAREGIVER_ORDERS_PAGE,
-  PETPAL_CAREGIVER_SERVICES_PAGE,
-  openPetPalAction,
-  PETPAL_MESSAGES_PAGE,
-  PETPAL_OWNER_HOME_PAGE,
-  PETPAL_ORDERS_PAGE,
-  PETPAL_REMINDERS_PAGE,
-  PETPAL_REQUEST_PAGE,
-} from './owner-shared'
-
-defineOptions({
-  name: 'PetPalHubPage',
-})
-
-definePage({
-  style: {
-    navigationBarTitleText: '切换身份',
-    enablePullDownRefresh: true,
-  },
-})
-
-type RoleMode = 'OWNER' | 'CAREGIVER'
+import PetpalEmpty from './rebuild/petpal-empty.vue'
+import PetpalPage from './rebuild/petpal-page.vue'
+import PetpalSection from './rebuild/petpal-section.vue'
+import { helpers, initials, isCaregiverEnabled, openLoginPage, openRoleHome, PETPAL_NOTIFICATIONS_PAGE, PETPAL_REMINDERS_PAGE, REGISTER_PAGE, roleSummary, stopPullDown } from './rebuild/shared'
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const notificationStore = useNotificationStore()
+const { userInfo } = storeToRefs(userStore)
+const { unreadCount, unreadHighPriorityCount } = storeToRefs(notificationStore)
 
-const activeRole = ref<RoleMode>('OWNER')
+const loading = ref(false)
+const pets = ref<PetProfileRecord[]>([])
+const requests = ref<ServiceRequestRecord[]>([])
+const ownerOrders = ref<OrderRecord[]>([])
+const caregiverProfile = ref<CaregiverProfileRecord | null>(null)
+const caregiverServices = ref<CaregiverServiceRecord[]>([])
+const caregiverOrderCount = ref(0)
 
-const roleOptions = [
-  { label: '主人', value: 'OWNER' },
-  { label: '照料者', value: 'CAREGIVER' },
-]
+const displayName = computed(() => userInfo.value.nickname || userInfo.value.username || 'PetPal 用户')
+const ownerNextAction = computed(() => {
+  if (!pets.value.length) return '先建立宠物档案'
+  const activeRequest = requests.value.find(item => ['OPEN', 'MATCHED', 'MATCHING', 'CONFIRMED'].includes(item.status))
+  if (activeRequest) return '回看正在流转的需求'
+  return '新建一次照料需求'
+})
+const caregiverNextAction = computed(() => {
+  if (!caregiverProfile.value) return '先建立照料者档案'
+  if (!caregiverServices.value.some(item => item.isActive)) return '先上架一个服务'
+  if (caregiverOrderCount.value > 0) return '处理待履约订单'
+  return '继续保持服务在线'
+})
 
-const displayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || 'PetPal 用户')
-const unreadNotificationCount = computed(() => notificationStore.items.filter(item => !notificationStore.isRead(item)).length)
+async function loadPage() {
+  if (!tokenStore.hasLogin || loading.value) {
+    stopPullDown()
+    return
+  }
 
-const activeRoleTitle = computed(() => activeRole.value === 'OWNER' ? '主人' : '照料者')
-const activeRoleSummary = computed(() => (
-  activeRole.value === 'OWNER'
-    ? '发需求、跟订单、处理售后。'
-    : '接单、履约、管理服务和收益。'
-))
-const enterHomeLabel = computed(() => activeRole.value === 'OWNER' ? '进入主人首页' : '进入照料者首页')
+  loading.value = true
+  try {
+    await Promise.all([
+      tokenStore.bootstrap(),
+      userStore.fetchUserInfo().catch(() => undefined),
+      notificationStore.refreshNotifications().catch(() => undefined),
+    ])
 
-const roleActionItems = computed(() => (
-  activeRole.value === 'OWNER'
-    ? [
-        {
-          title: '新建需求',
-          label: '快速开始一次新的照料安排',
-          value: '去发布',
-          action: () => openPetPalAction('navigate', PETPAL_REQUEST_PAGE),
-        },
-        {
-          title: '我的订单',
-          label: '查看进行中、待确认和待评价订单',
-          value: '去处理',
-          action: () => openPetPalAction('navigate', PETPAL_ORDERS_PAGE),
-        },
-        {
-          title: '售后中心',
-          label: '退款、投诉、争议统一处理',
-          value: '去跟进',
-          action: () => openPetPalAction('navigate', PETPAL_AFTERSALES_PAGE),
-        },
-      ]
-    : [
-        {
-          title: '履约订单',
-          label: '先看待接单和服务中订单',
-          value: '去接单',
-          action: () => uni.navigateTo({ url: PETPAL_CAREGIVER_ORDERS_PAGE }),
-        },
-        {
-          title: '服务管理',
-          label: '调整报价、城市和上架状态',
-          value: '去管理',
-          action: () => uni.navigateTo({ url: PETPAL_CAREGIVER_SERVICES_PAGE }),
-        },
-        {
-          title: '收益表现',
-          label: '查看收入、评分和风险订单',
-          value: '去查看',
-          action: () => uni.navigateTo({ url: PETPAL_CAREGIVER_EARNINGS_PAGE }),
-        },
-      ]
-))
+    const [
+      petsResult,
+      requestsResult,
+      ownerOrdersResult,
+      caregiverProfileResult,
+      caregiverServicesResult,
+      caregiverOrdersResult,
+    ] = await Promise.allSettled([
+      listPets(),
+      listServiceRequests(),
+      listOrders(),
+      getCaregiverProfile(),
+      listCaregiverServices(),
+      listCaregiverOrders({ page: 1, pageSize: 20 }),
+    ])
 
-function goToLogin() {
-  uni.navigateTo({ url: LOGIN_PAGE })
+    pets.value = petsResult.status === 'fulfilled' ? petsResult.value : []
+    requests.value = requestsResult.status === 'fulfilled' ? requestsResult.value : []
+    ownerOrders.value = ownerOrdersResult.status === 'fulfilled' ? ownerOrdersResult.value : []
+    caregiverProfile.value = caregiverProfileResult.status === 'fulfilled' ? caregiverProfileResult.value : null
+    caregiverServices.value = caregiverServicesResult.status === 'fulfilled' ? caregiverServicesResult.value : []
+    caregiverOrderCount.value = caregiverOrdersResult.status === 'fulfilled' ? caregiverOrdersResult.value.pagination.total : 0
+  }
+  finally {
+    loading.value = false
+    stopPullDown()
+  }
 }
 
-function openActiveRoleHome() {
-  openPetPalAction('redirect', activeRole.value === 'OWNER'
-    ? PETPAL_OWNER_HOME_PAGE
-    : PETPAL_CAREGIVER_HOME_PAGE)
-}
-
-function openMessages() {
-  openPetPalAction('navigate', PETPAL_MESSAGES_PAGE)
+function openNotifications() {
+  uni.navigateTo({ url: PETPAL_NOTIFICATIONS_PAGE })
 }
 
 function openReminders() {
   uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
 }
 
+function goToRegister() {
+  uni.navigateTo({ url: REGISTER_PAGE })
+}
+
 onShow(() => {
-  if (!tokenStore.hasLogin) {
-    return
-  }
-  void tokenStore.bootstrap()
-  void userStore.fetchUserInfo().catch(() => undefined)
-  void notificationStore.refreshNotifications()
+  void loadPage()
+})
+
+onPullDownRefresh(() => {
+  void loadPage()
 })
 </script>
 
 <template>
-  <AppPageShell title="切换身份">
-    <template v-if="tokenStore.hasLogin">
-      <view class="hub-page">
-        <view class="hub-focus">
-          <view class="hub-focus__copy">
-            <text class="hub-focus__eyebrow">{{ displayName }}</text>
-            <text class="hub-focus__title">先选当前身份</text>
-            <text class="hub-focus__meta">先切到当前身份，再继续处理今天要做的事。</text>
-          </view>
-          <view class="hub-focus__tags">
-            <AppTag :type="activeRole === 'OWNER' ? 'primary' : 'warning'">
-              {{ activeRoleTitle }}
-            </AppTag>
-            <AppTag :type="unreadNotificationCount > 0 ? 'danger' : 'success'">
-              {{ unreadNotificationCount > 0 ? `${unreadNotificationCount} 待处理` : '当前平稳' }}
-            </AppTag>
-          </view>
-        </view>
+  <PetpalPage
+    title="选择你现在要做的事"
+    :subtitle="tokenStore.hasLogin ? '主人和照料者入口都保留，但每个入口只做一件事，避免混在同一页里。' : '先登录后再进入主人或照料者主流程。'"
+    eyebrow="PetPal"
+  >
+    <template #bar>
+      <button
+        v-if="tokenStore.hasLogin"
+        class="petpal-icon-btn"
+        hover-class="none"
+        @click="openNotifications"
+      >
+        通知 {{ unreadCount }}
+      </button>
+    </template>
 
-        <view class="hub-role-grid">
-          <view
-            v-for="item in roleOptions"
-            :key="item.value"
-            class="hub-role-card"
-            :class="activeRole === item.value ? 'hub-role-card--active' : ''"
-            @click="activeRole = item.value as RoleMode"
-          >
-            <text class="hub-role-card__title">{{ item.label }}</text>
-            <text class="hub-role-card__meta">
-              {{ item.value === 'OWNER' ? '发需求、跟单、售后' : '接单、履约、管理服务' }}
-            </text>
-            <text class="hub-role-card__action">{{ item.value === 'OWNER' ? '作为主人继续' : '作为照料者继续' }}</text>
+    <template v-if="!tokenStore.hasLogin">
+      <PetpalSection title="先登录" subtitle="登录后会自动恢复你上次的主人和照料者数据。">
+        <PetpalEmpty title="当前未登录" description="没有登录态时，不展示冗长介绍，只保留两个入口动作。">
+          <view class="petpal-action-row">
+            <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openLoginPage">去登录</button>
+            <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="goToRegister">注册账号</button>
           </view>
-        </view>
-
-        <view class="hub-launchpad">
-          <view class="hub-launchpad__copy">
-            <text class="hub-launchpad__title">{{ activeRoleTitle }}</text>
-            <text class="hub-launchpad__summary">{{ activeRoleSummary }}</text>
-          </view>
-          <view class="hub-launchpad__actions">
-            <AppButton size="medium" @click="openActiveRoleHome">{{ enterHomeLabel }}</AppButton>
-            <AppButton size="medium" type="info" @click="openMessages">消息</AppButton>
-            <AppButton size="medium" type="danger" @click="openReminders">提醒</AppButton>
-          </view>
-        </view>
-
-        <view class="hub-action-grid">
-          <view
-            v-for="item in roleActionItems"
-            :key="item.title"
-            class="hub-action-card"
-            @click="item.action"
-          >
-            <text class="hub-action-card__title">{{ item.title }}</text>
-            <text class="hub-action-card__value">{{ item.value }}</text>
-            <text class="hub-action-card__hint">{{ item.label }}</text>
-          </view>
-        </view>
-      </view>
+        </PetpalEmpty>
+      </PetpalSection>
     </template>
 
     <template v-else>
-      <view class="hub-login">
-        <AppStatus text="登录后直接进入主人或照料者任务。" />
-        <AppButton block @click="goToLogin">去登录</AppButton>
-      </view>
+      <PetpalSection tone="accent">
+        <view class="petpal-inline">
+          <view class="petpal-inline" style="justify-content: flex-start;">
+            <view class="petpal-avatar-badge">{{ initials(displayName) }}</view>
+            <view class="petpal-stack" style="gap: 6rpx;">
+              <text class="petpal-banner__title">{{ displayName }}</text>
+              <text class="petpal-note">{{ roleSummary(userInfo) }}</text>
+            </view>
+          </view>
+          <button class="petpal-icon-btn" hover-class="none" @click="openReminders">
+            待办 {{ unreadHighPriorityCount }}
+          </button>
+        </view>
+        <view class="petpal-stat-row">
+          <view class="petpal-stat">
+            <text class="petpal-stat__label">主人侧</text>
+            <text class="petpal-stat__value">{{ pets.length }}/{{ ownerOrders.length }}</text>
+            <text class="petpal-stat__meta">宠物档案 / 订单数</text>
+          </view>
+          <view class="petpal-stat">
+            <text class="petpal-stat__label">照料者侧</text>
+            <text class="petpal-stat__value">{{ caregiverServices.length }}/{{ caregiverOrderCount }}</text>
+            <text class="petpal-stat__meta">服务数 / 订单数</text>
+          </view>
+        </view>
+      </PetpalSection>
+
+      <PetpalSection title="主人入口" :subtitle="ownerNextAction">
+        <button class="petpal-row-btn" hover-class="none" @click="openRoleHome('owner')">
+          <view class="petpal-row__copy">
+            <text class="petpal-row__title">进入主人首页</text>
+            <text class="petpal-row__meta">宠物、需求、下单、消息、售后都从这里分流。</text>
+          </view>
+          <text class="petpal-row__value">打开</text>
+        </button>
+        <view class="petpal-tag-row">
+          <text class="petpal-pill petpal-pill--accent">宠物 {{ pets.length }}</text>
+          <text class="petpal-pill">需求 {{ requests.length }}</text>
+          <text class="petpal-pill">订单 {{ ownerOrders.length }}</text>
+        </view>
+      </PetpalSection>
+
+      <PetpalSection title="照料者入口" :subtitle="caregiverNextAction">
+        <button class="petpal-row-btn" hover-class="none" @click="openRoleHome('caregiver')">
+          <view class="petpal-row__copy">
+            <text class="petpal-row__title">进入照料者首页</text>
+            <text class="petpal-row__meta">审核、服务、接单、履约、收益会拆成独立流转。</text>
+          </view>
+          <text class="petpal-row__value">打开</text>
+        </button>
+        <view class="petpal-tag-row">
+          <text :class="['petpal-pill', caregiverProfile ? 'petpal-pill--success' : 'petpal-pill--warning']">
+            {{ caregiverProfile ? helpers.getCaregiverAuditLabel(caregiverProfile.auditStatus) : '未建档' }}
+          </text>
+          <text class="petpal-pill">服务 {{ caregiverServices.length }}</text>
+          <text class="petpal-pill">订单 {{ caregiverOrderCount }}</text>
+          <text v-if="isCaregiverEnabled(userInfo)" class="petpal-pill petpal-pill--accent">已开通照料者角色</text>
+        </view>
+      </PetpalSection>
+
+      <PetpalSection title="当前最急的事" subtitle="保持简洁，只放任务，不放说明文案。">
+        <button class="petpal-row-btn" hover-class="none" @click="openReminders">
+          <view class="petpal-row__copy">
+            <text class="petpal-row__title">打开提醒中心</text>
+            <text class="petpal-row__hint">这里集中收口高优先通知和待处理订单。</text>
+          </view>
+          <text class="petpal-row__value">{{ unreadCount }} 条</text>
+        </button>
+        <button class="petpal-row-btn" hover-class="none" @click="openNotifications">
+          <view class="petpal-row__copy">
+            <text class="petpal-row__title">查看全部通知</text>
+            <text class="petpal-row__hint">包括资料、需求、未读沟通和售后提醒。</text>
+          </view>
+          <text class="petpal-row__value">进入</text>
+        </button>
+      </PetpalSection>
     </template>
-  </AppPageShell>
+  </PetpalPage>
 </template>
-
-<style scoped lang="scss">
-.hub-page {
-  display: grid;
-  gap: 20rpx;
-  padding-bottom: 40rpx;
-}
-
-.hub-focus,
-.hub-launchpad,
-.hub-action-card,
-.hub-role-card,
-.hub-login {
-  display: grid;
-  gap: 14rpx;
-  margin: 0 24rpx;
-  padding: 28rpx;
-  border-radius: var(--app-shape-xl);
-  border: 1rpx solid rgba(245, 220, 192, 0.88);
-  background:
-    radial-gradient(circle at top right, rgba(249, 115, 22, 0.12), transparent 34%),
-    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 240, 220, 0.98) 100%);
-  box-shadow: var(--app-elevation-1);
-}
-
-.hub-focus {
-  background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.22), transparent 34%),
-    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.18), transparent 32%),
-    linear-gradient(160deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 236, 212, 0.98) 100%);
-}
-
-.hub-focus__copy,
-.hub-launchpad__copy {
-  display: grid;
-  gap: 10rpx;
-}
-
-.hub-role-grid,
-.hub-action-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
-  padding: 0 24rpx;
-}
-
-.hub-role-card,
-.hub-action-card {
-  transition:
-    transform var(--app-motion-duration-short) var(--app-motion-easing-emphasis),
-    box-shadow var(--app-motion-duration-medium) var(--app-motion-easing-standard),
-    border-color var(--app-motion-duration-medium) var(--app-motion-easing-standard);
-}
-
-.hub-role-card--active {
-  border-color: rgba(37, 99, 235, 0.14);
-  background: linear-gradient(135deg, var(--app-accent) 0%, #60a5fa 100%);
-  box-shadow: 0 22rpx 40rpx rgba(37, 99, 235, 0.22);
-  transform: translateY(-2rpx);
-}
-
-.hub-focus__eyebrow {
-  color: var(--app-text-muted);
-  font-size: 22rpx;
-  line-height: 1.5;
-}
-
-.hub-focus__title,
-.hub-launchpad__title,
-.hub-role-card__title,
-.hub-action-card__title {
-  color: var(--app-text);
-  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
-  font-size: 36rpx;
-  line-height: 1.14;
-  font-weight: 700;
-}
-
-.hub-launchpad__title,
-.hub-action-card__title,
-.hub-role-card__title {
-  font-size: 30rpx;
-  line-height: 1.28;
-}
-
-.hub-focus__meta,
-.hub-launchpad__summary,
-.hub-role-card__meta,
-.hub-action-card__hint {
-  color: var(--app-text-secondary);
-  font-size: 24rpx;
-  line-height: 1.66;
-}
-
-.hub-action-card__value {
-  color: var(--app-brand-strong);
-  font-size: 40rpx;
-  line-height: 1.05;
-  font-weight: 700;
-}
-
-.hub-role-card__action {
-  color: var(--app-accent);
-  font-size: 22rpx;
-  line-height: 1.5;
-  font-weight: 700;
-}
-
-.hub-role-card--active .hub-role-card__title,
-.hub-role-card--active .hub-role-card__meta,
-.hub-role-card--active .hub-role-card__action {
-  color: #eff6ff;
-}
-
-.hub-focus__tags,
-.hub-launchpad__actions {
-  display: flex;
-  gap: 12rpx;
-  flex-wrap: wrap;
-}
-
-.hub-launchpad {
-  background:
-    radial-gradient(circle at top right, rgba(249, 115, 22, 0.22), transparent 34%),
-    linear-gradient(160deg, #fff0dd 0%, rgba(255, 251, 246, 0.98) 100%);
-}
-
-.hub-action-card {
-  background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 30%),
-    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 245, 231, 0.98) 100%);
-}
-
-@media (max-width: 680px) {
-  .hub-role-grid,
-  .hub-action-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

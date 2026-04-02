@@ -1,207 +1,41 @@
-<script lang="ts" setup>
-/**
- * UX Blueprint
- * User: 已选好照料者、此刻只想尽快完成下单和支付的主人
- * Entry: 需求详情页继续下单、活跃需求恢复结算、订单待支付回流
- * Core scenes:
- * 1. 一屏确认服务时间、金额和照料者是否靠谱
- * 2. 已有订单时优先继续支付，不重复创建
- * 3. 支付完成后直接进入结果页，确认到账和下一步
- * Primary action: 提交订单并支付，或继续支付当前订单
- * Secondary actions: 切换支付方式、返回需求详情、查看支付结果
- * Feedback: 当前阶段、应付金额、照料者可信信息、支付记录
- * States: 未登录、参数缺失、订单创建中、待支付、已支付待查看结果、加载失败
- */
-import type {
-  MatchedCaregiverRecord,
-  OrderDetailRecord,
-  OwnerPayChannel,
-  ServiceRequestRecord,
-} from '@rbac/api-common'
-import dayjs from 'dayjs'
+<script setup lang="ts">
+import type { MatchedCaregiverRecord, OrderDetailRecord, OwnerPayChannel, ServiceRequestRecord } from '@rbac/api-common'
 import { computed, ref } from 'vue'
-import AppButton from '@/components/app-button/app-button.vue'
-import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
-import AppList from '@/components/app-list/app-list.vue'
-import AppListItem from '@/components/app-list-item/app-list-item.vue'
-import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppSection from '@/components/app-section/app-section.vue'
-import AppStatus from '@/components/app-status/app-status.vue'
-import AppTag from '@/components/app-tag/app-tag.vue'
-import {
-  createOwnerOrder,
-  getOrderDetail,
-  listServiceRequests,
-  matchCaregivers,
-  payOwnerOrder,
-} from '@/api/petpal'
-import { LOGIN_PAGE } from '@/router/config'
+import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
+import { createOwnerOrder, getOrderDetail, listServiceRequests, matchCaregivers, payOwnerOrder } from '@/api/petpal'
 import { useTokenStore } from '@/store'
-import { getErrorMessage } from '@/utils/error'
+import PetpalEmpty from './rebuild/petpal-empty.vue'
+import PetpalPage from './rebuild/petpal-page.vue'
+import PetpalSection from './rebuild/petpal-section.vue'
 import {
   buildOwnerMatchQuery,
-  formatAmount,
-  formatCaregiverExperience,
-  formatCaregiverNoticeHours,
-  formatCaregiverRadius,
-  formatDistanceKm,
-  formatRange,
-  getRequestStatusLabel,
-  PETPAL_ORDER_DETAIL_PAGE,
+  describeCaregiverCapability,
+  describeCaregiverMatch,
+  getErrorMessage,
+  helpers,
+  openLoginPage,
+  payChannelOptions,
   PETPAL_PAYMENT_RESULT_PAGE,
   PETPAL_REQUEST_DETAIL_PAGE,
-  PETPAL_REQUEST_PAGE,
-  serviceTypeLabels,
-  speciesLabels,
-} from './owner-shared'
-
-defineOptions({
-  name: 'PetPalCheckoutPage',
-})
-
-definePage({
-  style: {
-    navigationBarTitleText: '确认支付',
-    enablePullDownRefresh: true,
-  },
-})
+  stopPullDown,
+  toast,
+} from './rebuild/shared'
 
 const tokenStore = useTokenStore()
-
 const loading = ref(false)
-const creatingOrder = ref(false)
-const paying = ref(false)
-const error = ref('')
+const submitting = ref(false)
 
 const requestId = ref('')
 const caregiverServiceId = ref('')
 const orderId = ref('')
-
 const requestRecord = ref<ServiceRequestRecord | null>(null)
-const caregiver = ref<MatchedCaregiverRecord | null>(null)
 const order = ref<OrderDetailRecord | null>(null)
+const caregiver = ref<MatchedCaregiverRecord | null>(null)
 const payChannel = ref<OwnerPayChannel>('WECHAT_PAY')
 
-const payChannelOptions = [
-  { label: '微信支付', value: 'WECHAT_PAY', description: '最快完成当前订单支付' },
-  { label: '支付宝', value: 'ALIPAY', description: '适合切换到支付宝付款' },
-  { label: '平台余额', value: 'BALANCE', description: '从平台余额直接扣款' },
-]
+const currentRequestId = computed(() => requestId.value || order.value?.serviceRequestId || '')
 
-const estimatedUnits = computed(() => {
-  if (!requestRecord.value || !caregiver.value) {
-    return 0
-  }
-
-  const durationHours = Math.max(
-    1,
-    dayjs(requestRecord.value.endTime).diff(dayjs(requestRecord.value.startTime), 'minute') / 60,
-  )
-  const unitType = caregiver.value.unitType.trim().toUpperCase()
-
-  if (unitType.includes('DAY')) {
-    return Math.max(1, Math.ceil(durationHours / 24))
-  }
-  if (unitType.includes('HOUR')) {
-    return Math.max(1, Math.ceil(durationHours))
-  }
-  if (unitType.includes('HALF')) {
-    return Math.max(1, Math.ceil(durationHours / 12))
-  }
-  if (unitType.includes('VISIT') || unitType.includes('TIME') || unitType.includes('TRIP')) {
-    return 1
-  }
-  if (requestRecord.value.serviceType === 'BOARDING') {
-    return Math.max(1, Math.ceil(durationHours / 24))
-  }
-  return 1
-})
-
-const estimatedAmount = computed(() => {
-  if (!caregiver.value) {
-    return 0
-  }
-  return Number((Number(caregiver.value.pricePerUnit) * estimatedUnits.value).toFixed(2))
-})
-
-const totalAmount = computed(() => {
-  if (order.value) {
-    return Number(order.value.amountTotal) + Number(order.value.amountAdjusted)
-  }
-  return estimatedAmount.value
-})
-
-const outstandingAmount = computed(() => {
-  if (!order.value) {
-    return estimatedAmount.value
-  }
-  return Number(Math.max(0, totalAmount.value - Number(order.value.amountPaid)).toFixed(2))
-})
-
-const isOrderPaid = computed(() => Boolean(order.value && outstandingAmount.value <= 0))
-const currentStageLabel = computed(() => {
-  if (isOrderPaid.value) {
-    return '已支付，待查看结果'
-  }
-  if (order.value) {
-    return '待支付'
-  }
-  return '确认订单'
-})
-const stageTagType = computed(() => {
-  if (isOrderPaid.value) {
-    return 'success'
-  }
-  if (order.value) {
-    return 'warning'
-  }
-  return 'primary'
-})
-const primaryButtonLabel = computed(() => {
-  if (isOrderPaid.value) {
-    return '查看支付结果'
-  }
-  return `${order.value ? '立即支付' : '提交并支付'} ¥${formatAmount(outstandingAmount.value)}`
-})
-
-const caregiverTrustPills = computed(() => {
-  if (!caregiver.value) {
-    return []
-  }
-  return [
-    caregiver.value.city || '城市待补充',
-    formatCaregiverExperience(caregiver.value.experienceYears),
-    formatCaregiverNoticeHours(caregiver.value.minNoticeHours),
-    formatCaregiverRadius(caregiver.value.serviceRadiusKm),
-    ...caregiver.value.specialtyTags.slice(0, 3),
-  ]
-})
-
-const caregiverMetrics = computed(() => {
-  if (!caregiver.value) {
-    return []
-  }
-  return [
-    {
-      label: '评分',
-      value: `${formatAmount(caregiver.value.ratingAvg)} / ${caregiver.value.ratingCount}`,
-    },
-    {
-      label: '距离',
-      value: formatDistanceKm(caregiver.value.distanceKm),
-    },
-    {
-      label: '接单前',
-      value: formatCaregiverNoticeHours(caregiver.value.minNoticeHours),
-    },
-    {
-      label: '服务圈',
-      value: formatCaregiverRadius(caregiver.value.serviceRadiusKm),
-    },
-  ]
-})
-
-async function resolveRequestContext() {
+async function loadFromRequest() {
   if (!requestId.value) {
     return
   }
@@ -210,487 +44,173 @@ async function resolveRequestContext() {
   requestRecord.value = requests.find(item => item.id === requestId.value) ?? null
 
   if (!requestRecord.value) {
-    throw new Error('需求不存在或已不可用')
+    return
   }
 
   const page = await matchCaregivers(buildOwnerMatchQuery({
-    petSpecies: requestRecord.value.pet?.species,
+    petSpecies: requestRecord.value.pet?.species || 'DOG',
     serviceType: requestRecord.value.serviceType,
-    pageSize: 20,
+    city: requestRecord.value.locationText || undefined,
+    pageSize: 12,
   }))
-
-  caregiver.value = page.items.find(item => item.serviceId === caregiverServiceId.value)
-    ?? page.items.find(item => item.caregiverId === requestRecord.value?.matchedCaregiverId)
-    ?? page.items[0]
-    ?? null
+  caregiver.value = page.items.find(item => item.serviceId === caregiverServiceId.value) ?? page.items[0] ?? null
+  caregiverServiceId.value = caregiver.value?.serviceId || caregiverServiceId.value
 }
 
-async function loadPage(showError = false) {
+async function loadPage() {
   if (!tokenStore.hasLogin || loading.value) {
-    uni.stopPullDownRefresh()
+    stopPullDown()
     return
   }
 
   loading.value = true
-  error.value = ''
   try {
     if (orderId.value) {
       order.value = await getOrderDetail(orderId.value)
       requestId.value = order.value.serviceRequestId || requestId.value
     }
 
-    if (requestId.value) {
-      await resolveRequestContext()
-    }
-
-    if (!order.value && !requestId.value) {
-      throw new Error('缺少结算参数')
-    }
-
-    if (!order.value && !caregiver.value) {
-      throw new Error('当前需求还没有可用照料者')
-    }
+    await loadFromRequest()
   }
-  catch (cause: unknown) {
-    error.value = getErrorMessage(cause, '加载结算页失败')
-    if (showError) {
-      uni.showToast({
-        title: error.value,
-        icon: 'none',
-      })
-    }
+  catch (error: unknown) {
+    toast(getErrorMessage(error, '加载结算页失败'))
   }
   finally {
     loading.value = false
-    uni.stopPullDownRefresh()
+    stopPullDown()
   }
 }
 
-async function createOrderAndStay() {
-  if (order.value) {
-    return order.value
-  }
-  if (!requestId.value || !caregiver.value) {
-    uni.showToast({ title: '缺少需求或照料者信息', icon: 'none' })
-    return null
+async function submitPayment() {
+  if (!tokenStore.hasLogin || submitting.value) {
+    return
   }
 
-  creatingOrder.value = true
-  try {
-    order.value = await createOwnerOrder({
-      requestId: requestId.value,
-      caregiverServiceId: caregiver.value.serviceId,
-    })
-    orderId.value = order.value.id
-    uni.showToast({ title: '订单已生成', icon: 'none' })
-    return order.value
+  if (!order.value) {
+    if (!requestRecord.value || !caregiver.value) {
+      toast('请先确认需求和照料者')
+      return
+    }
+
+    submitting.value = true
+    try {
+      order.value = await createOwnerOrder({
+        requestId: requestRecord.value.id,
+        caregiverServiceId: caregiver.value.serviceId,
+      })
+      orderId.value = order.value.id
+    }
+    catch (error: unknown) {
+      submitting.value = false
+      toast(getErrorMessage(error, '创建订单失败'))
+      return
+    }
   }
-  catch (cause: unknown) {
-    uni.showToast({
-      title: getErrorMessage(cause, '提交订单失败'),
-      icon: 'none',
-    })
-    return null
+
+  submitting.value = true
+  try {
+    const paidOrder = await payOwnerOrder(order.value.id, { payChannel: payChannel.value })
+    order.value = paidOrder
+    uni.redirectTo({ url: `${PETPAL_PAYMENT_RESULT_PAGE}?orderId=${paidOrder.id}` })
+  }
+  catch (error: unknown) {
+    toast(getErrorMessage(error, '支付失败'))
   }
   finally {
-    creatingOrder.value = false
+    submitting.value = false
   }
-}
-
-async function payNow() {
-  const currentOrder = order.value ?? await createOrderAndStay()
-  if (!currentOrder) {
-    return
-  }
-
-  paying.value = true
-  try {
-    order.value = await payOwnerOrder(currentOrder.id, {
-      payChannel: payChannel.value,
-    })
-    orderId.value = order.value.id
-    uni.redirectTo({ url: `${PETPAL_PAYMENT_RESULT_PAGE}?orderId=${order.value.id}` })
-  }
-  catch (cause: unknown) {
-    uni.showToast({
-      title: getErrorMessage(cause, '支付失败'),
-      icon: 'none',
-    })
-  }
-  finally {
-    paying.value = false
-  }
-}
-
-function openPaymentResult() {
-  if (!order.value) {
-    return
-  }
-  uni.redirectTo({ url: `${PETPAL_PAYMENT_RESULT_PAGE}?orderId=${order.value.id}` })
-}
-
-function handlePrimaryAction() {
-  if (isOrderPaid.value && order.value) {
-    openPaymentResult()
-    return
-  }
-  void payNow()
-}
-
-function openOrderDetail() {
-  if (!order.value) {
-    return
-  }
-  uni.redirectTo({ url: `${PETPAL_ORDER_DETAIL_PAGE}?id=${order.value.id}&tab=overview` })
 }
 
 function backToRequest() {
-  const targetRequestId = requestId.value || order.value?.serviceRequestId || ''
-  const url = targetRequestId
-    ? `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${targetRequestId}`
-    : PETPAL_REQUEST_PAGE
-  uni.redirectTo({ url })
-}
-
-function goToLogin() {
-  uni.navigateTo({ url: LOGIN_PAGE })
-}
-
-onLoad((options: Record<string, string | undefined>) => {
-  requestId.value = options.requestId || ''
-  caregiverServiceId.value = options.caregiverServiceId || ''
-  orderId.value = options.orderId || ''
-})
-
-onShow(() => {
-  if (!tokenStore.hasLogin) {
+  if (!currentRequestId.value) {
     return
   }
-  void loadPage(false)
+  uni.redirectTo({ url: `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${currentRequestId.value}` })
+}
+
+onLoad((options) => {
+  requestId.value = options?.requestId || ''
+  caregiverServiceId.value = options?.caregiverServiceId || ''
+  orderId.value = options?.orderId || ''
+  void loadPage()
 })
 
 onPullDownRefresh(() => {
-  void loadPage(true)
+  void loadPage()
 })
 </script>
 
 <template>
-  <AppPageShell title="确认支付">
-    <template v-if="tokenStore.hasLogin">
-      <template v-if="loading">
-        <AppSection title="同步状态">
-          <AppStatus mode="loading" text="正在同步结算信息" />
-        </AppSection>
-      </template>
+  <PetpalPage
+    title="确认支付"
+    subtitle="这里只做结算，不混入需求编辑或订单售后。"
+    eyebrow="Checkout"
+    back
+    :back-url="currentRequestId ? `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${currentRequestId}` : PETPAL_REQUEST_DETAIL_PAGE"
+  >
+    <template v-if="!tokenStore.hasLogin">
+      <PetpalSection title="需要登录">
+        <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openLoginPage">去登录</button>
+      </PetpalSection>
+    </template>
 
-      <template v-else-if="!error">
-        <AppSection title="当前阶段">
-          <view class="checkout-stage">
-            <view class="checkout-stage__copy">
-              <view class="checkout-stage__tags">
-                <AppTag :type="stageTagType">{{ currentStageLabel }}</AppTag>
-                <AppTag v-if="requestRecord?.pet?.name" type="primary">{{ requestRecord.pet.name }}</AppTag>
-                <AppTag v-if="order?.orderNo" type="default">{{ order.orderNo }}</AppTag>
-              </view>
-              <text class="checkout-stage__title">{{ serviceTypeLabels[order?.serviceType || requestRecord?.serviceType || 'BOARDING'] }}</text>
-              <text class="checkout-stage__meta">
-                {{ requestRecord ? formatRange(requestRecord.startTime, requestRecord.endTime) : formatRange(order?.appointmentStart, order?.appointmentEnd) }}
-              </text>
-            </view>
-            <view class="checkout-amount">
-              <text class="checkout-amount__label">{{ isOrderPaid ? '已支付' : '待支付' }}</text>
-              <text class="checkout-amount__value">¥{{ formatAmount(isOrderPaid ? totalAmount : outstandingAmount) }}</text>
-            </view>
-          </view>
-        </AppSection>
-
-        <AppSection v-if="requestRecord" title="服务安排">
-          <AppList>
-            <AppListItem
-              title="宠物与服务"
-              :label="`${requestRecord.pet?.name || '宠物'} · ${speciesLabels[requestRecord.pet?.species || 'DOG']}`"
-              :value="serviceTypeLabels[requestRecord.serviceType]"
-              value-emphasis
-            />
-            <AppListItem
-              title="服务时间"
-              :label="formatRange(requestRecord.startTime, requestRecord.endTime)"
-              :value="`${estimatedUnits || 1} ${caregiver?.unitType || '次'}`"
-            />
-            <AppListItem
-              title="服务地点"
-              :label="requestRecord.locationText"
-              :value="getRequestStatusLabel(requestRecord.status)"
-            />
-          </AppList>
-        </AppSection>
-
-        <AppSection v-if="caregiver" title="照料者">
-          <view class="checkout-caregiver">
-            <view class="checkout-caregiver__tags">
-              <AppTag
-                v-for="pill in caregiverTrustPills"
-                :key="pill"
-                type="default"
-              >
-                {{ pill }}
-              </AppTag>
-            </view>
-            <view class="checkout-caregiver__copy">
-              <text class="checkout-caregiver__title">{{ caregiver.caregiverName }}</text>
-              <text class="checkout-caregiver__meta">
-                {{ caregiver.city || '城市待补充' }} · 评分 {{ formatAmount(caregiver.ratingAvg) }} · {{ caregiver.ratingCount }} 条评价
-              </text>
-              <text v-if="caregiver.intro" class="checkout-caregiver__intro">{{ caregiver.intro }}</text>
-            </view>
-            <AppTag type="success">¥{{ formatAmount(caregiver.pricePerUnit) }}/{{ caregiver.unitType }}</AppTag>
-
-            <view class="checkout-caregiver__metrics">
-              <view
-                v-for="metric in caregiverMetrics"
-                :key="metric.label"
-                class="checkout-caregiver__metric"
-              >
-                <text class="checkout-caregiver__metric-label">{{ metric.label }}</text>
-                <text class="checkout-caregiver__metric-value">{{ metric.value }}</text>
-              </view>
-            </view>
-
-            <view v-if="caregiver.serviceCommitment" class="checkout-caregiver__promise">
-              <text class="checkout-caregiver__promise-label">承诺</text>
-              <text class="checkout-caregiver__promise-text">{{ caregiver.serviceCommitment }}</text>
-            </view>
-          </view>
-        </AppSection>
-
-        <AppSection title="金额">
-          <view class="checkout-grid">
-            <view class="checkout-metric-card">
-              <text class="checkout-metric-card__label">订单金额</text>
-              <text class="checkout-metric-card__value">¥{{ formatAmount(totalAmount) }}</text>
-            </view>
-            <view class="checkout-metric-card">
-              <text class="checkout-metric-card__label">已支付</text>
-              <text class="checkout-metric-card__value">¥{{ formatAmount(order?.amountPaid || 0) }}</text>
-            </view>
-            <view class="checkout-metric-card checkout-metric-card--accent">
-              <text class="checkout-metric-card__label">{{ isOrderPaid ? '支付状态' : '当前应付' }}</text>
-              <text class="checkout-metric-card__value">
-                {{ isOrderPaid ? '已完成' : `¥${formatAmount(outstandingAmount)}` }}
-              </text>
-            </view>
-          </view>
-        </AppSection>
-
-        <AppSection v-if="!isOrderPaid" title="支付方式">
-          <AppChoiceChips v-model="payChannel" :options="payChannelOptions" />
-        </AppSection>
-
-        <AppSection v-if="order?.payments.length" :title="`支付记录 (${order.payments.length})`">
-          <AppList>
-            <AppListItem
-              v-for="payment in order.payments"
-              :key="payment.id"
-              :title="payment.payNo"
-              :label="payment.payStatus"
-              :value="`¥${formatAmount(payment.payAmount)}`"
-              value-emphasis
-            />
-          </AppList>
-        </AppSection>
-
-        <view class="checkout-action-bar">
-          <AppButton block size="large" :loading="creatingOrder || paying" @click="handlePrimaryAction">
-            {{ primaryButtonLabel }}
-          </AppButton>
-          <AppButton v-if="order" block size="large" type="info" @click="openOrderDetail">订单详情</AppButton>
-          <AppButton v-else block size="large" type="info" @click="backToRequest">返回需求页</AppButton>
-        </view>
-      </template>
-
-      <template v-else>
-        <AppSection title="结算不可用">
-          <AppStatus :text="error" />
-        </AppSection>
-        <view class="checkout-action-bar">
-          <AppButton block size="large" type="info" @click="backToRequest">返回需求页</AppButton>
-        </view>
-      </template>
+    <template v-else-if="!requestRecord && !order && !loading">
+      <PetpalSection title="没有可结算的内容">
+        <PetpalEmpty title="请先从需求详情页进入" description="结算页只接收已选好的需求和照料者。">
+          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="backToRequest">返回需求详情</button>
+        </PetpalEmpty>
+      </PetpalSection>
     </template>
 
     <template v-else>
-      <AppSection title="登录后继续">
-        <AppStatus text="登录后才能确认订单和支付。" />
-      </AppSection>
-      <view class="checkout-action-bar">
-        <AppButton block size="large" @click="goToLogin">去登录</AppButton>
+      <PetpalSection tone="accent" title="本次服务" :subtitle="requestRecord ? helpers.serviceTypeLabels[requestRecord.serviceType] : '订单继续支付'">
+        <view class="petpal-grid--two">
+          <view class="petpal-stat">
+            <text class="petpal-stat__label">时间</text>
+            <text class="petpal-stat__value">{{ requestRecord ? helpers.formatDateTime(requestRecord.startTime) : '--' }}</text>
+            <text class="petpal-stat__meta">{{ requestRecord ? helpers.formatDateTime(requestRecord.endTime) : '订单时间同步中' }}</text>
+          </view>
+          <view class="petpal-stat">
+            <text class="petpal-stat__label">金额</text>
+            <text class="petpal-stat__value">{{ helpers.formatMoney(order?.amountTotal || requestRecord?.budgetAmount) }}</text>
+            <text class="petpal-stat__meta">{{ order ? order.orderNo : '将创建新订单' }}</text>
+          </view>
+        </view>
+        <text class="petpal-note">{{ requestRecord?.locationText || '地点同步中' }}</text>
+      </PetpalSection>
+
+      <PetpalSection v-if="caregiver" title="你选择的照料者" subtitle="这里只保留即将成交的这一位。">
+        <view class="petpal-banner">
+          <text class="petpal-banner__title">{{ caregiver.caregiverName }}</text>
+          <text class="petpal-banner__meta">{{ describeCaregiverMatch(caregiver) }}</text>
+          <text class="petpal-note">{{ describeCaregiverCapability(caregiver) }}</text>
+        </view>
+      </PetpalSection>
+
+      <PetpalSection title="支付方式" subtitle="支付行为单独处理，避免和其他逻辑混在一起。">
+        <button
+          v-for="item in payChannelOptions"
+          :key="item.value"
+          class="petpal-row-btn"
+          hover-class="none"
+          @click="payChannel = item.value"
+        >
+          <view class="petpal-row__copy">
+            <text class="petpal-row__title">{{ item.label }}</text>
+            <text class="petpal-row__hint">{{ item.note }}</text>
+          </view>
+          <text class="petpal-row__value">{{ payChannel === item.value ? '已选' : '选择' }}</text>
+        </button>
+      </PetpalSection>
+
+      <view class="petpal-bottom-bar">
+        <view class="petpal-action-row">
+          <button class="petpal-btn petpal-btn--primary" hover-class="none" :disabled="submitting" @click="submitPayment">
+            {{ submitting ? '处理中...' : '确认支付' }}
+          </button>
+          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="backToRequest">返回需求</button>
+        </view>
       </view>
     </template>
-  </AppPageShell>
+  </PetpalPage>
 </template>
-
-<style scoped lang="scss">
-.checkout-stage,
-.checkout-caregiver,
-.checkout-metric-card,
-.checkout-caregiver__metric {
-  display: grid;
-  gap: 14rpx;
-}
-
-.checkout-stage {
-  padding: 28rpx;
-  border-radius: var(--app-shape-xl);
-  border: 1rpx solid var(--app-outline-variant);
-  background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.16), transparent 34%),
-    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
-  box-shadow: var(--app-elevation-1);
-}
-
-.checkout-stage__copy,
-.checkout-stage__tags,
-.checkout-caregiver__tags {
-  display: flex;
-  gap: 12rpx;
-  flex-wrap: wrap;
-}
-
-.checkout-stage__copy {
-  display: grid;
-}
-
-.checkout-stage__title {
-  color: var(--app-text);
-  font-size: 36rpx;
-  line-height: 1.2;
-  font-weight: 700;
-}
-
-.checkout-stage__meta,
-.checkout-caregiver__meta,
-.checkout-caregiver__intro,
-.checkout-caregiver__metric-label,
-.checkout-metric-card__label {
-  color: var(--app-text-secondary);
-  font-size: 22rpx;
-  line-height: 1.6;
-}
-
-.checkout-amount {
-  display: grid;
-  gap: 6rpx;
-  padding: 18rpx 20rpx;
-  border-radius: 22rpx;
-  background: linear-gradient(180deg, var(--app-primary-soft) 0%, var(--app-surface) 100%);
-}
-
-.checkout-amount__label {
-  color: var(--app-text-secondary);
-  font-size: 22rpx;
-}
-
-.checkout-amount__value,
-.checkout-metric-card__value {
-  color: var(--app-text);
-  font-size: 34rpx;
-  line-height: 1.1;
-  font-weight: 700;
-}
-
-.checkout-caregiver {
-  padding: 24rpx;
-  border-radius: var(--app-shape-xl);
-  border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
-  box-shadow: var(--app-elevation-1);
-}
-
-.checkout-caregiver__copy {
-  display: grid;
-  gap: 10rpx;
-}
-
-.checkout-caregiver__intro {
-  color: var(--app-text);
-}
-
-.checkout-caregiver__title {
-  color: var(--app-text);
-  font-size: 30rpx;
-  line-height: 1.3;
-  font-weight: 700;
-}
-
-.checkout-caregiver__metrics {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
-}
-
-.checkout-caregiver__metric {
-  padding: 18rpx 20rpx;
-  border-radius: 20rpx;
-  background: linear-gradient(180deg, var(--app-surface-container-high) 0%, var(--app-surface) 100%);
-}
-
-.checkout-caregiver__metric-value {
-  color: var(--app-text);
-  font-size: 28rpx;
-  line-height: 1.25;
-  font-weight: 700;
-}
-
-.checkout-caregiver__promise {
-  display: grid;
-  gap: 8rpx;
-  padding: 18rpx 20rpx;
-  border-radius: 20rpx;
-  background: var(--app-success-soft);
-}
-
-.checkout-caregiver__promise-label {
-  color: var(--app-text-muted);
-  font-size: 22rpx;
-  line-height: 1.4;
-}
-
-.checkout-caregiver__promise-text {
-  color: var(--app-text);
-  font-size: 24rpx;
-  line-height: 1.6;
-}
-
-.checkout-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16rpx;
-}
-
-.checkout-metric-card {
-  padding: 22rpx;
-  border-radius: var(--app-shape-xl);
-  border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
-  box-shadow: var(--app-elevation-1);
-}
-
-.checkout-metric-card--accent {
-  background: linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
-}
-
-.checkout-action-bar {
-  padding: 0 32rpx 12rpx;
-}
-
-.checkout-action-bar .app-button + .app-button {
-  margin-top: 16rpx;
-}
-
-@media (max-width: 680px) {
-  .checkout-caregiver__metrics,
-  .checkout-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

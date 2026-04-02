@@ -1,4 +1,4 @@
-import type { AuthSession, CurrentUser } from '@rbac/api-common'
+import type { AuthSession, CurrentUser, CurrentUserProfilePayload } from '@rbac/api-common'
 import { appApi } from './client'
 
 export interface ILoginForm {
@@ -27,6 +27,14 @@ export function refreshToken(refreshToken: string) {
 
 export function getUserInfo() {
   return appApi.auth.me()
+}
+
+export function updateCurrentUserProfile(payload: CurrentUserProfilePayload) {
+  return appApi.auth.updateProfile(payload)
+}
+
+export function updateCurrentUserAvatar(avatarFileId: string | null) {
+  return appApi.auth.updateAvatar(avatarFileId)
 }
 
 export function logout(refreshToken?: string) {

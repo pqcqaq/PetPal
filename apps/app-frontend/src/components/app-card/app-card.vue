@@ -34,11 +34,9 @@ withDefaults(defineProps<{
 <style scoped lang="scss">
 .app-card {
   margin: 0 24rpx;
-  border: 1rpx solid rgba(245, 220, 192, 0.88);
+  border: 1rpx solid var(--app-outline-variant);
   border-radius: var(--app-shape-xl);
-  background:
-    radial-gradient(circle at top right, rgba(249, 115, 22, 0.1), transparent 34%),
-    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(255, 240, 220, 0.98) 100%);
+  background: var(--app-surface);
   box-shadow: var(--app-card-shadow);
   overflow: hidden;
   transition:
@@ -47,26 +45,26 @@ withDefaults(defineProps<{
 }
 
 .app-card__header {
-  padding: 30rpx 30rpx 8rpx;
+  padding: 24rpx 24rpx 8rpx;
 }
 
 .app-card__title {
-  font-family: 'Varela Round', 'Nunito Sans', 'PingFang SC', sans-serif;
+  font-family: 'Playfair Display', 'Noto Serif SC', 'Source Han Serif SC', serif;
   font-size: 32rpx;
-  line-height: 1.24;
-  font-weight: 700;
+  line-height: 1.18;
+  font-weight: 600;
   color: var(--app-text);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.03em;
 }
 
 .app-card__description {
-  margin-top: 10rpx;
-  font-size: 24rpx;
-  line-height: 1.68;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.62;
   color: var(--app-text-secondary);
 }
 
 .app-card__body {
-  padding: 22rpx 30rpx 30rpx;
+  padding: 18rpx 24rpx 24rpx;
 }
 </style>

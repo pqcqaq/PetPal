@@ -80,7 +80,7 @@ function handleClick() {
 .app-list-item__body {
   display: flex;
   align-items: flex-start;
-  padding: 30rpx 32rpx;
+  padding: 24rpx;
 }
 
 .app-list-item__meta {
@@ -96,17 +96,17 @@ function handleClick() {
 .app-list-item__title {
   flex: 1;
   min-width: 0;
-  font-size: 28rpx;
-  line-height: 1.42;
+  font-size: 27rpx;
+  line-height: 1.4;
   font-weight: 600;
   color: var(--app-text);
 }
 
 .app-list-item__value {
   max-width: 48%;
-  margin-left: 24rpx;
-  font-size: 26rpx;
-  line-height: 1.5;
+  margin-left: 18rpx;
+  font-size: 24rpx;
+  line-height: 1.45;
   color: var(--app-text-secondary);
   text-align: right;
   flex-shrink: 0;
@@ -120,24 +120,23 @@ function handleClick() {
 .app-list-item__label {
   margin-top: 8rpx;
   font-size: 22rpx;
-  line-height: 1.68;
+  line-height: 1.62;
   color: var(--app-text-secondary);
   display: block;
 }
 
 .app-list-item__arrow {
-  width: 18rpx;
-  height: 18rpx;
+  width: 14rpx;
+  height: 14rpx;
   margin-top: 8rpx;
-  margin-left: 20rpx;
-  border-top: 3rpx solid var(--app-brand-strong);
-  border-right: 3rpx solid var(--app-brand-strong);
+  margin-left: 16rpx;
+  border-top: 2rpx solid var(--app-text-muted);
+  border-right: 2rpx solid var(--app-text-muted);
   transform: rotate(45deg);
   flex-shrink: 0;
 }
 
 .app-list-item--hover {
-  background: rgba(255, 242, 223, 0.86);
-  transform: translateY(-1rpx);
+  background: rgba(247, 241, 233, 0.92);
 }
 </style>

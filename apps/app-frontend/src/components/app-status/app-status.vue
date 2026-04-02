@@ -33,13 +33,13 @@ withDefaults(defineProps<{
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 34rpx 32rpx;
+  padding: 28rpx 24rpx;
 }
 
 .app-status__spinner {
-  width: 40rpx;
-  height: 40rpx;
-  border: 4rpx solid rgba(37, 99, 235, 0.16);
+  width: 34rpx;
+  height: 34rpx;
+  border: 3rpx solid rgba(36, 84, 211, 0.14);
   border-top-color: var(--app-accent);
   border-radius: 50%;
   box-sizing: border-box;
@@ -47,23 +47,20 @@ withDefaults(defineProps<{
 }
 
 .app-status__empty-mark {
-  width: 72rpx;
-  height: 72rpx;
-  border: 1rpx solid rgba(239, 199, 159, 0.88);
-  border-radius: 24rpx;
+  width: 56rpx;
+  height: 56rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  border-radius: 999rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(circle at top right, rgba(249, 115, 22, 0.16), transparent 30%),
-    rgba(255, 251, 246, 0.86);
-  box-shadow: 0 12rpx 24rpx rgba(159, 73, 14, 0.08);
+  background: var(--app-surface);
 }
 
 .app-status__empty-line {
-  width: 24rpx;
-  height: 4rpx;
+  width: 18rpx;
+  height: 3rpx;
   border-radius: 999rpx;
   background: var(--app-border-strong);
 }
@@ -73,13 +70,13 @@ withDefaults(defineProps<{
 }
 
 .app-status__empty-line--short {
-  width: 16rpx;
+  width: 12rpx;
 }
 
 .app-status__text {
-  margin-top: 18rpx;
-  font-size: 24rpx;
-  line-height: 1.7;
+  margin-top: 14rpx;
+  font-size: 22rpx;
+  line-height: 1.62;
   color: var(--app-text-secondary);
   text-align: center;
 }
