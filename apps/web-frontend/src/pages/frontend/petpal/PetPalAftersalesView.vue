@@ -255,6 +255,11 @@ import {
   validatePetPalExportTemplateName,
 } from './export-template-state';
 import {
+  createPetPalClearableFieldBinding,
+  createPetPalFieldBinding,
+  createPetPalTrimmedTextFieldBinding,
+} from './export-field-bindings';
+import {
   applyOwnerRefundExportFilterSnapshot,
   buildOwnerRefundExportQuery,
   cloneOwnerRefundExportFilterSnapshot,
@@ -310,7 +315,7 @@ const { state: exportPageState } = usePageState<OwnerRefundExportPageState>(
     templates: [],
   },
 );
-const exportTemplateState = computed<OwnerRefundExportTemplate[]>({
+const exportTemplateState = createPetPalFieldBinding<OwnerRefundExportTemplate[]>({
   get: () => exportPageState.templates,
   set: (value) => {
     exportPageState.templates = value;
@@ -359,7 +364,7 @@ const pageNotice = computed(() => buildPetPalPageNotice({
   warningTitle: '售后摘要还有部分内容待刷新',
 }));
 
-const exportDateRange = computed<[Date, Date] | null>({
+const exportDateRange = createPetPalFieldBinding<[Date, Date] | null>({
   get: () => parseOwnerRefundExportDateRange(exportPageState),
   set: (value) => {
     applyOwnerRefundExportFilterSnapshot(
@@ -368,46 +373,46 @@ const exportDateRange = computed<[Date, Date] | null>({
     );
   },
 });
-const exportServiceType = computed<OwnerRefundExportFilterSnapshot['serviceType']>({
+const exportServiceType = createPetPalClearableFieldBinding<OwnerRefundExportFilterSnapshot['serviceType']>({
   get: () => exportPageState.serviceType,
   set: (value) => {
-    exportPageState.serviceType = value || '';
+    exportPageState.serviceType = value;
   },
 });
-const exportOrderNoKeyword = computed<string>({
+const exportOrderNoKeyword = createPetPalTrimmedTextFieldBinding<string>({
   get: () => exportPageState.orderNoKeyword,
   set: (value) => {
-    exportPageState.orderNoKeyword = value.trimStart();
+    exportPageState.orderNoKeyword = value;
   },
 });
-const exportRefundType = computed<OwnerRefundExportFilterSnapshot['refundType']>({
+const exportRefundType = createPetPalClearableFieldBinding<OwnerRefundExportFilterSnapshot['refundType']>({
   get: () => exportPageState.refundType,
   set: (value) => {
-    exportPageState.refundType = value || '';
+    exportPageState.refundType = value;
   },
 });
-const exportRefundStatus = computed<OwnerRefundExportFilterSnapshot['refundStatus']>({
+const exportRefundStatus = createPetPalClearableFieldBinding<OwnerRefundExportFilterSnapshot['refundStatus']>({
   get: () => exportPageState.refundStatus,
   set: (value) => {
-    exportPageState.refundStatus = value || '';
+    exportPageState.refundStatus = value;
   },
 });
-const exportComplaintStatus = computed<OwnerRefundExportFilterSnapshot['complaintStatus']>({
+const exportComplaintStatus = createPetPalClearableFieldBinding<OwnerRefundExportFilterSnapshot['complaintStatus']>({
   get: () => exportPageState.complaintStatus,
   set: (value) => {
-    exportPageState.complaintStatus = value || '';
+    exportPageState.complaintStatus = value;
   },
 });
-const exportComplaintType = computed<OwnerRefundExportFilterSnapshot['complaintType']>({
+const exportComplaintType = createPetPalClearableFieldBinding<OwnerRefundExportFilterSnapshot['complaintType']>({
   get: () => exportPageState.complaintType,
   set: (value) => {
-    exportPageState.complaintType = value || '';
+    exportPageState.complaintType = value;
   },
 });
-const exportComplaintTargetRole = computed<OwnerRefundExportFilterSnapshot['complaintTargetRole']>({
+const exportComplaintTargetRole = createPetPalClearableFieldBinding<OwnerRefundExportFilterSnapshot['complaintTargetRole']>({
   get: () => exportPageState.complaintTargetRole,
   set: (value) => {
-    exportPageState.complaintTargetRole = value || '';
+    exportPageState.complaintTargetRole = value;
   },
 });
 const exportTemplates = computed(() => exportPageState.templates);

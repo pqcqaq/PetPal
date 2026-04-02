@@ -513,6 +513,11 @@ import {
   validatePetPalExportTemplateName,
 } from './export-template-state';
 import {
+  createPetPalClearableFieldBinding,
+  createPetPalFieldBinding,
+  createPetPalTrimmedTextFieldBinding,
+} from './export-field-bindings';
+import {
   formatPetPalMoney,
   formatPetPalRange,
   getPetPalCaregiverAuditLabel,
@@ -580,7 +585,7 @@ const { state: exportPageState } = usePageState<CaregiverEarningsExportPageState
     templates: [],
   },
 );
-const exportTemplateState = computed<CaregiverEarningsExportTemplate[]>({
+const exportTemplateState = createPetPalFieldBinding<CaregiverEarningsExportTemplate[]>({
   get: () => exportPageState.templates,
   set: (value) => {
     exportPageState.templates = value;
@@ -735,7 +740,7 @@ const totals = computed(() => summary.value?.totals ?? emptyTotals);
 const auditLabel = computed(() =>
   profile.value ? getPetPalCaregiverAuditLabel(profile.value.auditStatus) : '未建档',
 );
-const exportDateRange = computed<[Date, Date] | null>({
+const exportDateRange = createPetPalFieldBinding<[Date, Date] | null>({
   get: () => {
     const startDate = parseDate(exportPageState.startDate);
     const endDate = parseDate(exportPageState.endDate);
@@ -745,61 +750,61 @@ const exportDateRange = computed<[Date, Date] | null>({
     setExportDateRange(value);
   },
 });
-const exportServiceType = computed<PetServiceType | ''>({
+const exportServiceType = createPetPalClearableFieldBinding<PetServiceType | ''>({
   get: () => exportPageState.serviceType,
   set: (value) => {
-    exportPageState.serviceType = value || '';
+    exportPageState.serviceType = value;
   },
 });
-const exportOrderNoKeyword = computed<string>({
+const exportOrderNoKeyword = createPetPalTrimmedTextFieldBinding<string>({
   get: () => exportPageState.orderNoKeyword || '',
   set: (value) => {
-    exportPageState.orderNoKeyword = value.trimStart();
+    exportPageState.orderNoKeyword = value;
   },
 });
-const exportRefundType = computed<RefundType | ''>({
+const exportRefundType = createPetPalClearableFieldBinding<RefundType | ''>({
   get: () => exportPageState.refundType,
   set: (value) => {
-    exportPageState.refundType = value || '';
+    exportPageState.refundType = value;
   },
 });
-const exportRefundStatus = computed<RefundStatus | ''>({
+const exportRefundStatus = createPetPalClearableFieldBinding<RefundStatus | ''>({
   get: () => exportPageState.refundStatus,
   set: (value) => {
-    exportPageState.refundStatus = value || '';
+    exportPageState.refundStatus = value;
   },
 });
-const exportRefundReasonKeyword = computed<string>({
+const exportRefundReasonKeyword = createPetPalTrimmedTextFieldBinding<string>({
   get: () => exportPageState.refundReasonKeyword,
   set: (value) => {
-    exportPageState.refundReasonKeyword = value.trimStart();
+    exportPageState.refundReasonKeyword = value;
   },
 });
-const exportComplaintStatus = computed<ComplaintStatus | ''>({
+const exportComplaintStatus = createPetPalClearableFieldBinding<ComplaintStatus | ''>({
   get: () => exportPageState.complaintStatus,
   set: (value) => {
-    exportPageState.complaintStatus = value || '';
+    exportPageState.complaintStatus = value;
   },
 });
-const exportComplaintType = computed<ComplaintType | ''>({
+const exportComplaintType = createPetPalClearableFieldBinding<ComplaintType | ''>({
   get: () => exportPageState.complaintType,
   set: (value) => {
-    exportPageState.complaintType = value || '';
+    exportPageState.complaintType = value;
   },
 });
-const exportComplaintKeyword = computed<string>({
+const exportComplaintKeyword = createPetPalTrimmedTextFieldBinding<string>({
   get: () => exportPageState.complaintKeyword || '',
   set: (value) => {
-    exportPageState.complaintKeyword = value.trimStart();
+    exportPageState.complaintKeyword = value;
   },
 });
-const exportComplaintTargetRole = computed<ComplaintTargetRole | ''>({
+const exportComplaintTargetRole = createPetPalClearableFieldBinding<ComplaintTargetRole | ''>({
   get: () => exportPageState.complaintTargetRole,
   set: (value) => {
-    exportPageState.complaintTargetRole = value || '';
+    exportPageState.complaintTargetRole = value;
   },
 });
-const exportRiskOnly = computed<boolean>({
+const exportRiskOnly = createPetPalFieldBinding<boolean>({
   get: () => exportPageState.riskOnly,
   set: (value) => {
     exportPageState.riskOnly = value;

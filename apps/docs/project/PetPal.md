@@ -7732,6 +7732,53 @@ flowchart TD
 2. 继续评估主人交易导出、主人退款导出和照料者收益导出的清空筛选与快照应用逻辑能否继续收口。
 3. 在导出筛选桥接层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.180 2026-04-03（P3-M1 Slice 180）
+
+**概述**：延续上一轮导出工具条壳层共享化，本轮继续收口三页里重复成片的字段桥接 `computed`，把“普通字段透传 / clearable 选择框回落空串 / 文本输入统一 `trimStart()`”这层 page-state 绑定规则抽成共享 helper，减少后续继续做筛选快照共享时的噪音。
+
+已完成：
+
+- 提取导出字段绑定 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/export-field-bindings.ts`
+    - 新增 `createPetPalFieldBinding`，统一承接普通字段的 `get/set` 透传绑定。
+    - 新增 `createPetPalClearableFieldBinding`，统一承接 clearable 选择框清空后回落到空串的绑定规则。
+    - 新增 `createPetPalTrimmedTextFieldBinding`，统一承接文本输入仅裁掉前导空白的绑定规则。
+- 三个页面迁到共享字段绑定层：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerOrdersView.vue`
+    - 交易导出的模板数组、时间范围、服务类型、订单状态和订单号关键词绑定现已改走共享 helper。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalAftersalesView.vue`
+    - 退款导出的模板数组、时间范围、服务类型、订单号关键词、退款状态和投诉相关筛选绑定现已改走共享 helper。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 收益导出的模板数组、时间范围、服务类型、订单号、退款筛选、投诉筛选和 `riskOnly` 绑定现已改走共享 helper。
+- 新增定向单测：
+  - `apps/web-frontend/test/petpal-export-field-bindings.test.ts`
+    - 覆盖普通字段透传、clearable 字段清空回落和文本输入前导空白裁剪三类共享绑定规则。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-export-field-bindings.test.ts ..\\web-frontend\\test\\use-petpal-export-templates.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增后端导出参数、接口契约或筛选字段，只收口 Web 前端 page-state 字段绑定层。
+- 已确认 clearable 下拉仍会在清空时回落到空串，文本关键词输入仍只会裁掉前导空白，不会改变既有导出查询的最终序列化规则。
+- 已确认收益页、售后页、订单页仍各自保留自己的快照应用逻辑和导出请求构建，helper 只负责字段绑定规则，不负责业务决策。
+
+风险与缓解：
+
+- 风险：当前“工具条壳层 + 模板动作区 + 字段绑定规则”都已共享，但日期范围解析、快照 clone/apply 和清空动作仍按页面并行维护。
+- 缓解：下一轮继续优先评估是否把 start/end 日期解析和快照应用规则再往上抽成共享 helper，逐步收口导出筛选快照桥接层。
+
+下一步（1-3）：
+
+1. 继续评估主人交易导出、主人退款导出和照料者收益导出之间可共享的日期范围解析与快照应用 helper。
+2. 继续评估清空筛选与模板应用时的快照写回逻辑能否进一步统一，减少页面内重复动作函数。
+3. 在导出快照桥接层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
 ### 14.172 2026-04-03（P3-M1 Slice 172）
 
 **概述**：延续退款原因关键词专项导出，本轮继续把照料者经营明细推进到“能按投诉摘要检索复盘”的层面，新增投诉摘要关键词筛选，让照料者可以快速定位服务争议、平台流程异常、处理结论等特定投诉上下文的完成订单。

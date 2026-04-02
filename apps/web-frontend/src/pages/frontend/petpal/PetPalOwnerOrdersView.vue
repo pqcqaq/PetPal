@@ -143,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import type { OrderRecord, OrderStatus } from '@rbac/api-common';
+import type { OrderRecord } from '@rbac/api-common';
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -162,6 +162,11 @@ import {
   PETPAL_EXPORT_TEMPLATE_LIMIT,
   validatePetPalExportTemplateName,
 } from './export-template-state';
+import {
+  createPetPalClearableFieldBinding,
+  createPetPalFieldBinding,
+  createPetPalTrimmedTextFieldBinding,
+} from './export-field-bindings';
 import {
   applyOwnerTransactionExportFilterSnapshot,
   buildOwnerTransactionExportQuery,
@@ -212,7 +217,7 @@ const { state: exportPageState } = usePageState<OwnerTransactionExportPageState>
     templates: [],
   },
 );
-const exportTemplateState = computed<OwnerTransactionExportTemplate[]>({
+const exportTemplateState = createPetPalFieldBinding<OwnerTransactionExportTemplate[]>({
   get: () => exportPageState.templates,
   set: (value) => {
     exportPageState.templates = value;
@@ -285,7 +290,7 @@ const pageNotice = computed(() => buildPetPalPageNotice({
   warningTitle: '订单队列暂未刷新完整',
 }));
 
-const exportDateRange = computed<[Date, Date] | null>({
+const exportDateRange = createPetPalFieldBinding<[Date, Date] | null>({
   get: () => parseOwnerTransactionExportDateRange(exportPageState),
   set: (value) => {
     applyOwnerTransactionExportFilterSnapshot(
@@ -294,22 +299,22 @@ const exportDateRange = computed<[Date, Date] | null>({
     );
   },
 });
-const exportServiceType = computed<OwnerTransactionExportFilterSnapshot['serviceType']>({
+const exportServiceType = createPetPalClearableFieldBinding<OwnerTransactionExportFilterSnapshot['serviceType']>({
   get: () => exportPageState.serviceType,
   set: (value) => {
-    exportPageState.serviceType = value || '';
+    exportPageState.serviceType = value;
   },
 });
-const exportOrderStatus = computed<OrderStatus | ''>({
+const exportOrderStatus = createPetPalClearableFieldBinding<OwnerTransactionExportFilterSnapshot['orderStatus']>({
   get: () => exportPageState.orderStatus,
   set: (value) => {
-    exportPageState.orderStatus = value || '';
+    exportPageState.orderStatus = value;
   },
 });
-const exportOrderNoKeyword = computed<string>({
+const exportOrderNoKeyword = createPetPalTrimmedTextFieldBinding<string>({
   get: () => exportPageState.orderNoKeyword,
   set: (value) => {
-    exportPageState.orderNoKeyword = value.trimStart();
+    exportPageState.orderNoKeyword = value;
   },
 });
 const exportTemplates = computed(() => exportPageState.templates);
