@@ -41,6 +41,7 @@ Last updated: 2026-04-03
   - 消息中心往返链路和订单详情缺失对象时的回流动作现也已补齐统一 handoff，提醒中心、主人 / 照料者总览和订单详情 fallback 不再出现裸跳或错角色回流。
   - 售后中心与支付 / 退款 / 投诉 / 评价结果页的残余 fallback 返回动作现也已补齐统一 handoff，辅助页在目标订单缺失时不再静默回默认队列。
   - 主人 / 照料者资源页与队列页页头的返回总览动作现也已补齐统一 handoff，工作台往返不再出现“进来有 notice、返回又裸跳”的断层。
+  - 主人侧表单页页头返回和主人 / 照料者总览的残余 bare fallback 现也已补齐统一 handoff，宠物 / 需求表单回列表、售后中心 / 服务清单 fallback 不再静默跳转。
 - 订单详情页已具备支付/退款时间线、服务记录、评价、投诉、消息沟通等完整信息面板。
 - 2026-04-01 新增前端重构蓝图文档，开始把 Web 首屏从“解释产品结构”改为“状态 + 动作 + 列表入口”。
 - 主人工作台、照料者工作台、售后中心和订单详情页首屏已移除一批面向开发者/产品语义的讲解文案，开始收敛为真实可操作的工作台。
@@ -134,6 +135,7 @@ Last updated: 2026-04-03
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalMessagesView.vue`、`PetPalRemindersView.vue`、`PetPalOwnerView.vue`、`PetPalCaregiverView.vue`、`OrderDetailView.vue` 已继续补齐消息中心往返链路和详情页 fallback 回流的 handoff。
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalAftersalesView.vue`、`PetPalOrderResultWorkbench.vue` 已继续补齐售后中心和结果页残余 fallback 动作的 handoff。
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetsView.vue`、`PetPalOwnerRequestsView.vue`、`PetPalOwnerOrdersView.vue`、`PetPalCaregiverServicesView.vue`、`PetPalCaregiverOrdersView.vue`、`PetPalCaregiverProfileView.vue` 已继续补齐资源页 / 队列页页头返回工作台动作的 handoff。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetFormView.vue`、`PetPalOwnerRequestFormView.vue`、`PetPalOwnerView.vue`、`PetPalCaregiverView.vue` 已继续补齐主人侧表单返回动作和总览页残余 fallback 的 handoff。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

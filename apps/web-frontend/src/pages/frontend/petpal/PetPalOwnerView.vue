@@ -303,6 +303,16 @@ function buildMessagesRoute(notice: string, orderId?: string) {
   };
 }
 
+function buildAftersalesRoute(notice: string, orderId?: string) {
+  return {
+    name: 'frontend-petpal-aftersales',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(orderId ? { focusOrderId: orderId } : {}),
+    }),
+  };
+}
+
 const heroStats = computed(() => [
   { label: '宠物档案', value: String(pets.value.length), hint: pets.value.length ? '资料可复用' : '先建第一只' },
   { label: '活跃需求', value: String(activeRequests.value.length), hint: activeRequests.value.length ? '继续匹配' : '可直接新建' },
@@ -342,14 +352,8 @@ const heroActions = computed(() => [
   {
     label: '售后中心',
     to: aftersalesOrders.value[0]
-      ? {
-          name: 'frontend-petpal-aftersales',
-          query: buildPetPalDeskHandoffQuery({
-            notice: '这里已经定位到当前最急的一笔售后订单，可直接继续跟进。',
-            focusOrderId: aftersalesOrders.value[0].id,
-          }),
-        }
-      : { name: 'frontend-petpal-aftersales' },
+      ? buildAftersalesRoute('这里已经定位到当前最急的一笔售后订单，可直接继续跟进。', aftersalesOrders.value[0].id)
+      : buildAftersalesRoute('这里已经回到售后中心，可继续查看退款和投诉摘要。'),
     tone: 'secondary' as const,
   },
 ]);
@@ -397,13 +401,7 @@ const focusTask = computed(() => {
       title: '售后事项需要优先处理',
       description: `当前有 ${aftersalesOrders.value.length} 笔订单处在退款或投诉链路中，建议直接进入售后中心。`,
       actionLabel: '去售后中心',
-      to: {
-        name: 'frontend-petpal-aftersales',
-        query: buildPetPalDeskHandoffQuery({
-          notice: '这里已经定位到当前最急的一笔售后订单，可直接继续跟进。',
-          focusOrderId: aftersalesOrders.value[0].id,
-        }),
-      },
+      to: buildAftersalesRoute('这里已经定位到当前最急的一笔售后订单，可直接继续跟进。', aftersalesOrders.value[0].id),
     };
   }
   return {

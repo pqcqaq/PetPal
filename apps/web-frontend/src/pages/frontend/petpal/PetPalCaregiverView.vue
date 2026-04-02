@@ -288,6 +288,16 @@ function buildMessagesRoute(notice: string, orderId?: string) {
   };
 }
 
+function buildServicesRoute(notice: string, serviceId?: string) {
+  return {
+    name: 'frontend-petpal-caregiver-services',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(serviceId ? { focusServiceId: serviceId } : {}),
+    }),
+  };
+}
+
 const primaryAction = computed(() => {
   if (!profile.value) {
     return {
@@ -371,14 +381,8 @@ const focusTask = computed(() => {
     description: '资料和服务都已经就绪，现在更适合回服务页微调价格、城市和最短提前时长。',
     actionLabel: '去服务页',
     to: services.value[0]
-      ? {
-          name: 'frontend-petpal-caregiver-services',
-          query: buildPetPalDeskHandoffQuery({
-            notice: '这里已经定位到最近一个在售服务，可直接继续微调价格或上下架。',
-            focusServiceId: services.value[0].id,
-          }),
-        }
-      : { name: 'frontend-petpal-caregiver-services' },
+      ? buildServicesRoute('这里已经定位到最近一个在售服务，可直接继续微调价格或上下架。', services.value[0].id)
+      : buildServicesRoute('这里已经回到服务清单，可继续微调价格、城市和上下架状态。'),
   };
 });
 

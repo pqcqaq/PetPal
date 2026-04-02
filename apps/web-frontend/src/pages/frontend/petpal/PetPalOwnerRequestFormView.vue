@@ -5,7 +5,7 @@
     summary="创建需求只在表单页完成，匹配和下单会在需求队列里继续。"
     :nav-items="petPalOwnerWorkspaceNav"
     active-name="frontend-petpal-requests"
-    :actions="[{ label: '返回需求队列', to: { name: 'frontend-petpal-requests' }, tone: 'secondary' }]"
+    :actions="pageActions"
     :stats="heroStats"
   >
     <template v-if="pageNotice" #notice>
@@ -108,6 +108,17 @@ const heroStats = computed(() => [
   { label: '预算', value: form.budgetAmount ? `¥${form.budgetAmount}` : '待填写', hint: '预算会影响匹配结果' },
   { label: '状态', value: '待提交', hint: '提交后回需求队列继续' },
 ]);
+const pageActions = computed(() => [
+  {
+    label: '返回需求队列',
+    to: buildRequestListRoute(
+      preferredPet.value
+        ? `这里已经回到需求队列，可继续查看需求状态，也可重新为 ${preferredPet.value.name} 发起新需求。`
+        : '这里已经回到需求队列，可继续查看匹配结果或重新发起需求。',
+    ),
+    tone: 'secondary' as const,
+  },
+]);
 const pageNotice = computed(() => {
   const description = mergePetPalPageNotice([
     getPetPalQueryString(route.query, 'notice'),
@@ -127,6 +138,16 @@ function buildOwnerPetCreateRoute(notice: string) {
   return {
     name: 'frontend-petpal-pet-create',
     query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
+
+function buildRequestListRoute(notice: string, requestId?: string) {
+  return {
+    name: 'frontend-petpal-requests',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(requestId ? { focusRequestId: requestId } : {}),
+    }),
   };
 }
 
@@ -167,13 +188,7 @@ async function submit() {
       demandTags: normalizePetPalTagText(form.demandTagsText),
     });
     ElMessage.success('需求已发布');
-    await router.push({
-      name: 'frontend-petpal-requests',
-      query: buildPetPalDeskHandoffQuery({
-        notice: '新需求已发布，可直接查看这条需求的匹配结果并继续下单。',
-        focusRequestId: result.id,
-      }),
-    });
+    await router.push(buildRequestListRoute('新需求已发布，可直接查看这条需求的匹配结果并继续下单。', result.id));
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '发布需求失败'));
   } finally {

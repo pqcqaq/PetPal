@@ -7202,6 +7202,49 @@ flowchart TD
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.153 2026-04-03（P3-M1 Slice 153）
+
+**概述**：继续推进 Web 前台收口，本轮把主人侧表单页页头返回动作和主人 / 照料者总览里最后几处 bare fallback 补成统一 handoff，避免“列表页已有 notice，但进入表单或从总览 fallback 回去时又静默跳转”。
+
+已完成：
+
+- 收口主人侧表单页页头返回动作：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetFormView.vue`
+    - 页头“返回宠物清单”现已改成 helper 路由，编辑和新建两种场景都会带 notice 返回。
+    - 缺失宠物对象和保存成功后的回列表动作也已统一复用同一 helper。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerRequestFormView.vue`
+    - 页头“返回需求队列”现已带 notice 回到需求队列。
+    - 发布成功后的回需求队列动作也已统一复用同一 helper。
+- 收口总览页剩余 bare fallback：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+    - “售后中心”按钮在没有焦点售后订单时，现也会带 notice 回售后中心。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue`
+    - “继续维护在售服务”任务在没有焦点服务对象时，现也会带 notice 回服务清单。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮仅改动主人侧表单页页头返回和总览页少量 fallback 导航，没有新增接口、数据模型或业务状态改动。
+- 已确认宠物表单、需求表单回列表时，现在和前序资源页 / 队列页一样，会带明确 handoff notice。
+- 已确认主人售后中心 fallback 与照料者服务清单 fallback 现在不再出现无 notice 的静默返回。
+
+风险与缓解：
+
+- 风险：主链路 handoff 已基本收口，但页面 notice 标题、弱网 / 局部失败文案和最终验收向材料仍需继续统一。
+- 缓解：下一轮转向 notice 标题和局部失败提示整理，再补测试说明与交付文档。
+
+下一步（1-3）：
+
+1. 继续统一 notice 标题和弱网 / 局部失败提示文案，收掉最后一批页面反馈差异。
+2. 开始补更细的验收向测试说明、角色链路清单和最终交付文档。
+3. 在 Web / App 高频链路继续稳定后，再集中补最终答辩与论文支撑材料。
+
 ### 14.152 2026-04-03（P3-M1 Slice 152）
 
 **概述**：继续推进 Web 前台收口，本轮把主人 / 照料者资源页与队列页页头的“返回总览 / 去售后中心”补成统一 handoff，避免资源页之间已经有 notice、回工作台时却再次裸跳。

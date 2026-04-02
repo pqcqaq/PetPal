@@ -5,7 +5,7 @@
     summary="表单页只负责编辑宠物资料，不再混入需求和订单动作。"
     :nav-items="petPalOwnerWorkspaceNav"
     active-name="frontend-petpal-pets"
-    :actions="[{ label: '返回宠物清单', to: { name: 'frontend-petpal-pets' }, tone: 'secondary' }]"
+    :actions="pageActions"
     :stats="heroStats"
   >
     <template v-if="pageNotice" #notice>
@@ -122,6 +122,18 @@ const heroStats = computed(() => [
   { label: '绝育状态', value: form.neutered ? '已绝育' : '未绝育', hint: '如实填写即可' },
   { label: '紧急联系人', value: form.emergencyPhone || '待填写', hint: '建议保留真实电话' },
 ]);
+const pageActions = computed(() => [
+  {
+    label: '返回宠物清单',
+    to: buildPetListRoute(
+      isEditing.value
+        ? '这里已经回到宠物清单，可继续查看这只宠物资料或直接为它发需求。'
+        : '这里已经回到宠物清单，可继续查看已有宠物或开始第一条需求。',
+      editingPetId.value || undefined,
+    ),
+    tone: 'secondary' as const,
+  },
+]);
 const pageNotice = computed(() => {
   const description = mergePetPalPageNotice([
     getPetPalQueryString(route.query, 'notice'),
@@ -135,6 +147,16 @@ const pageNotice = computed(() => {
     tone: 'accent' as const,
   };
 });
+
+function buildPetListRoute(notice: string, petId?: string) {
+  return {
+    name: 'frontend-petpal-pets',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(petId ? { focusPetId: petId } : {}),
+    }),
+  };
+}
 
 function applyPet(pet: PetProfileRecord) {
   form.name = pet.name;
@@ -162,12 +184,7 @@ async function loadPage() {
     const target = pets.find((item) => item.id === editingPetId.value);
     if (!target) {
       ElMessage.warning('没有找到对应宠物档案');
-      void router.replace({
-        name: 'frontend-petpal-pets',
-        query: buildPetPalDeskHandoffQuery({
-          notice: '未找到对应宠物档案，已回到宠物清单，可改为检查其他宠物资料。',
-        }),
-      });
+      void router.replace(buildPetListRoute('未找到对应宠物档案，已回到宠物清单，可改为检查其他宠物资料。'));
       return;
     }
     applyPet(target);
@@ -208,23 +225,11 @@ async function submit() {
     if (editingPetId.value) {
       const result = await api.petpal.pets.update(editingPetId.value, payload);
       ElMessage.success('宠物档案已更新');
-      await router.push({
-        name: 'frontend-petpal-pets',
-        query: buildPetPalDeskHandoffQuery({
-          notice: '宠物档案已更新，可继续检查资料或直接为它发起新需求。',
-          focusPetId: result.id,
-        }),
-      });
+      await router.push(buildPetListRoute('宠物档案已更新，可继续检查资料或直接为它发起新需求。', result.id));
     } else {
       const result = await api.petpal.pets.create(payload);
       ElMessage.success('宠物档案已创建');
-      await router.push({
-        name: 'frontend-petpal-pets',
-        query: buildPetPalDeskHandoffQuery({
-          notice: '新宠物档案已创建，可直接继续编辑或为它发起需求。',
-          focusPetId: result.id,
-        }),
-      });
+      await router.push(buildPetListRoute('新宠物档案已创建，可直接继续编辑或为它发起需求。', result.id));
     }
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '保存宠物档案失败'));
