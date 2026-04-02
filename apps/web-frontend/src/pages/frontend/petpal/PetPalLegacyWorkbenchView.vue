@@ -9,7 +9,7 @@
     :stats="heroStats"
   >
     <template v-if="pageNotice" #notice>
-      <PetPalDeskNotice eyebrow="Legacy" :title="pageNotice.title" :description="pageNotice.description" tone="accent" />
+      <PetPalDeskNotice eyebrow="Legacy" :title="pageNotice.title" :description="pageNotice.description" :tone="pageNotice.tone" />
     </template>
 
     <PetPalDeskSection eyebrow="Redirect" title="请选择新的入口" description="旧的混合式超级页面已经被拆解，不再继续承载新增功能。">
@@ -34,7 +34,7 @@ import { RouterLink, useRoute } from 'vue-router';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
-import { buildPetPalDeskHandoffQuery, getPetPalQueryString, mergePetPalPageNotice } from './recovery';
+import { buildPetPalDeskHandoffQuery, buildPetPalPageNotice, getPetPalQueryString } from './recovery';
 import { petPalOwnerWorkspaceNav } from './shared';
 
 const route = useRoute();
@@ -75,12 +75,13 @@ const routes = [
   },
 ];
 
-const pageNotice = computed(() => ({
-  title: '已进入兼容入口',
-  description: mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  notes: [
     '旧工作台现在只保留分流，不再承载新增业务功能',
-  ]),
+  ],
+  successTitle: '已进入兼容入口',
+  warningTitle: '兼容入口还有部分内容待确认',
 }));
 
 const heroStats = computed(() => [

@@ -7202,6 +7202,40 @@ flowchart TD
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.157 2026-04-03（P3-M1 Slice 157）
+
+**概述**：继续推进 Web 前台收口，本轮把遗留的 legacy 兼容入口页也迁到共享 notice helper，结束这一阶段的 page notice 统一化改造。
+
+已完成：
+
+- 遗留兼容页接入共享 notice helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalLegacyWorkbenchView.vue`
+    - 旧入口页不再单独手写 `mergePetPalPageNotice()`，现在也通过 `buildPetPalPageNotice()` 生成标题、说明和 tone。
+    - Legacy notice 组件现直接消费统一 helper 返回的 tone，兼容页与主流程页的 notice 结构完全对齐。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮只处理 legacy 分流页 notice 计算，不涉及任何业务流程或兼容跳转逻辑变更。
+- 目前 PetPal Web 页面里除 helper 自身外，已无页面继续直接手写 `mergePetPalPageNotice()`。
+
+风险与缓解：
+
+- 风险：notice 收口完成后，后续工作重点要转向验收说明、链路自测和剩余非 notice 类缺口，避免只做页面壳层优化。
+- 缓解：下一轮停止继续扩散同类重构，改为做覆盖清点、测试说明与剩余功能收口。
+
+下一步（1-3）：
+
+1. 做一次 PetPal Web 主链路覆盖清点，确认剩余缺口不再是 page notice 类问题。
+2. 补验收向测试说明、链路清单与交付文档索引。
+3. 转向剩余非 notice 类开发 / 收口项。
+
 ### 14.156 2026-04-03（P3-M1 Slice 156）
 
 **概述**：继续推进 Web 前台收口，本轮把表单页、订单详情页和结果工作台的 page notice 也迁到共享 helper，准备结束这一轮 notice 统一化改造。
