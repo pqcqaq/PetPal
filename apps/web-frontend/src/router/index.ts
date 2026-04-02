@@ -65,6 +65,30 @@ const routes = [
         meta: { publicPage: true, title: '订单详情' },
       },
       {
+        path: 'petpal/orders/:id/payment-result',
+        name: 'frontend-petpal-payment-result',
+        component: () => import('@/pages/frontend/petpal/PetPalPaymentResultView.vue'),
+        meta: { publicPage: true, title: '支付结果' },
+      },
+      {
+        path: 'petpal/orders/:id/refund-result',
+        name: 'frontend-petpal-refund-result',
+        component: () => import('@/pages/frontend/petpal/PetPalRefundResultView.vue'),
+        meta: { publicPage: true, title: '退款结果' },
+      },
+      {
+        path: 'petpal/orders/:id/complaint-result',
+        name: 'frontend-petpal-complaint-result',
+        component: () => import('@/pages/frontend/petpal/PetPalComplaintResultView.vue'),
+        meta: { publicPage: true, title: '投诉结果' },
+      },
+      {
+        path: 'petpal/orders/:id/review-result',
+        name: 'frontend-petpal-review-result',
+        component: () => import('@/pages/frontend/petpal/PetPalReviewResultView.vue'),
+        meta: { publicPage: true, title: '评价结果' },
+      },
+      {
         path: 'architecture',
         name: 'frontend-architecture',
         component: () => import('@/pages/frontend/architecture/ArchitectureView.vue'),

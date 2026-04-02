@@ -390,9 +390,7 @@ Secondary actions: 刷新、返回列表
               <p v-if="order.review">
                 评价提交于 {{ formatDateTime(order.review.createdAt) }}
               </p>
-              <p v-else-if="canCreateReview">
-                评价将用于完善照料者服务画像与后续匹配结果。
-              </p>
+              <p v-else-if="canCreateReview">订单已完成，可直接提交评价。</p>
               <p v-else-if="order.orderStatus === 'COMPLETED'">
                 当前订单尚未收到宠物主人的评价。
               </p>
@@ -400,8 +398,8 @@ Secondary actions: 刷新、返回列表
                 订单完成后才能提交评价。
               </p>
             </div>
-            <el-button v-if="canCreateReview" type="primary" @click="openReviewDialog">
-              提交评价
+            <el-button v-if="order.review || canCreateReview" type="primary" @click="openReviewAction">
+              {{ order.review ? '查看评价结果' : '提交评价' }}
             </el-button>
           </div>
 
@@ -442,9 +440,18 @@ Secondary actions: 刷新、返回列表
               <h3>{{ refundProgress ? getRefundProgressStageLabel(refundProgress.stage) : '暂无退款进度' }}</h3>
               <p>{{ refundProgress ? getRefundProgressStageHint(refundProgress.stage) : '当前暂无退款进度可展示' }}</p>
             </div>
-            <el-tag v-if="refundProgress" :type="getRefundProgressStageType(refundProgress.stage)">
-              {{ getRefundProgressStageLabel(refundProgress.stage) }}
-            </el-tag>
+            <div class="petpal-refund-progress__actions">
+              <el-tag v-if="refundProgress" :type="getRefundProgressStageType(refundProgress.stage)">
+                {{ getRefundProgressStageLabel(refundProgress.stage) }}
+              </el-tag>
+              <el-button
+                v-if="refundProgress || order.refunds.length > 0"
+                plain
+                @click="openRefundResultPage"
+              >
+                查看退款结果
+              </el-button>
+            </div>
           </div>
 
           <template v-if="refundProgress">
@@ -516,8 +523,13 @@ Secondary actions: 刷新、返回列表
                 当前没有可发起或进行中的投诉。
               </p>
             </div>
-            <el-button v-if="canCreateComplaint" type="danger" plain @click="openComplaintDialog">
-              发起投诉
+            <el-button
+              v-if="complaints.length > 0 || canCreateComplaint"
+              type="danger"
+              plain
+              @click="openComplaintAction"
+            >
+              {{ complaints.length > 0 ? '查看投诉结果' : '发起投诉' }}
             </el-button>
           </div>
 
@@ -631,7 +643,16 @@ Secondary actions: 刷新、返回列表
         <!-- 支付时间线 -->
         <article v-show="activeDetailTab === 'overview'" class="frontend-card petpal-order-detail__payments">
           <span class="frontend-card__eyebrow">支付记录</span>
-          <h3>{{ order.payments.length > 0 ? `共 ${order.payments.length} 条支付记录` : '暂无支付记录' }}</h3>
+          <div class="petpal-section-heading">
+            <h3>{{ order.payments.length > 0 ? `共 ${order.payments.length} 条支付记录` : '暂无支付记录' }}</h3>
+            <el-button
+              v-if="order.payments.length > 0 || outstandingAmount > 0"
+              plain
+              @click="openPaymentResultPage"
+            >
+              查看支付结果
+            </el-button>
+          </div>
           <template v-if="order.payments.length > 0">
             <div class="petpal-timeline">
               <div v-for="(payment, index) in order.payments" :key="payment.id" class="petpal-timeline__item">
@@ -928,6 +949,7 @@ const messageForm = reactive({
 
 type AftersalesTimelineDotClass = 'pending' | 'success' | 'warning' | 'error';
 type DetailTab = 'overview' | 'chat' | 'service' | 'aftersales';
+type DetailAction = 'review' | 'complaint' | null;
 
 interface AftersalesTimelineItem {
   id: string;
@@ -1009,6 +1031,13 @@ const normalizeDetailTab = (value: unknown): DetailTab => {
     return value;
   }
   return 'overview';
+};
+
+const normalizeDetailAction = (value: unknown): DetailAction => {
+  if (value === 'review' || value === 'complaint') {
+    return value;
+  }
+  return null;
 };
 
 watch(
@@ -1907,15 +1936,66 @@ const openTab = (tab: DetailTab) => {
   activeDetailTab.value = tab;
 };
 
+const openPaymentResultPage = () => {
+  if (!order.value) {
+    return;
+  }
+  void router.push({ name: 'frontend-petpal-payment-result', params: { id: order.value.id } });
+};
+
+const openRefundResultPage = () => {
+  if (!order.value) {
+    return;
+  }
+  void router.push({ name: 'frontend-petpal-refund-result', params: { id: order.value.id } });
+};
+
+const openComplaintResultPage = () => {
+  if (!order.value) {
+    return;
+  }
+  void router.push({ name: 'frontend-petpal-complaint-result', params: { id: order.value.id } });
+};
+
+const openReviewResultPage = () => {
+  if (!order.value) {
+    return;
+  }
+  void router.push({ name: 'frontend-petpal-review-result', params: { id: order.value.id } });
+};
+
 const openReviewAction = () => {
   activeDetailTab.value = 'overview';
+  if (order.value?.review) {
+    openReviewResultPage();
+    return;
+  }
   if (canCreateReview.value) {
     openReviewDialog();
   }
 };
 
+const openComplaintAction = () => {
+  activeDetailTab.value = 'aftersales';
+  if (complaints.value.length > 0) {
+    openComplaintResultPage();
+    return;
+  }
+  if (canCreateComplaint.value) {
+    openComplaintDialog();
+  }
+};
+
 const openAftersalesAction = () => {
   activeDetailTab.value = 'aftersales';
+  if (complaints.value.length > 0) {
+    openComplaintResultPage();
+    return;
+  }
+  if ((refundProgress.value?.stage && refundProgress.value.stage !== 'NONE') || order.value?.refunds.length) {
+    openRefundResultPage();
+    return;
+  }
   if (!hasAftersalesActivity.value && canCreateComplaint.value) {
     openComplaintDialog();
   }
@@ -1958,16 +2038,20 @@ const openPrimaryAction = async () => {
     goBack();
     return;
   }
+  if (outstandingAmount.value > 0) {
+    openPaymentResultPage();
+    return;
+  }
   if (canConfirmComplete.value) {
     await confirmOrderComplete();
     return;
   }
   if (canCreateReview.value) {
-    openReviewDialog();
+    openReviewAction();
     return;
   }
   if (activeComplaint.value || hasAftersalesActivity.value) {
-    openTab('aftersales');
+    openAftersalesAction();
     return;
   }
   if (currentConversationUnreadCount.value > 0) {
@@ -2003,8 +2087,7 @@ const submitReview = async () => {
     order.value = detail;
     orderNo.value = detail.orderNo;
     reviewDialogVisible.value = false;
-    activeDetailTab.value = 'overview';
-    ElMessage.success('评价已提交');
+    await router.replace({ name: 'frontend-petpal-review-result', params: { id: detail.id } });
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '提交评价失败'));
   } finally {
@@ -2036,8 +2119,7 @@ const submitComplaint = async () => {
     await api.petpal.orders.createComplaint(order.value.id, payload);
     complaintDialogVisible.value = false;
     await reload();
-    activeDetailTab.value = 'aftersales';
-    ElMessage.success('投诉已提交');
+    await router.replace({ name: 'frontend-petpal-complaint-result', params: { id: order.value.id } });
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '提交投诉失败'));
   } finally {
@@ -2046,6 +2128,30 @@ const submitComplaint = async () => {
 };
 
 const buildOrderRefundExportRequest = () => api.petpal.orders.exportRefunds(orderId);
+
+const clearRouteAction = async () => {
+  if (!('action' in route.query)) {
+    return;
+  }
+  const query = { ...route.query };
+  delete query.action;
+  await router.replace({ query });
+};
+
+const tryOpenRouteAction = async () => {
+  const action = normalizeDetailAction(route.query.action);
+  if (!action) {
+    return;
+  }
+
+  if (action === 'review' && canCreateReview.value) {
+    openReviewDialog();
+  } else if (action === 'complaint' && canCreateComplaint.value) {
+    openComplaintDialog();
+  }
+
+  await clearRouteAction();
+};
 
 const reload = async () => {
   loading.value = true;
@@ -2090,6 +2196,7 @@ const reload = async () => {
       refundProgress.value = null;
     }
 
+    await tryOpenRouteAction();
     await markConversationAsRead();
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '加载订单详情失败'));
@@ -2610,6 +2717,13 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+.petpal-refund-progress__actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .petpal-refund-progress__headline h3 {
   margin: 0;
   color: #333;
@@ -2809,7 +2923,8 @@ onMounted(() => {
   .petpal-message-composer__actions,
   .petpal-timeline__header,
   .petpal-timeline__meta,
-  .petpal-refund-progress__latest-header {
+  .petpal-refund-progress__latest-header,
+  .petpal-refund-progress__actions {
     flex-direction: column;
     align-items: stretch;
   }

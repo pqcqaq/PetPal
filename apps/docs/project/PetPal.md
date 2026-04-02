@@ -6966,6 +6966,54 @@ flowchart TD
 2. 继续补系统级主动提醒、跨页面主动引导和更细的结果回流。
 3. 在结果页链路基本稳定后，再集中补更多弱网态和最终验收收口。
 
+### 14.125 2026-04-02（P3-M1 Slice 116）
+
+**概述**：继续推进 Web 前台交易后段反馈收口，本轮补齐支付、退款、投诉、评价四类独立结果工作台，并把订单详情里的相关入口和提交回流统一接到结果页。
+
+已完成：
+
+- 新增 Web 结果工作台：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOrderResultWorkbench.vue`
+    - 新增统一结果工作台组件，按 `payment / refund / complaint / review` 四种模式渲染首屏结果、阶段信号、订单状态和下一步动作。
+    - 结果页首屏统一改成“结果 + 当前阶段 + 下一步”，不再让用户回长订单页自己找支付、售后或评价状态。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalPaymentResultView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalRefundResultView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalComplaintResultView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalReviewResultView.vue`
+- Web 路由接通：
+  - `apps/web-frontend/src/router/index.ts`
+    - 新增 `/petpal/orders/:id/payment-result`
+    - 新增 `/petpal/orders/:id/refund-result`
+    - 新增 `/petpal/orders/:id/complaint-result`
+    - 新增 `/petpal/orders/:id/review-result`
+- 订单详情入口与回流接通：
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+    - 支付记录、退款进度、投诉与评价区域已新增“查看结果”动作，不再只有分栏内就地浏览。
+    - 订单详情现在支持通过 `query.action=review|complaint` 直开评价 / 投诉动作，便于结果页回流。
+    - 评价提交成功后已直接回流到评价结果页，投诉提交成功后已直接回流到投诉结果页。
+    - 订单首屏主动作在待支付状态下已直接进入支付结果页，售后状态下会优先进入投诉 / 退款结果页。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，Web 结果工作台全部基于现有 `OrderDetailRecord`、退款进度、投诉记录和订单消息摘要做前端重排。
+- 已确认订单详情里的评价 / 投诉提交成功后不再停留在弹窗成功提示，而是直接回到对应结果页承接下一步。
+- 已确认结果页继续沿用“状态优先、动作优先、少解释”的 UI 标准，没有重新引入开发说明式文案。
+
+风险与缓解：
+
+- 风险：Web 结果工作台已经补齐，但主人页、照料者页和其他辅助页内部仍有一些旧式长表单与说明式布局没有完全清完。
+- 缓解：下一轮优先继续清理剩余页面里的低效解释文案、弱网态和跨页面主动引导，保证前台体验标准统一。
+
+下一步（1-3）：
+
+1. 继续清理主人页、照料者页和辅助页里的残余说明式布局，把高频动作继续压回首屏。
+2. 继续补更细的弱网态、局部失败恢复态和跨页面主动引导，减少用户回跳找入口。
+3. 在 Web / App 主路径都稳定后，再集中补更多验收向测试、审计收口与最终交付材料。
+
 ### 14.125 2026-04-02（P3-M1 Slice 115）
 
 **概述**：继续推进 Web 前台主流程重构，本轮优先收口主人端订单详情，把长页改成分段任务页，并把消息 / 售后 / 提醒中心进入订单详情时的上下文落点统一到正确分栏。
