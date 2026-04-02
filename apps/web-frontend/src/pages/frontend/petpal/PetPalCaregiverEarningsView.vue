@@ -520,6 +520,13 @@ import {
   type PetPalSectionLoadState,
 } from './recovery';
 import {
+  findPetPalNamedExportTemplate,
+  PETPAL_EXPORT_TEMPLATE_LIMIT,
+  removePetPalNamedExportTemplate,
+  upsertPetPalNamedExportTemplate,
+  validatePetPalExportTemplateName,
+} from './export-template-state';
+import {
   formatPetPalMoney,
   formatPetPalRange,
   getPetPalCaregiverAuditLabel,
@@ -560,8 +567,6 @@ type CaregiverEarningsExportTemplate = CaregiverEarningsExportFilterSnapshot & {
 type CaregiverEarningsExportPageState = CaregiverEarningsExportFilterSnapshot & {
   templates: CaregiverEarningsExportTemplate[];
 };
-
-const MAX_EARNINGS_EXPORT_TEMPLATE_COUNT = 5;
 
 const exportPresetOptions: Array<{ label: string; value: Exclude<EarningsExportDatePreset, ''> }> = [
   { label: '近 7 天', value: 'last7days' },
@@ -804,7 +809,7 @@ const exportRiskOnly = computed<boolean>({
 });
 const exportTemplates = computed(() => exportPageState.templates);
 const selectedExportTemplate = computed(
-  () => exportTemplates.value.find((item) => item.name === selectedExportTemplateName.value) ?? null,
+  () => findPetPalNamedExportTemplate(exportTemplates.value, selectedExportTemplateName.value),
 );
 const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
 const latestActiveOrder = computed(() => summary.value?.latestActiveOrder ?? null);
@@ -999,16 +1004,7 @@ async function saveCurrentExportTemplate() {
         confirmButtonText: '保存',
         cancelButtonText: '取消',
         inputValue: selectedExportTemplateName.value,
-        inputValidator: (inputValue) => {
-          const name = inputValue.trim();
-          if (!name) {
-            return '模板名称不能为空';
-          }
-          if (name.length > 20) {
-            return '模板名称请控制在 20 个字符以内';
-          }
-          return true;
-        },
+        inputValidator: validatePetPalExportTemplateName,
       },
     );
 
@@ -1017,21 +1013,16 @@ async function saveCurrentExportTemplate() {
       name,
       ...buildCurrentExportFilterSnapshot(),
     };
-    const existingIndex = exportPageState.templates.findIndex((item) => item.name === name);
+    const result = upsertPetPalNamedExportTemplate(exportPageState.templates, nextTemplate);
 
-    if (existingIndex === -1 && exportPageState.templates.length >= MAX_EARNINGS_EXPORT_TEMPLATE_COUNT) {
-      ElMessage.warning(`最多只能保存 ${MAX_EARNINGS_EXPORT_TEMPLATE_COUNT} 个导出模板`);
+    if (result.status === 'limit_exceeded') {
+      ElMessage.warning(`最多只能保存 ${PETPAL_EXPORT_TEMPLATE_LIMIT} 个导出模板`);
       return;
     }
 
-    const nextTemplates = [...exportPageState.templates];
-    if (existingIndex >= 0) {
-      nextTemplates.splice(existingIndex, 1);
-    }
-    nextTemplates.unshift(nextTemplate);
-    exportPageState.templates = nextTemplates;
+    exportPageState.templates = result.templates;
     selectedExportTemplateName.value = name;
-    ElMessage.success(existingIndex >= 0 ? `模板「${name}」已更新` : `模板「${name}」已保存`);
+    ElMessage.success(result.status === 'updated' ? `模板「${name}」已更新` : `模板「${name}」已保存`);
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(getErrorMessage(error, '保存经营导出模板失败'));
@@ -1057,7 +1048,10 @@ async function deleteSelectedExportTemplate() {
       },
     );
 
-    exportPageState.templates = exportPageState.templates.filter((item) => item.name !== templateName);
+    exportPageState.templates = removePetPalNamedExportTemplate(
+      exportPageState.templates,
+      templateName,
+    );
     selectedExportTemplateName.value = '';
     ElMessage.success(`模板「${templateName}」已删除`);
   } catch (error) {

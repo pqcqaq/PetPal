@@ -7446,6 +7446,51 @@ flowchart TD
 2. 继续评估是否围绕更细的经营归因视角补额外导出维度，而不是继续堆叠孤立筛选项。
 3. 在收益与售后视角继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.174 2026-04-03（P3-M1 Slice 174）
+
+**概述**：延续上一轮对导出筛选的收口，本轮先不继续叠加新筛选项，而是开始提取 Web 端命名导出模板的共享基础设施，先把模板名称校验、模板 upsert 和删除逻辑从照料者收益页中抽离成纯函数 helper，为后续主人端退款导出和更多导出页复用做准备。
+
+已完成：
+
+- 提取 PetPal 命名导出模板 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/export-template-state.ts`
+    - 新增 `PETPAL_EXPORT_TEMPLATE_LIMIT` 和 `PETPAL_EXPORT_TEMPLATE_NAME_MAX_LENGTH` 常量。
+    - 新增模板名称校验、模板查找、模板 upsert、模板删除四个纯函数，收口“名称不能为空 / 长度限制 / 超限不新增 / 更新时前置”等规则。
+- 照料者收益页改走共享 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 选择模板时不再页内手写查找逻辑，改为复用共享 `find` helper。
+    - 保存模板时不再页内手写数组插入 / 覆盖 / 限额判断，改为复用共享 `upsert` helper。
+    - 删除模板时不再页内手写过滤逻辑，改为复用共享 `remove` helper。
+    - 模板名称输入校验改为复用共享 `validate` helper，避免后续多个导出页再复制同一套文案和限制。
+- 定向测试补齐：
+  - `apps/web-frontend/test/petpal-export-template-state.test.ts`
+    - 新增纯函数测试，覆盖模板名称校验、模板新增不变异原数组、更新前置、超限阻止新增、查找和删除行为。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-export-template-state.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有新增后端接口、数据库结构或导出契约，全部改动都发生在 Web 前端命名导出模板的共享基础设施层。
+- 已确认收益页现有“应用模板 / 保存模板 / 删除模板”用户行为保持不变，只是底层模板规则开始共享化。
+- 已确认新增 helper 采用纯函数设计，后续迁移主人端退款导出或更多导出页时不需要耦合 Vue 状态对象本身。
+
+风险与缓解：
+
+- 风险：虽然模板规则已经开始共享，但目前真正接入该 helper 的还只有照料者收益页，主人端导出链路还没有一起迁入，重复实现问题尚未完全消除。
+- 缓解：下一轮继续优先把主人端退款导出或后续导出页迁到同一套 helper，避免共享层只停留在单页内部重构。
+
+下一步（1-3）：
+
+1. 继续评估并优先把主人端退款导出模板逻辑迁到同一套共享 helper。
+2. 继续评估是否把导出筛选快照和模板状态进一步抽成更高层的 composable，而不只是共享数组操作规则。
+3. 在导出链路共享层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
 ### 14.172 2026-04-03（P3-M1 Slice 172）
 
 **概述**：延续退款原因关键词专项导出，本轮继续把照料者经营明细推进到“能按投诉摘要检索复盘”的层面，新增投诉摘要关键词筛选，让照料者可以快速定位服务争议、平台流程异常、处理结论等特定投诉上下文的完成订单。
