@@ -3,9 +3,9 @@
  * UX Blueprint
  * User: 已登录主人或照料者，需要快速回消息
  * Entry: 首页消息入口、提醒中心、订单详情回流
- * First screen: 先看到还有多少未读和应该先回哪一侧
+ * First screen: 先看到最该先回的一条会话，再按角色切到主人侧或照料者侧
  * Primary action: 打开具体订单聊天并立即回复
- * Secondary actions: 切角色、看通知、回主页
+ * Secondary actions: 切到另一侧会话、看订单、看通知
  * States: 未登录、无会话、只看未读、主人侧待回、照料者侧待回
  */
 import type { CaregiverOrderRecord, OrderRecord, OrderStatus } from '@rbac/api-common'
@@ -13,7 +13,6 @@ import { computed, ref } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
 import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { listCaregiverOrders, listOrders } from '@/api/petpal'
@@ -28,12 +27,8 @@ import {
   getConversationUnreadCount,
   getOrderStatusLabel,
   getOrderTone,
-  openPetPalAction,
-  PETPAL_CAREGIVER_HOME_PAGE,
-  PETPAL_HUB_PAGE,
   PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
-  PETPAL_OWNER_HOME_PAGE,
   serviceTypeLabels,
 } from './owner-shared'
 
@@ -43,7 +38,7 @@ defineOptions({
 
 definePage({
   style: {
-    navigationBarTitleText: '消息中心',
+    navigationBarTitleText: '消息',
     enablePullDownRefresh: true,
   },
 })
@@ -78,18 +73,10 @@ const caregiverOrders = ref<CaregiverOrderRecord[]>([])
 const roleFilter = ref<MessageRoleFilter>('ALL')
 const viewFilter = ref<MessageViewFilter>('UNREAD')
 
-const roleFilterOptions = [
-  { label: '全部', value: 'ALL', description: '查看全部角色会话' },
-  { label: '主人侧', value: 'OWNER', description: '聚焦主人视角' },
-  { label: '照料者侧', value: 'CAREGIVER', description: '聚焦照料者视角' },
-]
-
 const viewFilterOptions = [
   { label: '未读', value: 'UNREAD', description: '只看当前仍有未读消息的订单' },
   { label: '全部', value: 'ALL', description: '包括还没开始沟通的活跃订单' },
 ]
-
-const displayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || 'PetPal 用户')
 
 const messageItems = computed<MessageCenterItem[]>(() => {
   const ownerItems = ownerOrders.value
@@ -120,48 +107,54 @@ const ownerUnreadCount = computed(() => messageItems.value
   .filter(item => item.role === 'owner')
   .reduce((total, item) => total + item.unreadCount, 0))
 
+const ownerConversationCount = computed(() => messageItems.value.filter(item => item.role === 'owner').length)
+
 const caregiverUnreadCount = computed(() => messageItems.value
   .filter(item => item.role === 'caregiver')
   .reduce((total, item) => total + item.unreadCount, 0))
 
+const caregiverConversationCount = computed(() => messageItems.value.filter(item => item.role === 'caregiver').length)
+
 const totalUnreadCount = computed(() => ownerUnreadCount.value + caregiverUnreadCount.value)
 
+const priorityConversation = computed(() => filteredItems.value.find(item => item.unreadCount > 0) ?? filteredItems.value[0] ?? null)
+
 const focusTitle = computed(() => (
-  totalUnreadCount.value > 0
-    ? `${displayName.value}，先回消息`
+  priorityConversation.value
+    ? priorityConversation.value.unreadCount > 0
+      ? `先回复 ${priorityConversation.value.orderNo}`
+      : '继续最近会话'
     : '消息已处理完'
 ))
 
 const focusHint = computed(() => {
-  if (!messageItems.value.length) {
+  if (!priorityConversation.value) {
     return '当前没有需要进入的订单沟通。'
   }
-  if (totalUnreadCount.value > 0) {
-    return `当前还有 ${totalUnreadCount.value} 条未读，优先处理最上面的会话。`
-  }
-  return '可以切到全部会话回看最近沟通。'
+  return `${priorityConversation.value.contextLabel} · ${priorityConversation.value.hint}`
 })
 
-const signalCards = computed(() => [
+const roleSummaryCards = computed(() => [
   {
-    label: '会话',
-    value: String(messageItems.value.length),
-    hint: messageItems.value.length ? '跨订单汇总' : '暂无会话',
+    label: '全部',
+    value: 'ALL' as MessageRoleFilter,
+    metric: `${messageItems.value.length}`,
+    unread: totalUnreadCount.value,
+    hint: messageItems.value.length ? '跨角色会话' : '暂无会话',
   },
   {
-    label: '主人未读',
-    value: String(ownerUnreadCount.value),
-    hint: ownerUnreadCount.value ? '需要主人回复' : '主人侧已读',
+    label: '主人侧',
+    value: 'OWNER' as MessageRoleFilter,
+    metric: `${ownerConversationCount.value}`,
+    unread: ownerUnreadCount.value,
+    hint: ownerConversationCount.value ? '主人订单沟通' : '暂无主人会话',
   },
   {
-    label: '照料者未读',
-    value: String(caregiverUnreadCount.value),
-    hint: caregiverUnreadCount.value ? '需要照料者回复' : '照料者侧已读',
-  },
-  {
-    label: '当前列表',
-    value: String(filteredItems.value.length),
-    hint: viewFilter.value === 'UNREAD' ? '只看未读' : '显示全部',
+    label: '照料者侧',
+    value: 'CAREGIVER' as MessageRoleFilter,
+    metric: `${caregiverConversationCount.value}`,
+    unread: caregiverUnreadCount.value,
+    hint: caregiverConversationCount.value ? '履约订单沟通' : '暂无照料者会话',
   },
 ])
 
@@ -220,7 +213,7 @@ function getRoleTagType(role: MessageRole) {
 }
 
 function getRoleLabel(role: MessageRole) {
-  return role === 'owner' ? '主人视角' : '照料者视角'
+  return role === 'owner' ? '主人' : '照料者'
 }
 
 function getOrderTagType(status: OrderStatus) {
@@ -241,16 +234,8 @@ function goToLogin() {
   uni.navigateTo({ url: LOGIN_PAGE })
 }
 
-function openRoleHub() {
-  uni.redirectTo({ url: PETPAL_HUB_PAGE })
-}
-
-function openOwnerHome() {
-  openPetPalAction('redirect', PETPAL_OWNER_HOME_PAGE)
-}
-
-function openCaregiverHome() {
-  uni.redirectTo({ url: PETPAL_CAREGIVER_HOME_PAGE })
+function setRoleFilter(value: MessageRoleFilter) {
+  roleFilter.value = value
 }
 
 function openNotifications() {
@@ -323,16 +308,16 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <AppPageShell title="消息中心">
+  <AppPageShell title="消息">
     <template v-if="tokenStore.hasLogin">
-      <AppSection title="待回消息">
+      <view class="message-page">
         <view class="message-focus">
           <view class="message-focus__copy">
             <view class="message-focus__tags">
               <AppTag :type="totalUnreadCount > 0 ? 'warning' : 'default'">
                 {{ totalUnreadCount > 0 ? `${totalUnreadCount} 条未读` : '已读' }}
               </AppTag>
-              <AppTag type="primary">{{ filteredItems.length }} 个入口</AppTag>
+              <AppTag type="primary">{{ filteredItems.length }} 个会话</AppTag>
             </view>
             <text class="message-focus__title">{{ focusTitle }}</text>
             <text class="message-focus__hint">{{ focusHint }}</text>
@@ -340,91 +325,129 @@ onPullDownRefresh(() => {
           <view class="message-focus__actions">
             <AppButton size="medium" :disabled="!messageItems.length" @click="openFirstConversation">先回第一条</AppButton>
             <AppButton size="medium" type="info" @click="openNotifications">通知</AppButton>
-            <AppButton size="medium" type="info" @click="openOwnerHome">主人首页</AppButton>
-            <AppButton size="medium" type="info" @click="openCaregiverHome">照料者首页</AppButton>
-            <AppButton size="medium" type="info" @click="openRoleHub">角色入口</AppButton>
           </view>
         </view>
 
-        <view class="message-signal-grid">
-          <view v-for="item in signalCards" :key="item.label" class="message-signal-card">
-            <text class="message-metric-card__label">{{ item.label }}</text>
-            <text class="message-metric-card__value">{{ item.value }}</text>
-            <text class="message-metric-card__hint">{{ item.hint }}</text>
+        <scroll-view class="message-role-scroll" :scroll-x="true" :show-scrollbar="false">
+          <view class="message-role-track">
+            <view
+              v-for="item in roleSummaryCards"
+              :key="item.label"
+              class="message-role-card"
+              :class="roleFilter === item.value ? 'message-role-card--active' : ''"
+              @click="setRoleFilter(item.value)"
+            >
+              <view class="message-role-card__head">
+                <text class="message-role-card__label">{{ item.label }}</text>
+                <AppTag :type="item.unread > 0 ? 'danger' : (roleFilter === item.value ? 'primary' : 'default')">
+                  {{ item.unread > 0 ? `${item.unread} 未读` : '已读' }}
+                </AppTag>
+              </view>
+              <text class="message-role-card__value">{{ item.metric }}</text>
+              <text class="message-role-card__hint">{{ item.hint }}</text>
+            </view>
           </view>
-        </view>
-      </AppSection>
+        </scroll-view>
 
-      <AppSection title="筛选">
         <view class="message-filter-panel">
-          <view class="message-filter-panel__group">
-            <text class="message-filter-panel__label">角色视角</text>
-            <AppChoiceChips v-model="roleFilter" :options="roleFilterOptions" />
-          </view>
           <view class="message-filter-panel__group">
             <text class="message-filter-panel__label">列表范围</text>
             <AppChoiceChips v-model="viewFilter" :options="viewFilterOptions" />
           </view>
         </view>
-      </AppSection>
 
-      <AppSection :title="filteredItems.length ? `会话列表 (${filteredItems.length})` : '会话列表'">
-        <view v-if="filteredItems.length" class="message-list">
-          <view v-for="item in filteredItems" :key="item.key" class="message-card">
-            <view class="message-card__header">
-              <view class="message-card__headline">
-                <view class="message-card__tags">
-                  <AppTag :type="getRoleTagType(item.role)">
-                    {{ getRoleLabel(item.role) }}
-                  </AppTag>
-                  <AppTag :type="getOrderTagType(item.orderStatus)">
-                    {{ getOrderStatusLabel(item.orderStatus) }}
-                  </AppTag>
-                </view>
-                <text class="message-card__title">{{ item.orderNo }}</text>
-                <text class="message-card__meta">{{ item.contextLabel }} · {{ formatRange(item.appointmentStart, item.appointmentEnd) }}</text>
-              </view>
-              <AppTag :type="item.unreadCount > 0 ? 'danger' : 'default'">
-                {{ item.unreadCount > 0 ? `未读 ${item.unreadCount}` : '已读' }}
+        <view v-if="priorityConversation" class="message-priority">
+          <view class="message-priority__copy">
+            <view class="message-card__tags">
+              <AppTag :type="getRoleTagType(priorityConversation.role)">
+                {{ getRoleLabel(priorityConversation.role) }}
+              </AppTag>
+              <AppTag :type="getOrderTagType(priorityConversation.orderStatus)">
+                {{ getOrderStatusLabel(priorityConversation.orderStatus) }}
+              </AppTag>
+              <AppTag :type="priorityConversation.unreadCount > 0 ? 'danger' : 'default'">
+                {{ priorityConversation.unreadCount > 0 ? `未读 ${priorityConversation.unreadCount}` : '已读' }}
               </AppTag>
             </view>
+            <text class="message-priority__title">{{ priorityConversation.orderNo }}</text>
+            <text class="message-priority__hint">{{ priorityConversation.preview }}</text>
+            <text class="message-priority__meta">{{ priorityConversation.secondaryLabel }}</text>
+          </view>
+          <view class="message-focus__actions">
+            <AppButton size="medium" @click="openOrderChat(priorityConversation.orderId)">回消息</AppButton>
+            <AppButton size="medium" type="info" @click="openOrderOverview(priorityConversation.orderId)">看订单</AppButton>
+          </view>
+        </view>
 
-            <view class="message-card__conversation">
-              <text class="message-card__preview">{{ item.preview }}</text>
-              <text class="message-card__hint">{{ item.hint }}</text>
-              <text class="message-card__meta">{{ item.secondaryLabel }}</text>
-            </view>
+        <view class="message-list-block">
+          <view class="message-list-block__head">
+            <text class="message-list-block__title">{{ filteredItems.length ? `会话 ${filteredItems.length}` : '会话列表' }}</text>
+            <AppTag type="default">{{ viewFilter === 'UNREAD' ? '未读优先' : '全部会话' }}</AppTag>
+          </view>
 
-            <view class="message-card__footer">
-              <text class="message-card__amount">实付 ¥{{ formatAmount(item.amountPaid) }}</text>
-              <view class="message-card__actions">
-                <AppButton size="medium" type="info" @click="openOrderOverview(item.orderId)">订单详情</AppButton>
-                <AppButton size="medium" @click="openOrderChat(item.orderId)">打开聊天</AppButton>
+          <view v-if="filteredItems.length" class="message-list">
+            <view v-for="item in filteredItems" :key="item.key" class="message-card">
+              <view class="message-card__header">
+                <view class="message-card__headline">
+                  <view class="message-card__tags">
+                    <AppTag :type="getRoleTagType(item.role)">
+                      {{ getRoleLabel(item.role) }}
+                    </AppTag>
+                    <AppTag :type="getOrderTagType(item.orderStatus)">
+                      {{ getOrderStatusLabel(item.orderStatus) }}
+                    </AppTag>
+                  </view>
+                  <text class="message-card__title">{{ item.orderNo }}</text>
+                  <text class="message-card__meta">{{ item.contextLabel }} · {{ formatRange(item.appointmentStart, item.appointmentEnd) }}</text>
+                </view>
+                <AppTag :type="item.unreadCount > 0 ? 'danger' : 'default'">
+                  {{ item.unreadCount > 0 ? `未读 ${item.unreadCount}` : '已读' }}
+                </AppTag>
+              </view>
+
+              <view class="message-card__conversation">
+                <text class="message-card__preview">{{ item.preview }}</text>
+                <text class="message-card__hint">{{ item.hint }}</text>
+                <text class="message-card__meta">{{ item.secondaryLabel }}</text>
+              </view>
+
+              <view class="message-card__footer">
+                <text class="message-card__amount">实付 ¥{{ formatAmount(item.amountPaid) }}</text>
+                <view class="message-card__actions">
+                  <AppButton size="medium" type="info" @click="openOrderOverview(item.orderId)">订单</AppButton>
+                  <AppButton size="medium" @click="openOrderChat(item.orderId)">{{ item.unreadCount > 0 ? '回消息' : '继续聊' }}</AppButton>
+                </view>
               </view>
             </view>
           </view>
+
+          <view v-else class="message-empty">
+            <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步消息中心' : '当前筛选下没有需要进入的订单沟通'" />
+          </view>
         </view>
-        <view v-else class="message-empty">
-          <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步消息中心' : '当前筛选下没有需要进入的订单沟通'" />
-        </view>
-      </AppSection>
+      </view>
     </template>
 
     <template v-else>
-      <AppSection title="登录后查看消息">
-        <view class="message-empty message-empty--login">
-          <AppStatus text="登录后即可查看跨订单消息。" />
-        </view>
+      <view class="message-login">
+        <AppStatus text="登录后即可查看跨订单消息。" />
         <AppButton block @click="goToLogin">去登录</AppButton>
-      </AppSection>
+      </view>
     </template>
   </AppPageShell>
 </template>
 
 <style scoped lang="scss">
+.message-page {
+  display: grid;
+  gap: 20rpx;
+  padding-bottom: 36rpx;
+}
+
 .message-focus {
   display: grid;
   gap: 18rpx;
+  margin: 0 24rpx;
   padding: 28rpx;
   border-radius: 30rpx;
   background:
@@ -438,6 +461,49 @@ onPullDownRefresh(() => {
   gap: 12rpx;
 }
 
+.message-role-scroll {
+  white-space: nowrap;
+}
+
+.message-role-track {
+  display: inline-flex;
+  gap: 16rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+}
+
+.message-role-card,
+.message-filter-panel,
+.message-priority,
+.message-card,
+.message-list-block,
+.message-login {
+  display: grid;
+  gap: 12rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
+  box-shadow: var(--app-elevation-1);
+}
+
+.message-role-card {
+  width: 260rpx;
+  padding: 22rpx;
+  border-radius: 26rpx;
+  box-sizing: border-box;
+}
+
+.message-role-card--active {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+}
+
+.message-role-card__head {
+  display: flex;
+  gap: 10rpx;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .message-focus__tags,
 .message-focus__actions,
 .message-card__actions {
@@ -446,59 +512,69 @@ onPullDownRefresh(() => {
   gap: 12rpx;
 }
 
+.message-role-card__label,
+.message-filter-panel__label {
+  color: var(--app-text-muted);
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.message-role-card__value {
+  color: var(--app-text);
+  font-size: 40rpx;
+  line-height: 1.08;
+  font-weight: 700;
+}
+
 .message-focus__title {
+  color: #eff6ff;
   font-size: 40rpx;
   line-height: 1.15;
   font-weight: 700;
 }
 
+.message-role-card__hint,
 .message-focus__hint {
   font-size: 24rpx;
   line-height: 1.7;
+}
+
+.message-role-card__hint {
+  color: var(--app-text-secondary);
+}
+
+.message-focus__hint {
   color: rgba(239, 246, 255, 0.9);
 }
 
-.message-signal-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
-  margin-top: 18rpx;
-}
-
-.message-signal-card,
 .message-filter-panel,
-.message-card {
-  display: grid;
-  gap: 12rpx;
+.message-priority,
+.message-list-block,
+.message-login {
+  margin: 0 24rpx;
   padding: 24rpx;
-  border-radius: 26rpx;
-  border: 1rpx solid var(--app-border);
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
-  box-shadow: 0 12rpx 30rpx rgba(15, 23, 42, 0.06);
+  border-radius: 28rpx;
 }
 
-.message-metric-card__label,
-.message-card__meta,
-.message-card__hint {
-  color: var(--app-text-secondary);
-  font-size: 22rpx;
-  line-height: 1.7;
+.message-list-block__head,
+.message-card__header,
+.message-card__footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  align-items: flex-start;
 }
 
-.message-metric-card__value {
+.message-list-block__title,
+.message-priority__title,
+.message-card__title {
   color: var(--app-text);
-  font-size: 40rpx;
-  line-height: 1.05;
+  font-size: 30rpx;
+  line-height: 1.3;
   font-weight: 700;
 }
 
-.message-metric-card__hint,
-.message-filter-panel__label {
-  color: var(--app-text-muted);
-  font-size: 22rpx;
-  line-height: 1.6;
-}
-
+.message-priority__copy,
 .message-filter-panel,
 .message-filter-panel__group,
 .message-list,
@@ -508,25 +584,25 @@ onPullDownRefresh(() => {
   gap: 16rpx;
 }
 
-.message-card__header,
-.message-card__footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 16rpx;
-  align-items: flex-start;
+.message-priority {
+  background:
+    radial-gradient(circle at top right, rgba(53, 89, 224, 0.12), transparent 36%),
+    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+}
+
+.message-priority__hint,
+.message-priority__meta,
+.message-card__meta,
+.message-card__hint {
+  color: var(--app-text-secondary);
+  font-size: 22rpx;
+  line-height: 1.7;
 }
 
 .message-card__tags {
   display: flex;
   flex-wrap: wrap;
   gap: 10rpx;
-}
-
-.message-card__title {
-  color: var(--app-text);
-  font-size: 30rpx;
-  line-height: 1.3;
-  font-weight: 700;
 }
 
 .message-card__conversation {
@@ -548,21 +624,10 @@ onPullDownRefresh(() => {
   font-weight: 700;
 }
 
-.message-empty {
-  padding: 8rpx 0;
-}
-
-.message-empty--login {
-  padding-bottom: 28rpx;
-}
-
 @media (max-width: 680px) {
-  .message-signal-grid {
-    grid-template-columns: 1fr;
-  }
-
   .message-card__header,
-  .message-card__footer {
+  .message-card__footer,
+  .message-list-block__head {
     flex-direction: column;
   }
 }

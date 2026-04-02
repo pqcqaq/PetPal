@@ -3,18 +3,14 @@
  * UX Blueprint
  * User: 已登录并需要快速进入主人或照料者工作状态的用户
  * Entry: 打开 App、切换身份、从其他页返回角色中枢
- * First screen: 只解决“我现在以哪个身份做什么”
+ * First screen: 先在两个身份卡片里确认“我此刻要以谁的身份做事”
  * Primary action: 进入当前身份首页
- * Secondary actions: 直接去消息、提醒、订单或服务
+ * Secondary actions: 直接去消息、提醒和当前身份的三个高频任务
  * States: 未登录、已登录无待办、已登录有未读提醒
  */
 import { computed, ref } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
-import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
-import AppList from '@/components/app-list/app-list.vue'
-import AppListItem from '@/components/app-list-item/app-list-item.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { LOGIN_PAGE } from '@/router/config'
@@ -39,7 +35,7 @@ defineOptions({
 
 definePage({
   style: {
-    navigationBarTitleText: 'PetPal',
+    navigationBarTitleText: '切换身份',
     enablePullDownRefresh: true,
   },
 })
@@ -60,12 +56,13 @@ const roleOptions = [
 const displayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || 'PetPal 用户')
 const unreadNotificationCount = computed(() => notificationStore.items.filter(item => !notificationStore.isRead(item)).length)
 
-const activeRoleTitle = computed(() => activeRole.value === 'OWNER' ? '主人模式' : '照料者模式')
+const activeRoleTitle = computed(() => activeRole.value === 'OWNER' ? '主人' : '照料者')
 const activeRoleSummary = computed(() => (
   activeRole.value === 'OWNER'
-    ? '查看订单、发布需求、处理售后。'
+    ? '发需求、跟订单、处理售后。'
     : '接单、履约、管理服务和收益。'
 ))
+const enterHomeLabel = computed(() => activeRole.value === 'OWNER' ? '进入主人首页' : '进入照料者首页')
 
 const roleActionItems = computed(() => (
   activeRole.value === 'OWNER'
@@ -140,15 +137,16 @@ onShow(() => {
 </script>
 
 <template>
-  <AppPageShell title="PetPal">
+  <AppPageShell title="切换身份">
     <template v-if="tokenStore.hasLogin">
-      <view class="hub-shell">
-        <view class="hub-top">
-          <view class="hub-top__headline">
-            <text class="hub-top__title">{{ displayName }}</text>
-            <text class="hub-top__meta">直接进入当前要处理的身份任务。</text>
+      <view class="hub-page">
+        <view class="hub-focus">
+          <view class="hub-focus__copy">
+            <text class="hub-focus__eyebrow">{{ displayName }}</text>
+            <text class="hub-focus__title">先选当前身份</text>
+            <text class="hub-focus__meta">先切到当前身份，再继续处理今天要做的事。</text>
           </view>
-          <view class="hub-top__tags">
+          <view class="hub-focus__tags">
             <AppTag :type="activeRole === 'OWNER' ? 'primary' : 'warning'">
               {{ activeRoleTitle }}
             </AppTag>
@@ -158,63 +156,73 @@ onShow(() => {
           </view>
         </view>
 
-        <AppSection title="切换身份">
-          <AppChoiceChips v-model="activeRole" :options="roleOptions" />
-        </AppSection>
-
-        <AppSection title="现在开始">
-          <view class="hub-primary">
-            <view class="hub-primary__copy">
-              <text class="hub-primary__title">{{ activeRoleTitle }}</text>
-              <text class="hub-primary__summary">{{ activeRoleSummary }}</text>
-            </view>
-            <view class="hub-primary__actions">
-              <AppButton size="medium" @click="openActiveRoleHome">进入首页</AppButton>
-              <AppButton size="medium" type="info" @click="openMessages">消息</AppButton>
-              <AppButton size="medium" type="danger" @click="openReminders">提醒</AppButton>
-            </view>
+        <view class="hub-role-grid">
+          <view
+            v-for="item in roleOptions"
+            :key="item.value"
+            class="hub-role-card"
+            :class="activeRole === item.value ? 'hub-role-card--active' : ''"
+            @click="activeRole = item.value as RoleMode"
+          >
+            <text class="hub-role-card__title">{{ item.label }}</text>
+            <text class="hub-role-card__meta">
+              {{ item.value === 'OWNER' ? '发需求、跟单、售后' : '接单、履约、管理服务' }}
+            </text>
+            <text class="hub-role-card__action">{{ item.value === 'OWNER' ? '作为主人继续' : '作为照料者继续' }}</text>
           </view>
-        </AppSection>
+        </view>
 
-        <AppSection title="直接操作">
-          <AppList>
-            <AppListItem
-              v-for="item in roleActionItems"
-              :key="item.title"
-              :title="item.title"
-              :label="item.label"
-              :value="item.value"
-              value-emphasis
-              clickable
-              is-link
-              @click="item.action"
-            />
-          </AppList>
-        </AppSection>
+        <view class="hub-launchpad">
+          <view class="hub-launchpad__copy">
+            <text class="hub-launchpad__title">{{ activeRoleTitle }}</text>
+            <text class="hub-launchpad__summary">{{ activeRoleSummary }}</text>
+          </view>
+          <view class="hub-launchpad__actions">
+            <AppButton size="medium" @click="openActiveRoleHome">{{ enterHomeLabel }}</AppButton>
+            <AppButton size="medium" type="info" @click="openMessages">消息</AppButton>
+            <AppButton size="medium" type="danger" @click="openReminders">提醒</AppButton>
+          </view>
+        </view>
+
+        <view class="hub-action-grid">
+          <view
+            v-for="item in roleActionItems"
+            :key="item.title"
+            class="hub-action-card"
+            @click="item.action"
+          >
+            <text class="hub-action-card__title">{{ item.title }}</text>
+            <text class="hub-action-card__value">{{ item.value }}</text>
+            <text class="hub-action-card__hint">{{ item.label }}</text>
+          </view>
+        </view>
       </view>
     </template>
 
     <template v-else>
-      <AppSection title="登录后开始">
-        <view class="hub-empty">
-          <AppStatus text="登录后直接进入主人或照料者任务。" />
-        </view>
+      <view class="hub-login">
+        <AppStatus text="登录后直接进入主人或照料者任务。" />
         <AppButton block @click="goToLogin">去登录</AppButton>
-      </AppSection>
+      </view>
     </template>
   </AppPageShell>
 </template>
 
 <style scoped lang="scss">
-.hub-shell {
+.hub-page {
   display: grid;
   gap: 18rpx;
+  padding-bottom: 36rpx;
 }
 
-.hub-top,
-.hub-primary {
+.hub-focus,
+.hub-launchpad,
+.hub-action-card,
+.hub-role-card,
+.hub-login {
   display: grid;
   gap: 14rpx;
+  margin: 0 24rpx;
   padding: 26rpx 28rpx;
   border-radius: var(--app-shape-xl);
   border: 1rpx solid var(--app-outline-variant);
@@ -224,35 +232,94 @@ onShow(() => {
   box-shadow: var(--app-elevation-1);
 }
 
-.hub-top__headline,
-.hub-primary__copy {
+.hub-focus {
+  background:
+    radial-gradient(circle at top right, rgba(53, 89, 224, 0.16), transparent 34%),
+    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+}
+
+.hub-focus__copy,
+.hub-launchpad__copy {
   display: grid;
   gap: 8rpx;
 }
 
-.hub-top__title,
-.hub-primary__title {
+.hub-role-grid,
+.hub-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  padding: 0 24rpx;
+}
+
+.hub-role-card--active {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+}
+
+.hub-focus__eyebrow {
+  color: var(--app-text-muted);
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.hub-focus__title,
+.hub-launchpad__title,
+.hub-role-card__title,
+.hub-action-card__title {
   color: var(--app-text);
   font-size: 36rpx;
   line-height: 1.2;
   font-weight: 700;
 }
 
-.hub-top__meta,
-.hub-primary__summary {
+.hub-launchpad__title,
+.hub-action-card__title,
+.hub-role-card__title {
+  font-size: 30rpx;
+  line-height: 1.28;
+}
+
+.hub-focus__meta,
+.hub-launchpad__summary,
+.hub-role-card__meta,
+.hub-action-card__hint {
   color: var(--app-text-secondary);
   font-size: 24rpx;
   line-height: 1.6;
 }
 
-.hub-top__tags,
-.hub-primary__actions {
+.hub-action-card__value {
+  color: var(--app-text);
+  font-size: 40rpx;
+  line-height: 1.05;
+  font-weight: 700;
+}
+
+.hub-role-card__action {
+  color: var(--app-accent);
+  font-size: 22rpx;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
+.hub-focus__tags,
+.hub-launchpad__actions {
   display: flex;
   gap: 12rpx;
   flex-wrap: wrap;
 }
 
-.hub-empty {
-  padding-bottom: 28rpx;
+.hub-launchpad {
+  background:
+    radial-gradient(circle at top right, rgba(11, 122, 117, 0.12), transparent 34%),
+    linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
+}
+
+@media (max-width: 680px) {
+  .hub-role-grid,
+  .hub-action-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -184,7 +184,7 @@
       "path": "pages/petpal/index",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "PetPal",
+        "navigationBarTitleText": "切换身份",
         "enablePullDownRefresh": true
       }
     },
@@ -192,7 +192,7 @@
       "path": "pages/petpal/messages",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "消息中心",
+        "navigationBarTitleText": "消息",
         "enablePullDownRefresh": true
       }
     },
