@@ -25,6 +25,7 @@ Last updated: 2026-04-03
 - Web 前台已开始按角色拆路由：
   - `/petpal` 为新的主人服务台，并已接入交易导出、退款导出、筛选模板和确认完成动作。
   - `/petpal/caregiver` 为新的照料者工作台，并已接入资质材料上传、服务记录和签退动作。
+  - `/petpal/caregiver/earnings` 为新的照料者收益页，并已接入累计收入、服务结构和售后风险聚合。
   - `/petpal/reminders` 为新的提醒中心，并已接入高优先待办、近 48 小时安排和主人/照料者双视角分发。
   - `/petpal/messages` 为新的跨订单消息中心，并已接入未读筛选、按角色聚合和订单快捷跳转。
   - `/petpal/aftersales` 为新的主人售后中心，并已接入退款进度、投诉状态、优先级排序和退款明细导出入口。
@@ -144,6 +145,8 @@ Last updated: 2026-04-03
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetsView.vue`、`PetPalOwnerOrdersView.vue`、`PetPalCaregiverProfileView.vue`、`PetPalCaregiverOrdersView.vue`、`PetPalCaregiverServicesView.vue` 已继续改走共享 page notice helper。
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetFormView.vue`、`PetPalOwnerRequestFormView.vue`、`PetPalCaregiverServiceFormView.vue`、`OrderDetailView.vue`、`PetPalOrderResultWorkbench.vue` 已继续改走共享 page notice helper。
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalLegacyWorkbenchView.vue` 已补齐最后一个 legacy 兼容入口页的共享 page notice 计算。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue` 已新增独立收益工作台，开始承接累计收入、近 30 天收入、平均客单价、服务收入结构和售后风险聚合。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue` 已把活跃履约订单和已完成订单拆开统计，当前只剩已完成订单时会直接进入收益页，而不再误导回履约队列。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。
@@ -198,7 +201,7 @@ Last updated: 2026-04-03
 - App 端订单详情已经基本完成“首屏决策 + 分栏任务区”重构，但订单列表、结果页与售后中心之间的跨页面主动回流仍可继续增强。
 - App 端订单列表已经开始从“筛选 + 卡片列表”转向“任务队列”，但与结果页、售后中心、消息中心之间的主动回流仍可继续增强。
 - Web 端结果页、队列页、资源页和主人 / 照料者总览之间已经建立焦点回流与分区级重试，但表单页保存后的更多细粒度回流、系统级主动提醒和少量辅助页的说明式布局仍待统一。
-- 健康记录独立子表、收益分析、规则发布、违规处罚、运营看板等能力仍未形成完整前后端闭环。
+- 健康记录独立子表、更完整的收益分析、规则发布、违规处罚、运营看板等能力仍未形成完整前后端闭环。
 - 最终答辩所需的统一验收脚本、截图素材、图表与论文配套文档仍需集中整理。
 
 ## 3. 关键演进脉络
@@ -229,7 +232,7 @@ Last updated: 2026-04-03
 - App 主人端订单详情首屏、支付结果页、退款结果页、投诉结果页、评价结果页、售后中心、评价页和投诉页已经开始统一到动作优先结构。
 - Web 端订单详情、结果页、队列页、资源页以及主人 / 照料者总览已经开始统一到“焦点对象 + 下一步动作 + 局部恢复”的结构，但系统级主动提醒、少量辅助页和更深的保存后回流仍需继续收口。
 - Web 前台已进入主人 / 照料者路由拆分阶段，后续要继续把剩余高级兼容动作按角色迁出。
-- 以“真实验收”为目标，收口收益分析、规则治理、运营看板与补充测试。
+- 以“真实验收”为目标，继续收口更完整的收益分析、规则治理、运营看板与补充测试。
 - 把最终交付材料从开发文档中拆出，单独整理验收脚本、演示路径、截图和答辩素材。
 
 ## 5. 开发日志归档索引

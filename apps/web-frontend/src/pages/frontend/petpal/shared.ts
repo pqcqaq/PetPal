@@ -29,6 +29,7 @@ export const petPalCaregiverWorkspaceNav = [
   { label: '入驻资料', name: 'frontend-petpal-caregiver-profile' },
   { label: '服务管理', name: 'frontend-petpal-caregiver-services' },
   { label: '履约订单', name: 'frontend-petpal-caregiver-orders' },
+  { label: '收益表现', name: 'frontend-petpal-caregiver-earnings' },
   { label: '提醒', name: 'frontend-petpal-reminders' },
   { label: '消息', name: 'frontend-petpal-messages' },
 ] as const;

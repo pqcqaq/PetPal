@@ -7202,6 +7202,52 @@ flowchart TD
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.158 2026-04-03（P3-M1 Slice 158）
+
+**概述**：停止继续扩散 notice 类收口后，本轮转向 PetPal Web 真实业务缺口，补上照料者收益页，并修正照料者工作台在“只剩已完成订单”场景下仍误导回履约队列的问题。
+
+已完成：
+
+- 新增 Web 照料者收益页：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 新增独立的照料者收益工作台，复用现有 `profile / services / orders` API 聚合累计收入、近 30 天收入、平均客单价、退款敞口和售后风险。
+    - 页面已补齐评分、审核状态、在售服务数和服务收入结构，不再要求照料者回履约队列自己推导经营结果。
+    - 最近完成订单区已支持按 `focusOrderId` 高亮回流，方便从总览页或其他入口直接落到复盘对象。
+- Web 路由与共享导航接通：
+  - `apps/web-frontend/src/router/index.ts`
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - 新增 `/petpal/caregiver/earnings`
+    - 照料者工作台导航现已补上“收益表现”入口。
+- 修正照料者工作台分流：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue`
+    - 工作台现在把活跃履约订单和已完成订单分开统计，履约卡片只保留 `PENDING_ACCEPT / ACCEPTED / SERVING` 三类订单。
+    - 当当前只剩已完成订单时，“当前下一步”和主动作会改为进入收益页，不再错误回到履约队列。
+    - 页头 summary、统计卡和快捷动作已补入收益页入口，照料者侧主线现已明确拆成“资料 / 服务 / 履约 / 收益”四条线。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增后端接口或数据模型，Web 收益页完全基于现有照料者资料、服务和订单接口做前端聚合。
+- 已确认照料者工作台不会再因为存在已完成订单而继续把用户误导回履约队列。
+- 已确认收益页和工作台都沿用现有 PetPal Web desk shell、notice helper 和局部分区重试模式，没有再引入新的页面壳层分叉。
+
+风险与缓解：
+
+- 风险：当前收益页仍是基于单页拉取订单后前端聚合，尚未形成日/周/月维度的后端统计接口与更完整运营看板。
+- 缓解：下一轮继续评估更深的收益分析、规则治理和运营看板缺口，避免把“基础收益页已落地”误判为整块能力已经收口。
+
+下一步（1-3）：
+
+1. 继续梳理照料者侧剩余数据分析与治理缺口，决定下一批是否补更完整的收益统计或运营看板。
+2. 继续补系统级主动提醒、保存后回流和更细的弱网恢复说明。
+3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
+
 ### 14.157 2026-04-03（P3-M1 Slice 157）
 
 **概述**：继续推进 Web 前台收口，本轮把遗留的 legacy 兼容入口页也迁到共享 notice helper，结束这一阶段的 page notice 统一化改造。

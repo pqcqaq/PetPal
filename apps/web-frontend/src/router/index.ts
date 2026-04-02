@@ -101,6 +101,12 @@ const routes = [
         meta: { publicPage: true, title: '照料者履约队列' },
       },
       {
+        path: 'petpal/caregiver/earnings',
+        name: 'frontend-petpal-caregiver-earnings',
+        component: () => import('@/pages/frontend/petpal/PetPalCaregiverEarningsView.vue'),
+        meta: { publicPage: true, title: '照料者收益表现' },
+      },
+      {
         path: 'petpal/reminders',
         name: 'frontend-petpal-reminders',
         component: () => import('@/pages/frontend/petpal/PetPalRemindersView.vue'),

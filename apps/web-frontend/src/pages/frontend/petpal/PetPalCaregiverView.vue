@@ -1,8 +1,8 @@
 <template>
   <PetPalDeskPage
     eyebrow="照料者工作台"
-    title="照料者入口只保留资料、服务和履约三条主线"
-    summary="审核资料、上架服务和处理履约订单都已经拆开，不再与主人流混在一起。"
+    title="照料者入口拆成资料、服务、履约和收益四条主线"
+    summary="审核资料、上架服务、处理履约订单和复盘收益都已经拆开，不再与主人流混在一起。"
     :nav-items="petPalCaregiverWorkspaceNav"
     active-name="frontend-petpal-caregiver"
     :primary-action="primaryAction"
@@ -46,7 +46,8 @@
             <div class="petpal-pill-row">
               <span class="petpal-pill" :class="profile ? 'is-success' : 'is-warning'">{{ profile ? auditLabel : '未建档' }}</span>
               <span class="petpal-pill">服务 {{ services.length }}</span>
-              <span class="petpal-pill">履约订单 {{ orders.length }}</span>
+              <span class="petpal-pill">履约订单 {{ activeOrders.length }}</span>
+              <span class="petpal-pill">已完成 {{ completedOrders.length }}</span>
             </div>
           </div>
           <div class="petpal-sheet-row__tail">
@@ -164,13 +165,13 @@
         />
 
         <PetPalDeskEmpty
-          v-else-if="!orders.length"
+          v-else-if="!activeOrders.length"
           title="当前没有履约订单"
-          description="当主人下单并被你接单后，新的履约订单会出现在这里。"
+          :description="completedOrders.length ? '当前只剩已完成订单，可直接去收益页复盘，不需要再回履约队列。' : '当主人下单并被你接单后，新的履约订单会出现在这里。'"
         />
 
         <div v-else class="petpal-sheet-list">
-          <div v-for="order in orders.slice(0, 3)" :key="order.id" class="petpal-sheet-row">
+          <div v-for="order in activeOrders.slice(0, 3)" :key="order.id" class="petpal-sheet-row">
             <div class="petpal-sheet-row__copy">
               <h3 class="petpal-sheet-row__title">{{ order.orderNo }}</h3>
               <p class="petpal-sheet-row__desc">{{ getPetPalOrderStatusLabel(order.orderStatus) }} · {{ order.ownerNickname }} · {{ order.petName || '宠物待同步' }}</p>
@@ -232,6 +233,9 @@ const profileState = ref<PetPalSectionLoadState>('idle');
 const servicesState = ref<PetPalSectionLoadState>('idle');
 const ordersState = ref<PetPalSectionLoadState>('idle');
 const sectionReloadingKey = ref<'' | 'profile' | 'services' | 'orders'>('');
+const activeOrders = computed(() => orders.value.filter((item) => ['PENDING_ACCEPT', 'ACCEPTED', 'SERVING'].includes(item.orderStatus)));
+const completedOrders = computed(() => orders.value.filter((item) => item.orderStatus === 'COMPLETED'));
+const latestCompletedOrder = computed(() => completedOrders.value[0] ?? null);
 const unreadOrder = computed(() => orders.value.find((item) => (item.conversation?.caregiverUnreadCount || 0) > 0) ?? null);
 const pageNotice = computed(() => buildPetPalPageNotice({
   baseNotice: getPetPalQueryString(route.query, 'notice'),
@@ -248,8 +252,16 @@ const auditLabel = computed(() => profile.value ? getPetPalCaregiverAuditLabel(p
 const heroStats = computed(() => [
   { label: '资料状态', value: auditLabel.value, hint: profile.value ? '资料页单独维护' : '先完成入驻建档' },
   { label: '服务数量', value: String(services.value.length), hint: services.value.length ? '服务页负责上下架' : '建议至少上架 1 个服务' },
-  { label: '履约订单', value: String(orders.value.length), hint: orders.value.length ? '去履约页处理' : '当前暂无履约订单' },
-  { label: '下一步', value: profile.value ? '看服务或履约' : '先建资料', hint: '按审核和接单状态变化' },
+  {
+    label: '履约订单',
+    value: String(activeOrders.value.length),
+    hint: activeOrders.value.length ? '去履约页处理' : latestCompletedOrder.value ? '当前只有已完成订单，可去看收益' : '当前暂无履约订单',
+  },
+  {
+    label: '下一步',
+    value: !profile.value ? '先建资料' : !services.value.length ? '先建服务' : activeOrders.value.length ? '先做履约' : latestCompletedOrder.value ? '看收益' : '看服务',
+    hint: completedOrders.value.length ? `已完成 ${completedOrders.value.length} 笔订单` : '按审核和接单状态变化',
+  },
 ]);
 
 function buildServiceCreateRoute(notice: string) {
@@ -262,6 +274,17 @@ function buildServiceCreateRoute(notice: string) {
 function buildOrdersRoute(notice: string, orderId?: string) {
   return {
     name: 'frontend-petpal-caregiver-orders',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(orderId ? { focusOrderId: orderId } : {}),
+      focusRole: 'caregiver',
+    }),
+  };
+}
+
+function buildEarningsRoute(notice: string, orderId?: string) {
+  return {
+    name: 'frontend-petpal-caregiver-earnings',
     query: buildPetPalDeskHandoffQuery({
       notice,
       ...(orderId ? { focusOrderId: orderId } : {}),
@@ -311,9 +334,25 @@ const primaryAction = computed(() => {
       tone: 'primary' as const,
     };
   }
+  if (activeOrders.value.length) {
+    return {
+      label: '进入履约队列',
+      to: buildOrdersRoute('这里已经定位到履约队列，可直接继续处理接单、签到或服务记录。', activeOrders.value[0].id),
+      tone: 'primary' as const,
+    };
+  }
+  if (latestCompletedOrder.value) {
+    return {
+      label: '查看收益表现',
+      to: buildEarningsRoute('这里已经定位到最近一笔已完成订单，可直接继续复盘收益和服务结构。', latestCompletedOrder.value.id),
+      tone: 'primary' as const,
+    };
+  }
   return {
-    label: '进入履约队列',
-    to: buildOrdersRoute('这里已经定位到履约队列，可直接继续处理接单、签到或服务记录。', orders.value[0]?.id),
+    label: '继续维护服务',
+    to: services.value[0]
+      ? buildServicesRoute('这里已经定位到最近一个在售服务，可直接继续微调价格或上下架。', services.value[0].id)
+      : buildServicesRoute('这里已经回到服务清单，可继续微调价格、城市和上下架状态。'),
     tone: 'primary' as const,
   };
 });
@@ -324,6 +363,13 @@ const heroActions = computed(() => [
     to: unreadOrder.value
       ? buildMessagesRoute('这里已经定位到最近一笔需要回复的履约会话，可直接继续沟通。', unreadOrder.value.id)
       : buildMessagesRoute('这里已经回到照料者消息中心，可继续查看跨订单沟通。'),
+    tone: 'secondary' as const,
+  },
+  {
+    label: '收益表现',
+    to: latestCompletedOrder.value
+      ? buildEarningsRoute('这里已经定位到最近一笔已完成订单，可直接继续复盘收益和服务结构。', latestCompletedOrder.value.id)
+      : buildEarningsRoute('这里已经进入收益页，可继续查看累计收入、评分和服务结构。'),
     tone: 'secondary' as const,
   },
   {
@@ -361,12 +407,20 @@ const focusTask = computed(() => {
       to: buildServiceCreateRoute('这里已经定位到新建服务页，可直接继续填写价格、城市和上架状态。'),
     };
   }
-  if (orders.value.length) {
+  if (activeOrders.value.length) {
     return {
       title: '优先处理当前履约订单',
-      description: `当前有 ${orders.value.length} 笔履约订单待跟进，接单、签到和服务记录都在履约页完成。`,
+      description: `当前有 ${activeOrders.value.length} 笔履约订单待跟进，接单、签到和服务记录都在履约页完成。`,
       actionLabel: '去履约页',
-      to: buildOrdersRoute('这里已经定位到最近一笔待处理履约订单，可直接继续接单或签到。', orders.value[0].id),
+      to: buildOrdersRoute('这里已经定位到最近一笔待处理履约订单，可直接继续接单或签到。', activeOrders.value[0].id),
+    };
+  }
+  if (latestCompletedOrder.value) {
+    return {
+      title: '当前更适合看收益复盘',
+      description: `当前只剩 ${completedOrders.value.length} 笔已完成订单，下一步更适合回收益页看收入、客单价和服务结构。`,
+      actionLabel: '去收益页',
+      to: buildEarningsRoute('这里已经定位到最近一笔已完成订单，可直接继续复盘收益和服务结构。', latestCompletedOrder.value.id),
     };
   }
   return {
