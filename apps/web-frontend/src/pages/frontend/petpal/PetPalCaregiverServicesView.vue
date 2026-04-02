@@ -36,7 +36,17 @@
         description="没有入驻资料时，服务清单无法稳定上架。"
       >
         <template #actions>
-          <RouterLink class="frontend-page__button is-primary" :to="{ name: 'frontend-petpal-caregiver-profile' }">去资料页</RouterLink>
+          <RouterLink
+            class="frontend-page__button is-primary"
+            :to="{
+              name: 'frontend-petpal-caregiver-profile',
+              query: buildPetPalDeskHandoffQuery({
+                notice: '这里已经定位到入驻资料页，可先补齐资料后再回来维护服务。',
+              }),
+            }"
+          >
+            去资料页
+          </RouterLink>
         </template>
       </PetPalDeskEmpty>
 
@@ -82,6 +92,7 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalDeskHandoffQuery,
   getPetPalQueryString,
   mergePetPalPageNotice,
   runPetPalSectionRetry,

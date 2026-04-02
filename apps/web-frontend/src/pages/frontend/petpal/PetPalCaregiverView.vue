@@ -70,7 +70,17 @@
           description="先完成入驻资料，审核通过后再持续维护服务清单。"
         >
           <template #actions>
-            <RouterLink class="frontend-page__button is-primary" :to="{ name: 'frontend-petpal-caregiver-profile' }">去建档</RouterLink>
+            <RouterLink
+              class="frontend-page__button is-primary"
+              :to="{
+                name: 'frontend-petpal-caregiver-profile',
+                query: buildPetPalDeskHandoffQuery({
+                  notice: '这里已经定位到入驻资料页，可先补齐城市、经验和资质材料。',
+                }),
+              }"
+            >
+              去建档
+            </RouterLink>
           </template>
         </PetPalDeskEmpty>
 
@@ -84,7 +94,16 @@
               </div>
             </div>
             <div class="petpal-sheet-row__tail">
-              <RouterLink :to="{ name: 'frontend-petpal-caregiver-profile' }">维护资料</RouterLink>
+              <RouterLink
+                :to="{
+                  name: 'frontend-petpal-caregiver-profile',
+                  query: buildPetPalDeskHandoffQuery({
+                    notice: '这里已经定位到入驻资料页，可继续补材料或查看审核状态。',
+                  }),
+                }"
+              >
+                维护资料
+              </RouterLink>
             </div>
           </div>
         </div>
@@ -237,7 +256,16 @@ const heroStats = computed(() => [
 
 const primaryAction = computed(() => {
   if (!profile.value) {
-    return { label: '先完成入驻资料', to: { name: 'frontend-petpal-caregiver-profile' }, tone: 'primary' as const };
+    return {
+      label: '先完成入驻资料',
+      to: {
+        name: 'frontend-petpal-caregiver-profile',
+        query: buildPetPalDeskHandoffQuery({
+          notice: '这里已经定位到入驻资料页，可先补齐城市、经验和资质材料。',
+        }),
+      },
+      tone: 'primary' as const,
+    };
   }
   if (!services.value.length) {
     return { label: '新建第一个服务', to: { name: 'frontend-petpal-caregiver-service-create' }, tone: 'primary' as const };
@@ -260,7 +288,17 @@ const heroActions = computed(() => [
       : { name: 'frontend-petpal-messages' },
     tone: 'secondary' as const,
   },
-  { label: '提醒中心', to: { name: 'frontend-petpal-reminders' }, tone: 'secondary' as const },
+  {
+    label: '提醒中心',
+    to: {
+      name: 'frontend-petpal-reminders',
+      query: buildPetPalDeskHandoffQuery({
+        notice: '这里已经定位到照料者侧待办，可优先处理资料、服务和履约任务。',
+        focusRole: 'caregiver',
+      }),
+    },
+    tone: 'secondary' as const,
+  },
 ]);
 
 const focusTask = computed(() => {
@@ -269,7 +307,12 @@ const focusTask = computed(() => {
       title: '先完成照料者入驻资料',
       description: '资料页会单独记录你的服务城市、半径、经验和资质材料，后续审核也只在那一页继续。',
       actionLabel: '去建档',
-      to: { name: 'frontend-petpal-caregiver-profile' },
+      to: {
+        name: 'frontend-petpal-caregiver-profile',
+        query: buildPetPalDeskHandoffQuery({
+          notice: '这里已经定位到入驻资料页，可先补齐城市、经验和资质材料。',
+        }),
+      },
     };
   }
   if (!services.value.length) {

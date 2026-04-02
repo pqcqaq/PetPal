@@ -15,7 +15,17 @@
         description="没有入驻资料时，先去资料页完成建档，再回来创建服务。"
       >
         <template #actions>
-          <RouterLink class="frontend-page__button is-primary" :to="{ name: 'frontend-petpal-caregiver-profile' }">去资料页</RouterLink>
+          <RouterLink
+            class="frontend-page__button is-primary"
+            :to="{
+              name: 'frontend-petpal-caregiver-profile',
+              query: buildPetPalDeskHandoffQuery({
+                notice: '这里已经定位到入驻资料页，可先补齐资料后再回来创建服务。',
+              }),
+            }"
+          >
+            去资料页
+          </RouterLink>
         </template>
       </PetPalDeskEmpty>
 
