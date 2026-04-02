@@ -36,20 +36,36 @@ function openUrl(url: string) {
 
 <template>
   <PetpalPage title="帮助中心" subtitle="只保留最短路径，不放产品介绍。" eyebrow="Help" back :back-url="'/pages/me/me'">
-    <PetpalSection v-for="group in helpGroups" :key="group.title" :title="group.title">
-      <button
-        v-for="row in group.rows"
-        :key="row.title"
-        class="petpal-row-btn"
-        hover-class="none"
-        @click="openUrl(row.url)"
-      >
-        <view class="petpal-row__copy">
-          <text class="petpal-row__title">{{ row.title }}</text>
-          <text class="petpal-row__hint">{{ row.hint }}</text>
+    <PetpalSection tone="accent" title="按角色找路径" subtitle="这里只保留主人、照料者和账户三个工作区。">
+      <view class="petpal-grid--two">
+        <view class="petpal-stat">
+          <text class="petpal-stat__label">主人</text>
+          <text class="petpal-stat__value">3 步</text>
+          <text class="petpal-stat__meta">宠物、需求、订单</text>
         </view>
-        <text class="petpal-row__value">进入</text>
-      </button>
+        <view class="petpal-stat">
+          <text class="petpal-stat__label">照料者</text>
+          <text class="petpal-stat__value">3 步</text>
+          <text class="petpal-stat__meta">入驻、服务、履约</text>
+        </view>
+      </view>
+    </PetpalSection>
+
+    <PetpalSection v-for="group in helpGroups" :key="group.title" :title="group.title">
+      <view class="petpal-choice-grid">
+        <button
+          v-for="row in group.rows"
+          :key="row.title"
+          class="petpal-choice-tile"
+          hover-class="none"
+          @click="openUrl(row.url)"
+        >
+          <text class="petpal-choice-tile__eyebrow">{{ group.title }}</text>
+          <text class="petpal-choice-tile__title">{{ row.title }}</text>
+          <text class="petpal-choice-tile__meta">{{ row.hint }}</text>
+          <text class="petpal-choice-tile__hint">直接进入对应页面，不额外解释流程背景。</text>
+        </button>
+      </view>
     </PetpalSection>
   </PetpalPage>
 </template>

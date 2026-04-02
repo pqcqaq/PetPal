@@ -100,15 +100,17 @@ onLoad((options) => {
       </PetpalSection>
 
       <PetpalSection title="评价标签" subtitle="只选真正影响复购判断的标签，不堆冗余标签墙。">
-        <view class="petpal-chip-row">
+        <view class="petpal-choice-grid petpal-choice-grid--two">
           <button
             v-for="tag in reviewTagOptions"
             :key="tag"
-            :class="['petpal-chip', form.tags.includes(tag) ? 'petpal-chip--active' : '']"
+            :class="['petpal-choice-tile', form.tags.includes(tag) ? 'petpal-choice-tile--active' : '']"
             hover-class="none"
             @click="form.tags = toggleTagValue(form.tags, tag)"
           >
-            {{ tag }}
+            <text class="petpal-choice-tile__eyebrow">Tag</text>
+            <text class="petpal-choice-tile__title">{{ tag }}</text>
+            <text class="petpal-choice-tile__hint">{{ form.tags.includes(tag) ? '当前已选' : '点击添加到本次评价' }}</text>
           </button>
         </view>
       </PetpalSection>

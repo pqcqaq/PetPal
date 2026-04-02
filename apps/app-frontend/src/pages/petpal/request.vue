@@ -229,15 +229,17 @@ onLoad((options) => {
       </PetpalSection>
 
       <PetpalSection title="3. 说明照料要求" subtitle="常用要求直接点选，额外细节再补一段描述。">
-        <view class="petpal-chip-row">
+        <view class="petpal-choice-grid petpal-choice-grid--two">
           <button
             v-for="item in requestTagOptions"
             :key="item"
-            :class="['petpal-chip', form.demandTags.includes(item) ? 'petpal-chip--active' : '']"
+            :class="['petpal-choice-tile', form.demandTags.includes(item) ? 'petpal-choice-tile--active' : '']"
             hover-class="none"
             @click="togglePresetTag(item)"
           >
-            {{ item }}
+            <text class="petpal-choice-tile__eyebrow">Need</text>
+            <text class="petpal-choice-tile__title">{{ item }}</text>
+            <text class="petpal-choice-tile__hint">{{ form.demandTags.includes(item) ? '当前已选' : '点选后会一起写入需求' }}</text>
           </button>
         </view>
         <view class="petpal-field">

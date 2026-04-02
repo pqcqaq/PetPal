@@ -7,7 +7,7 @@ import { useTokenStore } from '@/store'
 import PetpalEmpty from './rebuild/petpal-empty.vue'
 import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
-import { getComplaintTone, getErrorMessage, openLoginPage, openOrderComplaintPage, openOrderDetailPage, stopPullDown, summarizeComplaint, toast } from './rebuild/shared'
+import { getComplaintTone, getErrorMessage, helpers, openLoginPage, openOrderComplaintPage, openOrderDetailPage, stopPullDown, summarizeComplaint, toast } from './rebuild/shared'
 
 const tokenStore = useTokenStore()
 const loading = ref(false)
@@ -70,8 +70,8 @@ onPullDownRefresh(() => {
         <view :class="['petpal-result-hero__tone', `petpal-result-hero__tone--${getComplaintTone(activeComplaint.status)}`]">
           投
         </view>
-        <text class="petpal-result-hero__title">{{ activeComplaint.status }}</text>
-        <text class="petpal-result-hero__summary">{{ summarizeComplaint(activeComplaint) }}</text>
+        <text class="petpal-result-hero__title">{{ helpers.getComplaintStatusLabel(activeComplaint.status) }}</text>
+        <text class="petpal-result-hero__summary">{{ activeComplaint.resultSummary || helpers.getComplaintStatusHint(activeComplaint.status) }}</text>
       </view>
 
       <PetpalSection title="最近一条投诉" :subtitle="activeComplaint.description">

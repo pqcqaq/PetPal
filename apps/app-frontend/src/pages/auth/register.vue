@@ -1,7 +1,5 @@
 <script lang="ts" setup>
-import { reactive, ref } from 'vue'
-import AppButton from '@/components/app-button/app-button.vue'
-import AppInput from '@/components/app-input/app-input.vue'
+import { computed, reactive, ref } from 'vue'
 import { LOGIN_PAGE } from '@/router/config'
 import { isPageTabbar } from '@/tabbar/store'
 import { useTokenStore } from '@/store/token'
@@ -26,6 +24,10 @@ const form = reactive({
   email: '',
   password: '',
 })
+
+const pageSubtitle = computed(() => redirectUrl.value
+  ? '注册完成后直接回到你刚才的流程，不再经过介绍页。'
+  : '注册完成后直接进入新的任务式首页。')
 
 function normalizeRedirect(value?: string) {
   if (!value) {
@@ -95,75 +97,79 @@ function toLogin() {
 
 <template>
   <PetpalPage
-    title="创建宠托帮账号"
-    subtitle="注册页只保留必要字段，完成后直接进入当前设备。"
+    title="创建账号"
+    :subtitle="pageSubtitle"
     eyebrow="Register"
     back
   >
-    <PetpalSection title="填写注册信息" subtitle="昵称、邮箱和密码都会在完成后同步到当前账号。">
-      <view class="app-auth-block">
-        <AppInput v-model="form.username" label="用户名" clearable placeholder="请输入用户名" class="app-auth-input" />
-        <AppInput v-model="form.nickname" label="昵称" clearable placeholder="请输入昵称" class="app-auth-input" />
-        <AppInput v-model="form.email" label="邮箱" clearable placeholder="请输入邮箱" class="app-auth-input" />
-        <AppInput
-          v-model="form.password"
-          label="密码"
-          show-password
-          placeholder="请设置密码"
-          confirm-type="done"
-          class="app-auth-input"
-          @confirm="submit"
-        />
-        <AppButton block size="large" :loading="submitting" @click="submit">
-          注册并进入
-        </AppButton>
-      </view>
-    </PetpalSection>
-
-    <PetpalSection title="已有账号" subtitle="如果只是切换设备或回到原账号，直接登录即可。">
-      <button class="app-auth-link-row" hover-class="none" @click="toLogin">
-        <view class="app-auth-link-row__copy">
-          <text class="app-auth-link-row__title">去登录</text>
-          <text class="app-auth-link-row__meta">返回登录页继续当前任务。</text>
+    <template v-if="tokenStore.hasLogin">
+      <PetpalSection tone="success" title="当前账号已可用" subtitle="如果你已经完成注册，可以直接回到当前任务。">
+        <view class="petpal-sheet">
+          <text class="petpal-banner__eyebrow">Ready</text>
+          <text class="petpal-banner__title">继续当前流程</text>
+          <text class="petpal-banner__meta">{{ pageSubtitle }}</text>
         </view>
-        <text class="app-auth-link-row__value">进入</text>
-      </button>
-    </PetpalSection>
+      </PetpalSection>
+
+      <view class="petpal-bottom-bar">
+        <view class="petpal-action-row">
+          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="finishAuth">继续</button>
+        </view>
+      </view>
+    </template>
+
+    <template v-else>
+      <PetpalSection tone="accent" title="先建立身份" subtitle="用户名和昵称会成为你在平台上的基础识别。">
+        <view class="petpal-form">
+          <view class="petpal-field">
+            <text class="petpal-field__label">用户名</text>
+            <input v-model="form.username" class="petpal-input" :maxlength="30" placeholder="请输入用户名" confirm-type="next" />
+          </view>
+          <view class="petpal-field">
+            <text class="petpal-field__label">昵称</text>
+            <input v-model="form.nickname" class="petpal-input" :maxlength="20" placeholder="请输入昵称" confirm-type="next" />
+          </view>
+        </view>
+      </PetpalSection>
+
+      <PetpalSection title="设置登录方式" subtitle="邮箱和密码只在这里填写，后续资料编辑不会混在注册页。">
+        <view class="petpal-form">
+          <view class="petpal-field">
+            <text class="petpal-field__label">邮箱</text>
+            <input v-model="form.email" class="petpal-input" :maxlength="60" placeholder="请输入邮箱" confirm-type="next" />
+          </view>
+          <view class="petpal-field">
+            <text class="petpal-field__label">密码</text>
+            <input
+              v-model="form.password"
+              class="petpal-input"
+              password
+              :maxlength="60"
+              placeholder="请设置密码"
+              confirm-type="done"
+              @confirm="submit"
+            />
+          </view>
+        </view>
+      </PetpalSection>
+
+      <PetpalSection title="已有账号" subtitle="如果只是切换设备或回到原账号，直接登录即可。">
+        <button class="petpal-choice-tile" hover-class="none" @click="toLogin">
+          <text class="petpal-choice-tile__eyebrow">Login</text>
+          <text class="petpal-choice-tile__title">去登录</text>
+          <text class="petpal-choice-tile__meta">回到登录页继续当前任务。</text>
+          <text class="petpal-choice-tile__hint">注册页不再承载找回、设置和帮助内容。</text>
+        </button>
+      </PetpalSection>
+
+      <view class="petpal-bottom-bar">
+        <text class="petpal-note">注册页只处理建号，不混入业务入口和说明性内容。</text>
+        <view class="petpal-action-row">
+          <button class="petpal-btn petpal-btn--primary" hover-class="none" :disabled="submitting" @click="submit">
+            {{ submitting ? '注册中...' : '注册并进入' }}
+          </button>
+        </view>
+      </view>
+    </template>
   </PetpalPage>
 </template>
-
-<style scoped lang="scss">
-.app-auth-block {
-  display: grid;
-  gap: 20rpx;
-}
-
-.app-auth-link-row {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  gap: 20rpx;
-  align-items: center;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  text-align: left;
-}
-
-.app-auth-link-row__copy {
-  display: grid;
-  gap: 8rpx;
-}
-
-.app-auth-link-row__title {
-  font-size: 30rpx;
-  color: var(--app-text);
-  font-weight: 700;
-}
-
-.app-auth-link-row__meta,
-.app-auth-link-row__value {
-  font-size: 24rpx;
-  color: var(--app-text-secondary);
-}
-</style>

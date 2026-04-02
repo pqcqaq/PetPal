@@ -83,37 +83,44 @@ onPullDownRefresh(() => {
           <text class="petpal-pill petpal-pill--accent">{{ roleSummary(userInfo) }}</text>
           <text class="petpal-pill">{{ userInfo.status === 'ACTIVE' ? '账号正常' : '账号受限' }}</text>
         </view>
+        <view class="petpal-grid--two">
+          <view class="petpal-stat">
+            <text class="petpal-stat__label">未读通知</text>
+            <text class="petpal-stat__value">{{ notificationStore.unreadCount }}</text>
+            <text class="petpal-stat__meta">统一收在通知中心</text>
+          </view>
+          <view class="petpal-stat">
+            <text class="petpal-stat__label">售后入口</text>
+            <text class="petpal-stat__value">独立</text>
+            <text class="petpal-stat__meta">退款和投诉已拆出业务页</text>
+          </view>
+        </view>
       </PetpalSection>
 
-      <PetpalSection title="快捷入口">
-        <button class="petpal-row-btn" hover-class="none" @click="openProfile">
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">个人资料</text>
-            <text class="petpal-row__hint">修改昵称、邮箱和头像。</text>
-          </view>
-          <text class="petpal-row__value">进入</text>
-        </button>
-        <button class="petpal-row-btn" hover-class="none" @click="openSettings">
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">体验设置</text>
-            <text class="petpal-row__hint">调整主题、密度和动效。</text>
-          </view>
-          <text class="petpal-row__value">进入</text>
-        </button>
-        <button class="petpal-row-btn" hover-class="none" @click="openNotifications">
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">通知中心</text>
-            <text class="petpal-row__hint">统一查看提醒和当前任务。</text>
-          </view>
-          <text class="petpal-row__value">{{ notificationStore.unreadCount }}</text>
-        </button>
-        <button class="petpal-row-btn" hover-class="none" @click="openAftersales">
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">售后中心</text>
-            <text class="petpal-row__hint">退款、投诉、争议集中处理。</text>
-          </view>
-          <text class="petpal-row__value">进入</text>
-        </button>
+      <PetpalSection title="账户工作区" subtitle="资料、设置、通知、售后各自独立，不再塞成长列表。">
+        <view class="petpal-choice-grid petpal-choice-grid--two">
+          <button class="petpal-choice-tile" hover-class="none" @click="openProfile">
+            <text class="petpal-choice-tile__eyebrow">Profile</text>
+            <text class="petpal-choice-tile__title">个人资料</text>
+            <text class="petpal-choice-tile__hint">修改昵称、邮箱和头像。</text>
+          </button>
+          <button class="petpal-choice-tile" hover-class="none" @click="openSettings">
+            <text class="petpal-choice-tile__eyebrow">Settings</text>
+            <text class="petpal-choice-tile__title">体验设置</text>
+            <text class="petpal-choice-tile__hint">调整主题、密度和动效。</text>
+          </button>
+          <button class="petpal-choice-tile" hover-class="none" @click="openNotifications">
+            <text class="petpal-choice-tile__eyebrow">Notifications</text>
+            <text class="petpal-choice-tile__title">通知中心</text>
+            <text class="petpal-choice-tile__meta">{{ notificationStore.unreadCount }} 条未读</text>
+            <text class="petpal-choice-tile__hint">统一查看提醒和当前任务。</text>
+          </button>
+          <button class="petpal-choice-tile" hover-class="none" @click="openAftersales">
+            <text class="petpal-choice-tile__eyebrow">Aftersales</text>
+            <text class="petpal-choice-tile__title">售后中心</text>
+            <text class="petpal-choice-tile__hint">退款、投诉、争议集中处理。</text>
+          </button>
+        </view>
       </PetpalSection>
 
       <PetpalSection title="更多支持">
