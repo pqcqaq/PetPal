@@ -66,7 +66,8 @@
       "path": "pages/me/me",
       "type": "page",
       "style": {
-        "navigationBarTitleText": "我的 PetPal"
+        "navigationBarTitleText": "我的",
+        "enablePullDownRefresh": true
       }
     },
     {
