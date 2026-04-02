@@ -196,6 +196,7 @@ const caregiverEarningsExportQuerySchema = z.object({
   serviceType: z.enum(['BOARDING', 'WALKING', 'FEEDING', 'DOOR_VISIT']).optional(),
   refundType: z.enum(['FULL', 'PARTIAL']).optional(),
   refundStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'SUCCESS', 'FAILED']).optional(),
+  refundReasonKeyword: z.string().trim().min(1).max(100).optional(),
   riskOnly: optionalBooleanQuerySchema,
   complaintStatus: z.enum(['OPEN', 'PROCESSING', 'RESOLVED', 'REJECTED']).optional(),
   complaintType: z.enum(['SAFETY', 'FEE', 'SERVICE', 'FRAUD', 'OTHER']).optional(),
