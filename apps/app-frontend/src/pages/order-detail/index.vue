@@ -7,6 +7,9 @@
  * 1. 首屏先判断当前阶段、待支付金额、未读沟通和售后风险
  * 2. 支付 / 沟通 / 看履约 / 售后 / 评价都必须在首屏找到，不要求用户滚长页
  * 3. 总览负责决策，细节再进入沟通 / 履约 / 售后分栏
+ * 4. 沟通分栏必须像聊天工作区，优先处理未读，再完成发送和附件查看
+ * 5. 履约分栏必须先给出最新进展，再展示服务回传，最后决定是否确认完成
+ * 6. 售后分栏必须先判断有没有纠纷，再展示退款 / 投诉卡片和最新处理动作
  * Primary action: 按状态快速处理支付、沟通、履约、确认完成、评价或投诉
  * Secondary actions: 查看支付记录、退款记录、服务记录和附件
  * Feedback: 当前阶段、下一步、未读消息、服务记录数量、售后进度
@@ -222,6 +225,14 @@ interface OrderDetailTabCard {
   value: OrderDetailTab
   metric: string
   hint: string
+}
+
+interface OrderTabSummaryCard {
+  key: string
+  label: string
+  value: string
+  hint: string
+  tone: AppTagTone
 }
 
 const confirmingCompletion = ref(false)
@@ -562,6 +573,237 @@ const overviewSignalCards = computed<OrderOverviewSignalCard[]>(() => {
     },
   ]
 })
+const conversationMessages = computed(() => messageConversation.value?.messages ?? [])
+const latestConversationMessage = computed(() => {
+  const messages = conversationMessages.value
+  return messages.length > 0 ? messages[messages.length - 1] : null
+})
+const conversationAttachmentCount = computed(() => (
+  conversationMessages.value.reduce((total, item) => total + item.mediaUrls.length, 0)
+))
+const chatSpotlightTitle = computed(() => {
+  if (currentConversationUnreadCount.value > 0) {
+    return `先处理 ${currentConversationUnreadCount.value} 条未读消息`
+  }
+  if (latestConversationMessage.value) {
+    return '继续本单沟通'
+  }
+  return '发送第一条交接消息'
+})
+const chatSpotlightHint = computed(() => {
+  if (latestConversationMessage.value) {
+    return `最近一条来自${getConversationSenderLabel(latestConversationMessage.value)}，更新于 ${formatDateTime(latestConversationMessage.value.createdAt)}。`
+  }
+  return '交接说明、异常同步和附件都集中保留在这里。'
+})
+const chatSummaryCards = computed<OrderTabSummaryCard[]>(() => [
+  {
+    key: 'unread',
+    label: '未读',
+    value: `${currentConversationUnreadCount.value} 条`,
+    hint: currentConversationUnreadCount.value > 0 ? '进入后优先处理' : '当前沟通已读',
+    tone: currentConversationUnreadCount.value > 0 ? 'warning' : 'default',
+  },
+  {
+    key: 'message-count',
+    label: '消息',
+    value: `${conversationMessages.value.length} 条`,
+    hint: latestConversationMessage.value ? '最近一条已同步到订单' : '暂未开始沟通',
+    tone: conversationMessages.value.length > 0 ? 'primary' : 'default',
+  },
+  {
+    key: 'attachment-count',
+    label: '附件',
+    value: `${conversationAttachmentCount.value} 个`,
+    hint: conversationAttachmentCount.value > 0 ? '照片和文件已留档' : '当前没有附件',
+    tone: conversationAttachmentCount.value > 0 ? 'success' : 'default',
+  },
+  {
+    key: 'last-message',
+    label: '最近更新',
+    value: order.value?.conversation?.lastMessageAt ? dayjs(order.value.conversation.lastMessageAt).format('MM-DD HH:mm') : '未开始',
+    hint: truncateText(getMessageDigest(latestConversationMessage.value), 22),
+    tone: latestConversationMessage.value ? 'primary' : 'default',
+  },
+])
+const serviceTimelineFeed = computed(() => {
+  if (!order.value) {
+    return []
+  }
+  return [...order.value.timeline].sort((left, right) => (
+    new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+  ))
+})
+const serviceLogFeed = computed(() => {
+  if (!order.value) {
+    return []
+  }
+  return [...order.value.serviceLogs].sort((left, right) => (
+    new Date(right.happenedAt).getTime() - new Date(left.happenedAt).getTime()
+  ))
+})
+const latestServiceTimelineEvent = computed(() => serviceTimelineFeed.value[0] ?? null)
+const latestServiceLog = computed(() => serviceLogFeed.value[0] ?? null)
+const serviceMediaCount = computed(() => (
+  serviceLogFeed.value.reduce((total, item) => total + item.mediaUrls.length, 0)
+))
+const serviceSpotlightTitle = computed(() => {
+  if (canConfirmComplete.value) {
+    return '先核对记录，再确认完成'
+  }
+  if (latestServiceLog.value) {
+    return '最新服务回传已到达'
+  }
+  if (latestServiceTimelineEvent.value) {
+    return '先看最新履约节点'
+  }
+  return '等待第一条履约记录'
+})
+const serviceSpotlightHint = computed(() => {
+  if (canConfirmComplete.value) {
+    return '服务已进入收尾，确认完成后就可以继续评价。'
+  }
+  if (latestServiceLog.value?.textNote) {
+    return truncateText(latestServiceLog.value.textNote, 32)
+  }
+  if (latestServiceLog.value) {
+    return `${labels.serviceLogType[latestServiceLog.value.logType] || latestServiceLog.value.logType} 已在 ${formatDateTime(latestServiceLog.value.happenedAt)} 回传。`
+  }
+  if (latestServiceTimelineEvent.value) {
+    return `${labels.timelineEvent[latestServiceTimelineEvent.value.eventType] || latestServiceTimelineEvent.value.eventType} 已记录。`
+  }
+  return '履约节点和服务照片会持续更新在这里。'
+})
+const serviceSummaryCards = computed<OrderTabSummaryCard[]>(() => [
+  {
+    key: 'stage',
+    label: '当前阶段',
+    value: currentStageLabel.value,
+    hint: ownerActionSummary.value,
+    tone: canPayOrder.value ? 'warning' : activeComplaint.value ? 'danger' : 'primary',
+  },
+  {
+    key: 'timeline',
+    label: '履约节点',
+    value: `${serviceTimelineFeed.value.length} 条`,
+    hint: latestServiceTimelineEvent.value
+      ? labels.timelineEvent[latestServiceTimelineEvent.value.eventType] || latestServiceTimelineEvent.value.eventType
+      : '还没有节点',
+    tone: serviceTimelineFeed.value.length > 0 ? 'primary' : 'default',
+  },
+  {
+    key: 'service-logs',
+    label: '服务回传',
+    value: `${serviceLogFeed.value.length} 条`,
+    hint: latestServiceLog.value
+      ? labels.serviceLogType[latestServiceLog.value.logType] || latestServiceLog.value.logType
+      : '还没有回传',
+    tone: serviceLogFeed.value.length > 0 ? 'success' : 'default',
+  },
+  {
+    key: 'service-media',
+    label: '媒体',
+    value: `${serviceMediaCount.value} 个`,
+    hint: serviceMediaCount.value > 0 ? '可直接回看照片和文件' : '暂未上传媒体',
+    tone: serviceMediaCount.value > 0 ? 'success' : 'default',
+  },
+])
+const complaintFeed = computed(() => (
+  [...complaints.value].sort((left, right) => (
+    new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+  ))
+))
+const refundFeed = computed(() => {
+  if (!order.value) {
+    return []
+  }
+  return [...order.value.refunds].sort((left, right) => (
+    new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+  ))
+})
+const latestComplaintRecord = computed(() => complaintFeed.value[0] ?? null)
+const latestRefundRecord = computed(() => refundFeed.value[0] ?? null)
+const aftersalesTimelineFeed = computed(() => (
+  [...aftersalesTimeline.value].sort((left, right) => (
+    new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime()
+  ))
+))
+const aftersalesSpotlightTitle = computed(() => {
+  if (activeComplaint.value) {
+    return '先看投诉最新进度'
+  }
+  if (refundProgress.value && refundProgress.value.stage !== 'NONE') {
+    return '退款正在处理'
+  }
+  if (canCreateComplaint.value) {
+    return '需要售后时可立即发起'
+  }
+  if (aftersalesTimelineFeed.value.length > 0) {
+    return '售后记录已归档'
+  }
+  return '当前没有售后事项'
+})
+const aftersalesSpotlightHint = computed(() => {
+  if (activeComplaint.value) {
+    return `平台正在处理 ${getComplaintTypeLabel(activeComplaint.value.complaintType)}，当前状态为 ${getComplaintStatusLabel(activeComplaint.value.status)}。`
+  }
+  if (refundProgress.value && refundProgress.value.stage !== 'NONE') {
+    return getRefundProgressStageHint(refundProgress.value.stage)
+  }
+  if (canCreateComplaint.value) {
+    return '服务质量、费用争议和安全问题都从这里统一处理。'
+  }
+  if (aftersalesTimelineFeed.value.length > 0) {
+    return '可以回看退款和投诉处理记录。'
+  }
+  return '本单当前没有退款申请和投诉。'
+})
+const aftersalesSummaryCards = computed<OrderTabSummaryCard[]>(() => [
+  {
+    key: 'after-status',
+    label: '当前状态',
+    value: activeComplaint.value
+      ? `投诉${getComplaintStatusLabel(activeComplaint.value.status)}`
+      : refundProgress.value && refundProgress.value.stage !== 'NONE'
+        ? getRefundProgressStageLabel(refundProgress.value.stage)
+        : '无售后',
+    hint: aftersalesSpotlightHint.value,
+    tone: activeComplaint.value ? 'danger' : refundProgress.value && refundProgress.value.stage !== 'NONE' ? 'warning' : 'default',
+  },
+  {
+    key: 'refund-count',
+    label: '退款单',
+    value: `${refundFeed.value.length} 笔`,
+    hint: latestRefundRecord.value
+      ? `${labels.refundStatus[latestRefundRecord.value.refundStatus] || latestRefundRecord.value.refundStatus}`
+      : '暂未申请',
+    tone: refundFeed.value.length > 0 ? 'warning' : 'default',
+  },
+  {
+    key: 'complaint-count',
+    label: '投诉单',
+    value: `${complaintFeed.value.length} 笔`,
+    hint: latestComplaintRecord.value
+      ? getComplaintTypeLabel(latestComplaintRecord.value.complaintType)
+      : '暂未投诉',
+    tone: complaintFeed.value.length > 0 ? 'danger' : 'default',
+  },
+  {
+    key: 'refundable',
+    label: '可退余额',
+    value: `¥${formatAmount(refundProgress.value?.refundableBalance ?? 0)}`,
+    hint: (() => {
+      const latestAt = pickFirstDate(
+        refundProgress.value?.latestReviewedAt,
+        refundProgress.value?.latestAppliedAt,
+        order.value?.updatedAt,
+        order.value?.createdAt,
+      )
+      return latestAt ? `最近更新 ${formatDateTime(latestAt)}` : '暂无退款处理'
+    })(),
+    tone: Number(refundProgress.value?.refundableBalance ?? 0) > 0 ? 'primary' : 'default',
+  },
+])
 const orderFocusSummary = computed(() => {
   if (!order.value) {
     return '正在准备订单详情。'
@@ -597,6 +839,28 @@ const formatDateTime = (dateStr: string) => {
   return dayjs(dateStr).format('YYYY-MM-DD HH:mm:ss')
 }
 
+const truncateText = (value: string, maxLength: number) => (
+  value.length > maxLength ? `${value.slice(0, maxLength)}…` : value
+)
+
+const pickFirstDate = (...values: Array<string | null | undefined>) => (
+  values.find((item): item is string => Boolean(item && item.trim())) ?? null
+)
+
+const getMessageDigest = (message: OrderMessageRecord | null) => {
+  if (!message) {
+    return '暂无消息'
+  }
+  const content = message.content?.trim()
+  if (content) {
+    return content
+  }
+  if (message.mediaUrls.length > 0) {
+    return `附带 ${message.mediaUrls.length} 个附件`
+  }
+  return '已发送消息'
+}
+
 const getRefundProgressStageLabel = (stage: OrderRefundProgressRecord['stage']) => {
   return labels.refundProgressStage[stage] || stage
 }
@@ -625,6 +889,14 @@ const getRefundProgressStageClass = (stage: OrderRefundProgressRecord['stage']) 
     FAILED: 'error',
   }
   return classes[stage] || 'closed'
+}
+
+const getStatusTagType = (statusClass: string): AppTagTone => {
+  if (statusClass === 'primary') return 'primary'
+  if (statusClass === 'success') return 'success'
+  if (statusClass === 'warning' || statusClass === 'pending') return 'warning'
+  if (statusClass === 'error') return 'danger'
+  return 'default'
 }
 
 function handleQuickAction(action: OrderQuickAction) {
@@ -917,7 +1189,7 @@ const getTimelineDetails = (event: OrderTimelineRecord) => {
     details.push(`附带媒体：${mediaCount} 个`)
   }
   if (geoText) {
-    details.push(`定位坐标：${geoText}`)
+    details.push('已记录服务地点')
   }
   return details
 }
@@ -926,7 +1198,7 @@ const getServiceLogDetails = (log: ServiceLogRecord) => {
   const details: string[] = []
   const geoText = formatGeoValue(log.geo)
   if (geoText) {
-    details.push(`定位坐标：${geoText}`)
+    details.push('已记录服务地点')
   }
   if (log.createdAt !== log.happenedAt) {
     details.push(`上传时间：${formatDateTime(log.createdAt)}`)
@@ -1481,97 +1753,116 @@ onLoad((options: Record<string, string | undefined>) => {
             </view>
         </AppSection>
 
-        <AppSection v-if="detailTab === 'aftersales' && refundProgress" title="退款进度">
-          <view class="petpal-refund-progress">
-            <view class="petpal-refund-progress__header">
-              <view class="petpal-refund-progress__headline">
-                <text class="petpal-refund-progress__title">{{ getRefundProgressStageLabel(refundProgress.stage) }}</text>
-                <text class="petpal-refund-progress__hint">{{ getRefundProgressStageHint(refundProgress.stage) }}</text>
+        <AppSection v-if="detailTab === 'aftersales'" title="售后处理">
+          <view class="petpal-tab-workspace">
+            <view class="petpal-tab-hero petpal-tab-hero--aftersales">
+              <view class="petpal-tab-hero__copy">
+                <text class="petpal-tab-hero__eyebrow">售后区</text>
+                <text class="petpal-tab-hero__title">{{ aftersalesSpotlightTitle }}</text>
+                <text class="petpal-tab-hero__hint">{{ aftersalesSpotlightHint }}</text>
               </view>
-              <view class="petpal-timeline-dot" :class="`is-${getRefundProgressStageClass(refundProgress.stage)}`" />
-            </view>
-
-            <view class="petpal-refund-progress__stats">
-              <view class="petpal-refund-progress__stat">
-                <text class="petpal-refund-progress__stat-label">退款申请数</text>
-                <text class="petpal-refund-progress__stat-value">{{ refundProgress.totalRefundCount }}</text>
-              </view>
-              <view class="petpal-refund-progress__stat">
-                <text class="petpal-refund-progress__stat-label">处理中</text>
-                <text class="petpal-refund-progress__stat-value">{{ refundProgress.pendingCount + refundProgress.approvedCount }}</text>
-              </view>
-              <view class="petpal-refund-progress__stat">
-                <text class="petpal-refund-progress__stat-label">已退款</text>
-                <text class="petpal-refund-progress__stat-value">{{ refundProgress.successCount }}</text>
-              </view>
-              <view class="petpal-refund-progress__stat">
-                <text class="petpal-refund-progress__stat-label">可退余额</text>
-                <text class="petpal-refund-progress__stat-value">¥{{ formatAmount(refundProgress.refundableBalance) }}</text>
-              </view>
-            </view>
-
-            <view v-if="refundProgress.latestRefundNo" class="petpal-refund-progress__latest">
-              <view class="petpal-refund-progress__latest-header">
-                <text class="petpal-refund-progress__latest-no">{{ refundProgress.latestRefundNo }}</text>
-                <text class="petpal-refund-progress__latest-status">
-                  {{ refundProgress.latestRefundStatus ? (labels.refundStatus[refundProgress.latestRefundStatus] || refundProgress.latestRefundStatus) : '-' }}
-                </text>
-              </view>
-              <view class="petpal-timeline-meta">
-                <text class="petpal-timeline-meta-item">
-                  <text class="petpal-timeline-meta-label">申请金额</text>
-                  <text class="petpal-timeline-meta-value">¥{{ formatAmount(refundProgress.latestRefundAmount ?? 0) }}</text>
-                </text>
-                <text v-if="refundProgress.latestAppliedAt" class="petpal-timeline-meta-item">
-                  <text class="petpal-timeline-meta-label">申请时间</text>
-                  <text class="petpal-timeline-meta-value">{{ formatDateTime(refundProgress.latestAppliedAt) }}</text>
-                </text>
-                <text v-if="refundProgress.latestReviewedAt" class="petpal-timeline-meta-item">
-                  <text class="petpal-timeline-meta-label">审核时间</text>
-                  <text class="petpal-timeline-meta-value">{{ formatDateTime(refundProgress.latestReviewedAt) }}</text>
-                </text>
-              </view>
-              <view v-if="refundProgress.latestRefundReason" class="petpal-note-card">
-                <text>退款原因：{{ refundProgress.latestRefundReason }}</text>
+              <view class="petpal-tab-hero__actions">
+                <AppButton
+                  v-if="activeComplaint || complaintFeed.length > 0"
+                  size="medium"
+                  :type="activeComplaint ? 'danger' : 'info'"
+                  @click="openComplaintPage"
+                >
+                  {{ activeComplaint ? '看投诉进度' : '看投诉结果' }}
+                </AppButton>
+                <AppButton
+                  v-if="refundProgress && refundProgress.stage !== 'NONE'"
+                  size="medium"
+                  :type="['REJECTED', 'FAILED'].includes(refundProgress.stage) ? 'danger' : 'info'"
+                  @click="openRefundResultPage"
+                >
+                  {{ ['PENDING_REVIEW', 'APPROVED_WAITING'].includes(refundProgress.stage) ? '看退款进度' : '看退款结果' }}
+                </AppButton>
+                <AppButton
+                  v-if="!activeComplaint && complaintFeed.length === 0 && canCreateComplaint"
+                  size="medium"
+                  type="danger"
+                  @click="openComplaintPage"
+                >
+                  发起投诉
+                </AppButton>
               </view>
             </view>
 
-            <view v-if="refundProgress.stage !== 'NONE'" class="petpal-refund-progress__actions">
-              <AppButton
-                size="medium"
-                :type="['REJECTED', 'FAILED'].includes(refundProgress.stage) ? 'danger' : 'primary'"
-                @click="openRefundResultPage"
-              >
-                {{ ['PENDING_REVIEW', 'APPROVED_WAITING'].includes(refundProgress.stage) ? '看退款进度' : '查看退款结果' }}
-              </AppButton>
-            </view>
-          </view>
-        </AppSection>
-
-        <AppSection v-if="detailTab === 'aftersales'" :title="complaints.length > 0 ? `投诉与进度 (${complaints.length})` : '投诉与进度'">
-          <template v-if="complaints.length > 0">
-            <view class="petpal-complaint-list">
+            <view class="petpal-tab-summary-grid">
               <view
-                v-for="complaint in complaints"
-                :key="complaint.id"
-                class="petpal-complaint-card"
+                v-for="card in aftersalesSummaryCards"
+                :key="card.key"
+                class="petpal-tab-summary-card"
+                :class="`petpal-tab-summary-card--${card.tone}`"
               >
-                <view class="petpal-complaint-card__header">
-                  <view class="petpal-complaint-card__headline">
-                    <text class="petpal-complaint-card__title">{{ getComplaintTypeLabel(complaint.complaintType) }}</text>
-                    <text class="petpal-complaint-card__meta">
+                <text class="petpal-tab-summary-card__label">{{ card.label }}</text>
+                <text class="petpal-tab-summary-card__value">{{ card.value }}</text>
+                <text class="petpal-tab-summary-card__hint">{{ card.hint }}</text>
+              </view>
+            </view>
+
+            <view v-if="refundFeed.length > 0 || complaintFeed.length > 0" class="petpal-case-stack">
+              <view
+                v-for="refund in refundFeed"
+                :key="refund.id"
+                class="petpal-case-card petpal-case-card--refund"
+              >
+                <view class="petpal-case-card__header">
+                  <view class="petpal-case-card__headline">
+                    <text class="petpal-case-card__title">{{ labels.refundType[refund.refundType] || refund.refundType }}</text>
+                    <text class="petpal-case-card__meta">
+                      {{ formatDateTime(refund.createdAt) }} · 申请 ¥{{ formatAmount(refund.refundAmount) }}
+                    </text>
+                  </view>
+                  <AppTag :type="getStatusTagType(getRefundAftersalesClass(refund.refundStatus))">
+                    {{ labels.refundStatus[refund.refundStatus] || refund.refundStatus }}
+                  </AppTag>
+                </view>
+                <view class="petpal-feed-card__details">
+                  <text class="petpal-feed-card__detail">退款金额：¥{{ formatAmount(refund.refundAmount) }}</text>
+                  <text class="petpal-feed-card__detail">退款类型：{{ labels.refundType[refund.refundType] || refund.refundType }}</text>
+                  <text v-if="refund.reviewedAt" class="petpal-feed-card__detail">
+                    审核时间：{{ formatDateTime(refund.reviewedAt) }}
+                  </text>
+                </view>
+                <view v-if="refund.refundReason" class="petpal-note-card">
+                  <text>{{ refund.refundReason }}</text>
+                </view>
+                <view class="petpal-case-card__actions">
+                  <AppButton size="medium" type="info" @click="openRefundResultPage">
+                    查看退款结果
+                  </AppButton>
+                </view>
+              </view>
+
+              <view
+                v-for="complaint in complaintFeed"
+                :key="complaint.id"
+                class="petpal-case-card petpal-case-card--complaint"
+              >
+                <view class="petpal-case-card__header">
+                  <view class="petpal-case-card__headline">
+                    <text class="petpal-case-card__title">{{ getComplaintTypeLabel(complaint.complaintType) }}</text>
+                    <text class="petpal-case-card__meta">
                       {{ formatDateTime(complaint.createdAt) }} · 投诉对象：{{ getComplaintTargetRoleLabel(complaint.targetRole) }}
                     </text>
                   </view>
-                  <view class="petpal-timeline-dot" :class="`is-${getComplaintStatusClass(complaint.status)}`" />
+                  <AppTag :type="getStatusTagType(getComplaintStatusClass(complaint.status))">
+                    {{ getComplaintStatusLabel(complaint.status) }}
+                  </AppTag>
                 </view>
-
                 <view class="petpal-note-card">
                   <text>{{ complaint.description }}</text>
                 </view>
-
-                <view v-if="complaint.assignedAdminNickname" class="petpal-detail-line">
-                  <text>当前负责人：{{ complaint.assignedAdminNickname }}</text>
+                <view class="petpal-feed-card__details">
+                  <text v-if="complaint.assignedAdminNickname" class="petpal-feed-card__detail">
+                    当前负责人：{{ complaint.assignedAdminNickname }}
+                  </text>
+                  <text class="petpal-feed-card__detail">投诉类型：{{ getComplaintTypeLabel(complaint.complaintType) }}</text>
+                  <text v-if="complaint.resultSummary" class="petpal-feed-card__detail">
+                    处理结论：{{ complaint.resultSummary }}
+                  </text>
                 </view>
 
                 <view v-if="complaint.evidenceUrls.length > 0" class="petpal-service-log-media">
@@ -1596,31 +1887,21 @@ onLoad((options: Record<string, string | undefined>) => {
                   </view>
                 </view>
 
-                <view v-if="complaint.processLogs.length > 0" class="petpal-complaint-progress">
+                <view v-if="complaint.processLogs.length > 0" class="petpal-inline-progress">
                   <view
-                    v-for="log in complaint.processLogs"
+                    v-for="log in complaint.processLogs.slice(0, 3)"
                     :key="log.id"
-                    class="petpal-complaint-progress__item"
+                    class="petpal-inline-progress__item"
                   >
-                    <text class="petpal-complaint-progress__title">{{ getComplaintActionLabel(log.actionType) }}</text>
-                    <text class="petpal-complaint-progress__meta">
-                      {{ formatDateTime(log.createdAt) }} · {{ log.operatorNickname || '系统' }}
+                    <text class="petpal-inline-progress__title">{{ getComplaintActionLabel(log.actionType) }}</text>
+                    <text class="petpal-inline-progress__meta">
+                      {{ formatDateTime(log.createdAt) }} · {{ log.operatorNickname || '平台' }}
                     </text>
-                    <text v-if="log.note" class="petpal-complaint-progress__note">{{ log.note }}</text>
+                    <text v-if="log.note" class="petpal-inline-progress__note">{{ log.note }}</text>
                   </view>
                 </view>
-                <view v-else class="petpal-detail-line">
-                  <text>平台尚未追加处理进度</text>
-                </view>
 
-                <view v-if="complaint.resultSummary" class="petpal-note-card">
-                  <text>处理结论：{{ complaint.resultSummary }}</text>
-                </view>
-
-                <view class="petpal-detail-line">
-                  <text>当前状态：{{ getComplaintStatusLabel(complaint.status) }}</text>
-                </view>
-                <view class="petpal-action-grid">
+                <view class="petpal-case-card__actions">
                   <AppButton
                     size="medium"
                     :type="['OPEN', 'PROCESSING'].includes(complaint.status) ? 'danger' : 'info'"
@@ -1631,86 +1912,97 @@ onLoad((options: Record<string, string | undefined>) => {
                 </view>
               </view>
             </view>
-          </template>
-          <view v-else class="petpal-empty">
-            <text>当前暂无投诉记录</text>
+            <view v-else class="petpal-empty petpal-empty--soft">
+              <text>当前没有退款和投诉记录</text>
+            </view>
           </view>
         </AppSection>
 
-        <AppSection v-if="detailTab === 'chat'" :title="messageConversation?.messages.length ? `订单沟通 (${messageConversation.messages.length})` : '订单沟通'">
-          <view class="petpal-message-panel">
-            <view class="petpal-message-panel__header">
-              <view class="petpal-message-panel__headline">
-                <text class="petpal-message-panel__title">
-                  {{
-                    order.conversation?.lastMessageAt
-                      ? `最近更新：${formatDateTime(order.conversation.lastMessageAt)}`
-                      : '当前还没有订单沟通记录'
-                  }}
-                </text>
-                <text class="petpal-message-panel__hint">
-                  {{
-                    currentConversationUnreadCount > 0
-                      ? `你有 ${currentConversationUnreadCount} 条未读消息`
-                      : '订单内的交接说明、异常同步和附件回传都会保留在这里。'
-                  }}
-                </text>
+        <AppSection v-if="detailTab === 'chat'" :title="conversationMessages.length ? `订单沟通 (${conversationMessages.length})` : '订单沟通'">
+          <view class="petpal-tab-workspace">
+            <view class="petpal-tab-hero petpal-tab-hero--chat">
+              <view class="petpal-tab-hero__copy">
+                <text class="petpal-tab-hero__eyebrow">沟通区</text>
+                <text class="petpal-tab-hero__title">{{ chatSpotlightTitle }}</text>
+                <text class="petpal-tab-hero__hint">{{ chatSpotlightHint }}</text>
               </view>
-              <view v-if="currentConversationUnreadCount > 0" class="petpal-message-panel__badge">
-                <text>待读 {{ currentConversationUnreadCount }}</text>
+              <view class="petpal-tab-hero__actions">
+                <AppButton v-if="currentConversationUnreadCount > 0" size="medium" @click="markConversationAsRead">
+                  全部已读
+                </AppButton>
+                <AppButton size="medium" type="info" @click="handleQuickAction('SERVICE')">
+                  看履约
+                </AppButton>
               </view>
             </view>
 
-            <view v-if="messageConversation?.messages.length" class="petpal-message-list">
+            <view class="petpal-tab-summary-grid">
               <view
-                v-for="message in messageConversation.messages"
-                :key="message.id"
-                :class="['petpal-message-card', { 'is-self': isOwnMessage(message) }]"
+                v-for="card in chatSummaryCards"
+                :key="card.key"
+                class="petpal-tab-summary-card"
+                :class="`petpal-tab-summary-card--${card.tone}`"
               >
-                <view class="petpal-message-card__header">
-                  <view class="petpal-message-card__headline">
-                    <text class="petpal-message-card__title">{{ getConversationSenderLabel(message) }}</text>
-                    <text class="petpal-message-card__meta">{{ formatDateTime(message.createdAt) }}</text>
+                <text class="petpal-tab-summary-card__label">{{ card.label }}</text>
+                <text class="petpal-tab-summary-card__value">{{ card.value }}</text>
+                <text class="petpal-tab-summary-card__hint">{{ card.hint }}</text>
+              </view>
+            </view>
+
+            <view v-if="conversationMessages.length" class="petpal-chat-thread">
+              <view
+                v-for="message in conversationMessages"
+                :key="message.id"
+                class="petpal-chat-row"
+                :class="isOwnMessage(message) ? 'petpal-chat-row--self' : ''"
+              >
+                <view class="petpal-chat-bubble">
+                  <view class="petpal-chat-bubble__meta">
+                    <text class="petpal-chat-bubble__sender">{{ getConversationSenderLabel(message) }}</text>
+                    <text class="petpal-chat-bubble__time">{{ formatDateTime(message.createdAt) }}</text>
                   </view>
-                  <text class="petpal-message-card__tag">{{ isOwnMessage(message) ? '我发送的' : '对方发送' }}</text>
-                </view>
-                <view v-if="message.content" class="petpal-note-card">
-                  <text>{{ message.content }}</text>
-                </view>
-                <view v-if="message.mediaUrls.length > 0" class="petpal-service-log-media">
-                  <view
-                    v-for="(url, index) in message.mediaUrls"
-                    :key="`${message.id}-${url}`"
-                    class="petpal-service-log-media-item"
-                    @tap="openMediaUrl(message.mediaUrls, url)"
-                  >
-                    <image
-                      v-if="isPreviewableImage(url)"
-                      :src="url"
-                      mode="aspectFill"
-                      class="petpal-service-log-media-image"
-                    />
-                    <view v-else class="petpal-service-log-media-file">
-                      <text>{{ getMediaLinkLabel(url, index) }}</text>
+                  <view v-if="message.content" class="petpal-note-card petpal-note-card--bubble">
+                    <text>{{ message.content }}</text>
+                  </view>
+                  <view v-if="message.mediaUrls.length > 0" class="petpal-service-log-media">
+                    <view
+                      v-for="(url, index) in message.mediaUrls"
+                      :key="`${message.id}-${url}`"
+                      class="petpal-service-log-media-item"
+                      @tap="openMediaUrl(message.mediaUrls, url)"
+                    >
+                      <image
+                        v-if="isPreviewableImage(url)"
+                        :src="url"
+                        mode="aspectFill"
+                        class="petpal-service-log-media-image"
+                      />
+                      <view v-else class="petpal-service-log-media-file">
+                        <text>{{ getMediaLinkLabel(url, index) }}</text>
+                      </view>
+                      <text class="petpal-service-log-media-meta">
+                        {{ isPreviewableImage(url) ? '点击预览附件' : '点击打开或复制链接' }}
+                      </text>
                     </view>
-                    <text class="petpal-service-log-media-meta">
-                      {{ isPreviewableImage(url) ? '点击预览附件' : '点击打开或复制链接' }}
-                    </text>
                   </view>
                 </view>
               </view>
             </view>
-            <view v-else class="petpal-empty">
-              <text>发送第一条消息后，这里会形成完整沟通记录。</text>
+            <view v-else class="petpal-empty petpal-empty--soft">
+              <text>还没有沟通记录</text>
             </view>
 
-            <view v-if="canSendMessage" class="petpal-message-composer">
+            <view v-if="canSendMessage" class="petpal-chat-composer">
+              <view class="petpal-chat-composer__header">
+                <text class="petpal-chat-composer__title">发送消息</text>
+                <text class="petpal-chat-composer__hint">交接说明和附件都会直接留在订单里。</text>
+              </view>
               <textarea
                 v-model="messageForm.content"
                 class="petpal-textarea"
                 :maxlength="300"
                 auto-height
-                placeholder="补充照料安排、交接说明或售后沟通内容"
+                placeholder="输入交接说明、异常同步或补充信息"
               />
               <view class="petpal-action-row">
                 <AppButton
@@ -1720,14 +2012,6 @@ onLoad((options: Record<string, string | undefined>) => {
                   @click="uploadMessageAttachments"
                 >
                   上传附件
-                </AppButton>
-                <AppButton
-                  v-if="currentConversationUnreadCount > 0"
-                  size="medium"
-                  type="info"
-                  @click="markConversationAsRead"
-                >
-                  标记已读
                 </AppButton>
                 <AppButton size="medium" :loading="messageSubmitting" @click="submitMessage">
                   发送消息
@@ -1757,122 +2041,162 @@ onLoad((options: Record<string, string | undefined>) => {
           </view>
         </AppSection>
 
-        <AppSection v-if="detailTab === 'aftersales'" :title="aftersalesTimeline.length > 0 ? `售后时间线 (${aftersalesTimeline.length})` : '售后时间线'">
-          <template v-if="aftersalesTimeline.length > 0">
-            <view class="petpal-timeline">
-              <view v-for="item in aftersalesTimeline" :key="item.id" class="petpal-timeline-item">
-                <view class="petpal-timeline-dot" :class="`is-${item.statusClass}`" />
-                <view class="petpal-timeline-content">
-                  <view class="petpal-timeline-header">
-                    <text class="petpal-timeline-title">{{ item.title }}</text>
-                    <text class="petpal-timeline-label">{{ item.statusLabel }}</text>
+        <AppSection v-if="detailTab === 'aftersales'" :title="aftersalesTimelineFeed.length > 0 ? `售后动态 (${aftersalesTimelineFeed.length})` : '售后动态'">
+          <template v-if="aftersalesTimelineFeed.length > 0">
+            <view class="petpal-feed-list">
+              <view
+                v-for="item in aftersalesTimelineFeed"
+                :key="item.id"
+                class="petpal-feed-card"
+              >
+                <view class="petpal-feed-card__header">
+                  <view class="petpal-feed-card__headline">
+                    <text class="petpal-feed-card__title">{{ item.title }}</text>
+                    <text class="petpal-feed-card__meta">{{ formatDateTime(item.occurredAt) }}</text>
                   </view>
-                  <view class="petpal-timeline-meta">
-                    <text class="petpal-timeline-meta-item">
-                      <text class="petpal-timeline-meta-label">时间</text>
-                      <text class="petpal-timeline-meta-value">{{ formatDateTime(item.occurredAt) }}</text>
-                    </text>
-                    <text class="petpal-timeline-meta-item">
-                      <text class="petpal-timeline-meta-label">{{ item.referenceLabel }}</text>
-                      <text class="petpal-timeline-meta-value">{{ item.referenceValue }}</text>
-                    </text>
-                  </view>
-                  <view v-if="item.note" class="petpal-note-card">
-                    <text>{{ item.note }}</text>
-                  </view>
-                  <view v-for="detail in item.details" :key="`${item.id}-${detail}`" class="petpal-detail-line">
-                    <text>{{ detail }}</text>
-                  </view>
+                  <AppTag :type="getStatusTagType(item.statusClass)">
+                    {{ item.statusLabel }}
+                  </AppTag>
+                </view>
+                <view class="petpal-feed-card__details">
+                  <text class="petpal-feed-card__detail">{{ item.referenceLabel }}：{{ item.referenceValue }}</text>
+                  <text
+                    v-for="detail in item.details"
+                    :key="`${item.id}-${detail}`"
+                    class="petpal-feed-card__detail"
+                  >
+                    {{ detail }}
+                  </text>
+                </view>
+                <view v-if="item.note" class="petpal-note-card">
+                  <text>{{ item.note }}</text>
                 </view>
               </view>
             </view>
           </template>
-          <view v-else class="petpal-empty">
-            <text>当前暂无退款申请或投诉处理记录</text>
+          <view v-else class="petpal-empty petpal-empty--soft">
+            <text>还没有售后动态</text>
           </view>
         </AppSection>
 
-        <AppSection v-if="detailTab === 'service'" :title="order.timeline.length > 0 ? `履约时间线 (${order.timeline.length})` : '履约时间线'">
-          <template v-if="order.timeline.length > 0">
-            <view class="petpal-timeline">
-              <view v-for="event in order.timeline" :key="event.id" class="petpal-timeline-item">
-                <view class="petpal-timeline-dot" :class="`is-${getTimelineClass(event.eventType as OrderTimelineEventType)}`" />
-                <view class="petpal-timeline-content">
-                  <view class="petpal-timeline-header">
-                    <text class="petpal-timeline-title">{{ labels.timelineEvent[event.eventType] || event.eventType }}</text>
-                    <text class="petpal-timeline-label">{{ labels.operatorRole[event.operatorRole] || event.operatorRole }}</text>
+        <AppSection v-if="detailTab === 'service'" title="履约进度">
+          <view class="petpal-tab-workspace">
+            <view class="petpal-tab-hero petpal-tab-hero--service">
+              <view class="petpal-tab-hero__copy">
+                <text class="petpal-tab-hero__eyebrow">履约区</text>
+                <text class="petpal-tab-hero__title">{{ serviceSpotlightTitle }}</text>
+                <text class="petpal-tab-hero__hint">{{ serviceSpotlightHint }}</text>
+              </view>
+              <view class="petpal-tab-hero__actions">
+                <AppButton v-if="canConfirmComplete" size="medium" @click="handleConfirmComplete">
+                  确认完成
+                </AppButton>
+                <AppButton size="medium" type="info" @click="handleQuickAction('CHAT')">
+                  去沟通
+                </AppButton>
+              </view>
+            </view>
+
+            <view class="petpal-tab-summary-grid">
+              <view
+                v-for="card in serviceSummaryCards"
+                :key="card.key"
+                class="petpal-tab-summary-card"
+                :class="`petpal-tab-summary-card--${card.tone}`"
+              >
+                <text class="petpal-tab-summary-card__label">{{ card.label }}</text>
+                <text class="petpal-tab-summary-card__value">{{ card.value }}</text>
+                <text class="petpal-tab-summary-card__hint">{{ card.hint }}</text>
+              </view>
+            </view>
+
+            <view v-if="serviceTimelineFeed.length > 0" class="petpal-feed-list">
+              <view
+                v-for="event in serviceTimelineFeed"
+                :key="event.id"
+                class="petpal-feed-card"
+              >
+                <view class="petpal-feed-card__header">
+                  <view class="petpal-feed-card__headline">
+                    <text class="petpal-feed-card__title">{{ labels.timelineEvent[event.eventType] || event.eventType }}</text>
+                    <text class="petpal-feed-card__meta">{{ formatDateTime(event.createdAt) }}</text>
                   </view>
-                  <view class="petpal-timeline-meta">
-                    <text class="petpal-timeline-meta-item">
-                      <text class="petpal-timeline-meta-label">记录</text>
-                      <text class="petpal-timeline-meta-value">{{ formatDateTime(event.createdAt) }}</text>
-                    </text>
-                    <text v-if="event.operatorId" class="petpal-timeline-meta-item">
-                      <text class="petpal-timeline-meta-label">操作人</text>
-                      <text class="petpal-timeline-meta-value">{{ event.operatorId }}</text>
-                    </text>
-                  </view>
-                  <view v-for="detail in getTimelineDetails(event)" :key="`${event.id}-${detail}`" class="petpal-detail-line">
-                    <text>{{ detail }}</text>
-                  </view>
+                  <AppTag :type="getStatusTagType(getTimelineClass(event.eventType as OrderTimelineEventType))">
+                    {{ labels.operatorRole[event.operatorRole] || event.operatorRole }}
+                  </AppTag>
+                </view>
+                <view v-if="getTimelineDetails(event).length > 0" class="petpal-feed-card__details">
+                  <text
+                    v-for="detail in getTimelineDetails(event)"
+                    :key="`${event.id}-${detail}`"
+                    class="petpal-feed-card__detail"
+                  >
+                    {{ detail }}
+                  </text>
                 </view>
               </view>
             </view>
-          </template>
-          <view v-else class="petpal-empty">
-            <text>订单尚未产生履约事件</text>
+            <view v-else class="petpal-empty petpal-empty--soft">
+              <text>还没有履约节点</text>
+            </view>
           </view>
         </AppSection>
 
-        <AppSection v-if="detailTab === 'service'" :title="order.serviceLogs.length > 0 ? `服务记录 (${order.serviceLogs.length})` : '服务记录'">
-          <template v-if="order.serviceLogs.length > 0">
-            <view class="petpal-timeline">
-              <view v-for="log in order.serviceLogs" :key="log.id" class="petpal-timeline-item">
-                <view class="petpal-timeline-dot" :class="`is-${getServiceLogClass(log.logType as ServiceLogType)}`" />
-                <view class="petpal-timeline-content">
-                  <view class="petpal-timeline-header">
-                    <text class="petpal-timeline-title">{{ labels.serviceLogType[log.logType] || log.logType }}</text>
-                    <text class="petpal-timeline-label">{{ formatDateTime(log.happenedAt) }}</text>
+        <AppSection v-if="detailTab === 'service'" :title="serviceLogFeed.length > 0 ? `服务回传 (${serviceLogFeed.length})` : '服务回传'">
+          <template v-if="serviceLogFeed.length > 0">
+            <view class="petpal-feed-list">
+              <view
+                v-for="log in serviceLogFeed"
+                :key="log.id"
+                class="petpal-feed-card petpal-feed-card--service"
+              >
+                <view class="petpal-feed-card__header">
+                  <view class="petpal-feed-card__headline">
+                    <text class="petpal-feed-card__title">{{ labels.serviceLogType[log.logType] || log.logType }}</text>
+                    <text class="petpal-feed-card__meta">{{ formatDateTime(log.happenedAt) }}</text>
                   </view>
-                  <view class="petpal-timeline-meta">
-                    <text class="petpal-timeline-meta-item">
-                      <text class="petpal-timeline-meta-label">媒体</text>
-                      <text class="petpal-timeline-meta-value">{{ log.mediaUrls.length }} 个</text>
-                    </text>
-                  </view>
-                  <view v-if="log.textNote" class="petpal-note-card">
-                    <text>{{ log.textNote }}</text>
-                  </view>
-                  <view v-for="detail in getServiceLogDetails(log)" :key="`${log.id}-${detail}`" class="petpal-detail-line">
-                    <text>{{ detail }}</text>
-                  </view>
-                  <view v-if="log.mediaUrls.length > 0" class="petpal-service-log-media">
-                    <view
-                      v-for="(url, index) in log.mediaUrls"
-                      :key="`${log.id}-${url}`"
-                      class="petpal-service-log-media-item"
-                      @tap="openServiceLogMedia(log, url)"
-                    >
-                      <image
-                        v-if="isPreviewableImage(url)"
-                        :src="url"
-                        mode="aspectFill"
-                        class="petpal-service-log-media-image"
-                      />
-                      <view v-else class="petpal-service-log-media-file">
-                        <text>{{ getMediaLinkLabel(url, index) }}</text>
-                      </view>
-                      <text class="petpal-service-log-media-meta">
-                        {{ isPreviewableImage(url) ? '点击预览' : '点击打开或复制链接' }}
-                      </text>
+                  <AppTag :type="getStatusTagType(getServiceLogClass(log.logType as ServiceLogType))">
+                    {{ log.mediaUrls.length > 0 ? `${log.mediaUrls.length} 个媒体` : '文字回传' }}
+                  </AppTag>
+                </view>
+                <view v-if="log.textNote" class="petpal-note-card">
+                  <text>{{ log.textNote }}</text>
+                </view>
+                <view v-if="getServiceLogDetails(log).length > 0" class="petpal-feed-card__details">
+                  <text
+                    v-for="detail in getServiceLogDetails(log)"
+                    :key="`${log.id}-${detail}`"
+                    class="petpal-feed-card__detail"
+                  >
+                    {{ detail }}
+                  </text>
+                </view>
+                <view v-if="log.mediaUrls.length > 0" class="petpal-service-log-media">
+                  <view
+                    v-for="(url, index) in log.mediaUrls"
+                    :key="`${log.id}-${url}`"
+                    class="petpal-service-log-media-item"
+                    @tap="openServiceLogMedia(log, url)"
+                  >
+                    <image
+                      v-if="isPreviewableImage(url)"
+                      :src="url"
+                      mode="aspectFill"
+                      class="petpal-service-log-media-image"
+                    />
+                    <view v-else class="petpal-service-log-media-file">
+                      <text>{{ getMediaLinkLabel(url, index) }}</text>
                     </view>
+                    <text class="petpal-service-log-media-meta">
+                      {{ isPreviewableImage(url) ? '点击预览' : '点击打开或复制链接' }}
+                    </text>
                   </view>
                 </view>
               </view>
             </view>
           </template>
-          <view v-else class="petpal-empty">
-            <text>照料者尚未上传服务记录</text>
+          <view v-else class="petpal-empty petpal-empty--soft">
+            <text>照料者还没有回传服务记录</text>
           </view>
         </AppSection>
 
@@ -1900,37 +2224,6 @@ onLoad((options: Record<string, string | undefined>) => {
                   <text class="petpal-timeline-meta-item">
                     <text class="petpal-timeline-meta-label">完成</text>
                     <text class="petpal-timeline-meta-value">{{ formatDateTime(payment.paidAt) }}</text>
-                  </text>
-                </view>
-              </view>
-            </view>
-          </view>
-        </AppSection>
-
-        <!-- 退款时间线 -->
-        <AppSection v-if="detailTab === 'aftersales' && order.refunds.length > 0" :title="`退款记录 (${order.refunds.length})`">
-          <view class="petpal-timeline">
-            <view v-for="refund in order.refunds" :key="refund.id" class="petpal-timeline-item">
-              <view class="petpal-timeline-dot" :class="`is-${refund.refundStatus.toLowerCase()}`" />
-              <view class="petpal-timeline-content">
-                <view class="petpal-timeline-header">
-                  <text class="petpal-timeline-title">{{ refund.refundNo }}</text>
-                  <text class="petpal-timeline-label">{{ labels.refundStatus[refund.refundStatus] || refund.refundStatus }}</text>
-                </view>
-                <view class="petpal-timeline-meta">
-                  <text class="petpal-timeline-meta-item">
-                    <text class="petpal-timeline-meta-label">金额</text>
-                    <text class="petpal-timeline-meta-value">¥{{ formatAmount(refund.refundAmount) }}</text>
-                  </text>
-                  <text class="petpal-timeline-meta-item">
-                    <text class="petpal-timeline-meta-label">类型</text>
-                    <text class="petpal-timeline-meta-value">{{ labels.refundType[refund.refundType] || refund.refundType }}</text>
-                  </text>
-                </view>
-                <view v-if="refund.reviewedAt" class="petpal-timeline-meta">
-                  <text class="petpal-timeline-meta-item">
-                    <text class="petpal-timeline-meta-label">审核</text>
-                    <text class="petpal-timeline-meta-value">{{ formatDateTime(refund.reviewedAt) }}</text>
                   </text>
                 </view>
               </view>
@@ -2241,6 +2534,343 @@ onLoad((options: Record<string, string | undefined>) => {
 .petpal-action-panel__meta {
   color: #667085;
   font-size: 12px;
+}
+
+.petpal-tab-workspace {
+  display: grid;
+  gap: 14px;
+}
+
+.petpal-tab-hero {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid #dbe3ef;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.petpal-tab-hero--chat {
+  background:
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.14), transparent 34%),
+    linear-gradient(180deg, #f2fbf6 0%, #ffffff 100%);
+}
+
+.petpal-tab-hero--service {
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 34%),
+    linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.petpal-tab-hero--aftersales {
+  background:
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.14), transparent 34%),
+    linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+}
+
+.petpal-tab-hero__copy {
+  display: grid;
+  gap: 6px;
+}
+
+.petpal-tab-hero__eyebrow {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.petpal-tab-hero__title {
+  color: #111827;
+  font-size: 18px;
+  line-height: 1.32;
+  font-weight: 700;
+}
+
+.petpal-tab-hero__hint {
+  color: #475467;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.petpal-tab-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.petpal-tab-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.petpal-tab-summary-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #e5ebf3;
+  background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+}
+
+.petpal-tab-summary-card--primary {
+  border-color: #dbeafe;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.petpal-tab-summary-card--success {
+  border-color: #cce9d5;
+  background: linear-gradient(180deg, #edf9f0 0%, #ffffff 100%);
+}
+
+.petpal-tab-summary-card--warning {
+  border-color: #fde7b3;
+  background: linear-gradient(180deg, #fff8e7 0%, #ffffff 100%);
+}
+
+.petpal-tab-summary-card--danger {
+  border-color: #fecdd3;
+  background: linear-gradient(180deg, #fff1f2 0%, #ffffff 100%);
+}
+
+.petpal-tab-summary-card__label {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.petpal-tab-summary-card__value {
+  color: #111827;
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.petpal-tab-summary-card__hint {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.petpal-feed-list {
+  display: grid;
+  gap: 12px;
+}
+
+.petpal-feed-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #e5ebf3;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+}
+
+.petpal-feed-card--service {
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.petpal-feed-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.petpal-feed-card__headline {
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-feed-card__title {
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.petpal-feed-card__meta {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.petpal-feed-card__details {
+  display: grid;
+  gap: 6px;
+}
+
+.petpal-feed-card__detail {
+  color: #4b5563;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.petpal-case-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.petpal-case-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid #e5ebf3;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+}
+
+.petpal-case-card--refund {
+  border-color: #dbeafe;
+  background: linear-gradient(180deg, #f6faff 0%, #ffffff 100%);
+}
+
+.petpal-case-card--complaint {
+  border-color: #ffd6dc;
+  background: linear-gradient(180deg, #fff6f7 0%, #ffffff 100%);
+}
+
+.petpal-case-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.petpal-case-card__headline {
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-case-card__title {
+  color: #111827;
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.petpal-case-card__meta {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.petpal-case-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.petpal-inline-progress {
+  display: grid;
+  gap: 8px;
+}
+
+.petpal-inline-progress__item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid #e5ebf3;
+}
+
+.petpal-inline-progress__title {
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.petpal-inline-progress__meta {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.petpal-inline-progress__note {
+  color: #4b5563;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.petpal-chat-thread {
+  display: grid;
+  gap: 12px;
+}
+
+.petpal-chat-row {
+  display: flex;
+}
+
+.petpal-chat-row--self {
+  justify-content: flex-end;
+}
+
+.petpal-chat-bubble {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: 86%;
+  padding: 12px;
+  border-radius: 18px 18px 18px 8px;
+  border: 1px solid #dbe3ef;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.petpal-chat-row--self .petpal-chat-bubble {
+  border-radius: 18px 18px 8px 18px;
+  border-color: #bfd7ff;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.petpal-chat-bubble__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.petpal-chat-bubble__sender {
+  color: #111827;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.petpal-chat-bubble__time {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.petpal-chat-composer {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid #dbe7ff;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+}
+
+.petpal-chat-composer__header {
+  display: grid;
+  gap: 4px;
+}
+
+.petpal-chat-composer__title {
+  color: #111827;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.petpal-chat-composer__hint {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.petpal-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .petpal-form-group {
@@ -2743,6 +3373,16 @@ onLoad((options: Record<string, string | undefined>) => {
   line-height: 1.6;
 }
 
+.petpal-note-card--bubble {
+  margin-top: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.petpal-chat-row--self .petpal-note-card--bubble {
+  background: rgba(239, 246, 255, 0.95);
+}
+
 .petpal-service-log-media {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2794,6 +3434,14 @@ onLoad((options: Record<string, string | undefined>) => {
   color: #999;
 }
 
+.petpal-empty--soft {
+  padding: 24px 16px;
+  border-radius: 16px;
+  border: 1px dashed #dbe3ef;
+  background: #f8fafc;
+  color: #667085;
+}
+
 .petpal-order-actions {
   display: flex;
   gap: 12px;
@@ -2803,8 +3451,14 @@ onLoad((options: Record<string, string | undefined>) => {
 @media (max-width: 680px) {
   .petpal-quick-grid,
   .petpal-signal-grid,
+  .petpal-tab-summary-grid,
+  .petpal-service-log-media,
   .petpal-order-overview-banner__stats {
     grid-template-columns: 1fr;
+  }
+
+  .petpal-chat-bubble {
+    max-width: 100%;
   }
 }
 </style>
