@@ -518,9 +518,17 @@ import {
   createPetPalTrimmedTextFieldBinding,
 } from './export-field-bindings';
 import {
-  parsePetPalExportDateRange,
-  serializePetPalExportDateRange,
-} from './export-date-range';
+  applyCaregiverEarningsExportFilterSnapshot,
+  buildCaregiverEarningsExportQuery,
+  cloneCaregiverEarningsExportFilterSnapshot,
+  createEmptyCaregiverEarningsExportFilterSnapshot,
+  type CaregiverEarningsExportFilterSnapshot,
+  type CaregiverEarningsExportTemplate,
+  type EarningsExportDatePreset,
+  hasCaregiverEarningsExportFilters,
+  parseCaregiverEarningsExportDateRange,
+  withCaregiverEarningsExportDateRange,
+} from './caregiver-earnings-export-state';
 import {
   formatPetPalMoney,
   formatPetPalRange,
@@ -540,25 +548,6 @@ const summary = ref<CaregiverEarningsSummaryRecord | null>(null);
 const summaryState = ref<PetPalSectionLoadState>('idle');
 const sectionReloadingKey = ref<'' | 'summary'>('');
 
-type EarningsExportDatePreset = '' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
-type CaregiverEarningsExportFilterSnapshot = {
-  startDate: string;
-  endDate: string;
-  serviceType: PetServiceType | '';
-  orderNoKeyword: string;
-  refundType: RefundType | '';
-  refundStatus: RefundStatus | '';
-  refundReasonKeyword: string;
-  complaintStatus: ComplaintStatus | '';
-  complaintType: ComplaintType | '';
-  complaintKeyword: string;
-  complaintTargetRole: ComplaintTargetRole | '';
-  datePreset: EarningsExportDatePreset;
-  riskOnly: boolean;
-};
-type CaregiverEarningsExportTemplate = CaregiverEarningsExportFilterSnapshot & {
-  name: string;
-};
 type CaregiverEarningsExportPageState = CaregiverEarningsExportFilterSnapshot & {
   templates: CaregiverEarningsExportTemplate[];
 };
@@ -573,19 +562,7 @@ const exportPresetOptions: Array<{ label: string; value: Exclude<EarningsExportD
 const { state: exportPageState } = usePageState<CaregiverEarningsExportPageState>(
   'page:petpal:caregiver-earnings-export-filters',
   {
-    startDate: '',
-    endDate: '',
-    serviceType: '',
-    orderNoKeyword: '',
-    refundType: '',
-    refundStatus: '',
-    refundReasonKeyword: '',
-    complaintStatus: '',
-    complaintType: '',
-    complaintKeyword: '',
-    complaintTargetRole: '',
-    datePreset: '',
-    riskOnly: false,
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
     templates: [],
   },
 );
@@ -653,57 +630,12 @@ const addDays = (value: Date, amount: number) => {
   next.setDate(next.getDate() + amount);
   return next;
 };
-const applyExportFilterSnapshot = (snapshot: CaregiverEarningsExportFilterSnapshot) => {
-  exportPageState.startDate = snapshot.startDate;
-  exportPageState.endDate = snapshot.endDate;
-  exportPageState.serviceType = snapshot.serviceType;
-  exportPageState.orderNoKeyword = snapshot.orderNoKeyword ?? '';
-  exportPageState.refundType = snapshot.refundType;
-  exportPageState.refundStatus = snapshot.refundStatus;
-  exportPageState.refundReasonKeyword = snapshot.refundReasonKeyword;
-  exportPageState.complaintStatus = snapshot.complaintStatus;
-  exportPageState.complaintType = snapshot.complaintType;
-  exportPageState.complaintKeyword = snapshot.complaintKeyword ?? '';
-  exportPageState.complaintTargetRole = snapshot.complaintTargetRole ?? '';
-  exportPageState.datePreset = snapshot.datePreset;
-  exportPageState.riskOnly = snapshot.riskOnly;
-};
-const buildCurrentExportFilterSnapshot = (): CaregiverEarningsExportFilterSnapshot => ({
-  startDate: exportPageState.startDate,
-  endDate: exportPageState.endDate,
-  serviceType: exportPageState.serviceType,
-  orderNoKeyword: exportPageState.orderNoKeyword,
-  refundType: exportPageState.refundType,
-  refundStatus: exportPageState.refundStatus,
-  refundReasonKeyword: exportPageState.refundReasonKeyword,
-  complaintStatus: exportPageState.complaintStatus,
-  complaintType: exportPageState.complaintType,
-  complaintKeyword: exportPageState.complaintKeyword,
-  complaintTargetRole: exportPageState.complaintTargetRole,
-  datePreset: exportPageState.datePreset,
-  riskOnly: exportPageState.riskOnly,
-});
-const clearCurrentExportFilters = () => {
-  applyExportFilterSnapshot({
-    startDate: '',
-    endDate: '',
-    serviceType: '',
-    orderNoKeyword: '',
-    refundType: '',
-    refundStatus: '',
-    refundReasonKeyword: '',
-    complaintStatus: '',
-    complaintType: '',
-    complaintKeyword: '',
-    complaintTargetRole: '',
-    datePreset: '',
-    riskOnly: false,
-  });
-};
 const setExportDateRange = (value: [Date, Date] | null, datePreset: EarningsExportDatePreset = '') => {
-  applyExportFilterSnapshot({
-    ...buildCurrentExportFilterSnapshot(),
-    ...serializePetPalExportDateRange(value),
+  applyCaregiverEarningsExportFilterSnapshot(exportPageState, {
+    ...withCaregiverEarningsExportDateRange(
+      cloneCaregiverEarningsExportFilterSnapshot(exportPageState),
+      value,
+    ),
     datePreset: value ? datePreset : '',
   });
 };
@@ -737,7 +669,7 @@ const auditLabel = computed(() =>
   profile.value ? getPetPalCaregiverAuditLabel(profile.value.auditStatus) : '未建档',
 );
 const exportDateRange = createPetPalFieldBinding<[Date, Date] | null>({
-  get: () => parsePetPalExportDateRange(exportPageState),
+  get: () => parseCaregiverEarningsExportDateRange(exportPageState),
   set: (value: [Date, Date] | null) => {
     setExportDateRange(value);
   },
@@ -837,19 +769,7 @@ const trendGroups = computed(() =>
 );
 const hasTrendData = computed(() => totals.value.completedOrderCount > 0);
 const activeExportPreset = computed(() => exportPageState.datePreset);
-const hasExportFilters = computed(() => Boolean(
-  exportDateRange.value
-  || exportServiceType.value
-  || exportOrderNoKeyword.value.trim()
-  || exportRefundType.value
-  || exportRefundStatus.value
-  || exportRefundReasonKeyword.value.trim()
-  || exportComplaintStatus.value
-  || exportComplaintType.value
-  || exportComplaintKeyword.value.trim()
-  || exportComplaintTargetRole.value
-  || exportRiskOnly.value,
-));
+const hasExportFilters = computed(() => hasCaregiverEarningsExportFilters(exportPageState));
 const revenueCards = computed(() => [
   {
     label: '累计收入',
@@ -970,12 +890,15 @@ function applyExportPreset(preset: Exclude<EarningsExportDatePreset, ''>) {
 }
 
 function clearExportFilters() {
-  clearCurrentExportFilters();
+  applyCaregiverEarningsExportFilterSnapshot(
+    exportPageState,
+    createEmptyCaregiverEarningsExportFilterSnapshot(),
+  );
 }
 
 function applySelectedExportTemplate() {
   const appliedTemplate = applyNamedExportTemplate((template) => {
-    applyExportFilterSnapshot(template);
+    applyCaregiverEarningsExportFilterSnapshot(exportPageState, template);
   });
 
   if (!appliedTemplate) {
@@ -1005,7 +928,7 @@ async function saveCurrentExportTemplate() {
     const name = value.trim();
     const nextTemplate: CaregiverEarningsExportTemplate = {
       name,
-      ...buildCurrentExportFilterSnapshot(),
+      ...cloneCaregiverEarningsExportFilterSnapshot(exportPageState),
     };
     const result = saveNamedExportTemplate(nextTemplate);
 
@@ -1053,20 +976,7 @@ async function deleteSelectedExportTemplate() {
 }
 
 function buildEarningsExportRequest() {
-  return api.petpal.caregiver.exportEarnings({
-    startDate: exportDateRange.value?.[0]?.toISOString(),
-    endDate: exportDateRange.value?.[1]?.toISOString(),
-    serviceType: exportServiceType.value || undefined,
-    orderNoKeyword: exportOrderNoKeyword.value.trim() || undefined,
-    refundType: exportRefundType.value || undefined,
-    refundStatus: exportRefundStatus.value || undefined,
-    refundReasonKeyword: exportRefundReasonKeyword.value.trim() || undefined,
-    complaintStatus: exportComplaintStatus.value || undefined,
-    complaintType: exportComplaintType.value || undefined,
-    complaintKeyword: exportComplaintKeyword.value.trim() || undefined,
-    complaintTargetRole: exportComplaintTargetRole.value || undefined,
-    riskOnly: exportRiskOnly.value || undefined,
-  });
+  return api.petpal.caregiver.exportEarnings(buildCaregiverEarningsExportQuery(exportPageState));
 }
 
 function buildOrderDetailLink(orderId: string) {

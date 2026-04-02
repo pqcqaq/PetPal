@@ -7828,6 +7828,52 @@ flowchart TD
 2. 继续评估模板应用与清空筛选动作能否收口到统一的导出筛选桥接层，减少页面动作函数重复。
 3. 在导出快照桥接层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.182 2026-04-03（P3-M1 Slice 182）
+
+**概述**：延续上一轮把日期范围桥接抽成共享 helper 的收口，本轮继续把照料者收益页里仍然内联的导出快照状态抽成独立模块，统一承接空快照、快照克隆、快照应用、日期范围桥接、筛选存在性判断和导出查询构建，减少收益页继续把整套导出状态规则写在单文件里。
+
+已完成：
+
+- 提取照料者收益导出状态模块：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-earnings-export-state.ts`
+    - 新增 `createEmptyCaregiverEarningsExportFilterSnapshot`，统一承接收益导出默认快照。
+    - 新增 `cloneCaregiverEarningsExportFilterSnapshot`、`applyCaregiverEarningsExportFilterSnapshot`，统一承接收益导出快照 clone / apply 逻辑。
+    - 新增 `parseCaregiverEarningsExportDateRange`、`withCaregiverEarningsExportDateRange`，在共享日期 helper 之上补齐收益导出的日期桥接。
+    - 新增 `hasCaregiverEarningsExportFilters` 与 `buildCaregiverEarningsExportQuery`，统一承接筛选存在性判断和导出请求序列化。
+- 收益页切到独立状态模块：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 页面已移除内联的收益导出快照类型、快照读写和导出请求组装。
+    - 清空筛选、应用模板、保存模板、时间范围写回和导出请求构建现已统一改走新的状态模块。
+    - 快捷时间窗 `datePreset` 的页面特有逻辑继续保留在收益页，不和主人侧导出页过度耦合。
+- 新增定向单测：
+  - `apps/web-frontend/test/caregiver-earnings-export-state.test.ts`
+    - 覆盖收益导出快照创建 / 克隆 / 应用、日期范围桥接、筛选存在性判断和导出查询构建。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts ..\\web-frontend\\test\\petpal-export-date-range.test.ts ..\\web-frontend\\test\\petpal-export-field-bindings.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增后端导出契约、筛选字段或页面交互，只继续收口 Web 前端照料者收益导出的状态桥接层。
+- 已确认收益页的快捷时间窗、模板持久化和导出入口行为保持不变，变化只在于快照状态从页面内联逻辑迁到独立模块。
+- 已确认 `buildCaregiverEarningsExportQuery` 继续复用现有筛选语义，关键词仍会在导出时做 `trim()`，`riskOnly` 仍只在为 `true` 时才透传。
+
+风险与缓解：
+
+- 风险：照料者收益导出状态已抽出独立模块，但主人退款导出和主人交易导出状态文件之间仍存在平行的 clone / apply / has-filters 模式，导出状态层还没有彻底统一。
+- 缓解：下一轮继续优先评估三份导出状态模块之间可共享的快照基础 helper，避免后续再在更多页面复制同构状态函数。
+
+下一步（1-3）：
+
+1. 继续评估主人交易导出、主人退款导出和照料者收益导出之间可共享的快照基础 helper，减少三个状态模块的平行实现。
+2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
+3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
 ### 14.172 2026-04-03（P3-M1 Slice 172）
 
 **概述**：延续退款原因关键词专项导出，本轮继续把照料者经营明细推进到“能按投诉摘要检索复盘”的层面，新增投诉摘要关键词筛选，让照料者可以快速定位服务争议、平台流程异常、处理结论等特定投诉上下文的完成订单。
