@@ -115,6 +115,17 @@ type CallbackAlertOutboxQueryFilters = {
 type OwnerTransactionExportFilters = {
   startDate?: Date;
   endDate?: Date;
+  serviceType?: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+  orderStatus?:
+    | 'PENDING_ACCEPT'
+    | 'ACCEPTED'
+    | 'SERVING'
+    | 'COMPLETED'
+    | 'CANCELLED'
+    | 'DISPUTED'
+    | 'PARTIAL_REFUNDED'
+    | 'REFUNDED';
+  orderNoKeyword?: string;
 };
 
 type OwnerRefundExportFilters = {
@@ -425,6 +436,20 @@ const normalizeOwnerTransactionExportRange = (
   return {
     startDate,
     endDate,
+  };
+};
+
+const normalizeOwnerTransactionExportFilters = (
+  filters: OwnerTransactionExportFilters,
+  now = new Date(),
+): OwnerTransactionExportFilters & { startDate: Date; endDate: Date } => {
+  const { startDate, endDate } = normalizeOwnerTransactionExportRange(filters, now);
+
+  return {
+    ...filters,
+    startDate,
+    endDate,
+    orderNoKeyword: filters.orderNoKeyword?.trim() || undefined,
   };
 };
 
@@ -2778,15 +2803,33 @@ export const petpalService = {
       throw forbidden('Authentication required');
     }
 
-    const { startDate, endDate } = normalizeOwnerTransactionExportRange(filters);
+    const normalizedFilters = normalizeOwnerTransactionExportFilters(filters);
     const orders = await prisma.orderMain.findMany({
       where: {
         ownerId: actorId,
         deleteAt: null,
         createdAt: {
-          gte: startDate,
-          lte: endDate,
+          gte: normalizedFilters.startDate,
+          lte: normalizedFilters.endDate,
         },
+        ...(normalizedFilters.serviceType
+          ? {
+              serviceType: normalizedFilters.serviceType,
+            }
+          : {}),
+        ...(normalizedFilters.orderStatus
+          ? {
+              orderStatus: normalizedFilters.orderStatus,
+            }
+          : {}),
+        ...(normalizedFilters.orderNoKeyword
+          ? {
+              orderNo: {
+                contains: normalizedFilters.orderNoKeyword,
+                mode: 'insensitive' as const,
+              },
+            }
+          : {}),
       },
       orderBy: {
         createdAt: 'desc',

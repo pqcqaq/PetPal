@@ -4542,6 +4542,104 @@ describe('PetPal API integration', () => {
     assert.equal(oversizeRangeResponse.body.message, 'Export date range cannot exceed 366 days');
   });
 
+  it('filters owner transaction export by order number keyword, service type, and order status', async () => {
+    const { app, prisma, ownerSession, caregiverProfile } = await createFulfillmentScenario();
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+    const suffix = Date.now().toString(36);
+    const now = Date.now();
+
+    const matchedOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-export-match-${suffix}`,
+        orderNo: `PP-TX-FOCUS-${suffix}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'BOARDING',
+        appointmentStart: new Date(now + 1 * 60 * 60 * 1000),
+        appointmentEnd: new Date(now + 25 * 60 * 60 * 1000),
+        amountTotal: 188,
+        amountAdjusted: 0,
+        amountPaid: 188,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date(now),
+      },
+    });
+
+    await prisma.orderMain.create({
+      data: {
+        id: `order-export-service-miss-${suffix}`,
+        orderNo: `PP-TX-FOCUS-SERVICE-${suffix}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'WALKING',
+        appointmentStart: new Date(now + 2 * 60 * 60 * 1000),
+        appointmentEnd: new Date(now + 3 * 60 * 60 * 1000),
+        amountTotal: 88,
+        amountAdjusted: 0,
+        amountPaid: 88,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date(now),
+      },
+    });
+
+    await prisma.orderMain.create({
+      data: {
+        id: `order-export-status-miss-${suffix}`,
+        orderNo: `PP-TX-FOCUS-STATUS-${suffix}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'BOARDING',
+        appointmentStart: new Date(now + 4 * 60 * 60 * 1000),
+        appointmentEnd: new Date(now + 28 * 60 * 60 * 1000),
+        amountTotal: 128,
+        amountAdjusted: 0,
+        amountPaid: 0,
+        amountRefunded: 0,
+        orderStatus: 'PENDING_ACCEPT',
+      },
+    });
+
+    await prisma.orderMain.create({
+      data: {
+        id: `order-export-foreign-match-${suffix}`,
+        orderNo: `PP-TX-FOCUS-FOREIGN-${suffix}`,
+        ownerId: adminSession.user.id,
+        caregiverId: caregiverProfile.id,
+        serviceType: 'BOARDING',
+        appointmentStart: new Date(now + 5 * 60 * 60 * 1000),
+        appointmentEnd: new Date(now + 29 * 60 * 60 * 1000),
+        amountTotal: 168,
+        amountAdjusted: 0,
+        amountPaid: 168,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date(now),
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/orders/transactions/export')
+      .query({
+        orderNoKeyword: 'tx-focus',
+        serviceType: 'BOARDING',
+        orderStatus: 'COMPLETED',
+      })
+      .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    const exportedOrderNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(exportedOrderNos, [matchedOrder.orderNo]);
+  });
+
   it('allows owner to export refund detail rows for the current order only', async () => {
     const { app, prisma, ownerSession, caregiverProfile, order } =
       await createFulfillmentScenario();

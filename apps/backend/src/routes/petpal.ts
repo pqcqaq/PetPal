@@ -175,6 +175,18 @@ const orderMessageSchema = z.object({
 const ownerTransactionExportQuerySchema = z.object({
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
+  serviceType: z.enum(['BOARDING', 'WALKING', 'FEEDING', 'DOOR_VISIT']).optional(),
+  orderStatus: z.enum([
+    'PENDING_ACCEPT',
+    'ACCEPTED',
+    'SERVING',
+    'COMPLETED',
+    'CANCELLED',
+    'DISPUTED',
+    'PARTIAL_REFUNDED',
+    'REFUNDED',
+  ]).optional(),
+  orderNoKeyword: z.string().trim().min(1).max(64).optional(),
 });
 
 const ownerRefundExportQuerySchema = z.object({

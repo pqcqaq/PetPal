@@ -532,6 +532,9 @@ export interface OwnerTransactionExportQuery {
   [key: string]: string | number | boolean | undefined;
   startDate?: string;
   endDate?: string;
+  serviceType?: PetServiceType;
+  orderStatus?: OrderStatus;
+  orderNoKeyword?: string;
 }
 
 export interface OwnerRefundExportQuery {

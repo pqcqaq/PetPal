@@ -96,6 +96,17 @@ export const petPalRefundStatusOptions: Array<{ label: string; value: RefundStat
   { label: '退款失败', value: 'FAILED' },
 ];
 
+export const petPalOrderStatusOptions: Array<{ label: string; value: OrderStatus }> = [
+  { label: '待接单', value: 'PENDING_ACCEPT' },
+  { label: '已接单', value: 'ACCEPTED' },
+  { label: '服务中', value: 'SERVING' },
+  { label: '已完成', value: 'COMPLETED' },
+  { label: '已取消', value: 'CANCELLED' },
+  { label: '纠纷中', value: 'DISPUTED' },
+  { label: '部分退款', value: 'PARTIAL_REFUNDED' },
+  { label: '已退款', value: 'REFUNDED' },
+];
+
 export const petPalServiceLogOptions: Array<{ label: string; value: ServiceLogType; note: string }> = [
   { label: '签到', value: 'CHECK_IN', note: '到达后快速留痕' },
   { label: '喂养', value: 'FEED', note: '记录进食和饮水' },

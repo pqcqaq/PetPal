@@ -7583,6 +7583,63 @@ flowchart TD
 2. 继续评估是否为主人端交易记录导出补筛选和模板，而不是继续维持“交易导出无筛选、退款导出有模板”的不对称状态。
 3. 在导出链路共享层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.177 2026-04-03（P3-M1 Slice 177）
+
+**概述**：延续上一轮对主人端退款导出模板的收口，本轮继续补齐主人订单页的交易导出能力，不再让“交易导出只有一个裸按钮、退款导出已有筛选和模板”继续不对称。主人现在可以按时间范围、服务类型、订单状态和订单号关键词导出交易记录，并保存常用模板。
+
+已完成：
+
+- 主人交易导出补后端筛选契约：
+  - `packages/api-common/src/types/petpal.ts`
+    - `OwnerTransactionExportQuery` 新增 `serviceType`、`orderStatus`、`orderNoKeyword`。
+  - `apps/backend/src/routes/petpal.ts`
+    - 主人交易导出查询新增服务类型、订单状态和订单号关键词校验。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 主人交易导出新增筛选归一化逻辑，补齐订单号关键词去空白处理。
+    - 交易导出查询现支持在当前主人、最近一年范围内继续按服务类型、订单状态和订单号关键词收窄。
+- 主人订单页补交易导出筛选与模板：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerOrdersView.vue`
+    - 订单队列页不再只有“导出交易记录”单按钮，现已新增交易导出筛选工具条。
+    - 新增时间范围、服务类型、订单状态、订单号关键词筛选。
+    - 新增最近一次交易导出条件持久化，以及“应用模板 / 保存为模板 / 删除模板”交互。
+- 新增主人交易导出状态 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/owner-transaction-export-state.ts`
+    - 提供空快照、快照克隆、快照应用、日期范围解析、筛选存在性判断和导出查询构建纯函数。
+- 共享状态补充：
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - 新增 `petPalOrderStatusOptions`，让主人订单页和后续页面可复用统一订单状态选项。
+- 定向测试补齐：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增主人交易导出组合筛选用例，验证订单号关键词、服务类型和订单状态可叠加过滤，同时不会误导出其他主人订单。
+  - `apps/web-frontend/test/owner-transaction-export-state.test.ts`
+    - 新增纯函数测试，覆盖交易导出快照克隆 / 应用、日期范围解析、筛选存在性判断和导出查询构建。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 --test-name-pattern "filters owner transaction export by order number keyword, service type, and order status" test/integration/petpal-api.test.ts` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\owner-transaction-export-state.test.ts ..\\web-frontend\\test\\use-petpal-export-templates.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增新的交易导出接口，只是在已有主人交易导出能力上补齐更细筛选和前端模板入口。
+- 已确认主人交易导出筛选只影响导出文件，不会改变订单队列顶部当前标签筛选。
+- 已确认共享模板 helper / composable 现在已经覆盖照料者收益导出、主人退款导出和主人交易导出三条实际业务链路。
+
+风险与缓解：
+
+- 风险：主人退款导出和主人交易导出都已经有模板和最近筛选，但两套页面的筛选快照 helper 仍然是并行文件，共用导出工具条层还没有彻底抽象出来。
+- 缓解：下一轮继续优先评估把日期范围、关键词输入、清空动作和模板区壳层抽成更完整的导出工具条基础设施。
+
+下一步（1-3）：
+
+1. 继续评估主人交易导出、主人退款导出、照料者收益导出之间可共享的导出工具条壳层与筛选快照桥接逻辑。
+2. 继续评估是否为交易导出补更细的退款状态或支付状态筛选，前提是不把简单导出链路重新做成过重表单。
+3. 在导出链路共享层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
 ### 14.172 2026-04-03（P3-M1 Slice 172）
 
 **概述**：延续退款原因关键词专项导出，本轮继续把照料者经营明细推进到“能按投诉摘要检索复盘”的层面，新增投诉摘要关键词筛选，让照料者可以快速定位服务争议、平台流程异常、处理结论等特定投诉上下文的完成订单。

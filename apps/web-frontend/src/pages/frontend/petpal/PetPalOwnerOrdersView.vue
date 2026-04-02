@@ -38,8 +38,93 @@
           <el-radio-button label="aftersales">售后</el-radio-button>
           <el-radio-button label="done">已完成</el-radio-button>
         </el-radio-group>
+      </div>
 
-        <ListExportButton :request="() => api.petpal.orders.exportTransactions()" label="导出交易记录" pending-label="导出中" />
+      <div class="petpal-export-toolbar">
+        <div class="petpal-export-toolbar__templates">
+          <span class="petpal-export-toolbar__label">常用模板</span>
+          <el-select
+            v-model="selectedExportTemplateName"
+            clearable
+            placeholder="选择交易导出模板"
+            class="petpal-export-toolbar__template"
+          >
+            <el-option
+              v-for="item in exportTemplates"
+              :key="item.name"
+              :label="item.name"
+              :value="item.name"
+            />
+          </el-select>
+          <el-button :disabled="!selectedExportTemplate" @click="applySelectedExportTemplate">
+            应用模板
+          </el-button>
+          <el-button :disabled="!hasExportFilters" @click="saveCurrentExportTemplate">
+            保存为模板
+          </el-button>
+          <el-button
+            v-if="selectedExportTemplate"
+            text
+            @click="deleteSelectedExportTemplate"
+          >
+            删除模板
+          </el-button>
+        </div>
+
+        <div class="petpal-export-toolbar__filters">
+          <el-date-picker
+            v-model="exportDateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="交易开始日期"
+            end-placeholder="交易结束日期"
+            clearable
+          />
+          <el-select
+            v-model="exportServiceType"
+            clearable
+            placeholder="全部服务类型"
+            class="petpal-export-toolbar__control"
+          >
+            <el-option
+              v-for="item in petPalServiceTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <el-select
+            v-model="exportOrderStatus"
+            clearable
+            placeholder="全部订单状态"
+            class="petpal-export-toolbar__control"
+          >
+            <el-option
+              v-for="item in petPalOrderStatusOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <el-input
+            v-model="exportOrderNoKeyword"
+            clearable
+            placeholder="订单号关键词"
+            class="petpal-export-toolbar__control"
+          />
+          <el-button v-if="hasExportFilters" text @click="clearExportFilters">
+            清空导出筛选
+          </el-button>
+          <ListExportButton
+            :request="buildTransactionExportRequest"
+            label="导出交易记录"
+            pending-label="导出中"
+          />
+        </div>
+
+        <p class="petpal-export-toolbar__hint">
+          交易导出只影响当前导出文件，不改变订单队列顶部状态切换；系统会记住最近一次交易导出条件，并可保存最多 5 套常用模板。
+        </p>
       </div>
 
       <PetPalDeskEmpty
@@ -76,17 +161,34 @@
 </template>
 
 <script setup lang="ts">
-import type { OrderRecord } from '@rbac/api-common';
+import type { OrderRecord, OrderStatus } from '@rbac/api-common';
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '@/api/client';
 import ListExportButton from '@/components/download/ListExportButton.vue';
+import { usePetPalExportTemplates } from '@/composables/use-petpal-export-templates';
+import { usePageState } from '@/composables/use-page-state';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import {
+  PETPAL_EXPORT_TEMPLATE_LIMIT,
+  validatePetPalExportTemplateName,
+} from './export-template-state';
+import {
+  applyOwnerTransactionExportFilterSnapshot,
+  buildOwnerTransactionExportQuery,
+  cloneOwnerTransactionExportFilterSnapshot,
+  createEmptyOwnerTransactionExportFilterSnapshot,
+  hasOwnerTransactionExportFilters,
+  parseOwnerTransactionExportDateRange,
+  type OwnerTransactionExportFilterSnapshot,
+  type OwnerTransactionExportTemplate,
+  withOwnerTransactionExportDateRange,
+} from './owner-transaction-export-state';
 import {
   buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
@@ -104,7 +206,9 @@ import {
   getPetPalServiceTypeLabel,
   isPetPalAftersalesStatus,
   isPetPalOutstandingOrder,
+  petPalOrderStatusOptions,
   petPalOwnerWorkspaceNav,
+  petPalServiceTypeOptions,
 } from './shared';
 
 const route = useRoute();
@@ -112,6 +216,31 @@ const orders = ref<OrderRecord[]>([]);
 const filter = ref<'all' | 'needs_payment' | 'active' | 'aftersales' | 'done'>('all');
 const loadState = ref<PetPalSectionLoadState>('idle');
 const sectionReloadingKey = ref<'' | 'orders'>('');
+
+type OwnerTransactionExportPageState = OwnerTransactionExportFilterSnapshot & {
+  templates: OwnerTransactionExportTemplate[];
+};
+
+const { state: exportPageState } = usePageState<OwnerTransactionExportPageState>(
+  'page:petpal:owner-transaction-export-filters',
+  {
+    ...createEmptyOwnerTransactionExportFilterSnapshot(),
+    templates: [],
+  },
+);
+const exportTemplateState = computed<OwnerTransactionExportTemplate[]>({
+  get: () => exportPageState.templates,
+  set: (value) => {
+    exportPageState.templates = value;
+  },
+});
+const {
+  selectedTemplateName: selectedExportTemplateName,
+  selectedTemplate: selectedExportTemplate,
+  applySelectedTemplate: applyNamedExportTemplate,
+  saveTemplate: saveNamedExportTemplate,
+  removeSelectedTemplate: removeNamedExportTemplate,
+} = usePetPalExportTemplates(exportTemplateState);
 
 const filteredOrders = computed(() => orders.value.filter((item) => {
   if (filter.value === 'needs_payment') {
@@ -172,6 +301,36 @@ const pageNotice = computed(() => buildPetPalPageNotice({
   warningTitle: '订单队列暂未刷新完整',
 }));
 
+const exportDateRange = computed<[Date, Date] | null>({
+  get: () => parseOwnerTransactionExportDateRange(exportPageState),
+  set: (value) => {
+    applyOwnerTransactionExportFilterSnapshot(
+      exportPageState,
+      withOwnerTransactionExportDateRange(exportPageState, value),
+    );
+  },
+});
+const exportServiceType = computed<OwnerTransactionExportFilterSnapshot['serviceType']>({
+  get: () => exportPageState.serviceType,
+  set: (value) => {
+    exportPageState.serviceType = value || '';
+  },
+});
+const exportOrderStatus = computed<OrderStatus | ''>({
+  get: () => exportPageState.orderStatus,
+  set: (value) => {
+    exportPageState.orderStatus = value || '';
+  },
+});
+const exportOrderNoKeyword = computed<string>({
+  get: () => exportPageState.orderNoKeyword,
+  set: (value) => {
+    exportPageState.orderNoKeyword = value.trimStart();
+  },
+});
+const exportTemplates = computed(() => exportPageState.templates);
+const hasExportFilters = computed(() => hasOwnerTransactionExportFilters(exportPageState));
+
 const unreadCount = (order: OrderRecord) => getPetPalConversationUnreadCount(order.conversation, 'owner');
 
 const resolveOrderFilter = (order: OrderRecord): PetPalDeskOrderFilter => {
@@ -231,6 +390,96 @@ function buildPaymentResultLink(order: OrderRecord) {
   };
 }
 
+function clearExportFilters() {
+  applyOwnerTransactionExportFilterSnapshot(
+    exportPageState,
+    createEmptyOwnerTransactionExportFilterSnapshot(),
+  );
+}
+
+function applySelectedExportTemplate() {
+  const appliedTemplate = applyNamedExportTemplate((template) => {
+    applyOwnerTransactionExportFilterSnapshot(exportPageState, template);
+  });
+
+  if (!appliedTemplate) {
+    return;
+  }
+  ElMessage.success(`已应用模板「${appliedTemplate.name}」`);
+}
+
+async function saveCurrentExportTemplate() {
+  if (!hasExportFilters.value) {
+    ElMessage.warning('请先选择至少一个交易导出筛选条件');
+    return;
+  }
+
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '为当前交易导出条件取一个名字，便于后续快速套用。',
+      '保存交易导出模板',
+      {
+        confirmButtonText: '保存',
+        cancelButtonText: '取消',
+        inputValue: selectedExportTemplateName.value,
+        inputValidator: validatePetPalExportTemplateName,
+      },
+    );
+
+    const name = value.trim();
+    const nextTemplate: OwnerTransactionExportTemplate = {
+      name,
+      ...cloneOwnerTransactionExportFilterSnapshot(exportPageState),
+    };
+    const result = saveNamedExportTemplate(nextTemplate);
+
+    if (result.status === 'limit_exceeded') {
+      ElMessage.warning(`最多只能保存 ${PETPAL_EXPORT_TEMPLATE_LIMIT} 个导出模板`);
+      return;
+    }
+
+    ElMessage.success(result.status === 'updated' ? `模板「${name}」已更新` : `模板「${name}」已保存`);
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error(getErrorMessage(error, '保存交易导出模板失败'));
+    }
+  }
+}
+
+async function deleteSelectedExportTemplate() {
+  if (!selectedExportTemplate.value) {
+    return;
+  }
+
+  const templateName = selectedExportTemplate.value.name;
+
+  try {
+    await ElMessageBox.confirm(
+      `删除后将不再保留模板「${templateName}」的交易导出条件。`,
+      '删除交易导出模板',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+      },
+    );
+
+    const removedTemplateName = removeNamedExportTemplate();
+    if (!removedTemplateName) {
+      return;
+    }
+    ElMessage.success(`模板「${removedTemplateName}」已删除`);
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error(getErrorMessage(error, '删除交易导出模板失败'));
+    }
+  }
+}
+
+function buildTransactionExportRequest() {
+  return api.petpal.orders.exportTransactions(buildOwnerTransactionExportQuery(exportPageState));
+}
+
 function applyRouteContext() {
   const routeFilter = getPetPalDeskOrderFilter(route.query);
   if (routeFilter) {
@@ -279,9 +528,55 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+.petpal-export-toolbar {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.petpal-export-toolbar__templates,
+.petpal-export-toolbar__filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.petpal-export-toolbar__label {
+  color: #6b625a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.petpal-export-toolbar__template,
+.petpal-export-toolbar__control {
+  width: 220px;
+}
+
+.petpal-export-toolbar__hint {
+  margin: 0;
+  color: #6b625a;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .petpal-sheet-row.is-focused {
   margin-inline: -10px;
   padding-inline: 10px;
   background: rgba(244, 248, 255, 0.9);
+}
+
+@media (max-width: 720px) {
+  .petpal-export-toolbar__templates,
+  .petpal-export-toolbar__filters {
+    align-items: stretch;
+  }
+
+  .petpal-export-toolbar__template,
+  .petpal-export-toolbar__control {
+    width: 100%;
+  }
 }
 </style>
