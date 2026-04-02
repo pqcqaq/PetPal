@@ -3,6 +3,7 @@ import AppButton from '@/components/app-button/app-button.vue'
 import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import {
+  openPetPalAction,
   ownerFlowOptions,
   PETPAL_HUB_PAGE,
   PETPAL_MESSAGES_PAGE,
@@ -23,7 +24,7 @@ function redirectTo(url: string) {
   if (props.currentPath === url) {
     return
   }
-  uni.redirectTo({ url })
+  openPetPalAction('redirect', url)
 }
 
 function openHub() {
@@ -44,7 +45,7 @@ function openReminders() {
     <view class="owner-flow-nav__top">
       <view class="owner-flow-nav__headline">
         <AppTag type="primary">
-          主人
+          当前任务
         </AppTag>
         <text class="owner-flow-nav__title">{{ title }}</text>
       </view>

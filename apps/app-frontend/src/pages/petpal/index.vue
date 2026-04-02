@@ -25,6 +25,7 @@ import {
   PETPAL_CAREGIVER_HOME_PAGE,
   PETPAL_CAREGIVER_ORDERS_PAGE,
   PETPAL_CAREGIVER_SERVICES_PAGE,
+  openPetPalAction,
   PETPAL_MESSAGES_PAGE,
   PETPAL_OWNER_HOME_PAGE,
   PETPAL_ORDERS_PAGE,
@@ -73,19 +74,19 @@ const roleActionItems = computed(() => (
           title: '新建需求',
           label: '快速开始一次新的照料安排',
           value: '去发布',
-          action: () => uni.navigateTo({ url: PETPAL_REQUEST_PAGE }),
+          action: () => openPetPalAction('navigate', PETPAL_REQUEST_PAGE),
         },
         {
           title: '我的订单',
           label: '查看进行中、待确认和待评价订单',
           value: '去处理',
-          action: () => uni.navigateTo({ url: PETPAL_ORDERS_PAGE }),
+          action: () => openPetPalAction('navigate', PETPAL_ORDERS_PAGE),
         },
         {
           title: '售后中心',
           label: '退款、投诉、争议统一处理',
           value: '去跟进',
-          action: () => uni.navigateTo({ url: PETPAL_AFTERSALES_PAGE }),
+          action: () => openPetPalAction('navigate', PETPAL_AFTERSALES_PAGE),
         },
       ]
     : [
@@ -115,15 +116,13 @@ function goToLogin() {
 }
 
 function openActiveRoleHome() {
-  uni.redirectTo({
-    url: activeRole.value === 'OWNER'
-      ? PETPAL_OWNER_HOME_PAGE
-      : PETPAL_CAREGIVER_HOME_PAGE,
-  })
+  openPetPalAction('redirect', activeRole.value === 'OWNER'
+    ? PETPAL_OWNER_HOME_PAGE
+    : PETPAL_CAREGIVER_HOME_PAGE)
 }
 
 function openMessages() {
-  uni.navigateTo({ url: PETPAL_MESSAGES_PAGE })
+  openPetPalAction('navigate', PETPAL_MESSAGES_PAGE)
 }
 
 function openReminders() {

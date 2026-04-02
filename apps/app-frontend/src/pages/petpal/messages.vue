@@ -28,6 +28,7 @@ import {
   getConversationUnreadCount,
   getOrderStatusLabel,
   getOrderTone,
+  openPetPalAction,
   PETPAL_CAREGIVER_HOME_PAGE,
   PETPAL_HUB_PAGE,
   PETPAL_NOTIFICATIONS_PAGE,
@@ -245,7 +246,7 @@ function openRoleHub() {
 }
 
 function openOwnerHome() {
-  uni.redirectTo({ url: PETPAL_OWNER_HOME_PAGE })
+  openPetPalAction('redirect', PETPAL_OWNER_HOME_PAGE)
 }
 
 function openCaregiverHome() {

@@ -37,6 +37,7 @@ import {
   getCaregiverAuditLabel,
   getConversationUnreadCount,
   getOrderStatusLabel,
+  openPetPalAction,
   PETPAL_CAREGIVER_EARNINGS_PAGE,
   PETPAL_CAREGIVER_HOME_PAGE,
   PETPAL_CAREGIVER_ORDERS_PAGE,
@@ -232,7 +233,7 @@ function openEarnings() {
 }
 
 function openMessages() {
-  uni.redirectTo({ url: PETPAL_MESSAGES_PAGE })
+  openPetPalAction('redirect', PETPAL_MESSAGES_PAGE)
 }
 
 function openReminders() {

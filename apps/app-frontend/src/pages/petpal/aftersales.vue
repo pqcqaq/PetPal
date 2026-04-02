@@ -39,6 +39,7 @@ import {
   getConversationUnreadCount,
   getOrderStatusLabel,
   getOrderTone,
+  openPetPalAction,
   getRefundProgressStageLabel,
   isOrderAftersalesTracked,
   PETPAL_AFTERSALES_PAGE,
@@ -563,11 +564,11 @@ function openPrimaryAction(entry: AftersalesOrderView) {
 }
 
 function openOrders() {
-  uni.redirectTo({ url: PETPAL_ORDERS_PAGE })
+  openPetPalAction('redirect', PETPAL_ORDERS_PAGE)
 }
 
 function openMessages() {
-  uni.redirectTo({ url: PETPAL_MESSAGES_PAGE })
+  openPetPalAction('redirect', PETPAL_MESSAGES_PAGE)
 }
 
 function goToLogin() {

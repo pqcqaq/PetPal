@@ -13,8 +13,20 @@ export const nativeTabbarList: NativeTabBarItem[] = [
   {
     iconPath: 'static/tabbar/home.png',
     selectedIconPath: 'static/tabbar/homeHL.png',
-    pagePath: 'pages/index/index',
-    text: '工作台',
+    pagePath: 'pages/petpal/owner-home',
+    text: '首页',
+  },
+  {
+    iconPath: 'static/tabbar/example.png',
+    selectedIconPath: 'static/tabbar/exampleHL.png',
+    pagePath: 'pages/petpal/orders',
+    text: '订单',
+  },
+  {
+    iconPath: 'static/tabbar/scan.png',
+    selectedIconPath: 'static/tabbar/exampleHL.png',
+    pagePath: 'pages/petpal/messages',
+    text: '消息',
   },
   {
     iconPath: 'static/tabbar/personal.png',
@@ -26,10 +38,22 @@ export const nativeTabbarList: NativeTabBarItem[] = [
 
 export const customTabbarList: CustomTabBarItem[] = [
   {
-    text: '工作台',
-    pagePath: 'pages/index/index',
+    text: '首页',
+    pagePath: 'pages/petpal/owner-home',
     iconType: 'unocss',
     icon: 'i-carbon-home',
+  },
+  {
+    pagePath: 'pages/petpal/orders',
+    text: '订单',
+    iconType: 'unocss',
+    icon: 'i-carbon-receipt',
+  },
+  {
+    pagePath: 'pages/petpal/messages',
+    text: '消息',
+    iconType: 'unocss',
+    icon: 'i-carbon-chat',
   },
   {
     pagePath: 'pages/me/me',

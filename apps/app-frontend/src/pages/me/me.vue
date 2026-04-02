@@ -169,7 +169,7 @@ function openServiceBoard() {
     handleLogin()
     return
   }
-  uni.navigateTo({ url: '/pages/petpal/owner-home' })
+  uni.switchTab({ url: '/pages/petpal/owner-home' })
 }
 
 function openAftersalesCenter() {

@@ -35,6 +35,7 @@ import {
   getConversationPreview,
   getConversationUnreadCount,
   getOrderStatusLabel,
+  openPetPalAction,
   PETPAL_CAREGIVER_ORDERS_PAGE,
   PETPAL_MESSAGES_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
@@ -122,7 +123,7 @@ function goToLogin() {
 }
 
 function openMessages() {
-  uni.redirectTo({ url: PETPAL_MESSAGES_PAGE })
+  openPetPalAction('redirect', PETPAL_MESSAGES_PAGE)
 }
 
 function openOrderDetail(orderId: string, tab: 'overview' | 'chat' | 'service') {

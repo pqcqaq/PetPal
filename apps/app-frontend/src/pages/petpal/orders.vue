@@ -20,7 +20,6 @@ import { listOrders } from '@/api/petpal'
 import { LOGIN_PAGE } from '@/router/config'
 import { useTokenStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
-import OwnerFlowNav from './components/owner-flow-nav.vue'
 import {
   formatAmount,
   formatRange,
@@ -31,7 +30,6 @@ import {
   PETPAL_AFTERSALES_PAGE,
   PETPAL_CHECKOUT_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
-  PETPAL_ORDERS_PAGE,
   PETPAL_REQUEST_PAGE,
   serviceTypeLabels,
 } from './owner-shared'
@@ -187,10 +185,24 @@ onPullDownRefresh(() => {
 <template>
   <AppPageShell title="订单">
     <template v-if="tokenStore.hasLogin">
-      <OwnerFlowNav
-        :current-path="PETPAL_ORDERS_PAGE"
-        title="订单"
-      />
+      <view class="order-focus">
+        <view class="order-focus__copy">
+          <view class="order-focus__tags">
+            <AppTag :type="activeCount > 0 ? 'warning' : 'default'">
+              {{ activeCount > 0 ? `${activeCount} 单进行中` : '当前空闲' }}
+            </AppTag>
+            <AppTag :type="unreadCount > 0 ? 'danger' : 'default'">
+              {{ unreadCount > 0 ? `${unreadCount} 条待读` : '消息已读' }}
+            </AppTag>
+          </view>
+          <text class="order-focus__title">订单</text>
+          <text class="order-focus__hint">先按状态筛，再直接进入支付、服务、沟通或售后。</text>
+        </view>
+        <view class="order-toolbar">
+          <AppButton size="medium" type="danger" @click="openAftersalesCenter">售后中心</AppButton>
+          <AppButton size="medium" type="info" @click="openRequestFlow">新建需求</AppButton>
+        </view>
+      </view>
 
       <AppSection title="订单状态">
         <view class="order-summary">
@@ -215,10 +227,6 @@ onPullDownRefresh(() => {
 
       <AppSection title="筛选">
         <AppChoiceChips v-model="activeFilter" :options="orderFilterOptions" />
-        <view class="order-toolbar">
-          <AppButton size="medium" type="danger" @click="openAftersalesCenter">售后中心</AppButton>
-          <AppButton size="medium" type="info" @click="openRequestFlow">新建需求</AppButton>
-        </view>
       </AppSection>
 
       <AppSection :title="filteredOrders.length ? `订单列表 (${filteredOrders.length})` : '订单列表'">
@@ -284,6 +292,47 @@ onPullDownRefresh(() => {
 </template>
 
 <style scoped lang="scss">
+.order-focus {
+  display: grid;
+  gap: 18rpx;
+  margin: 0 24rpx 20rpx;
+  padding: 28rpx;
+  border-radius: 30rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  background:
+    radial-gradient(circle at top right, rgba(181, 106, 0, 0.16), transparent 36%),
+    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
+}
+
+.order-focus__copy {
+  display: grid;
+  gap: 10rpx;
+}
+
+.order-focus__tags,
+.order-toolbar,
+.order-row__actions {
+  display: flex;
+  gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.order-focus__title {
+  color: var(--app-text);
+  font-size: 36rpx;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.order-focus__hint,
+.order-summary__label,
+.order-row__meta {
+  color: var(--app-text-secondary);
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
 .order-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -301,13 +350,6 @@ onPullDownRefresh(() => {
   box-shadow: var(--app-elevation-1);
 }
 
-.order-summary__label,
-.order-row__meta {
-  color: var(--app-text-secondary);
-  font-size: 22rpx;
-  line-height: 1.6;
-}
-
 .order-row__meta--accent {
   color: #0f766e;
   font-weight: 600;
@@ -318,13 +360,6 @@ onPullDownRefresh(() => {
   font-size: 40rpx;
   line-height: 1.05;
   font-weight: 700;
-}
-
-.order-toolbar,
-.order-row__actions {
-  display: flex;
-  gap: 12rpx;
-  flex-wrap: wrap;
 }
 
 .order-list {

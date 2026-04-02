@@ -33,6 +33,7 @@ import {
   getConversationUnreadCount,
   getOrderStatusLabel,
   isOrderAftersalesTracked,
+  openPetPalAction,
   PETPAL_AFTERSALES_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDER_REVIEW_PAGE,
@@ -228,7 +229,7 @@ function openOrderDetail(tab: 'overview' | 'chat' | 'service' | 'aftersales' = '
 }
 
 function openOrders() {
-  uni.redirectTo({ url: PETPAL_ORDERS_PAGE })
+  openPetPalAction('redirect', PETPAL_ORDERS_PAGE)
 }
 
 function openAftersales() {

@@ -16,10 +16,7 @@ import type {
 } from '@rbac/api-common'
 import { computed, ref } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
-import AppList from '@/components/app-list/app-list.vue'
-import AppListItem from '@/components/app-list-item/app-list-item.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { listOrders, listPets, listServiceRequests, matchCaregivers } from '@/api/petpal'
@@ -27,11 +24,17 @@ import { LOGIN_PAGE } from '@/router/config'
 import { useNotificationStore, useTokenStore, useUserStore } from '@/store'
 import { getErrorMessage } from '@/utils/error'
 import ActionSignalCard from './components/action-signal-card.vue'
-import OwnerFlowNav from './components/owner-flow-nav.vue'
 import {
   buildOwnerMatchQuery,
   formatAmount,
+  formatCaregiverExperience,
+  formatCaregiverNoticeHours,
+  formatCaregiverRadius,
+  formatDistanceKm,
+  formatPetTagSummary,
   formatRange,
+  getConversationHint,
+  getConversationPreview,
   getConversationUnreadCount,
   getOrderStatusLabel,
   getRequestStatusLabel,
@@ -41,10 +44,10 @@ import {
   PETPAL_MESSAGES_PAGE,
   PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDERS_PAGE,
-  PETPAL_OWNER_HOME_PAGE,
   PETPAL_PETS_PAGE,
   PETPAL_REQUEST_DETAIL_PAGE,
   PETPAL_REQUEST_PAGE,
+  openPetPalAction,
   serviceTypeLabels,
   speciesLabels,
 } from './owner-shared'
@@ -54,6 +57,7 @@ defineOptions({
 })
 
 definePage({
+  type: 'home',
   style: {
     navigationBarTitleText: 'PetPal 主人首页',
     enablePullDownRefresh: true,
@@ -65,12 +69,18 @@ const userStore = useUserStore()
 const notificationStore = useNotificationStore()
 
 const loading = ref(false)
+const selectedPetId = ref('')
 const pets = ref<PetProfileRecord[]>([])
 const requests = ref<ServiceRequestRecord[]>([])
 const orders = ref<OrderRecord[]>([])
 const caregivers = ref<MatchedCaregiverRecord[]>([])
 
 const displayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || 'PetPal 用户')
+const readyPetCount = computed(() => pets.value.filter(item => (
+  Boolean(item.feedingNote?.trim())
+  && Boolean(item.emergencyContact?.name?.trim())
+  && Boolean(item.emergencyContact?.phone?.trim())
+)).length)
 const activeOrderCount = computed(() => orders.value.filter(item => (
   item.orderStatus === 'PENDING_ACCEPT'
   || item.orderStatus === 'ACCEPTED'
@@ -101,113 +111,225 @@ const latestActiveRequest = computed(() => [...requests.value]
 const latestRequests = computed(() => [...requests.value]
   .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
   .slice(0, 2))
-const petHighlights = computed(() => pets.value.slice(0, 2))
 const caregiverHighlights = computed(() => caregivers.value.slice(0, 2))
+const focusPet = computed(() => {
+  if (selectedPetId.value) {
+    return pets.value.find(item => item.id === selectedPetId.value) ?? null
+  }
+  return pets.value[0] ?? null
+})
+const focusOrder = computed(() => [...orders.value]
+  .sort((left, right) => {
+    const leftRank = isOrderAftersalesTracked(left)
+      ? 0
+      : left.orderStatus === 'SERVING'
+        ? 1
+        : left.orderStatus === 'ACCEPTED'
+          ? 2
+          : left.orderStatus === 'PENDING_ACCEPT'
+            ? 3
+            : 4
+    const rightRank = isOrderAftersalesTracked(right)
+      ? 0
+      : right.orderStatus === 'SERVING'
+        ? 1
+        : right.orderStatus === 'ACCEPTED'
+          ? 2
+          : right.orderStatus === 'PENDING_ACCEPT'
+            ? 3
+            : 4
+    if (leftRank !== rightRank) {
+      return leftRank - rightRank
+    }
+    return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+  })[0] ?? null)
+
+const heroTags = computed(() => [
+  { label: `${pets.value.length} 只宠物`, type: 'primary' as const },
+  { label: `${activeRequestCount.value} 条需求`, type: activeRequestCount.value > 0 ? 'warning' as const : 'default' as const },
+  { label: `${activeOrderCount.value} 笔进行中`, type: activeOrderCount.value > 0 ? 'warning' as const : 'default' as const },
+  { label: unreadConversationCount.value > 0 ? `${unreadConversationCount.value} 条未读` : '消息已读完', type: unreadConversationCount.value > 0 ? 'danger' as const : 'default' as const },
+])
+
+const metricTiles = computed(() => [
+  {
+    label: '宠物',
+    value: String(pets.value.length),
+    helper: readyPetCount.value ? `${readyPetCount.value} 只可直接复用` : '先补第一只',
+    action: openPets,
+  },
+  {
+    label: '需求',
+    value: String(activeRequestCount.value),
+    helper: activeRequestCount.value ? '继续推进' : '现在可新建',
+    action: activeRequestCount.value ? openLatestRequest : () => openRequests(focusPet.value?.id),
+  },
+  {
+    label: '订单',
+    value: String(activeOrderCount.value),
+    helper: activeOrderCount.value ? '直接跟单' : '当前空闲',
+    action: openOrders,
+  },
+  {
+    label: '售后',
+    value: String(aftersaleCount.value),
+    helper: aftersaleCount.value ? '优先处理' : '当前平稳',
+    action: openAftersales,
+  },
+])
+
+const agendaTiles = computed(() => {
+  const items: Array<{
+    eyebrow: string
+    title: string
+    meta: string
+    actionLabel: string
+    action: () => void
+  }> = []
+
+  if (!pets.value.length) {
+    items.push({
+      eyebrow: '宠物',
+      title: '补第一只宠物档案',
+      meta: '名字、照料偏好和紧急联系人先录进去。',
+      actionLabel: '去建档',
+      action: openPets,
+    })
+  }
+  else if (focusPet.value) {
+    items.push({
+      eyebrow: '宠物',
+      title: focusPet.value.name,
+      meta: `${speciesLabels[focusPet.value.species]}${focusPet.value.breed ? ` · ${focusPet.value.breed}` : ''}`,
+      actionLabel: '用它发需求',
+      action: () => openRequests(focusPet.value!.id),
+    })
+  }
+
+  if (latestActiveRequest.value) {
+    items.push({
+      eyebrow: '需求',
+      title: `${latestActiveRequest.value.pet?.name || '宠物'} · ${serviceTypeLabels[latestActiveRequest.value.serviceType]}`,
+      meta: `${getRequestStatusLabel(latestActiveRequest.value.status)} · ${formatRange(latestActiveRequest.value.startTime, latestActiveRequest.value.endTime)}`,
+      actionLabel: '继续处理',
+      action: openLatestRequest,
+    })
+  }
+
+  if (focusOrder.value) {
+    items.push({
+      eyebrow: '订单',
+      title: focusOrder.value.orderNo,
+      meta: `${getOrderStatusLabel(focusOrder.value.orderStatus)} · ${getConversationHint(focusOrder.value.conversation, 'owner')}`,
+      actionLabel: isOrderAftersalesTracked(focusOrder.value) ? '看售后' : '看订单',
+      action: isOrderAftersalesTracked(focusOrder.value)
+        ? () => openOrderDetail(focusOrder.value!.id, 'aftersales')
+        : () => openOrderDetail(focusOrder.value!.id, 'overview'),
+    })
+  }
+
+  if (!items.length) {
+    items.push({
+      eyebrow: '现在',
+      title: '今天可以直接发新需求',
+      meta: '先选宠物，再补时间地点，然后继续筛人下单。',
+      actionLabel: '发需求',
+      action: openRequests,
+    })
+  }
+
+  return items.slice(0, 3)
+})
 
 const primaryAction = computed(() => {
   if (!pets.value.length) {
     return {
+      tone: 'pet',
+      title: '先把第一只宠物建好',
       label: '先建宠物档案',
-      hint: '没有宠物档案时，后续需求和订单都不好继续。',
+      hint: '档案建好后，发需求和跟单都会更顺。',
+      meta: '档案建好后，发需求和跟单都会更顺。',
       action: openPets,
     }
   }
   if (aftersaleCount.value > 0) {
     return {
+      tone: 'danger',
+      title: '先处理售后',
       label: '处理售后',
       hint: `${aftersaleCount.value} 笔订单涉及退款或投诉，优先处理。`,
+      meta: `${aftersaleCount.value} 笔订单涉及退款或投诉，优先处理。`,
       action: openAftersales,
     }
   }
-  if (activeOrderCount.value > 0) {
+  if (focusOrder.value) {
     return {
+      tone: 'order',
+      title: `继续跟进 ${getOrderStatusLabel(focusOrder.value.orderStatus)}`,
       label: '查看进行中订单',
-      hint: `${activeOrderCount.value} 笔订单还在履约中。`,
-      action: openOrders,
+      hint: `${focusOrder.value.orderNo} · ${formatRange(focusOrder.value.appointmentStart, focusOrder.value.appointmentEnd)}`,
+      meta: `${focusOrder.value.orderNo} · ${formatRange(focusOrder.value.appointmentStart, focusOrder.value.appointmentEnd)}`,
+      action: () => openOrderDetail(focusOrder.value!.id, 'overview'),
     }
   }
   if (activeRequestCount.value > 0) {
     return {
+      tone: 'request',
+      title: '继续当前需求',
       label: '继续当前需求',
       hint: `${activeRequestCount.value} 条需求还在推进。`,
+      meta: `${activeRequestCount.value} 条需求还在推进。`,
       action: openLatestRequest,
     }
   }
   return {
+    tone: 'fresh',
+    title: '直接发一个新需求',
     label: '新建照料需求',
     hint: '今天还没有进行中的订单，可以直接开始新需求。',
+    meta: '今天还没有进行中的订单，可以直接开始新需求。',
     action: openRequests,
   }
 })
-
-const taskRows = computed(() => [
-  {
-    title: '宠物档案',
-    label: pets.value.length
-      ? `${pets.value.length} 只宠物可直接复用下单`
-      : '先补第一只宠物的资料和照料偏好',
-    value: pets.value.length ? '维护' : '建档',
-    action: openPets,
-  },
-  {
-    title: '照料需求',
-    label: activeRequestCount.value
-      ? `${activeRequestCount.value} 条需求还在推进`
-      : '当前没有活跃需求，可新建一条',
-    value: activeRequestCount.value ? '继续' : '创建',
-    action: activeRequestCount.value ? openLatestRequest : openRequests,
-  },
-  {
-    title: '订单处理',
-    label: activeOrderCount.value
-      ? `${activeOrderCount.value} 笔订单需要继续跟单`
-      : '当前没有进行中订单',
-    value: activeOrderCount.value ? '查看' : '浏览',
-    action: openOrders,
-  },
-  {
-    title: '售后处理',
-    label: aftersaleCount.value
-      ? `${aftersaleCount.value} 笔订单进入售后`
-      : '当前没有售后事项',
-    value: aftersaleCount.value ? '优先' : '查看',
-    action: openAftersales,
-  },
-])
 
 function goToLogin() {
   uni.navigateTo({ url: LOGIN_PAGE })
 }
 
-function openPets() {
-  uni.redirectTo({ url: PETPAL_PETS_PAGE })
+function selectPet(petId: string) {
+  selectedPetId.value = petId
 }
 
-function openRequests() {
-  uni.redirectTo({ url: PETPAL_REQUEST_PAGE })
+function openPets() {
+  openPetPalAction('redirect', PETPAL_PETS_PAGE)
+}
+
+function openRequests(petId?: string) {
+  const query = petId ? `?petId=${petId}` : ''
+  openPetPalAction('redirect', `${PETPAL_REQUEST_PAGE}${query}`)
 }
 
 function openLatestRequest() {
   if (latestActiveRequest.value) {
-    uni.redirectTo({ url: `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${latestActiveRequest.value.id}` })
+    openPetPalAction('redirect', `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${latestActiveRequest.value.id}`)
     return
   }
   openRequests()
 }
 
 function openOrders() {
-  uni.redirectTo({ url: PETPAL_ORDERS_PAGE })
+  openPetPalAction('redirect', PETPAL_ORDERS_PAGE)
 }
 
 function openAftersales() {
-  uni.redirectTo({ url: PETPAL_AFTERSALES_PAGE })
+  openPetPalAction('redirect', PETPAL_AFTERSALES_PAGE)
 }
 
 function openMessages() {
-  uni.navigateTo({ url: PETPAL_MESSAGES_PAGE })
+  openPetPalAction('navigate', PETPAL_MESSAGES_PAGE)
 }
 
-function openOrderDetail(orderId: string, tab: 'overview' | 'chat' = 'overview') {
+function openOrderDetail(orderId: string, tab: 'overview' | 'chat' | 'aftersales' = 'overview') {
   uni.navigateTo({ url: `${PETPAL_ORDER_DETAIL_PAGE}?id=${orderId}&tab=${tab}` })
 }
 
@@ -238,7 +360,12 @@ async function loadPage(showError = false) {
     requests.value = requestRows
     orders.value = orderRows
 
-    const latestPet = petRows[0]
+    const latestPetId = selectedPetId.value && petRows.some(item => item.id === selectedPetId.value)
+      ? selectedPetId.value
+      : requestRows[0]?.petId || petRows[0]?.id || ''
+    selectedPetId.value = latestPetId
+
+    const latestPet = petRows.find(item => item.id === latestPetId) || petRows[0]
     const latestRequest = requestRows[0]
     caregivers.value = latestPet
       ? (await matchCaregivers(buildOwnerMatchQuery({
@@ -279,250 +406,368 @@ onPullDownRefresh(() => {
 <template>
   <AppPageShell title="主人首页">
     <template v-if="tokenStore.hasLogin">
-      <OwnerFlowNav
-        :current-path="PETPAL_OWNER_HOME_PAGE"
-        title="主人首页"
-      />
-
-      <AppSection title="今天先做这个">
-        <view class="owner-focus">
+      <view class="owner-home">
+        <view class="owner-focus" :class="`owner-focus--${primaryAction.tone}`">
           <view class="owner-focus__copy">
-            <view class="owner-focus__headline">
-              <text class="owner-focus__title">{{ displayName }}</text>
-              <view class="owner-focus__tags">
-                <AppTag type="primary">{{ pets.length }} 只宠物</AppTag>
-                <AppTag :type="activeOrderCount > 0 ? 'warning' : 'default'">{{ activeOrderCount }} 笔进行中</AppTag>
-                <AppTag :type="aftersaleCount > 0 ? 'danger' : 'default'">{{ aftersaleCount }} 笔售后</AppTag>
-              </view>
-            </view>
-            <text class="owner-focus__hint">{{ primaryAction.hint }}</text>
+            <text class="owner-focus__eyebrow">{{ displayName }}</text>
+            <text class="owner-focus__title">{{ primaryAction.title }}</text>
+            <text class="owner-focus__hint">{{ primaryAction.meta }}</text>
+          </view>
+          <view class="owner-focus__tags">
+            <AppTag v-for="item in heroTags" :key="item.label" :type="item.type">{{ item.label }}</AppTag>
           </view>
           <view class="owner-focus__actions">
             <AppButton size="medium" @click="primaryAction.action">{{ primaryAction.label }}</AppButton>
+            <AppButton size="medium" type="info" @click="openPets">宠物</AppButton>
             <AppButton size="medium" type="info" @click="openMessages">消息</AppButton>
-            <AppButton size="medium" type="danger" @click="openAftersales">售后</AppButton>
           </view>
         </view>
-      </AppSection>
 
-      <AppSection title="当前优先">
-        <ActionSignalCard
-          title="待处理事项"
-          scope="OWNER"
-          empty-text="当前没有新的高优先事项，可以继续维护宠物、需求和订单。"
-        />
-      </AppSection>
+        <scroll-view class="owner-metric-scroll" :scroll-x="true" :show-scrollbar="false">
+          <view class="owner-metric-track">
+            <view
+              v-for="item in metricTiles"
+              :key="item.label"
+              class="owner-metric-tile"
+              hover-class="owner-metric-tile--hover"
+              :hover-stay-time="80"
+              @click="item.action"
+            >
+              <text class="owner-metric-tile__label">{{ item.label }}</text>
+              <text class="owner-metric-tile__value">{{ item.value }}</text>
+              <text class="owner-metric-tile__helper">{{ item.helper }}</text>
+            </view>
+          </view>
+        </scroll-view>
 
-      <AppSection title="继续处理">
-        <AppList>
-          <AppListItem
-            v-for="item in taskRows"
-            :key="item.title"
-            :title="item.title"
-            :label="item.label"
-            :value="item.value"
-            value-emphasis
-            clickable
-            is-link
+        <ActionSignalCard title="当前优先" scope="OWNER" empty-text="当前没有新的高优先事项，可以继续宠物、需求或订单主流程。" />
+
+        <view class="owner-agenda-grid">
+          <view
+            v-for="item in agendaTiles"
+            :key="`${item.eyebrow}-${item.title}`"
+            class="owner-agenda-tile"
+            hover-class="owner-agenda-tile--hover"
+            :hover-stay-time="80"
             @click="item.action"
-          />
-        </AppList>
-      </AppSection>
-
-      <AppSection title="最近订单">
-        <view v-if="latestOrders.length" class="owner-order-list">
-          <view v-for="order in latestOrders" :key="order.id" class="owner-order-row">
-            <view class="owner-order-row__headline">
-              <view class="owner-order-row__copy">
-                <text class="owner-order-row__title">{{ order.orderNo }}</text>
-                <text class="owner-order-row__meta">
-                  {{ getOrderStatusLabel(order.orderStatus) }} · {{ formatRange(order.appointmentStart, order.appointmentEnd) }}
-                </text>
-                <text class="owner-order-row__meta">
-                  实付 ¥{{ formatAmount(order.amountPaid) }} · 已退 ¥{{ formatAmount(order.amountRefunded) }}
-                </text>
-              </view>
-              <AppTag :type="getConversationUnreadCount(order.conversation, 'owner') > 0 ? 'warning' : 'default'">
-                {{ getConversationUnreadCount(order.conversation, 'owner') > 0 ? `待读 ${getConversationUnreadCount(order.conversation, 'owner')}` : '已读' }}
-              </AppTag>
-            </view>
-            <view class="owner-order-row__actions">
-              <AppButton size="medium" type="info" @click="openOrderDetail(order.id, 'chat')">沟通</AppButton>
-              <AppButton size="medium" @click="openOrderDetail(order.id, 'overview')">详情</AppButton>
-            </view>
+          >
+            <text class="owner-agenda-tile__eyebrow">{{ item.eyebrow }}</text>
+            <text class="owner-agenda-tile__title">{{ item.title }}</text>
+            <text class="owner-agenda-tile__meta">{{ item.meta }}</text>
+            <text class="owner-agenda-tile__action">{{ item.actionLabel }}</text>
           </view>
         </view>
-        <view v-else class="owner-empty">
-          <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步订单' : '当前还没有订单'" />
-        </view>
-      </AppSection>
 
-      <AppSection title="最近宠物和需求">
-        <view class="owner-dual-grid">
-          <AppList>
-            <AppListItem
-              v-for="pet in petHighlights"
-              :key="pet.id"
-              :title="pet.name"
-              :label="`${speciesLabels[pet.species]}${pet.breed ? ` · ${pet.breed}` : ''}`"
-              :value="`${pet.weightKg || '-'}kg`"
-              value-emphasis
-            />
-            <view v-if="!petHighlights.length" class="owner-list-empty">
-              <AppStatus text="还没有宠物档案" />
+        <view v-if="latestActiveRequest" class="owner-focus-panel owner-focus-panel--request">
+          <text class="owner-focus-panel__title">{{ latestActiveRequest.pet?.name || '宠物' }} · {{ serviceTypeLabels[latestActiveRequest.serviceType] }}</text>
+          <text class="owner-focus-panel__meta">{{ getRequestStatusLabel(latestActiveRequest.status) }} · {{ formatRange(latestActiveRequest.startTime, latestActiveRequest.endTime) }}</text>
+          <text class="owner-focus-panel__meta">{{ latestActiveRequest.locationText }}</text>
+          <view class="owner-focus__actions">
+            <AppButton size="medium" @click="openLatestRequest">继续处理</AppButton>
+            <AppButton size="medium" type="info" @click="openRequests(latestActiveRequest.petId)">新开一条</AppButton>
+          </view>
+        </view>
+
+        <template v-if="pets.length && focusPet">
+          <scroll-view class="owner-card-scroll" :scroll-x="true" :show-scrollbar="false">
+            <view class="owner-pet-strip">
+              <view
+                v-for="pet in pets"
+                :key="pet.id"
+                class="owner-pet-chip"
+                :class="pet.id === focusPet.id ? 'owner-pet-chip--active' : ''"
+                @click="selectPet(pet.id)"
+              >
+                <text class="owner-pet-chip__name">{{ pet.name }}</text>
+                <text class="owner-pet-chip__meta">{{ speciesLabels[pet.species] }}</text>
+              </view>
             </view>
-          </AppList>
-
-          <AppList>
-            <AppListItem
-              v-for="item in latestRequests"
-              :key="item.id"
-              :title="`${item.pet?.name || '宠物'} · ${serviceTypeLabels[item.serviceType]}`"
-              :label="formatRange(item.startTime, item.endTime)"
-              :value="getRequestStatusLabel(item.status)"
-              value-emphasis
-              clickable
-              is-link
-              @click="openRequestDetail(item.id)"
-            />
-            <view v-if="!latestRequests.length" class="owner-list-empty">
-              <AppStatus text="当前还没有需求" />
+          </scroll-view>
+          <view class="owner-focus-panel">
+            <text class="owner-focus-panel__title">{{ focusPet.name }}</text>
+            <text class="owner-focus-panel__meta">{{ speciesLabels[focusPet.species] }}{{ focusPet.breed ? ` · ${focusPet.breed}` : '' }}</text>
+            <text class="owner-focus-panel__meta">{{ formatPetTagSummary(focusPet.temperamentTags) }}</text>
+            <text class="owner-focus-panel__meta">{{ focusPet.feedingNote || '喂养说明待补充' }}</text>
+            <text class="owner-focus-panel__meta">{{ focusPet.emergencyContact ? `${focusPet.emergencyContact.name} · ${focusPet.emergencyContact.phone}` : '紧急联系人待补充' }}</text>
+            <view class="owner-focus__actions">
+              <AppButton size="medium" @click="openRequests(focusPet.id)">用它发需求</AppButton>
+              <AppButton size="medium" type="info" @click="openPets">编辑档案</AppButton>
             </view>
-          </AppList>
-        </view>
-      </AppSection>
-
-      <AppSection title="最近匹配">
-        <AppList v-if="caregiverHighlights.length">
-          <AppListItem
-            v-for="caregiver in caregiverHighlights"
-            :key="caregiver.serviceId"
-            :title="caregiver.caregiverName"
-            :label="`${serviceTypeLabels[caregiver.serviceType]} · ${speciesLabels[caregiver.petSpecies]} · ${caregiver.city || '城市待补充'}`"
-            :value="`¥${formatAmount(caregiver.pricePerUnit)}/${caregiver.unitType}`"
-            value-emphasis
-          />
-        </AppList>
+          </view>
+        </template>
         <view v-else class="owner-empty">
-          <AppStatus text="补齐宠物和需求后，这里会出现更准确的匹配结果。" />
+          <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步宠物资料' : '还没有宠物档案'" />
+          <AppButton block @click="openPets">去建档</AppButton>
         </view>
-      </AppSection>
+
+        <view v-if="focusOrder" class="owner-focus-panel owner-focus-panel--order">
+          <text class="owner-focus-panel__title">{{ focusOrder.orderNo }}</text>
+          <text class="owner-focus-panel__meta">{{ getOrderStatusLabel(focusOrder.orderStatus) }} · {{ formatRange(focusOrder.appointmentStart, focusOrder.appointmentEnd) }}</text>
+          <text class="owner-focus-panel__meta">实付 ¥{{ formatAmount(focusOrder.amountPaid) }} · 已退 ¥{{ formatAmount(focusOrder.amountRefunded) }}</text>
+          <text class="owner-focus-panel__meta">{{ getConversationPreview(focusOrder.conversation) }}</text>
+          <view class="owner-focus__actions">
+            <AppButton size="medium" type="info" @click="openMessages">消息</AppButton>
+            <AppButton size="medium" @click="openOrders">去订单</AppButton>
+            <AppButton size="medium" type="info" @click="openOrderDetail(focusOrder.id, 'aftersales')">售后</AppButton>
+          </view>
+        </view>
+
+        <scroll-view v-if="caregiverHighlights.length" class="owner-card-scroll" :scroll-x="true" :show-scrollbar="false">
+          <view class="owner-card-track">
+            <view v-for="item in caregiverHighlights" :key="item.serviceId" class="owner-trust-card" @click="openLatestRequest">
+              <text class="owner-trust-card__title">{{ item.caregiverName }}</text>
+              <text class="owner-trust-card__meta">¥{{ formatAmount(item.pricePerUnit) }}/{{ item.unitType }} · {{ formatDistanceKm(item.distanceKm) }}</text>
+              <text class="owner-trust-card__meta">{{ formatCaregiverExperience(item.experienceYears) }} · {{ formatCaregiverRadius(item.serviceRadiusKm) }}</text>
+              <text class="owner-trust-card__meta">{{ formatCaregiverNoticeHours(item.minNoticeHours) }}</text>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
     </template>
 
     <template v-else>
-      <AppSection title="登录后开始">
-        <view class="owner-empty owner-empty--login">
-          <AppStatus text="登录后即可管理宠物、需求、订单和售后。" />
+      <view class="owner-home">
+        <view class="owner-focus owner-focus--guest">
+          <view class="owner-focus__copy">
+            <text class="owner-focus__eyebrow">PetPal</text>
+            <text class="owner-focus__title">登录后开始照料主流程</text>
+            <text class="owner-focus__hint">建档、发需求、跟单和售后都会从这里继续。</text>
+          </view>
+          <AppButton block @click="goToLogin">去登录</AppButton>
         </view>
-        <AppButton block @click="goToLogin">去登录</AppButton>
-      </AppSection>
+      </view>
     </template>
   </AppPageShell>
 </template>
 
 <style scoped lang="scss">
+.owner-home {
+  display: grid;
+  gap: 20rpx;
+  padding-bottom: 36rpx;
+}
+
 .owner-focus {
   display: grid;
-  gap: 16rpx;
-  padding: 26rpx 28rpx;
-  border-radius: var(--app-shape-xl);
+  gap: 18rpx;
+  margin: 0 24rpx;
+  padding: 28rpx;
+  border-radius: 32rpx;
   border: 1rpx solid var(--app-outline-variant);
   background:
-    radial-gradient(circle at top right, rgba(53, 89, 224, 0.12), transparent 34%),
+    radial-gradient(circle at top right, rgba(53, 89, 224, 0.16), transparent 36%),
     linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
-.owner-focus__copy,
-.owner-focus__headline {
+.owner-focus--request,
+.owner-focus--fresh {
+  background:
+    radial-gradient(circle at top right, rgba(11, 122, 117, 0.18), transparent 36%),
+    linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
+}
+
+.owner-focus--order {
+  background:
+    radial-gradient(circle at top right, rgba(181, 106, 0, 0.18), transparent 36%),
+    linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
+}
+
+.owner-focus--danger {
+  background:
+    radial-gradient(circle at top right, rgba(186, 26, 26, 0.16), transparent 36%),
+    linear-gradient(180deg, rgba(248, 221, 221, 0.9) 0%, var(--app-surface) 100%);
+}
+
+.owner-focus__copy {
   display: grid;
   gap: 10rpx;
+}
+
+.owner-focus__eyebrow,
+.owner-agenda-tile__eyebrow,
+.owner-metric-tile__label,
+.owner-metric-tile__helper {
+  color: var(--app-text-muted);
+  font-size: 22rpx;
+  line-height: 1.5;
 }
 
 .owner-focus__title {
   color: var(--app-text);
   font-size: 38rpx;
-  line-height: 1.2;
+  line-height: 1.24;
   font-weight: 700;
 }
 
 .owner-focus__hint {
   color: var(--app-text-secondary);
-  font-size: 24rpx;
-  line-height: 1.6;
+  font-size: 23rpx;
+  line-height: 1.68;
 }
 
 .owner-focus__tags,
-.owner-focus__actions,
-.owner-order-row__actions {
+.owner-focus__actions {
   display: flex;
   gap: 12rpx;
   flex-wrap: wrap;
 }
 
-.owner-order-list {
-  display: grid;
-  gap: 16rpx;
+.owner-metric-scroll,
+.owner-card-scroll {
+  white-space: nowrap;
 }
 
-.owner-order-row {
-  display: grid;
-  gap: 14rpx;
-  padding: 24rpx;
-  border-radius: var(--app-shape-xl);
+.owner-metric-track,
+.owner-card-track,
+.owner-pet-strip {
+  display: inline-flex;
+  gap: 16rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+}
+
+.owner-metric-tile,
+.owner-agenda-tile,
+.owner-trust-card,
+.owner-pet-chip,
+.owner-focus-panel,
+.owner-stack-row {
   border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container-high) 100%);
   box-shadow: var(--app-elevation-1);
 }
 
-.owner-order-row__headline {
-  display: flex;
-  gap: 16rpx;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.owner-order-row__copy {
+.owner-metric-tile {
+  width: 210rpx;
   display: grid;
-  gap: 6rpx;
-  min-width: 0;
+  gap: 8rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 28rpx;
+  box-sizing: border-box;
 }
 
-.owner-order-row__title {
+.owner-metric-tile__value {
   color: var(--app-text);
-  font-size: 30rpx;
-  line-height: 1.3;
+  font-size: 40rpx;
+  line-height: 1.1;
   font-weight: 700;
 }
 
-.owner-order-row__meta {
-  color: var(--app-text-secondary);
-  font-size: 22rpx;
-  line-height: 1.6;
-}
-
-.owner-dual-grid {
+.owner-agenda-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16rpx;
 }
 
-.owner-empty,
-.owner-list-empty {
-  padding: 8rpx 0;
+.owner-agenda-grid {
+  padding: 0 24rpx;
 }
 
-.owner-empty--login {
-  padding-bottom: 28rpx;
+.owner-agenda-tile,
+.owner-focus-panel,
+.owner-stack-row {
+  margin: 0 24rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 30rpx;
+}
+
+.owner-agenda-tile {
+  display: grid;
+  gap: 10rpx;
+}
+
+.owner-agenda-tile__title,
+.owner-trust-card__title,
+.owner-pet-chip__name,
+.owner-focus-panel__title,
+.owner-stack-row__title {
+  color: var(--app-text);
+  font-size: 28rpx;
+  line-height: 1.42;
+  font-weight: 700;
+}
+
+.owner-agenda-tile__meta,
+.owner-agenda-tile__action,
+.owner-trust-card__meta,
+.owner-pet-chip__meta,
+.owner-focus-panel__meta,
+.owner-stack-row__meta {
+  color: var(--app-text-secondary);
+  font-size: 22rpx;
+  line-height: 1.62;
+}
+
+.owner-agenda-tile__action {
+  color: var(--app-accent);
+  font-weight: 700;
+}
+
+.owner-trust-card {
+  width: 400rpx;
+  display: grid;
+  gap: 8rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 28rpx;
+  box-sizing: border-box;
+}
+
+.owner-pet-chip {
+  width: 170rpx;
+  display: grid;
+  gap: 6rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 24rpx;
+  box-sizing: border-box;
+}
+
+.owner-pet-chip--active {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+}
+
+.owner-focus-panel--request {
+  background:
+    radial-gradient(circle at top right, rgba(11, 122, 117, 0.18), transparent 34%),
+    linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
+}
+
+.owner-focus-panel--order {
+  background:
+    radial-gradient(circle at top right, rgba(181, 106, 0, 0.18), transparent 34%),
+    linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
+}
+
+.owner-stack-row {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.owner-stack-row__copy {
+  display: grid;
+  gap: 6rpx;
+  min-width: 0;
+  flex: 1;
+}
+
+.owner-empty {
+  margin: 0 24rpx;
+  padding: 24rpx;
+  border-radius: 30rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container-high) 100%);
+  box-shadow: var(--app-elevation-1);
 }
 
 @media (max-width: 680px) {
-  .owner-dual-grid {
-    grid-template-columns: 1fr;
+  .owner-metric-tile {
+    width: 198rpx;
   }
 
-  .owner-order-row__headline {
-    flex-direction: column;
+  .owner-trust-card {
+    width: 360rpx;
   }
 }
 </style>

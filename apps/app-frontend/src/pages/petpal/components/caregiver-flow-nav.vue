@@ -4,6 +4,7 @@ import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import {
   caregiverFlowOptions,
+  openPetPalAction,
   PETPAL_HUB_PAGE,
   PETPAL_MESSAGES_PAGE,
   PETPAL_REMINDERS_PAGE,
@@ -23,7 +24,7 @@ function redirectTo(url: string) {
   if (props.currentPath === url) {
     return
   }
-  uni.redirectTo({ url })
+  openPetPalAction('redirect', url)
 }
 
 function openHub() {

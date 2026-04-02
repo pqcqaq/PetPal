@@ -32,7 +32,6 @@ defineOptions({
 })
 
 definePage({
-  type: 'home',
   style: {
     navigationBarTitleText: 'PetPal',
     enablePullDownRefresh: true,
@@ -147,7 +146,7 @@ const getRequestStatusLabel = (status: ServiceRequestStatus) => ({
 }[status] ?? status)
 
 function openServiceBoard() {
-  uni.navigateTo({ url: '/pages/petpal/owner-home' })
+  uni.switchTab({ url: '/pages/petpal/owner-home' })
 }
 
 function openProfile() {

@@ -43,6 +43,12 @@ export const PETPAL_MESSAGES_PAGE = '/pages/petpal/messages'
 export const PETPAL_ORDER_DETAIL_PAGE = '/pages/order-detail/index'
 export const PETPAL_ORDER_REVIEW_PAGE = '/pages/order-review/index'
 export const PETPAL_ORDER_COMPLAINT_PAGE = '/pages/order-complaint/index'
+export const PETPAL_TABBAR_PAGES = [
+  PETPAL_OWNER_HOME_PAGE,
+  PETPAL_ORDERS_PAGE,
+  PETPAL_MESSAGES_PAGE,
+  '/pages/me/me',
+]
 
 export type ConversationRole = 'owner' | 'caregiver'
 export type CaregiverOrderFilterValue = OrderStatus | 'ALL'
@@ -148,11 +154,9 @@ export const yesNoOptions = [
 ]
 
 export const ownerFlowOptions = [
-  { label: '主人首页', value: PETPAL_OWNER_HOME_PAGE, description: '查看办事概览与快捷入口' },
   { label: '宠物档案', value: PETPAL_PETS_PAGE, description: '维护宠物资料与照料偏好' },
   { label: '新建需求', value: PETPAL_REQUEST_PAGE, description: '创建临时照料需求并筛选照料者' },
   { label: '确认支付', value: PETPAL_CHECKOUT_PAGE, description: '确认照料者、金额与支付方式' },
-  { label: '订单跟进', value: PETPAL_ORDERS_PAGE, description: '按沟通、履约和售后持续跟进' },
   { label: '售后中心', value: PETPAL_AFTERSALES_PAGE, description: '集中处理退款、投诉和争议事项' },
 ]
 
@@ -186,6 +190,12 @@ export function formatAmount(value: number | string | null | undefined) {
 }
 
 export function openPetPalAction(mode: 'redirect' | 'navigate', url: string) {
+  const normalizedUrl = url.split('?')[0]
+  if (PETPAL_TABBAR_PAGES.includes(normalizedUrl)) {
+    uni.switchTab({ url: normalizedUrl })
+    return
+  }
+
   const openWithNavigate = () => {
     uni.navigateTo({ url })
   }

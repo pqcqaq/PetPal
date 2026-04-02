@@ -139,11 +139,11 @@ function markAllVisibleAsRead() {
 }
 
 function openReminders() {
-  uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
+  openPetPalAction('navigate', PETPAL_REMINDERS_PAGE)
 }
 
 function openMessages() {
-  uni.navigateTo({ url: PETPAL_MESSAGES_PAGE })
+  openPetPalAction('navigate', PETPAL_MESSAGES_PAGE)
 }
 
 function openLogin() {
