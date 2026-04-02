@@ -91,6 +91,18 @@
 
       <template v-else>
         <div class="petpal-export-toolbar">
+          <div class="petpal-export-toolbar__presets">
+            <span class="petpal-export-toolbar__label">快捷时间窗</span>
+            <el-button
+              v-for="preset in exportPresetOptions"
+              :key="preset.value"
+              size="small"
+              :type="activeExportPreset === preset.value ? 'primary' : 'default'"
+              @click="applyExportPreset(preset.value)"
+            >
+              {{ preset.label }}
+            </el-button>
+          </div>
           <div class="petpal-export-toolbar__filters">
             <el-date-picker
               v-model="exportDateRange"
@@ -118,7 +130,7 @@
             </el-button>
           </div>
           <p class="petpal-export-toolbar__hint">
-            导出筛选只影响经营明细，不改变当前摘要和趋势口径。
+            导出筛选只影响经营明细，不改变当前摘要和趋势口径；系统会按当前账号记住最近一次导出条件。
           </p>
         </div>
 
@@ -374,6 +386,7 @@ import { RouterLink, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import ListExportButton from '@/components/download/ListExportButton.vue';
+import { usePageState } from '@/composables/use-page-state';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
@@ -399,8 +412,31 @@ const route = useRoute();
 const summary = ref<CaregiverEarningsSummaryRecord | null>(null);
 const summaryState = ref<PetPalSectionLoadState>('idle');
 const sectionReloadingKey = ref<'' | 'summary'>('');
-const exportDateRange = ref<[Date, Date] | null>(null);
-const exportServiceType = ref<PetServiceType | ''>('');
+
+type EarningsExportDatePreset = '' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
+type CaregiverEarningsExportPageState = {
+  startDate: string;
+  endDate: string;
+  serviceType: PetServiceType | '';
+  datePreset: EarningsExportDatePreset;
+};
+
+const exportPresetOptions: Array<{ label: string; value: Exclude<EarningsExportDatePreset, ''> }> = [
+  { label: '近 7 天', value: 'last7days' },
+  { label: '近 30 天', value: 'last30days' },
+  { label: '本月', value: 'thisMonth' },
+  { label: '上月', value: 'lastMonth' },
+];
+
+const { state: exportPageState, reset: resetExportPageState } = usePageState<CaregiverEarningsExportPageState>(
+  'page:petpal:caregiver-earnings-export-filters',
+  {
+    startDate: '',
+    endDate: '',
+    serviceType: '',
+    datePreset: '',
+  },
+);
 
 const emptyTotals: CaregiverEarningsSummaryRecord['totals'] = {
   totalIncome: 0,
@@ -428,12 +464,90 @@ const getTrendBarWidth = (value: number | string, maxRevenue: number) => {
   }
   return `${Math.max((revenue / maxRevenue) * 100, 12)}%`;
 };
+const parseDate = (value: string) => {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+const cloneDate = (value: Date) => new Date(value.getTime());
+const getStartOfDay = (value: Date) => new Date(
+  value.getFullYear(),
+  value.getMonth(),
+  value.getDate(),
+  0,
+  0,
+  0,
+  0,
+);
+const getEndOfDay = (value: Date) => new Date(
+  value.getFullYear(),
+  value.getMonth(),
+  value.getDate(),
+  23,
+  59,
+  59,
+  999,
+);
+const addDays = (value: Date, amount: number) => {
+  const next = cloneDate(value);
+  next.setDate(next.getDate() + amount);
+  return next;
+};
+const setExportDateRange = (
+  value: [Date, Date] | null,
+  datePreset: EarningsExportDatePreset = '',
+) => {
+  exportPageState.startDate = value?.[0]?.toISOString() ?? '';
+  exportPageState.endDate = value?.[1]?.toISOString() ?? '';
+  exportPageState.datePreset = value ? datePreset : '';
+};
+const resolveExportPresetRange = (
+  preset: Exclude<EarningsExportDatePreset, ''>,
+): [Date, Date] => {
+  const now = new Date();
+  const todayStart = getStartOfDay(now);
+
+  switch (preset) {
+    case 'last7days':
+      return [addDays(todayStart, -6), getEndOfDay(now)];
+    case 'last30days':
+      return [addDays(todayStart, -29), getEndOfDay(now)];
+    case 'thisMonth':
+      return [
+        new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0),
+        getEndOfDay(now),
+      ];
+    case 'lastMonth':
+      return [
+        new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0),
+        new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999),
+      ];
+  }
+};
 
 const profile = computed(() => summary.value?.profile ?? null);
 const totals = computed(() => summary.value?.totals ?? emptyTotals);
 const auditLabel = computed(() =>
   profile.value ? getPetPalCaregiverAuditLabel(profile.value.auditStatus) : '未建档',
 );
+const exportDateRange = computed<[Date, Date] | null>({
+  get: () => {
+    const startDate = parseDate(exportPageState.startDate);
+    const endDate = parseDate(exportPageState.endDate);
+    return startDate && endDate ? [startDate, endDate] as [Date, Date] : null;
+  },
+  set: (value: [Date, Date] | null) => {
+    setExportDateRange(value);
+  },
+});
+const exportServiceType = computed<PetServiceType | ''>({
+  get: () => exportPageState.serviceType,
+  set: (value) => {
+    exportPageState.serviceType = value || '';
+  },
+});
 const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
 const latestActiveOrder = computed(() => summary.value?.latestActiveOrder ?? null);
 const recentCompletedOrders = computed(() => {
@@ -467,6 +581,7 @@ const trendGroups = computed(() =>
   })),
 );
 const hasTrendData = computed(() => totals.value.completedOrderCount > 0);
+const activeExportPreset = computed(() => exportPageState.datePreset);
 const hasExportFilters = computed(() => Boolean(exportDateRange.value || exportServiceType.value));
 const revenueCards = computed(() => [
   {
@@ -583,9 +698,12 @@ function buildProfileRoute(notice: string) {
   };
 }
 
+function applyExportPreset(preset: Exclude<EarningsExportDatePreset, ''>) {
+  setExportDateRange(resolveExportPresetRange(preset), preset);
+}
+
 function clearExportFilters() {
-  exportDateRange.value = null;
-  exportServiceType.value = '';
+  resetExportPageState();
 }
 
 function buildEarningsExportRequest() {
@@ -726,11 +844,20 @@ onMounted(() => {
   margin-bottom: 16px;
 }
 
+.petpal-export-toolbar__presets,
 .petpal-export-toolbar__filters {
   display: flex;
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.petpal-export-toolbar__label {
+  color: #6b625a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .petpal-export-toolbar__service {
@@ -970,6 +1097,7 @@ onMounted(() => {
     align-items: stretch;
   }
 
+  .petpal-export-toolbar__presets,
   .petpal-export-toolbar__filters {
     align-items: stretch;
   }
