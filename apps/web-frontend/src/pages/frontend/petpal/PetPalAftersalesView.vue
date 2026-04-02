@@ -170,7 +170,9 @@ const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'foc
 const pageActions = computed(() => [
   {
     label: '订单队列',
-    to: activeOrder.value ? buildOrderQueueLink(activeOrder.value.id) : { name: 'frontend-petpal-orders' },
+    to: activeOrder.value
+      ? buildOrderQueueLink(activeOrder.value.id)
+      : buildOrderQueueFallbackLink('售后中心当前还没有定位到具体订单，已回到订单队列，可稍后重新进入售后链路。'),
     tone: 'secondary' as const,
   },
 ]);
@@ -216,6 +218,17 @@ function buildOrderQueueLink(orderId: string) {
     query: buildPetPalDeskHandoffQuery({
       notice: '这里已经定位到这笔售后订单，可直接回订单队列继续跟进。',
       focusOrderId: orderId,
+      focusFilter: 'aftersales',
+    }),
+  };
+}
+
+function buildOrderQueueFallbackLink(notice: string) {
+  return {
+    name: 'frontend-petpal-orders',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(highlightedOrderId.value ? { focusOrderId: highlightedOrderId.value } : {}),
       focusFilter: 'aftersales',
     }),
   };

@@ -316,7 +316,19 @@ const currentOrderId = computed(() => order.value?.id || orderId.value);
 
 const heroActions = computed(() => {
   if (!order.value) {
-    return [{ label: '返回订单队列', to: { name: 'frontend-petpal-orders' }, tone: 'secondary' as const }];
+    return [
+      {
+        label: props.mode === 'refund' || props.mode === 'complaint' ? '回售后中心继续跟进' : '返回订单队列',
+        to: props.mode === 'refund' || props.mode === 'complaint'
+          ? buildFallbackAftersalesLink('结果页暂未加载完整，已回到售后中心，可稍后重新进入当前订单继续跟进。')
+          : buildFallbackOrderQueueLink(
+              props.mode === 'payment'
+                ? '支付结果页暂未加载完整，已回到订单队列，可稍后重新进入当前订单继续付款。'
+                : '评价结果页暂未加载完整，已回到订单队列，可稍后重新进入当前订单继续查看或补评。',
+            ),
+        tone: 'secondary' as const,
+      },
+    ];
   }
   const activeOrder = order.value;
   return [
@@ -441,6 +453,31 @@ function resolveOrderFilter(record: OrderDetailRecord): PetPalDeskOrderFilter {
     return 'done';
   }
   return 'all';
+}
+
+function buildFallbackOrderQueueLink(notice: string) {
+  return {
+    name: 'frontend-petpal-orders',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(currentOrderId.value ? { focusOrderId: currentOrderId.value } : {}),
+      focusFilter: props.mode === 'payment'
+        ? 'needs_payment'
+        : props.mode === 'review'
+          ? 'done'
+          : 'all',
+    }),
+  };
+}
+
+function buildFallbackAftersalesLink(notice: string) {
+  return {
+    name: 'frontend-petpal-aftersales',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(currentOrderId.value ? { focusOrderId: currentOrderId.value } : {}),
+    }),
+  };
 }
 
 async function loadPage() {
