@@ -245,6 +245,20 @@ const resolveReminderSectionState = (results: PromiseSettledResult<unknown>[]): 
   };
 };
 
+function buildOwnerPetCreateRoute(notice: string) {
+  return {
+    name: 'frontend-petpal-pet-create',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
+
+function buildCaregiverServiceCreateRoute(notice: string) {
+  return {
+    name: 'frontend-petpal-caregiver-service-create',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
+
 const ownerTasks = computed<ReminderTask[]>(() => {
   const tasks: ReminderTask[] = [];
   const firstOutstandingOrder = ownerOrders.value.find((item) => isPetPalOutstandingOrder(item));
@@ -255,7 +269,7 @@ const ownerTasks = computed<ReminderTask[]>(() => {
       title: '先建立第一只宠物档案',
       description: '没有宠物档案时，需求和订单流程都无法顺畅开始。',
       actionLabel: '去建档',
-      to: { name: 'frontend-petpal-pet-create' },
+      to: buildOwnerPetCreateRoute('这里已经定位到新建宠物档案，可先补齐第一只宠物后再回来继续提醒里的主人任务。'),
       priority: 100,
     });
   }
@@ -361,7 +375,7 @@ const caregiverTasks = computed<ReminderTask[]>(() => {
       title: '还没有在售服务',
       description: '建议至少创建一个服务，让主人端可以在匹配中看到你。',
       actionLabel: '去新建服务',
-      to: { name: 'frontend-petpal-caregiver-service-create' },
+      to: buildCaregiverServiceCreateRoute('这里已经定位到新建服务页，可先补齐价格、城市和上架状态后再回来继续待办。'),
       priority: 92,
     });
   }

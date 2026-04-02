@@ -5,7 +5,7 @@
     summary="服务页不再混入入驻审核和履约订单，照料者可以在这里稳定维护报价和可售状态。"
     :nav-items="petPalCaregiverWorkspaceNav"
     active-name="frontend-petpal-caregiver-services"
-    :primary-action="{ label: '新建服务', to: { name: 'frontend-petpal-caregiver-service-create' }, tone: 'primary' }"
+    :primary-action="primaryAction"
     :actions="[{ label: '返回照料者总览', to: { name: 'frontend-petpal-caregiver' }, tone: 'secondary' }]"
     :stats="heroStats"
   >
@@ -21,7 +21,7 @@
           </el-button>
           <RouterLink
             v-else-if="highlightedService"
-            :to="{ name: 'frontend-petpal-caregiver-service-edit', params: { id: highlightedService.id } }"
+            :to="buildServiceEditRoute(highlightedService.id)"
           >
             继续编辑这个服务
           </RouterLink>
@@ -56,7 +56,12 @@
         description="建议至少创建一个可售服务，让主人在匹配中能看到你。"
       >
         <template #actions>
-          <RouterLink class="frontend-page__button is-primary" :to="{ name: 'frontend-petpal-caregiver-service-create' }">新建服务</RouterLink>
+          <RouterLink
+            class="frontend-page__button is-primary"
+            :to="buildServiceCreateRoute('这里已经定位到新建服务页，可直接继续填写价格、城市和上架状态。')"
+          >
+            新建服务
+          </RouterLink>
         </template>
       </PetPalDeskEmpty>
 
@@ -69,7 +74,7 @@
           </div>
           <div class="petpal-sheet-row__tail">
             <span class="petpal-pill" :class="service.isActive ? 'is-success' : 'is-warning'">{{ service.isActive ? '在售' : '停用' }}</span>
-            <RouterLink :to="{ name: 'frontend-petpal-caregiver-service-edit', params: { id: service.id } }">编辑</RouterLink>
+            <RouterLink :to="buildServiceEditRoute(service.id)">编辑</RouterLink>
             <button type="button" class="petpal-link-button" @click="toggleService(service)">
               {{ service.isActive ? '停用' : '重新上架' }}
             </button>
@@ -111,6 +116,11 @@ const loadState = ref<PetPalSectionLoadState>('idle');
 const sectionReloadingKey = ref<'' | 'services'>('');
 const highlightedServiceId = computed(() => getPetPalQueryString(route.query, 'focusServiceId'));
 const highlightedService = computed(() => services.value.find((item) => item.id === highlightedServiceId.value) ?? null);
+const primaryAction = computed(() => ({
+  label: '新建服务',
+  to: buildServiceCreateRoute('这里已经定位到新建服务页，可直接继续填写价格、城市和上架状态。'),
+  tone: 'primary' as const,
+}));
 
 const heroStats = computed(() => [
   { label: '服务总数', value: String(services.value.length), hint: '上架与停用都在这里' },
@@ -132,6 +142,24 @@ const pageNotice = computed(() => {
     tone: loadState.value === 'error' ? 'warning' as const : 'accent' as const,
   };
 });
+
+function buildServiceCreateRoute(notice: string) {
+  return {
+    name: 'frontend-petpal-caregiver-service-create',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
+
+function buildServiceEditRoute(serviceId: string) {
+  return {
+    name: 'frontend-petpal-caregiver-service-edit',
+    params: { id: serviceId },
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这里已经定位到这个服务，可直接继续调整价格、城市或上架状态。',
+      focusServiceId: serviceId,
+    }),
+  };
+}
 
 async function loadPage() {
   loadState.value = 'idle';

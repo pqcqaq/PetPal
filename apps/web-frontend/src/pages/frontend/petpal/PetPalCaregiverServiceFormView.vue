@@ -5,9 +5,13 @@
     summary="表单页只负责一个服务的配置，不再展示审核或履约内容。"
     :nav-items="petPalCaregiverWorkspaceNav"
     active-name="frontend-petpal-caregiver-services"
-    :actions="[{ label: '返回服务清单', to: { name: 'frontend-petpal-caregiver-services' }, tone: 'secondary' }]"
+    :actions="pageActions"
     :stats="heroStats"
   >
+    <template v-if="pageNotice" #notice>
+      <PetPalDeskNotice eyebrow="Handoff" :title="pageNotice.title" :description="pageNotice.description" :tone="pageNotice.tone" />
+    </template>
+
     <PetPalDeskSection eyebrow="Form" :title="isEditing ? '编辑服务' : '填写服务'" description="价格、计价单位、提前时长和城市是主人最先看到的字段。">
       <PetPalDeskEmpty
         v-if="!hasProfile"
@@ -74,9 +78,10 @@ import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
-import { buildPetPalDeskHandoffQuery } from './recovery';
+import { buildPetPalDeskHandoffQuery, getPetPalQueryString, mergePetPalPageNotice } from './recovery';
 import { petPalCaregiverWorkspaceNav, petPalServiceTypeOptions, petPalSpeciesOptions } from './shared';
 
 const route = useRoute();
@@ -103,6 +108,39 @@ const heroStats = computed(() => [
   { label: '服务城市', value: form.serviceCity || '待填写', hint: '默认沿用资料页城市' },
   { label: '在售状态', value: form.isActive ? '在售' : '停用', hint: '保存后可随时切换' },
 ]);
+const pageActions = computed(() => [
+  {
+    label: '返回服务清单',
+    to: buildServiceListRoute(
+      isEditing.value ? '这里已经回到服务清单，可继续查看这个服务的上下架状态。' : '这里已经回到服务清单，可继续查看所有服务配置。',
+      editingServiceId.value || undefined,
+    ),
+    tone: 'secondary' as const,
+  },
+]);
+const pageNotice = computed(() => {
+  const description = mergePetPalPageNotice([
+    getPetPalQueryString(route.query, 'notice'),
+  ]);
+  if (!description) {
+    return null;
+  }
+  return {
+    title: isEditing.value ? '已进入服务编辑页' : '已进入新建服务页',
+    description,
+    tone: 'accent' as const,
+  };
+});
+
+function buildServiceListRoute(notice: string, serviceId?: string) {
+  return {
+    name: 'frontend-petpal-caregiver-services',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(serviceId ? { focusServiceId: serviceId } : {}),
+    }),
+  };
+}
 
 function applyService(service: CaregiverServiceRecord) {
   form.serviceType = service.serviceType;
@@ -133,7 +171,7 @@ async function loadPage() {
     const target = services.find((item) => item.id === editingServiceId.value);
     if (!target) {
       ElMessage.warning('没有找到对应服务');
-      void router.replace({ name: 'frontend-petpal-caregiver-services' });
+      void router.replace(buildServiceListRoute('未找到对应服务，已回到服务清单，可改为检查其他服务配置。'));
       return;
     }
     applyService(target);
@@ -165,21 +203,13 @@ async function submit() {
       const result = await api.petpal.caregiver.updateService(editingServiceId.value, payload);
       ElMessage.success('服务已更新');
       await router.push({
-        name: 'frontend-petpal-caregiver-services',
-        query: buildPetPalDeskHandoffQuery({
-          notice: '服务配置已更新，可继续检查上下架状态或再次编辑。',
-          focusServiceId: result.id,
-        }),
+        ...buildServiceListRoute('服务配置已更新，可继续检查上下架状态或再次编辑。', result.id),
       });
     } else {
       const result = await api.petpal.caregiver.createService(payload);
       ElMessage.success('服务已创建');
       await router.push({
-        name: 'frontend-petpal-caregiver-services',
-        query: buildPetPalDeskHandoffQuery({
-          notice: '新服务已创建，可继续微调报价或上架状态。',
-          focusServiceId: result.id,
-        }),
+        ...buildServiceListRoute('新服务已创建，可继续微调报价或上架状态。', result.id),
       });
     }
   } catch (error: unknown) {

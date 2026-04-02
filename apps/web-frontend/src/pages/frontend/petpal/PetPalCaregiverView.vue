@@ -122,7 +122,12 @@
           description="服务清单为空时，主人无法稳定匹配到你。"
         >
           <template #actions>
-            <RouterLink class="frontend-page__button is-primary" :to="{ name: 'frontend-petpal-caregiver-service-create' }">新建服务</RouterLink>
+            <RouterLink
+              class="frontend-page__button is-primary"
+              :to="buildServiceCreateRoute('这里已经定位到新建服务页，可直接继续填写价格、城市和上架状态。')"
+            >
+              新建服务
+            </RouterLink>
           </template>
         </PetPalDeskEmpty>
 
@@ -254,6 +259,24 @@ const heroStats = computed(() => [
   { label: '下一步', value: profile.value ? '看服务或履约' : '先建资料', hint: '按审核和接单状态变化' },
 ]);
 
+function buildServiceCreateRoute(notice: string) {
+  return {
+    name: 'frontend-petpal-caregiver-service-create',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
+
+function buildOrdersRoute(notice: string, orderId?: string) {
+  return {
+    name: 'frontend-petpal-caregiver-orders',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(orderId ? { focusOrderId: orderId } : {}),
+      focusRole: 'caregiver',
+    }),
+  };
+}
+
 const primaryAction = computed(() => {
   if (!profile.value) {
     return {
@@ -268,9 +291,17 @@ const primaryAction = computed(() => {
     };
   }
   if (!services.value.length) {
-    return { label: '新建第一个服务', to: { name: 'frontend-petpal-caregiver-service-create' }, tone: 'primary' as const };
+    return {
+      label: '新建第一个服务',
+      to: buildServiceCreateRoute('这里已经定位到新建服务页，可直接继续填写价格、城市和上架状态。'),
+      tone: 'primary' as const,
+    };
   }
-  return { label: '进入履约队列', to: { name: 'frontend-petpal-caregiver-orders' }, tone: 'primary' as const };
+  return {
+    label: '进入履约队列',
+    to: buildOrdersRoute('这里已经定位到履约队列，可直接继续处理接单、签到或服务记录。', orders.value[0]?.id),
+    tone: 'primary' as const,
+  };
 });
 
 const heroActions = computed(() => [
@@ -320,7 +351,7 @@ const focusTask = computed(() => {
       title: '先上架一个可售服务',
       description: '没有服务时，主人无法在需求匹配里看到你，建议尽快创建至少一个服务项目。',
       actionLabel: '去新建服务',
-      to: { name: 'frontend-petpal-caregiver-service-create' },
+      to: buildServiceCreateRoute('这里已经定位到新建服务页，可直接继续填写价格、城市和上架状态。'),
     };
   }
   if (orders.value.length) {
@@ -328,14 +359,7 @@ const focusTask = computed(() => {
       title: '优先处理当前履约订单',
       description: `当前有 ${orders.value.length} 笔履约订单待跟进，接单、签到和服务记录都在履约页完成。`,
       actionLabel: '去履约页',
-      to: {
-        name: 'frontend-petpal-caregiver-orders',
-        query: buildPetPalDeskHandoffQuery({
-          notice: '这里已经定位到最近一笔待处理履约订单，可直接继续接单或签到。',
-          focusOrderId: orders.value[0].id,
-          focusRole: 'caregiver',
-        }),
-      },
+      to: buildOrdersRoute('这里已经定位到最近一笔待处理履约订单，可直接继续接单或签到。', orders.value[0].id),
     };
   }
   return {

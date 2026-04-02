@@ -7202,6 +7202,50 @@ flowchart TD
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.149 2026-04-03（P3-M1 Slice 149）
+
+**概述**：继续推进 Web 前台收口，本轮把提醒中心和照料者服务管理链路里的残余裸跳转补齐，并让服务表单页真正承接 handoff notice，避免 caregiver 侧“入口有上下文、表单页无反馈”。
+
+已完成：
+
+- 收口提醒中心里的残余创建入口：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalRemindersView.vue`
+    - 主人侧“去建档”和照料者侧“去新建服务”待办现已统一接入 handoff query，不再从提醒中心裸跳到表单页。
+- 收口照料者服务管理入口：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverServicesView.vue`
+    - “主按钮 / 空态新建服务 / 继续编辑这个服务 / 编辑” 已统一改走 service handoff helper，进入新建页或编辑页时都会带明确 notice。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue`
+    - 服务区空态的“新建服务”、主按钮里的“新建第一个服务 / 进入履约队列”、当前下一步里的“去新建服务 / 去履约页” 都已补齐 handoff notice。
+- 让服务表单页真正承接 notice：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverServiceFormView.vue`
+    - 已新增 notice 区块，能承接来自提醒中心、照料者总览和服务清单的 handoff 说明。
+    - “返回服务清单” 现在会带回当前服务焦点。
+    - 编辑页在目标服务不存在时，现会带 notice 回到服务清单，而不是静默跳回列表。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮只改动 Web 前台提醒中心、照料者服务管理入口和服务表单页 notice 承接，没有新增后端接口或数据模型变更。
+- 已确认提醒中心、照料者总览、服务清单和服务表单之间的高频入口现在遵循同一套 handoff 规则，caregiver 侧服务管理不再混用有上下文和无上下文跳转。
+- 已确认服务编辑对象缺失时现在具备明确回流说明，避免用户误判为页面未响应。
+
+风险与缓解：
+
+- 风险：提醒中心和照料者服务管理主链路已收口，但消息中心、少量辅助导航和跨角色空态动作仍可能残留零散 notice 不一致点。
+- 缓解：下一轮继续扫描消息中心和其余辅助入口，清掉最后一批 handoff 缺口。
+
+下一步（1-3）：
+
+1. 继续扫描消息中心、辅助导航和跨角色空态动作，收掉最后一批 handoff 不一致点。
+2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
+3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
+
 ### 14.146 2026-04-03（P3-M1 Slice 146）
 
 **概述**：继续推进 Web 前台收口，本轮把照料者侧残余的无上下文入口补齐，并让 `legacy` 兼容页也承接统一 notice，把旧链接稳定分发到带 handoff 的新页面。
