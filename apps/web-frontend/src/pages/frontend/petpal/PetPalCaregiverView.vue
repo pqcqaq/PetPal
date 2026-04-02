@@ -209,9 +209,9 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
   getPetPalQueryString,
-  mergePetPalPageNotice,
   runPetPalSectionRetry,
   type PetPalSectionLoadState,
 } from './recovery';
@@ -233,23 +233,16 @@ const servicesState = ref<PetPalSectionLoadState>('idle');
 const ordersState = ref<PetPalSectionLoadState>('idle');
 const sectionReloadingKey = ref<'' | 'profile' | 'services' | 'orders'>('');
 const unreadOrder = computed(() => orders.value.find((item) => (item.conversation?.caregiverUnreadCount || 0) > 0) ?? null);
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  warnings: [
     profileState.value === 'error' ? '资料区暂未刷新完成，可只重试资料区' : '',
     servicesState.value === 'error' ? '服务区暂未刷新完成，可只重试服务区' : '',
     ordersState.value === 'error' ? '履约区暂未刷新完成，可只重试履约区' : '',
-  ]);
-  if (!description) {
-    return null;
-  }
-  const hasError = profileState.value === 'error' || servicesState.value === 'error' || ordersState.value === 'error';
-  return {
-    title: hasError ? '照料者工作台还有部分分区未刷新完成' : '已回到照料者工作台',
-    description,
-    tone: hasError ? 'warning' as const : 'accent' as const,
-  };
-});
+  ],
+  successTitle: '已回到照料者工作台',
+  warningTitle: '照料者工作台还有部分分区未刷新完成',
+}));
 
 const auditLabel = computed(() => profile.value ? getPetPalCaregiverAuditLabel(profile.value.auditStatus) : '未建档');
 const heroStats = computed(() => [

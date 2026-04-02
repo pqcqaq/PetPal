@@ -7202,6 +7202,53 @@ flowchart TD
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.154 2026-04-03（P3-M1 Slice 154）
+
+**概述**：继续推进 Web 前台收口，本轮开始整理页面级反馈，把主人 / 照料者工作台、提醒中心、消息中心、需求队列和售后中心的 page notice 逻辑抽成共享 helper，统一 success / warning 标题和弱网说明拼接方式。
+
+已完成：
+
+- 抽出共享 notice helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/recovery.ts`
+    - 新增 `buildPetPalPageNotice()`，统一处理：
+      - 路由 handoff notice
+      - notes 与 warnings 拼接
+      - success / warning 标题切换
+      - `accent / warning` tone 判定
+- 首批接入共享 helper 的页面：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalRemindersView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalMessagesView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerRequestsView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalAftersalesView.vue`
+    - 这些工作台 / 队列页原先各自手写 notice 标题与 warning 判定，现已统一改走共享 helper。
+    - 提醒中心里的“角色未开通”说明现与错误 warning 分离，不会再误触 warning 标题。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮只改动 Web 前台页面 notice 计算与共享恢复工具，没有新增接口、状态模型或业务流程改动。
+- 已确认主人 / 照料者工作台、提醒、消息、需求队列和售后中心现在遵循同一套 notice 拼接与标题切换规则。
+- 已确认提醒中心的 role unavailable 说明不会再和真正的弱网 / 局部失败 warning 混为一类。
+
+风险与缓解：
+
+- 风险：其余资源页、表单页和详情页仍有分散的 page notice 逻辑，后续还需继续统一。
+- 缓解：下一轮继续把剩余列表页 / 表单页 / 详情页 notice 迁到共享 helper，再开始收口验收向文档。
+
+下一步（1-3）：
+
+1. 继续把剩余资源页、表单页和详情页的 page notice 逻辑迁到共享 helper，统一最后一批页面反馈差异。
+2. 开始补更细的验收向测试说明、角色链路清单和最终交付文档。
+3. 在 Web / App 高频链路继续稳定后，再集中补最终答辩与论文支撑材料。
+
 ### 14.153 2026-04-03（P3-M1 Slice 153）
 
 **概述**：继续推进 Web 前台收口，本轮把主人侧表单页页头返回动作和主人 / 照料者总览里最后几处 bare fallback 补成统一 handoff，避免“列表页已有 notice，但进入表单或从总览 fallback 回去时又静默跳转”。

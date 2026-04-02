@@ -129,10 +129,10 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
   getPetPalDeskFocusRole,
   getPetPalQueryString,
-  mergePetPalPageNotice,
   runPetPalSectionRetry,
   type PetPalRoleAwareSectionLoadState,
 } from './recovery';
@@ -189,22 +189,15 @@ const heroStats = computed(() => [
   { label: '当前视角未读', value: String(conversations.value.reduce((sum, item) => sum + threadUnread(item), 0)), hint: '可先标记已读再进入详情' },
   { label: '当前视角', value: role.value === 'owner' ? '主人' : '照料者', hint: '两端消息不再混排' },
 ]);
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  warnings: [
     ownerState.value === 'error' ? '主人侧会话暂未刷新完整，可只重试主人侧' : '',
     caregiverState.value === 'error' ? '照料者侧会话暂未刷新完整，可只重试照料者侧' : '',
-  ]);
-  if (!description) {
-    return null;
-  }
-  const hasError = ownerState.value === 'error' || caregiverState.value === 'error';
-  return {
-    title: hasError ? '消息中心还有部分内容未刷新完成' : '已回到消息中心',
-    description,
-    tone: hasError ? 'warning' as const : 'accent' as const,
-  };
-});
+  ],
+  successTitle: '已回到消息中心',
+  warningTitle: '消息中心还有部分内容未刷新完成',
+}));
 
 const threadUnread = (item: ConversationItem) => getPetPalConversationUnreadCount(item.conversation, role.value);
 

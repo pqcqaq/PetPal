@@ -15,6 +15,31 @@ export const mergePetPalPageNotice = (items: string[]) => {
   return normalized.length ? `${normalized.join('；')}。` : '';
 };
 
+export const buildPetPalPageNotice = (options: {
+  baseNotice?: string;
+  notes?: string[];
+  warnings?: string[];
+  successTitle: string;
+  warningTitle: string;
+}) => {
+  const notes = options.notes ?? [];
+  const warnings = options.warnings ?? [];
+  const description = mergePetPalPageNotice([
+    options.baseNotice || '',
+    ...notes,
+    ...warnings,
+  ]);
+  if (!description) {
+    return null;
+  }
+  const hasWarning = warnings.some(item => item.trim());
+  return {
+    title: hasWarning ? options.warningTitle : options.successTitle,
+    description,
+    tone: hasWarning ? 'warning' as const : 'accent' as const,
+  };
+};
+
 export const isPetPalReadySectionState = (
   state: PetPalSectionLoadState | PetPalRoleAwareSectionLoadState,
 ) => state === 'ready';

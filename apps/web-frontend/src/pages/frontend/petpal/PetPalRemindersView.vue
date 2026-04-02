@@ -146,10 +146,10 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
   getPetPalDeskFocusRole,
   getPetPalQueryString,
-  mergePetPalPageNotice,
   runPetPalSectionRetry,
   type PetPalRoleAwareSectionLoadState,
 } from './recovery';
@@ -190,43 +190,31 @@ const firstUnreadCaregiverOrder = computed(() =>
 const messageActionRole = computed(() => (
   focusedRole.value || (firstUnreadOwnerOrder.value ? 'owner' : firstUnreadCaregiverOrder.value ? 'caregiver' : 'owner')
 ));
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  notes: [
+    ownerState.value === 'role_unavailable' && focusedRole.value === 'owner' ? '当前账号还没有主人侧能力，可先处理照料者侧待办' : '',
+    caregiverState.value === 'role_unavailable' && focusedRole.value === 'caregiver' ? '当前账号还没有照料者侧能力，可先处理主人侧待办' : '',
+  ],
+  warnings: [
     ownerState.value === 'error'
       ? '主人侧待办暂未刷新完成，可只重试主人侧'
       : ownerNeedsRetry.value
         ? '主人侧待办有部分数据未刷新完成，可只重试主人侧'
-        : ownerState.value === 'role_unavailable' && focusedRole.value === 'owner'
-          ? '当前账号还没有主人侧能力，可先处理照料者侧待办'
-          : '',
+        : '',
     caregiverState.value === 'error'
       ? '照料者侧待办暂未刷新完成，可只重试照料者侧'
       : caregiverNeedsRetry.value
         ? '照料者侧待办有部分数据未刷新完成，可只重试照料者侧'
-        : caregiverState.value === 'role_unavailable' && focusedRole.value === 'caregiver'
-          ? '当前账号还没有照料者侧能力，可先处理主人侧待办'
-          : '',
-  ]);
-  if (!description) {
-    return null;
-  }
-  const hasError = ownerState.value === 'error'
-    || caregiverState.value === 'error'
-    || ownerNeedsRetry.value
-    || caregiverNeedsRetry.value;
-  return {
-    title: hasError
-      ? '提醒中心还有部分待办未刷新完整'
-      : focusedRole.value === 'caregiver'
-        ? '已回到照料者侧待办'
-        : focusedRole.value === 'owner'
-          ? '已回到主人侧待办'
-          : '已回到提醒中心',
-    description,
-    tone: hasError ? 'warning' as const : 'accent' as const,
-  };
-});
+        : '',
+  ],
+  successTitle: focusedRole.value === 'caregiver'
+    ? '已回到照料者侧待办'
+    : focusedRole.value === 'owner'
+      ? '已回到主人侧待办'
+      : '已回到提醒中心',
+  warningTitle: '提醒中心还有部分待办未刷新完整',
+}));
 const pageActions = computed(() => [
   {
     label: '消息中心',

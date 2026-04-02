@@ -131,9 +131,9 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
   getPetPalQueryString,
-  mergePetPalPageNotice,
   runPetPalSectionRetry,
   type PetPalSectionLoadState,
 } from './recovery';
@@ -183,22 +183,15 @@ const heroStats = computed(() => [
   { label: '退款处理中', value: String(Object.values(refundProgressByOrder.value).filter((item) => item && item.stage !== 'NONE' && item.stage !== 'FULL_SUCCESS').length), hint: '持续关注渠道回执' },
   { label: '导出入口', value: '已独立', hint: '当前页可导出全部或单订单退款' },
 ]);
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  warnings: [
     loadState.value === 'error' ? '售后中心刷新失败，可直接重试当前页' : '',
     summaryFailureCount.value ? `${summaryFailureCount.value} 笔订单的退款或投诉摘要未完全刷新` : '',
-  ]);
-  if (!description) {
-    return null;
-  }
-  const hasWarning = loadState.value === 'error' || summaryFailureCount.value > 0;
-  return {
-    title: hasWarning ? '售后摘要还有部分内容待刷新' : '已回到售后中心',
-    description,
-    tone: hasWarning ? 'warning' as const : 'accent' as const,
-  };
-});
+  ],
+  successTitle: '已回到售后中心',
+  warningTitle: '售后摘要还有部分内容待刷新',
+}));
 
 function buildOrderDetailLink(orderId: string) {
   return {

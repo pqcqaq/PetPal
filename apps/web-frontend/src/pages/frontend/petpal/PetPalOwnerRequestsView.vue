@@ -149,9 +149,9 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
   getPetPalQueryString,
-  mergePetPalPageNotice,
   runPetPalSectionRetry,
   type PetPalSectionLoadState,
 } from './recovery';
@@ -204,22 +204,15 @@ const heroStats = computed(() => [
   { label: '当前匹配数', value: String(matches.value.length), hint: selectedRequest.value ? '按右侧选中需求展示' : '先选择一条需求' },
   { label: '下一步', value: '查看匹配', hint: '确认合适照料者后再创建订单' },
 ]);
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  warnings: [
     requestsState.value === 'error' ? '需求清单暂未刷新完成，可先重试清单' : '',
     matchesState.value === 'error' && selectedRequest.value ? '当前需求的匹配区暂未刷新完成，可只重试右侧匹配区' : '',
-  ]);
-  if (!description) {
-    return null;
-  }
-  const hasError = requestsState.value === 'error' || matchesState.value === 'error';
-  return {
-    title: hasError ? '需求队列还有部分内容未刷新完成' : '已回到需求队列',
-    description,
-    tone: hasError ? 'warning' as const : 'accent' as const,
-  };
-});
+  ],
+  successTitle: '已回到需求队列',
+  warningTitle: '需求队列还有部分内容未刷新完成',
+}));
 
 function buildOwnerDashboardRoute(notice: string) {
   return {
