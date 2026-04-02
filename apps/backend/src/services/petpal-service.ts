@@ -227,6 +227,29 @@ type OwnerRefundProgressRecord = {
   refundableBalance: number;
 };
 
+type CaregiverEarningsExportRow = {
+  orderNo: string;
+  serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+  appointmentStart: Date;
+  appointmentEnd: Date;
+  amountPaid: number;
+  amountRefunded: number;
+  netIncome: number;
+  orderStatus:
+    | 'PENDING_ACCEPT'
+    | 'ACCEPTED'
+    | 'SERVING'
+    | 'COMPLETED'
+    | 'CANCELLED'
+    | 'DISPUTED'
+    | 'PARTIAL_REFUNDED'
+    | 'REFUNDED';
+  ownerNickname: string;
+  petName: string | null;
+  locationText: string | null;
+  closedAt: Date | null;
+};
+
 type ComplaintAdminScopeFilters = {
   status?: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
   complaintType?: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
@@ -698,6 +721,15 @@ type CaregiverEarningsOrderEntity = Prisma.OrderMainGetPayload<{
   select: typeof caregiverEarningsOrderSelect;
 }>;
 
+const caregiverEarningsExportSelect = {
+  ...caregiverEarningsOrderSelect,
+  closedAt: true,
+} satisfies Prisma.OrderMainSelect;
+
+type CaregiverEarningsExportEntity = Prisma.OrderMainGetPayload<{
+  select: typeof caregiverEarningsExportSelect;
+}>;
+
 const toCaregiverEarningsOrderRecord = (order: CaregiverEarningsOrderEntity) => ({
   id: order.id,
   orderNo: order.orderNo,
@@ -710,6 +742,14 @@ const toCaregiverEarningsOrderRecord = (order: CaregiverEarningsOrderEntity) => 
   ownerNickname: order.owner.nickname,
   petName: order.serviceRequest?.pet?.name ?? null,
   locationText: order.serviceRequest?.locationText ?? null,
+});
+
+const toCaregiverEarningsExportRow = (
+  order: CaregiverEarningsExportEntity,
+): CaregiverEarningsExportRow => ({
+  ...toCaregiverEarningsOrderRecord(order),
+  netIncome: Number(calcNetIncome(order.amountPaid, order.amountRefunded).toFixed(2)),
+  closedAt: order.closedAt,
 });
 
 const getApprovedCaregiverProfile = async (
@@ -1873,6 +1913,38 @@ export const petpalService = {
         createdAt: 'desc',
       },
     });
+  },
+
+  async listCaregiverEarningsExportRows(): Promise<CaregiverEarningsExportRow[]> {
+    const actorId = getRequestActorId();
+    if (!actorId) {
+      throw forbidden('Authentication required');
+    }
+
+    const caregiverProfile = await petpalService.getOrCreateCaregiverProfile(actorId);
+    if (caregiverProfile.auditStatus !== 'APPROVED') {
+      return [];
+    }
+
+    const orders = await prisma.orderMain.findMany({
+      where: {
+        caregiverId: caregiverProfile.id,
+        deleteAt: null,
+        orderStatus: 'COMPLETED',
+      },
+      orderBy: [
+        {
+          appointmentEnd: 'desc',
+        },
+        {
+          createdAt: 'desc',
+        },
+      ],
+      select: caregiverEarningsExportSelect,
+      take: 5000,
+    });
+
+    return orders.map(toCaregiverEarningsExportRow);
   },
 
   async createCaregiverService(

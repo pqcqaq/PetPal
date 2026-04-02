@@ -526,6 +526,10 @@ export const createApiFactory = (options: ClientOptions) => {
           client.request<CaregiverEarningsSummaryRecord>({
             url: '/petpal/caregiver/earnings-summary',
           }),
+        exportEarnings: createDownloadEndpoint(
+          '/petpal/caregiver/earnings/export',
+          'petpal-caregiver-earnings.xlsx',
+        ),
         orders: (query?: CaregiverOrderQuery) =>
           client.request<CaregiverOrderPage>({
             url: '/petpal/caregiver/orders',

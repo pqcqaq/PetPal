@@ -383,6 +383,11 @@ export interface CaregiverEarningsOrderRecord {
   locationText: string | null;
 }
 
+export interface CaregiverEarningsExportRow extends CaregiverEarningsOrderRecord {
+  netIncome: AmountValue;
+  closedAt: string | null;
+}
+
 export interface CaregiverServiceRevenueMixRecord {
   serviceType: PetServiceType;
   revenue: AmountValue;

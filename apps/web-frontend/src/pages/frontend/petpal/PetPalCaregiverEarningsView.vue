@@ -34,24 +34,33 @@
       description="只统计已完成订单收入，把售后敞口单独暴露出来。"
     >
       <template #actions>
-        <el-button
-          v-if="summaryState === 'error'"
-          :loading="sectionReloadingKey === 'summary'"
-          @click="retrySummary"
-        >
-          重试收益摘要
-        </el-button>
-        <RouterLink
-          v-else-if="latestActiveOrder"
-          :to="
-            buildOrdersRoute(
-              '这里已经定位到当前最优先的一笔履约订单，可直接继续接单或签到。',
-              latestActiveOrder.id,
-            )
-          "
-        >
-          回履约队列
-        </RouterLink>
+        <div class="petpal-section-actions">
+          <el-button
+            v-if="summaryState === 'error'"
+            :loading="sectionReloadingKey === 'summary'"
+            @click="retrySummary"
+          >
+            重试收益摘要
+          </el-button>
+          <ListExportButton
+            v-else
+            :request="() => api.petpal.caregiver.exportEarnings()"
+            label="导出经营明细"
+            pending-label="导出中"
+            error-message="导出收益明细失败"
+          />
+          <RouterLink
+            v-if="summaryState !== 'error' && latestActiveOrder"
+            :to="
+              buildOrdersRoute(
+                '这里已经定位到当前最优先的一笔履约订单，可直接继续接单或签到。',
+                latestActiveOrder.id,
+              )
+            "
+          >
+            回履约队列
+          </RouterLink>
+        </div>
       </template>
 
       <PetPalDeskEmpty
@@ -329,6 +338,7 @@ import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
+import ListExportButton from '@/components/download/ListExportButton.vue';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
@@ -651,6 +661,13 @@ onMounted(() => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.petpal-section-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .petpal-metric-grid--compact {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -873,6 +890,10 @@ onMounted(() => {
 }
 
 @media (max-width: 720px) {
+  .petpal-section-actions {
+    align-items: stretch;
+  }
+
   .petpal-metric-grid,
   .petpal-metric-grid--compact {
     grid-template-columns: 1fr;

@@ -7202,6 +7202,54 @@ flowchart TD
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.161 2026-04-03（P3-M1 Slice 161）
+
+**概述**：延续上一轮补齐的收益趋势，本轮继续把照料者收益中心补到“可带走”的层面，新增经营明细导出，让收益页不只会看，还能做线下对账与阶段复盘。
+
+已完成：
+
+- 新增照料者收益导出链路：
+  - `packages/api-common/src/types/petpal.ts`
+  - `packages/api-common/src/api/factory.ts`
+  - `apps/backend/src/services/petpal-service.ts`
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `CaregiverEarningsExportRow` 契约，统一导出行里的订单号、服务类型、主人、宠物、地点、已付 / 已退 / 净收入和关闭时间。
+    - 新增 `GET /api/petpal/caregiver/earnings/export`，导出范围只统计当前照料者自己的已完成订单，不把进行中、售后中或其他照料者订单混进经营明细。
+    - 未审核照料者导出时返回空工作簿，继续与收益摘要页的零值空态保持同一条主线，不额外抛 403 打断照料者侧流程。
+- Web 收益页补经营导出入口：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 收益总览区已新增“导出经营明细”按钮，直接复用现有下载按钮与 Excel 下载链路。
+    - 导出入口与“回履约队列”并列放在收益页主分区动作中，避免用户再跳去其他页面找对账导出。
+- 定向测试补齐：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 已补“未审核照料者导出空工作簿”和“已审核照料者只导出自己的已完成订单”两条集成测试。
+    - 导出测试已继续校验工作表标题、列头和净收入等关键单元格，避免只是拿到一个非空二进制就误判导出正确。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `node --import tsx --test --test-concurrency=1 --test-name-pattern "caregiver earnings" test/integration/petpal-api.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮继续复用现有 `createExcelExportHandler`、下载按钮和请求上下文，不额外引入新的导出协议或前端二进制处理分支。
+- 已确认导出与收益摘要使用同一条“只统计当前照料者已完成订单净收入”的口径，不会出现页面看的是净收入、导出拿到的是毛收入或混入活跃单的偏差。
+- 已确认未审核照料者仍可进入收益页并执行导出动作，但只会拿到空明细，导出行为不会打断照料者入驻补资料主线。
+
+风险与缓解：
+
+- 风险：当前经营导出仍是固定列的完成单明细，不支持时间段、服务类型或售后暴露维度筛选。
+- 缓解：下一轮继续评估是否补收益导出筛选、经营模板或平台级经营看板，避免把“已能导出”误判为收益分析全部收口。
+
+下一步（1-3）：
+
+1. 继续评估是否为照料者收益导出补时间范围、服务类型等筛选维度。
+2. 继续补系统级主动提醒、保存后回流和更细的弱网恢复说明。
+3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
+
 ### 14.160 2026-04-03（P3-M1 Slice 160）
 
 **概述**：延续上一轮统一后的收益摘要，本轮继续补齐照料者收益的日 / 周 / 月趋势视角，让收益分析开始覆盖文档里明确要求的周期性报表维度。

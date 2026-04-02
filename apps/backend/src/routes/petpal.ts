@@ -173,6 +173,7 @@ const ownerRefundExportQuerySchema = z.object({
 });
 
 const ownerOrderRefundExportQuerySchema = z.object({});
+const caregiverEarningsExportQuerySchema = z.object({});
 
 const adminComplaintQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
@@ -698,6 +699,38 @@ petpalRouter.get(
     const auth = req.auth!;
     const summary = await petpalService.getCaregiverEarningsSummary(auth.id);
     return ok(res, summary, 'Caregiver earnings summary');
+  }),
+);
+
+petpalRouter.get(
+  '/caregiver/earnings/export',
+  createExcelExportHandler({
+    fileName: () => createTimestampedExcelFileName('petpal-caregiver-earnings'),
+    sheetName: 'PetPal Caregiver Earnings',
+    parseQuery: (query) => caregiverEarningsExportQuerySchema.parse(query ?? {}),
+    queryRows: () => petpalService.listCaregiverEarningsExportRows(),
+    columns: [
+      { header: '订单号', width: 24, value: (row) => row.orderNo },
+      {
+        header: '服务类型',
+        width: 14,
+        value: (row) => serviceTypeLabels[row.serviceType] ?? row.serviceType,
+      },
+      { header: '主人昵称', width: 18, value: (row) => row.ownerNickname },
+      { header: '宠物名', width: 16, value: (row) => row.petName ?? '' },
+      { header: '服务地点', width: 28, value: (row) => row.locationText ?? '' },
+      { header: '预约开始', width: 22, value: (row) => row.appointmentStart },
+      { header: '预约结束', width: 22, value: (row) => row.appointmentEnd },
+      {
+        header: '订单状态',
+        width: 14,
+        value: (row) => orderStatusLabels[row.orderStatus] ?? row.orderStatus,
+      },
+      { header: '已付金额', width: 14, value: (row) => row.amountPaid },
+      { header: '已退金额', width: 14, value: (row) => row.amountRefunded },
+      { header: '净收入', width: 14, value: (row) => row.netIncome },
+      { header: '关闭时间', width: 22, value: (row) => row.closedAt },
+    ],
   }),
 );
 

@@ -638,6 +638,18 @@ describe('PetPal API integration', () => {
           Number(item.revenue) === 0 && item.completedOrderCount === 0,
       ),
     );
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings/export')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    assert.equal(worksheet.name, 'PetPal Caregiver Earnings');
+    assert.equal(worksheet.getRow(1).getCell(1).value, '订单号');
+    assert.equal(worksheet.rowCount, 1);
   });
 
   it('supports caregiver earnings summary aggregation', async () => {
@@ -673,10 +685,22 @@ describe('PetPal API integration', () => {
       },
       select: {
         id: true,
+        name: true,
       },
     });
 
     assert.ok(ownerPet);
+
+    const ownerRecord = await prisma.user.findUnique({
+      where: {
+        id: ownerSession.user.id,
+      },
+      select: {
+        nickname: true,
+      },
+    });
+
+    assert.ok(ownerRecord);
 
     await request(app)
       .post('/api/petpal/caregiver/services')
@@ -941,6 +965,215 @@ describe('PetPal API integration', () => {
         sumTrendOrders(baselineResponse.body.data.trends.monthly),
       2,
     );
+  });
+
+  it('exports caregiver earnings rows for completed orders only', async () => {
+    const { app, prisma } = context;
+    const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
+    const ownerSession = await loginAs(app, 'user', 'User123!');
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+
+    const caregiverProfileResponse = await request(app)
+      .get('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    await prisma.caregiverProfile.update({
+      where: {
+        id: caregiverProfileResponse.body.data.id,
+      },
+      data: {
+        auditStatus: 'APPROVED',
+      },
+    });
+
+    const ownerPet = await prisma.petProfile.findFirst({
+      where: {
+        ownerId: ownerSession.user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    assert.ok(ownerPet);
+
+    const suffix = Date.now().toString(36);
+    const completedRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-completed-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'WALKING',
+        startTime: new Date('2026-04-01T09:00:00.000Z'),
+        endTime: new Date('2026-04-01T10:00:00.000Z'),
+        locationText: '杭州市滨江区导出-完成单',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 88,
+        demandTags: ['export-completed'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const activeRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-active-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'DOOR_VISIT',
+        startTime: new Date('2026-04-02T09:00:00.000Z'),
+        endTime: new Date('2026-04-02T10:00:00.000Z'),
+        locationText: '杭州市滨江区导出-进行中',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 66,
+        demandTags: ['export-active'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const existingForeignCaregiverProfile = await prisma.caregiverProfile.findFirst({
+      where: {
+        userId: adminSession.user.id,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const foreignCaregiverProfile =
+      existingForeignCaregiverProfile ??
+      (await prisma.caregiverProfile.create({
+        data: {
+          id: `caregiver-export-foreign-${suffix}`,
+          userId: adminSession.user.id,
+          experienceYears: 3,
+          serviceRadiusKm: 6,
+          serviceCity: '杭州',
+          auditStatus: 'APPROVED',
+        },
+        select: {
+          id: true,
+        },
+      }));
+
+    assert.ok(foreignCaregiverProfile);
+
+    const foreignRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-foreign-${suffix}`,
+        ownerId: adminSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'FEEDING',
+        startTime: new Date('2026-04-03T09:00:00.000Z'),
+        endTime: new Date('2026-04-03T09:30:00.000Z'),
+        locationText: '杭州市滨江区导出-外部',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 52,
+        demandTags: ['export-foreign'],
+        status: 'MATCHED',
+        matchedCaregiverId: foreignCaregiverProfile.id,
+      },
+    });
+
+    const completedOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-completed-${suffix}`,
+        orderNo: `PP-EARN-EXPORT-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: completedRequest.id,
+        serviceType: 'WALKING',
+        appointmentStart: completedRequest.startTime,
+        appointmentEnd: completedRequest.endTime,
+        amountTotal: 120,
+        amountAdjusted: 0,
+        amountPaid: 120,
+        amountRefunded: 20,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-01T10:15:00.000Z'),
+      },
+    });
+
+    const activeOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-active-${suffix}`,
+        orderNo: `PP-EARN-ACTIVE-${Date.now() + 1}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: activeRequest.id,
+        serviceType: 'DOOR_VISIT',
+        appointmentStart: activeRequest.startTime,
+        appointmentEnd: activeRequest.endTime,
+        amountTotal: 66,
+        amountAdjusted: 0,
+        amountPaid: 66,
+        amountRefunded: 0,
+        orderStatus: 'SERVING',
+      },
+    });
+
+    const foreignOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-foreign-${suffix}`,
+        orderNo: `PP-EARN-FOREIGN-${Date.now() + 2}`,
+        ownerId: adminSession.user.id,
+        caregiverId: foreignCaregiverProfile.id,
+        serviceRequestId: foreignRequest.id,
+        serviceType: 'FEEDING',
+        appointmentStart: foreignRequest.startTime,
+        appointmentEnd: foreignRequest.endTime,
+        amountTotal: 52,
+        amountAdjusted: 0,
+        amountPaid: 52,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-03T10:00:00.000Z'),
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings/export')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    assert.match(
+      String(exportResponse.headers['content-type']),
+      /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/i,
+    );
+    assert.match(String(exportResponse.headers['content-disposition']), /attachment;\s*filename=/i);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    assert.equal(worksheet.name, 'PetPal Caregiver Earnings');
+    assert.equal(worksheet.getRow(1).getCell(1).value, '订单号');
+
+    const exportedOrderNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.ok(exportedOrderNos.includes(completedOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(activeOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(foreignOrder.orderNo));
+
+    const completedRowIndex = exportedOrderNos.indexOf(completedOrder.orderNo);
+    assert.ok(completedRowIndex >= 0);
+
+    const completedRow = worksheet.getRow(completedRowIndex + 2);
+    assert.equal(completedRow.getCell(2).value, '遛宠');
+    assert.equal(completedRow.getCell(3).value, ownerRecord.nickname);
+    assert.equal(completedRow.getCell(4).value, ownerPet.name);
+    assert.equal(completedRow.getCell(5).value, '杭州市滨江区导出-完成单');
+    assert.equal(completedRow.getCell(9).value, '120');
+    assert.equal(completedRow.getCell(10).value, '20');
+    assert.equal(completedRow.getCell(11).value, '100');
   });
 
   it('supports caregiver fulfillment actions and owner completion workflow', async () => {
