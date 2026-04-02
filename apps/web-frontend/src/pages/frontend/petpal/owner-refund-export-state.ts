@@ -7,6 +7,10 @@ import type {
   RefundStatus,
   RefundType,
 } from '@rbac/api-common';
+import {
+  parsePetPalExportDateRange,
+  withPetPalExportDateRange,
+} from './export-date-range';
 
 export type OwnerRefundExportFilterSnapshot = {
   startDate: string;
@@ -66,30 +70,17 @@ export const applyOwnerRefundExportFilterSnapshot = (
   return target;
 };
 
-const parseOwnerRefundExportDate = (value: string) => {
-  if (!value) {
-    return null;
-  }
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-};
-
 export const parseOwnerRefundExportDateRange = (
   snapshot: OwnerRefundExportFilterSnapshot,
-): [Date, Date] | null => {
-  const startDate = parseOwnerRefundExportDate(snapshot.startDate);
-  const endDate = parseOwnerRefundExportDate(snapshot.endDate);
-  return startDate && endDate ? [startDate, endDate] : null;
-};
+): [Date, Date] | null => parsePetPalExportDateRange(snapshot);
 
 export const withOwnerRefundExportDateRange = (
   snapshot: OwnerRefundExportFilterSnapshot,
   value: [Date, Date] | null,
-): OwnerRefundExportFilterSnapshot => ({
-  ...cloneOwnerRefundExportFilterSnapshot(snapshot),
-  startDate: value?.[0]?.toISOString() ?? '',
-  endDate: value?.[1]?.toISOString() ?? '',
-});
+): OwnerRefundExportFilterSnapshot => withPetPalExportDateRange(
+  cloneOwnerRefundExportFilterSnapshot(snapshot),
+  value,
+);
 
 export const hasOwnerRefundExportFilters = (snapshot: OwnerRefundExportFilterSnapshot) => Boolean(
   snapshot.startDate

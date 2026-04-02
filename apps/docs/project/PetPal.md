@@ -7779,6 +7779,55 @@ flowchart TD
 2. 继续评估清空筛选与模板应用时的快照写回逻辑能否进一步统一，减少页面内重复动作函数。
 3. 在导出快照桥接层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.181 2026-04-03（P3-M1 Slice 181）
+
+**概述**：延续上一轮对字段绑定规则的共享化，本轮继续把导出日期范围桥接单独抽到共享 helper，统一承接日期字符串解析、`[Date, Date]` 序列化以及带 `startDate/endDate` 快照的写回逻辑，避免主人退款、主人交易和照料者收益页继续各自维护一套日期转换代码。
+
+已完成：
+
+- 提取导出日期范围 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/export-date-range.ts`
+    - 新增 `parsePetPalExportDate`，统一处理单个导出日期字符串解析与非法值兜底。
+    - 新增 `parsePetPalExportDateRange`，统一把 `startDate/endDate` 快照转成 `[Date, Date] | null`。
+    - 新增 `serializePetPalExportDateRange` 与 `withPetPalExportDateRange`，统一把日期范围写回快照对象。
+- 主人退款 / 主人交易导出状态改走共享日期 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/owner-refund-export-state.ts`
+  - `apps/web-frontend/src/pages/frontend/petpal/owner-transaction-export-state.ts`
+    - 两份状态文件已移除各自的本地日期解析实现，统一改走共享 helper。
+    - `with*DateRange` 现在会先克隆快照再复用共享日期写回逻辑，保持原有行为不变。
+- 收益页改走共享日期 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 收益页已删除本地 `parseDate` 实现。
+    - 导出日期范围读取和 `setExportDateRange` 写回现已统一走共享 helper，同时继续保留 `datePreset` 的页面特有逻辑。
+- 新增定向单测：
+  - `apps/web-frontend/test/petpal-export-date-range.test.ts`
+    - 覆盖单个日期解析、日期范围解析/序列化以及快照写回三类共享行为。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-export-date-range.test.ts ..\\web-frontend\\test\\owner-refund-export-state.test.ts ..\\web-frontend\\test\\owner-transaction-export-state.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增导出字段、后端契约或页面交互，只收口日期范围转换与快照写回逻辑。
+- 已确认主人退款与主人交易导出状态文件对外暴露的 `parse*DateRange` / `with*DateRange` API 保持不变，因此既有页面和测试无需调整调用方式。
+- 已确认收益页仍然保留 `datePreset` 这一页内特有状态，日期 helper 只负责纯日期范围转换，不会吞掉快捷时间窗逻辑。
+
+风险与缓解：
+
+- 风险：当前日期范围、字段绑定和工具条壳层都已共享，但快照 clone / apply / clear 仍在不同页面和平行状态文件里重复维护。
+- 缓解：下一轮继续优先评估快照 clone/apply 与清空动作 helper，逐步把导出筛选快照桥接层收口到更少文件。
+
+下一步（1-3）：
+
+1. 继续评估主人交易导出、主人退款导出和照料者收益导出的快照 clone / apply / clear helper 是否可以继续共享化。
+2. 继续评估模板应用与清空筛选动作能否收口到统一的导出筛选桥接层，减少页面动作函数重复。
+3. 在导出快照桥接层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
 ### 14.172 2026-04-03（P3-M1 Slice 172）
 
 **概述**：延续退款原因关键词专项导出，本轮继续把照料者经营明细推进到“能按投诉摘要检索复盘”的层面，新增投诉摘要关键词筛选，让照料者可以快速定位服务争议、平台流程异常、处理结论等特定投诉上下文的完成订单。

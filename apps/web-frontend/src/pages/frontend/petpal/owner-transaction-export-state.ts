@@ -1,4 +1,8 @@
 import type { OrderStatus, OwnerTransactionExportQuery, PetServiceType } from '@rbac/api-common';
+import {
+  parsePetPalExportDateRange,
+  withPetPalExportDateRange,
+} from './export-date-range';
 
 export type OwnerTransactionExportFilterSnapshot = {
   startDate: string;
@@ -43,30 +47,17 @@ export const applyOwnerTransactionExportFilterSnapshot = (
   return target;
 };
 
-const parseOwnerTransactionExportDate = (value: string) => {
-  if (!value) {
-    return null;
-  }
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-};
-
 export const parseOwnerTransactionExportDateRange = (
   snapshot: OwnerTransactionExportFilterSnapshot,
-): [Date, Date] | null => {
-  const startDate = parseOwnerTransactionExportDate(snapshot.startDate);
-  const endDate = parseOwnerTransactionExportDate(snapshot.endDate);
-  return startDate && endDate ? [startDate, endDate] : null;
-};
+): [Date, Date] | null => parsePetPalExportDateRange(snapshot);
 
 export const withOwnerTransactionExportDateRange = (
   snapshot: OwnerTransactionExportFilterSnapshot,
   value: [Date, Date] | null,
-): OwnerTransactionExportFilterSnapshot => ({
-  ...cloneOwnerTransactionExportFilterSnapshot(snapshot),
-  startDate: value?.[0]?.toISOString() ?? '',
-  endDate: value?.[1]?.toISOString() ?? '',
-});
+): OwnerTransactionExportFilterSnapshot => withPetPalExportDateRange(
+  cloneOwnerTransactionExportFilterSnapshot(snapshot),
+  value,
+);
 
 export const hasOwnerTransactionExportFilters = (
   snapshot: OwnerTransactionExportFilterSnapshot,

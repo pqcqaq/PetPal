@@ -518,6 +518,10 @@ import {
   createPetPalTrimmedTextFieldBinding,
 } from './export-field-bindings';
 import {
+  parsePetPalExportDateRange,
+  serializePetPalExportDateRange,
+} from './export-date-range';
+import {
   formatPetPalMoney,
   formatPetPalRange,
   getPetPalCaregiverAuditLabel,
@@ -625,13 +629,6 @@ const getTrendBarWidth = (value: number | string, maxRevenue: number) => {
   }
   return `${Math.max((revenue / maxRevenue) * 100, 12)}%`;
 };
-const parseDate = (value: string) => {
-  if (!value) {
-    return null;
-  }
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-};
 const cloneDate = (value: Date) => new Date(value.getTime());
 const getStartOfDay = (value: Date) => new Date(
   value.getFullYear(),
@@ -706,8 +703,7 @@ const clearCurrentExportFilters = () => {
 const setExportDateRange = (value: [Date, Date] | null, datePreset: EarningsExportDatePreset = '') => {
   applyExportFilterSnapshot({
     ...buildCurrentExportFilterSnapshot(),
-    startDate: value?.[0]?.toISOString() ?? '',
-    endDate: value?.[1]?.toISOString() ?? '',
+    ...serializePetPalExportDateRange(value),
     datePreset: value ? datePreset : '',
   });
 };
@@ -741,11 +737,7 @@ const auditLabel = computed(() =>
   profile.value ? getPetPalCaregiverAuditLabel(profile.value.auditStatus) : '未建档',
 );
 const exportDateRange = createPetPalFieldBinding<[Date, Date] | null>({
-  get: () => {
-    const startDate = parseDate(exportPageState.startDate);
-    const endDate = parseDate(exportPageState.endDate);
-    return startDate && endDate ? [startDate, endDate] as [Date, Date] : null;
-  },
+  get: () => parsePetPalExportDateRange(exportPageState),
   set: (value: [Date, Date] | null) => {
     setExportDateRange(value);
   },
