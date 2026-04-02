@@ -3,23 +3,16 @@
  * UX Blueprint
  * User: 已提交评价或正在回看评价结果的主人
  * Entry: 评价提交成功回流、订单详情评价入口、支付/退款/投诉结果页下一步
- * Core scenes:
- * 1. 首屏直接确认评价是否已提交、评分多少、当前订单下一步是什么
- * 2. 已评价时优先展示评分、标签和一句话反馈，不再回表单页确认
- * 3. 仍有沟通或售后时直接给出回流，不让用户自己猜该回哪里
+ * First screen: 先确认有没有评价、打了几分、订单下一步是什么
  * Primary action: 进入当前订单最相关的下一步
- * Secondary actions: 回订单、回订单列表、继续评价
- * Feedback: 评分结果、订单阶段、未读沟通、服务记录数量、售后状态
+ * Secondary actions: 回订单、回售后、继续评价
  * States: 加载中、无评价、已评价、可继续评价、订单不存在
  */
 import type { OrderDetailRecord } from '@rbac/api-common'
 import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
-import AppList from '@/components/app-list/app-list.vue'
-import AppListItem from '@/components/app-list-item/app-list-item.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { getOrderDetail } from '@/api/petpal'
@@ -54,12 +47,18 @@ definePage({
 
 type ViewTone = 'default' | 'primary' | 'success' | 'warning' | 'danger'
 
-interface ResultSignalCard {
+type SignalCard = {
   key: string
   title: string
   value: string
   hint: string
   tone: ViewTone
+}
+
+type SummaryRow = {
+  title: string
+  value: string
+  hint: string
 }
 
 const tokenStore = useTokenStore()
@@ -81,6 +80,38 @@ const canCreateReview = computed(() => Boolean(
 const hasReview = computed(() => Boolean(order.value?.review))
 const unreadCount = computed(() => getConversationUnreadCount(order.value?.conversation, 'owner'))
 const aftersalesTracked = computed(() => Boolean(order.value && isOrderAftersalesTracked(order.value)))
+
+const focusTitle = computed(() => {
+  if (!order.value) {
+    return '正在同步评价结果'
+  }
+  if (order.value.review) {
+    return `${order.value.review.rating} / 5 分`
+  }
+  if (canCreateReview.value) {
+    return '还没有评价'
+  }
+  return '当前没有评价记录'
+})
+
+const focusSummary = computed(() => {
+  if (!order.value) {
+    return '正在同步这笔订单的评价结果。'
+  }
+  if (order.value.review) {
+    if (aftersalesTracked.value) {
+      return '评价已经提交，这单还有售后事项，建议先继续跟进处理。'
+    }
+    if (unreadCount.value > 0) {
+      return '评价已经提交，当前还有未读沟通待处理。'
+    }
+    return '评价已经提交，可以直接回订单继续查看服务与金额状态。'
+  }
+  if (canCreateReview.value) {
+    return '订单已经完成，现在可以直接写评价。'
+  }
+  return '当前这笔订单还没有可回看的评价结果。'
+})
 
 const heroTags = computed(() => {
   if (!order.value) {
@@ -125,39 +156,7 @@ const heroTags = computed(() => {
   return tags
 })
 
-const headline = computed(() => {
-  if (!order.value) {
-    return '正在同步评价结果'
-  }
-  if (order.value.review) {
-    return `${order.value.review.rating} / 5 分`
-  }
-  if (canCreateReview.value) {
-    return '还没有评价'
-  }
-  return '当前没有评价记录'
-})
-
-const summary = computed(() => {
-  if (!order.value) {
-    return '正在同步这笔订单的评价结果。'
-  }
-  if (order.value.review) {
-    if (aftersalesTracked.value) {
-      return '评价已经提交，这单还有售后事项，建议先继续跟进处理。'
-    }
-    if (unreadCount.value > 0) {
-      return '评价已经提交，当前还有未读沟通待处理。'
-    }
-    return '评价已经提交，可以直接回订单继续查看服务与金额状态。'
-  }
-  if (canCreateReview.value) {
-    return '订单已经完成，现在可以直接写评价。'
-  }
-  return '当前这笔订单还没有可回看的评价结果。'
-})
-
-const signalCards = computed<ResultSignalCard[]>(() => {
+const signalCards = computed<SignalCard[]>(() => {
   if (!order.value) {
     return []
   }
@@ -165,7 +164,7 @@ const signalCards = computed<ResultSignalCard[]>(() => {
   return [
     {
       key: 'review',
-      title: '评价结果',
+      title: '评价',
       value: order.value.review
         ? `${order.value.review.rating} / 5 分`
         : canCreateReview.value ? '待提交' : '暂无记录',
@@ -176,14 +175,14 @@ const signalCards = computed<ResultSignalCard[]>(() => {
     },
     {
       key: 'stage',
-      title: '订单阶段',
+      title: '订单',
       value: getOrderStatusLabel(order.value.orderStatus),
       hint: `实付 ¥${formatAmount(order.value.amountPaid)} · 已退 ¥${formatAmount(order.value.amountRefunded)}`,
       tone: aftersalesTracked.value ? 'warning' : 'primary',
     },
     {
-      key: 'follow-up',
-      title: '继续处理',
+      key: 'follow',
+      title: '后续',
       value: unreadCount.value > 0 ? `${unreadCount.value} 条未读` : `${order.value.serviceLogs.length} 条服务记录`,
       hint: aftersalesTracked.value
         ? '这单仍有售后事项，可直接回订单继续跟进'
@@ -191,6 +190,30 @@ const signalCards = computed<ResultSignalCard[]>(() => {
           ? '先去看沟通，再决定是否继续售后'
           : '没有未读沟通时，直接回订单查看完整记录',
       tone: unreadCount.value > 0 || aftersalesTracked.value ? 'warning' : 'default',
+    },
+  ]
+})
+
+const summaryRows = computed<SummaryRow[]>(() => {
+  if (!order.value) {
+    return []
+  }
+
+  return [
+    {
+      title: '订单号',
+      value: order.value.orderNo,
+      hint: formatRange(order.value.appointmentStart, order.value.appointmentEnd),
+    },
+    {
+      title: '服务类型',
+      value: serviceTypeLabels[order.value.serviceType],
+      hint: getOrderStatusLabel(order.value.orderStatus),
+    },
+    {
+      title: '金额',
+      value: `实付 ¥${formatAmount(order.value.amountPaid)}`,
+      hint: `已退 ¥${formatAmount(order.value.amountRefunded)} · ${order.value.serviceLogs.length} 条服务记录`,
     },
   ]
 })
@@ -211,7 +234,7 @@ const primaryActionLabel = computed(() => {
   return '返回订单'
 })
 
-const contextActionLabel = computed(() => {
+const secondaryActionLabel = computed(() => {
   if (!order.value) {
     return '订单列表'
   }
@@ -263,7 +286,7 @@ function openPrimaryAction() {
   openOrderDetail('overview')
 }
 
-function openContextAction() {
+function openSecondaryAction() {
   if (!order.value) {
     openOrders()
     return
@@ -318,247 +341,267 @@ onPullDownRefresh(() => {
 <template>
   <AppPageShell title="评价结果">
     <template v-if="tokenStore.hasLogin">
-      <template v-if="loading && !order">
-        <AppSection title="同步评价结果">
-          <AppStatus mode="loading" text="正在同步订单和评价状态" />
-        </AppSection>
-      </template>
+      <view v-if="loading && !order" class="review-empty">
+        <AppStatus mode="loading" text="正在同步评价结果" />
+      </view>
 
-      <template v-else-if="order">
-        <AppSection title="评价结果">
-          <view class="review-result-focus">
-            <view class="review-result-focus__copy">
-              <view class="review-result-focus__tags">
-                <AppTag
-                  v-for="tag in heroTags"
-                  :key="tag.label"
-                  :type="tag.type"
-                >
-                  {{ tag.label }}
-                </AppTag>
-              </view>
-              <text class="review-result-focus__title">{{ headline }}</text>
-              <text class="review-result-focus__meta">{{ order.orderNo }} · {{ formatRange(order.appointmentStart, order.appointmentEnd) }}</text>
-              <text class="review-result-focus__meta">
-                {{ serviceTypeLabels[order.serviceType] }} · 实付 ¥{{ formatAmount(order.amountPaid) }} · 已退 ¥{{ formatAmount(order.amountRefunded) }}
-              </text>
-              <text class="review-result-focus__summary">{{ summary }}</text>
-            </view>
-
-            <view class="review-result-signal-grid">
-              <view
-                v-for="signal in signalCards"
-                :key="signal.key"
-                class="review-result-signal"
-                :class="`review-result-signal--${signal.tone}`"
+      <view v-else-if="order" class="review-page">
+        <view class="review-focus">
+          <view class="review-focus__copy">
+            <view class="review-focus__tags">
+              <AppTag
+                v-for="tag in heroTags"
+                :key="tag.label"
+                :type="tag.type"
               >
-                <text class="review-result-signal__title">{{ signal.title }}</text>
-                <text class="review-result-signal__value">{{ signal.value }}</text>
-                <text class="review-result-signal__hint">{{ signal.hint }}</text>
-              </view>
-            </view>
-          </view>
-        </AppSection>
-
-        <AppSection v-if="order.review" title="本次评价">
-          <view class="review-result-card">
-            <view class="review-result-card__header">
-              <text class="review-result-card__title">{{ order.review.rating }} / 5 分</text>
-              <AppTag :type="order.review.isAnonymous ? 'warning' : 'default'">
-                {{ order.review.isAnonymous ? '匿名评价' : '实名评价' }}
+                {{ tag.label }}
               </AppTag>
             </view>
+            <text class="review-focus__title">{{ focusTitle }}</text>
+            <text class="review-focus__meta">{{ order.orderNo }} · {{ formatRange(order.appointmentStart, order.appointmentEnd) }}</text>
+            <text class="review-focus__summary">{{ focusSummary }}</text>
+          </view>
 
-            <view v-if="order.review.tags.length" class="review-result-chip-row">
+          <view class="review-focus__actions">
+            <AppButton size="medium" @click="openPrimaryAction">{{ primaryActionLabel }}</AppButton>
+            <AppButton size="medium" type="info" @click="openSecondaryAction">{{ secondaryActionLabel }}</AppButton>
+          </view>
+        </view>
+
+        <view class="review-signal-grid">
+          <view
+            v-for="signal in signalCards"
+            :key="signal.key"
+            class="review-signal"
+            :class="`review-signal--${signal.tone}`"
+          >
+            <text class="review-signal__title">{{ signal.title }}</text>
+            <text class="review-signal__value">{{ signal.value }}</text>
+            <text class="review-signal__hint">{{ signal.hint }}</text>
+          </view>
+        </view>
+
+        <view v-if="order.review" class="review-group">
+          <view class="review-group__head">
+            <text class="review-group__title">本次评价</text>
+            <AppTag :type="order.review.isAnonymous ? 'warning' : 'default'">
+              {{ order.review.isAnonymous ? '匿名评价' : '实名评价' }}
+            </AppTag>
+          </view>
+
+          <view class="review-card">
+            <text class="review-card__score">{{ order.review.rating }} / 5 分</text>
+            <view v-if="order.review.tags.length" class="review-card__chips">
               <view
                 v-for="tag in order.review.tags"
                 :key="tag"
-                class="review-result-chip review-result-chip--selected"
+                class="review-chip"
               >
                 <text>{{ tag }}</text>
               </view>
             </view>
-
-            <text v-if="order.review.content" class="review-result-card__content">{{ order.review.content }}</text>
-            <text class="review-result-card__meta">提交于 {{ formatDateTime(order.review.createdAt) }}</text>
+            <text v-if="order.review.content" class="review-card__content">{{ order.review.content }}</text>
+            <text class="review-card__meta">提交于 {{ formatDateTime(order.review.createdAt) }}</text>
           </view>
-        </AppSection>
+        </view>
 
-        <AppSection v-else title="还没有评价">
+        <view v-else class="review-empty-block">
           <AppStatus :text="canCreateReview ? '订单已经完成，可以直接提交评价。' : '当前没有可回看的评价记录。'" />
-        </AppSection>
+        </view>
 
-        <AppSection title="当前订单">
-          <AppList>
-            <AppListItem
-              title="订单状态"
-              :label="serviceTypeLabels[order.serviceType]"
-              :value="getOrderStatusLabel(order.orderStatus)"
-              value-emphasis
-            />
-            <AppListItem
-              title="服务时间"
-              :label="formatRange(order.appointmentStart, order.appointmentEnd)"
-              :value="`${order.serviceLogs.length} 条记录`"
-              value-emphasis
-            />
-            <AppListItem
-              title="金额"
-              :label="`实付 ¥${formatAmount(order.amountPaid)} · 已退 ¥${formatAmount(order.amountRefunded)}`"
-              :value="aftersalesTracked ? '售后跟进中' : hasReview ? '评价已完成' : '待处理'"
-              value-emphasis
-            />
-          </AppList>
-        </AppSection>
-
-        <AppSection title="下一步">
-          <view class="review-result-actions">
-            <AppButton size="medium" type="info" @click="openContextAction">{{ contextActionLabel }}</AppButton>
-            <AppButton size="medium" @click="openPrimaryAction">{{ primaryActionLabel }}</AppButton>
+        <view class="review-group">
+          <view
+            v-for="item in summaryRows"
+            :key="item.title"
+            class="review-row"
+          >
+            <view class="review-row__copy">
+              <text class="review-row__title">{{ item.title }}</text>
+              <text class="review-row__hint">{{ item.hint }}</text>
+            </view>
+            <text class="review-row__value">{{ item.value }}</text>
           </view>
-        </AppSection>
-      </template>
+        </view>
+      </view>
 
-      <template v-else>
-        <AppSection title="评价结果不可用">
-          <AppStatus :text="error || '订单不存在或暂时无法查看评价结果'" />
-        </AppSection>
-      </template>
+      <view v-else class="review-empty">
+        <AppStatus :text="error || '订单不存在或暂时无法查看评价结果'" />
+      </view>
     </template>
 
     <template v-else>
-      <AppSection title="请先登录">
-        <AppStatus text="登录后查看评价结果和订单下一步动作" />
-        <view class="review-result-actions">
-          <AppButton size="medium" @click="goToLogin">去登录</AppButton>
-        </view>
-      </AppSection>
+      <view class="review-empty">
+        <AppStatus text="登录后查看评价结果和订单下一步。" />
+        <AppButton block @click="goToLogin">去登录</AppButton>
+      </view>
     </template>
   </AppPageShell>
 </template>
 
 <style scoped lang="scss">
-.review-result-focus,
-.review-result-card,
-.review-result-signal {
+.review-page {
+  display: grid;
+  gap: 20rpx;
+  padding-bottom: 36rpx;
+}
+
+.review-focus,
+.review-group,
+.review-empty,
+.review-empty-block {
   display: grid;
   gap: 16rpx;
-  padding: 24rpx;
-  border-radius: var(--app-shape-xl);
+  margin: 0 24rpx;
+  padding: 26rpx 28rpx;
   border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  border-radius: 30rpx;
   box-shadow: var(--app-elevation-1);
 }
 
-.review-result-focus {
+.review-focus {
   background:
     radial-gradient(circle at top right, rgba(53, 89, 224, 0.14), transparent 34%),
     linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
 }
 
-.review-result-focus__copy {
+.review-focus__copy,
+.review-row__copy,
+.review-card {
   display: grid;
   gap: 8rpx;
 }
 
-.review-result-focus__tags,
-.review-result-card__header,
-.review-result-chip-row,
-.review-result-actions {
+.review-focus__tags,
+.review-focus__actions,
+.review-card__chips {
   display: flex;
   gap: 12rpx;
   flex-wrap: wrap;
 }
 
-.review-result-focus__title,
-.review-result-card__title {
+.review-focus__title,
+.review-group__title,
+.review-row__title,
+.review-card__score {
   color: var(--app-text);
-  font-size: 34rpx;
-  line-height: 1.24;
+  font-size: 30rpx;
+  line-height: 1.28;
   font-weight: 700;
 }
 
-.review-result-focus__meta,
-.review-result-card__meta {
+.review-focus__meta,
+.review-focus__summary,
+.review-signal__title,
+.review-signal__hint,
+.review-row__hint,
+.review-card__meta,
+.review-card__content {
   color: var(--app-text-secondary);
   font-size: 22rpx;
-  line-height: 1.6;
-}
-
-.review-result-focus__summary,
-.review-result-card__content {
-  color: var(--app-text);
-  font-size: 24rpx;
   line-height: 1.7;
 }
 
-.review-result-signal-grid {
+.review-focus__summary,
+.review-card__content,
+.review-row__value,
+.review-signal__value {
+  color: var(--app-text);
+}
+
+.review-signal-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12rpx;
+  padding: 0 24rpx;
 }
 
-.review-result-signal {
-  padding: 18rpx 20rpx;
+.review-signal {
+  display: grid;
   gap: 10rpx;
+  padding: 20rpx;
+  border-radius: 24rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  box-shadow: var(--app-elevation-1);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
-.review-result-signal--primary {
+.review-signal--primary {
   background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
 }
 
-.review-result-signal--success {
+.review-signal--success {
   background: linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
 }
 
-.review-result-signal--warning {
+.review-signal--warning {
   background: linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
 }
 
-.review-result-signal--danger {
+.review-signal--danger {
   background: linear-gradient(180deg, rgba(179, 38, 30, 0.12) 0%, var(--app-surface) 100%);
 }
 
-.review-result-signal__title {
-  color: var(--app-text-secondary);
-  font-size: 22rpx;
-  line-height: 1.4;
-}
-
-.review-result-signal__value {
-  color: var(--app-text);
+.review-signal__value,
+.review-row__value {
   font-size: 28rpx;
   line-height: 1.3;
   font-weight: 700;
 }
 
-.review-result-signal__hint {
-  color: var(--app-text-secondary);
-  font-size: 20rpx;
-  line-height: 1.6;
+.review-group {
+  overflow: hidden;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
 }
 
-.review-result-chip {
+.review-group__head,
+.review-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.review-row {
+  padding: 24rpx 0;
+}
+
+.review-row + .review-row {
+  border-top: 1rpx solid var(--app-outline-variant);
+}
+
+.review-card {
+  padding: 20rpx 22rpx;
+  border-radius: 22rpx;
+  background: var(--app-surface-soft);
+}
+
+.review-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 60rpx;
+  min-height: 56rpx;
   padding: 0 24rpx;
   border-radius: 999rpx;
-  border: 1rpx solid var(--app-outline-variant);
-  background: var(--app-surface);
-  color: var(--app-text-secondary);
-}
-
-.review-result-chip--selected {
-  border-color: rgba(53, 89, 224, 0.32);
+  border: 1rpx solid rgba(53, 89, 224, 0.32);
   background: rgba(53, 89, 224, 0.12);
   color: var(--app-accent);
 }
 
+.review-empty,
+.review-empty-block {
+  background:
+    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 34%),
+    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+}
+
 @media (max-width: 720px) {
-  .review-result-signal-grid {
+  .review-signal-grid {
     grid-template-columns: 1fr;
+  }
+
+  .review-group__head,
+  .review-row {
+    align-items: flex-start;
   }
 }
 </style>
