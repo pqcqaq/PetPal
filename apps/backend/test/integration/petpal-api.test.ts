@@ -1488,6 +1488,287 @@ describe('PetPal API integration', () => {
     assert.ok(!fullExportedOrderNos.includes(foreignRiskOrder.orderNo));
   });
 
+  it('filters caregiver earnings export by refund type', async () => {
+    const { app, prisma } = context;
+    const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
+    const ownerSession = await loginAs(app, 'user', 'User123!');
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+
+    const caregiverProfileResponse = await request(app)
+      .get('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    await prisma.caregiverProfile.update({
+      where: {
+        id: caregiverProfileResponse.body.data.id,
+      },
+      data: {
+        auditStatus: 'APPROVED',
+      },
+    });
+
+    const ownerPet = await prisma.petProfile.findFirst({
+      where: {
+        ownerId: ownerSession.user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    assert.ok(ownerPet);
+
+    const suffix = Date.now().toString(36);
+    const fullRefundRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-refund-type-full-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-06T09:00:00.000Z'),
+        endTime: new Date('2026-04-06T18:00:00.000Z'),
+        locationText: '杭州市滨江区导出-全额退款',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 198,
+        demandTags: ['export-refund-type-full'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const partialRefundRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-refund-type-partial-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-06T19:00:00.000Z'),
+        endTime: new Date('2026-04-06T21:00:00.000Z'),
+        locationText: '杭州市滨江区导出-部分退款',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 168,
+        demandTags: ['export-refund-type-partial'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const safeRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-refund-type-safe-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-06T21:30:00.000Z'),
+        endTime: new Date('2026-04-06T23:00:00.000Z'),
+        locationText: '杭州市滨江区导出-无退款类型',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 158,
+        demandTags: ['export-refund-type-safe'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const existingForeignCaregiverProfile = await prisma.caregiverProfile.findFirst({
+      where: {
+        userId: adminSession.user.id,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const foreignCaregiverProfile =
+      existingForeignCaregiverProfile ??
+      (await prisma.caregiverProfile.create({
+        data: {
+          id: `caregiver-export-refund-type-foreign-${suffix}`,
+          userId: adminSession.user.id,
+          experienceYears: 2,
+          serviceRadiusKm: 5,
+          serviceCity: '杭州',
+          auditStatus: 'APPROVED',
+        },
+        select: {
+          id: true,
+        },
+      }));
+
+    const foreignFullRefundRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-refund-type-foreign-${suffix}`,
+        ownerId: adminSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-06T10:00:00.000Z'),
+        endTime: new Date('2026-04-06T17:00:00.000Z'),
+        locationText: '杭州市滨江区导出-外部全额退款',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 188,
+        demandTags: ['export-refund-type-foreign'],
+        status: 'MATCHED',
+        matchedCaregiverId: foreignCaregiverProfile.id,
+      },
+    });
+
+    const fullRefundOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-refund-type-full-${suffix}`,
+        orderNo: `PP-EARN-REFUND-TYPE-FULL-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: fullRefundRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: fullRefundRequest.startTime,
+        appointmentEnd: fullRefundRequest.endTime,
+        amountTotal: 198,
+        amountAdjusted: 0,
+        amountPaid: 198,
+        amountRefunded: 198,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-06T18:15:00.000Z'),
+      },
+    });
+
+    const partialRefundOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-refund-type-partial-${suffix}`,
+        orderNo: `PP-EARN-REFUND-TYPE-PARTIAL-${Date.now() + 1}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: partialRefundRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: partialRefundRequest.startTime,
+        appointmentEnd: partialRefundRequest.endTime,
+        amountTotal: 168,
+        amountAdjusted: 0,
+        amountPaid: 168,
+        amountRefunded: 28,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-06T21:10:00.000Z'),
+      },
+    });
+
+    const safeOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-refund-type-safe-${suffix}`,
+        orderNo: `PP-EARN-REFUND-TYPE-SAFE-${Date.now() + 2}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: safeRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: safeRequest.startTime,
+        appointmentEnd: safeRequest.endTime,
+        amountTotal: 158,
+        amountAdjusted: 0,
+        amountPaid: 158,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-06T23:10:00.000Z'),
+      },
+    });
+
+    const foreignFullRefundOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-refund-type-foreign-${suffix}`,
+        orderNo: `PP-EARN-REFUND-TYPE-FOREIGN-${Date.now() + 3}`,
+        ownerId: adminSession.user.id,
+        caregiverId: foreignCaregiverProfile.id,
+        serviceRequestId: foreignFullRefundRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: foreignFullRefundRequest.startTime,
+        appointmentEnd: foreignFullRefundRequest.endTime,
+        amountTotal: 188,
+        amountAdjusted: 0,
+        amountPaid: 188,
+        amountRefunded: 188,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-06T17:10:00.000Z'),
+      },
+    });
+
+    await prisma.refundRecord.create({
+      data: {
+        id: `refund-earn-export-type-full-${suffix}`,
+        orderId: fullRefundOrder.id,
+        refundNo: `REF-EARN-TYPE-FULL-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'FULL',
+        refundReason: '行程取消，整单退回',
+        refundAmount: 198,
+        refundStatus: 'SUCCESS',
+        reviewedBy: adminSession.user.id,
+        reviewedAt: new Date('2026-04-06T18:20:00.000Z'),
+        createdAt: new Date('2026-04-06T18:18:00.000Z'),
+      },
+    });
+
+    await prisma.refundRecord.create({
+      data: {
+        id: `refund-earn-export-type-partial-${suffix}`,
+        orderId: partialRefundOrder.id,
+        refundNo: `REF-EARN-TYPE-PARTIAL-${Date.now() + 1}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '缩短服务时段，仅退部分费用',
+        refundAmount: 28,
+        refundStatus: 'SUCCESS',
+        reviewedBy: adminSession.user.id,
+        reviewedAt: new Date('2026-04-06T21:15:00.000Z'),
+        createdAt: new Date('2026-04-06T21:12:00.000Z'),
+      },
+    });
+
+    await prisma.refundRecord.create({
+      data: {
+        id: `refund-earn-export-type-foreign-${suffix}`,
+        orderId: foreignFullRefundOrder.id,
+        refundNo: `REF-EARN-TYPE-FOREIGN-${Date.now() + 2}`,
+        applyUserId: adminSession.user.id,
+        refundType: 'FULL',
+        refundReason: 'foreign full refund',
+        refundAmount: 188,
+        refundStatus: 'SUCCESS',
+        createdAt: new Date('2026-04-06T17:12:00.000Z'),
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings/export')
+      .query({
+        startDate: '2026-04-06T00:00:00.000Z',
+        endDate: '2026-04-07T00:00:00.000Z',
+        serviceType: 'BOARDING',
+        refundType: 'FULL',
+      })
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    const exportedOrderNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(exportedOrderNos, [fullRefundOrder.orderNo]);
+    assert.ok(!exportedOrderNos.includes(partialRefundOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(safeOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(foreignFullRefundOrder.orderNo));
+
+    const refundTypeFilteredRow = worksheet.getRow(2);
+    assert.equal(refundTypeFilteredRow.getCell(1).value, fullRefundOrder.orderNo);
+    assert.equal(refundTypeFilteredRow.getCell(5).value, '杭州市滨江区导出-全额退款');
+  });
+
   it('filters caregiver earnings export by complaint status', async () => {
     const { app, prisma } = context;
     const caregiverSession = await loginAs(app, 'manager', 'Manager123!');

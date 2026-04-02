@@ -7396,6 +7396,57 @@ flowchart TD
 2. 继续评估是否把主人端与照料者端的导出筛选能力抽成共用工具条和共享模板基础设施。
 3. 在收益与售后视角继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.169 2026-04-03（P3-M1 Slice 169）
+
+**概述**：延续投诉责任角色专项导出，本轮继续把照料者经营明细推进到“能按退款结构复盘”的层面，新增退款类型筛选，让照料者可以单独导出全额退款或部分退款的完成订单。
+
+已完成：
+
+- 照料者收益导出补退款类型筛选：
+  - `packages/api-common/src/types/petpal.ts`
+    - 照料者经营导出查询契约新增 `refundType`。
+  - `apps/backend/src/routes/petpal.ts`
+    - 照料者收益导出查询新增退款类型枚举筛选。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 照料者经营导出筛选新增 `refundType`。
+    - 当指定退款类型时，导出只保留当前照料者名下、已完成且存在对应退款类型记录的订单，并继续与服务类型、退款风险、投诉状态、投诉类型、责任角色和完成时间区间筛选叠加生效。
+- Web 收益页补退款类型导出入口：
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - 新增共享退款类型选项集，避免收益页重复手写枚举文案。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 导出筛选条新增“导出全部退款类型”下拉。
+    - 最近一次导出条件与常用模板现在会一并记住 `refundType`，切换模板不会丢失退款结构视角。
+    - 导出提示文案已更新为“可按退款类型、退款风险单、投诉状态、投诉类型或责任角色导出经营明细”。
+- 定向集成测试补齐：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增退款类型导出用例，验证 `refundType=FULL` 时只导出当前照料者名下的全额退款完成订单。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 --test-name-pattern "filters caregiver earnings export by refund type" test/integration/petpal-api.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮退款类型筛选仍只在当前照料者、已完成订单作用域内做 `refunds.some(...)` 收窄，没有扩大导出数据域。
+- 已确认退款类型筛选会和退款风险、投诉状态、投诉类型、责任角色、服务类型、时间范围一起持久化到最近筛选和模板状态。
+- 已确认前端复用共享退款类型选项集，没有在收益页新增重复常量。
+
+风险与缓解：
+
+- 风险：当前经营风险导出已支持退款类型、退款风险、投诉状态、投诉类型和责任角色，但仍缺退款状态或投诉关闭结果等更细的组合筛选。
+- 缓解：下一轮可继续补退款状态或投诉关闭结果摘要，逐步把经营风险导出从单维过滤扩到更完整的售后归因复盘。
+
+下一步（1-3）：
+
+1. 继续评估是否围绕退款状态、投诉关闭结果和责任角色组合补更细的经营风险导出维度。
+2. 继续评估是否把主人端与照料者端的导出筛选能力抽成共用工具条和共享模板基础设施。
+3. 在收益与售后视角继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
+
 ### 14.168 2026-04-03（P3-M1 Slice 168）
 
 **概述**：延续投诉类型专项导出，本轮继续把照料者经营明细推进到“能按责任归因复盘”的层面，新增投诉责任角色筛选，让照料者可以单独导出平台责任或照料者责任的风险订单。

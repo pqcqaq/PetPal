@@ -254,6 +254,7 @@ type CaregiverEarningsExportFilters = {
   startDate?: Date;
   endDate?: Date;
   serviceType?: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+  refundType?: 'FULL' | 'PARTIAL';
   riskOnly?: boolean;
   complaintStatus?: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
   complaintType?: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
@@ -1973,6 +1974,16 @@ export const petpalService = {
           ? {
               amountRefunded: {
                 gt: 0,
+              },
+            }
+          : {}),
+        ...(normalizedFilters.refundType
+          ? {
+              refunds: {
+                some: {
+                  deleteAt: null,
+                  refundType: normalizedFilters.refundType,
+                },
               },
             }
           : {}),

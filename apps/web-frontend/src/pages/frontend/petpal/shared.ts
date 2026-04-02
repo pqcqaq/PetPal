@@ -82,6 +82,11 @@ export const petPalComplaintStatusOptions: Array<{ label: string; value: Complai
   { label: '已驳回', value: 'REJECTED' },
 ];
 
+export const petPalRefundTypeOptions: Array<{ label: string; value: RefundType }> = [
+  { label: '全额退款', value: 'FULL' },
+  { label: '部分退款', value: 'PARTIAL' },
+];
+
 export const petPalServiceLogOptions: Array<{ label: string; value: ServiceLogType; note: string }> = [
   { label: '签到', value: 'CHECK_IN', note: '到达后快速留痕' },
   { label: '喂养', value: 'FEED', note: '记录进食和饮水' },
