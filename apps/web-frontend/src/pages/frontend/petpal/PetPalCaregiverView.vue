@@ -9,6 +9,34 @@
     :actions="heroActions"
     :stats="heroStats"
   >
+    <template v-if="pageNotice" #notice>
+      <PetPalDeskNotice eyebrow="Handoff" :title="pageNotice.title" :description="pageNotice.description" :tone="pageNotice.tone">
+        <template #actions>
+          <el-button
+            v-if="profileState === 'error'"
+            :loading="sectionReloadingKey === 'profile'"
+            @click="retryProfile"
+          >
+            重试资料区
+          </el-button>
+          <el-button
+            v-if="servicesState === 'error'"
+            :loading="sectionReloadingKey === 'services'"
+            @click="retryServices"
+          >
+            重试服务区
+          </el-button>
+          <el-button
+            v-if="ordersState === 'error'"
+            :loading="sectionReloadingKey === 'orders'"
+            @click="retryOrders"
+          >
+            重试履约区
+          </el-button>
+        </template>
+      </PetPalDeskNotice>
+    </template>
+
     <PetPalDeskSection eyebrow="Priority" title="当前下一步" description="照料者总览只负责指出下一步，不承接具体表单。">
       <div class="petpal-sheet-list">
         <div class="petpal-sheet-row">
@@ -31,7 +59,13 @@
     <div class="petpal-split-grid">
       <PetPalDeskSection class="petpal-span-4" eyebrow="Profile" title="入驻资料" description="资料页只做资质和服务能力说明。">
         <PetPalDeskEmpty
-          v-if="!profile"
+          v-if="profileState === 'error'"
+          title="入驻资料暂未刷新完成"
+          description="可以先重试资料区，恢复后再继续维护入驻信息。"
+        />
+
+        <PetPalDeskEmpty
+          v-else-if="!profile"
           title="还没有照料者资料"
           description="先完成入驻资料，审核通过后再持续维护服务清单。"
         >
@@ -58,7 +92,13 @@
 
       <PetPalDeskSection class="petpal-span-4" eyebrow="Services" title="服务清单" description="上架、停用和编辑都去服务页完成。">
         <PetPalDeskEmpty
-          v-if="!services.length"
+          v-if="servicesState === 'error'"
+          title="服务清单暂未刷新完成"
+          description="可以先重试服务区，恢复后再继续编辑上下架状态。"
+        />
+
+        <PetPalDeskEmpty
+          v-else-if="!services.length"
           title="当前没有服务"
           description="服务清单为空时，主人无法稳定匹配到你。"
         >
@@ -76,7 +116,17 @@
             </div>
             <div class="petpal-sheet-row__tail">
               <span class="petpal-pill" :class="service.isActive ? 'is-success' : 'is-warning'">{{ service.isActive ? '在售' : '停用' }}</span>
-              <RouterLink :to="{ name: 'frontend-petpal-caregiver-services' }">去服务页</RouterLink>
+              <RouterLink
+                :to="{
+                  name: 'frontend-petpal-caregiver-services',
+                  query: buildPetPalDeskHandoffQuery({
+                    notice: '这里已经定位到这个服务，可直接继续编辑或调整上架状态。',
+                    focusServiceId: service.id,
+                  }),
+                }"
+              >
+                去服务页
+              </RouterLink>
             </div>
           </div>
         </div>
@@ -84,7 +134,13 @@
 
       <PetPalDeskSection class="petpal-span-4" eyebrow="Orders" title="履约队列" description="接单、签到、服务记录和签退都放到履约页处理。">
         <PetPalDeskEmpty
-          v-if="!orders.length"
+          v-if="ordersState === 'error'"
+          title="履约队列暂未刷新完成"
+          description="可以先重试履约区，恢复后再继续接单或签到。"
+        />
+
+        <PetPalDeskEmpty
+          v-else-if="!orders.length"
           title="当前没有履约订单"
           description="当主人下单并被你接单后，新的履约订单会出现在这里。"
         />
@@ -97,7 +153,18 @@
               <p class="petpal-sheet-row__desc">{{ formatPetPalRange(order.appointmentStart, order.appointmentEnd) }}</p>
             </div>
             <div class="petpal-sheet-row__tail">
-              <RouterLink :to="{ name: 'frontend-petpal-caregiver-orders' }">进入履约</RouterLink>
+              <RouterLink
+                :to="{
+                  name: 'frontend-petpal-caregiver-orders',
+                  query: buildPetPalDeskHandoffQuery({
+                    notice: '这里已经定位到这笔履约订单，可直接继续接单或签到。',
+                    focusOrderId: order.id,
+                    focusRole: 'caregiver',
+                  }),
+                }"
+              >
+                进入履约
+              </RouterLink>
             </div>
           </div>
         </div>
@@ -109,13 +176,21 @@
 <script setup lang="ts">
 import type { CaregiverOrderRecord, CaregiverProfileRecord, CaregiverServiceRecord } from '@rbac/api-common';
 import { computed, onMounted, ref } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import {
+  buildPetPalDeskHandoffQuery,
+  getPetPalQueryString,
+  mergePetPalPageNotice,
+  runPetPalSectionRetry,
+  type PetPalSectionLoadState,
+} from './recovery';
 import {
   formatPetPalMoney,
   formatPetPalRange,
@@ -125,9 +200,32 @@ import {
   petPalCaregiverWorkspaceNav,
 } from './shared';
 
+const route = useRoute();
 const profile = ref<CaregiverProfileRecord | null>(null);
 const services = ref<CaregiverServiceRecord[]>([]);
 const orders = ref<CaregiverOrderRecord[]>([]);
+const profileState = ref<PetPalSectionLoadState>('idle');
+const servicesState = ref<PetPalSectionLoadState>('idle');
+const ordersState = ref<PetPalSectionLoadState>('idle');
+const sectionReloadingKey = ref<'' | 'profile' | 'services' | 'orders'>('');
+const unreadOrder = computed(() => orders.value.find((item) => (item.conversation?.caregiverUnreadCount || 0) > 0) ?? null);
+const pageNotice = computed(() => {
+  const description = mergePetPalPageNotice([
+    getPetPalQueryString(route.query, 'notice'),
+    profileState.value === 'error' ? '资料区暂未刷新完成，可只重试资料区' : '',
+    servicesState.value === 'error' ? '服务区暂未刷新完成，可只重试服务区' : '',
+    ordersState.value === 'error' ? '履约区暂未刷新完成，可只重试履约区' : '',
+  ]);
+  if (!description) {
+    return null;
+  }
+  const hasError = profileState.value === 'error' || servicesState.value === 'error' || ordersState.value === 'error';
+  return {
+    title: hasError ? '照料者工作台还有部分分区未刷新完成' : '已回到照料者工作台',
+    description,
+    tone: hasError ? 'warning' as const : 'accent' as const,
+  };
+});
 
 const auditLabel = computed(() => profile.value ? getPetPalCaregiverAuditLabel(profile.value.auditStatus) : '未建档');
 const heroStats = computed(() => [
@@ -148,7 +246,20 @@ const primaryAction = computed(() => {
 });
 
 const heroActions = computed(() => [
-  { label: '消息中心', to: { name: 'frontend-petpal-messages' }, tone: 'secondary' as const },
+  {
+    label: '消息中心',
+    to: unreadOrder.value
+      ? {
+          name: 'frontend-petpal-messages',
+          query: buildPetPalDeskHandoffQuery({
+            notice: '这里已经定位到最近一笔需要回复的履约会话，可直接继续沟通。',
+            focusOrderId: unreadOrder.value.id,
+            focusRole: 'caregiver',
+          }),
+        }
+      : { name: 'frontend-petpal-messages' },
+    tone: 'secondary' as const,
+  },
   { label: '提醒中心', to: { name: 'frontend-petpal-reminders' }, tone: 'secondary' as const },
 ]);
 
@@ -174,18 +285,36 @@ const focusTask = computed(() => {
       title: '优先处理当前履约订单',
       description: `当前有 ${orders.value.length} 笔履约订单待跟进，接单、签到和服务记录都在履约页完成。`,
       actionLabel: '去履约页',
-      to: { name: 'frontend-petpal-caregiver-orders' },
+      to: {
+        name: 'frontend-petpal-caregiver-orders',
+        query: buildPetPalDeskHandoffQuery({
+          notice: '这里已经定位到最近一笔待处理履约订单，可直接继续接单或签到。',
+          focusOrderId: orders.value[0].id,
+          focusRole: 'caregiver',
+        }),
+      },
     };
   }
   return {
     title: '继续维护在售服务',
     description: '资料和服务都已经就绪，现在更适合回服务页微调价格、城市和最短提前时长。',
     actionLabel: '去服务页',
-    to: { name: 'frontend-petpal-caregiver-services' },
+    to: services.value[0]
+      ? {
+          name: 'frontend-petpal-caregiver-services',
+          query: buildPetPalDeskHandoffQuery({
+            notice: '这里已经定位到最近一个在售服务，可直接继续微调价格或上下架。',
+            focusServiceId: services.value[0].id,
+          }),
+        }
+      : { name: 'frontend-petpal-caregiver-services' },
   };
 });
 
 async function loadPage() {
+  profileState.value = 'idle';
+  servicesState.value = 'idle';
+  ordersState.value = 'idle';
   const [profileResult, servicesResult, ordersResult] = await Promise.allSettled([
     api.petpal.caregiver.profile(),
     api.petpal.caregiver.services(),
@@ -195,10 +324,74 @@ async function loadPage() {
   profile.value = profileResult.status === 'fulfilled' ? profileResult.value : null;
   services.value = servicesResult.status === 'fulfilled' ? servicesResult.value : [];
   orders.value = ordersResult.status === 'fulfilled' ? ordersResult.value.items : [];
+  profileState.value = profileResult.status === 'fulfilled' ? 'ready' : 'error';
+  servicesState.value = servicesResult.status === 'fulfilled' ? 'ready' : 'error';
+  ordersState.value = ordersResult.status === 'fulfilled' ? 'ready' : 'error';
 
   if (profileResult.status === 'rejected' && servicesResult.status === 'rejected' && ordersResult.status === 'rejected') {
     ElMessage.error(getErrorMessage(profileResult.reason, '加载照料者工作台失败'));
   }
+}
+
+async function retryProfile() {
+  await runPetPalSectionRetry({
+    key: 'profile',
+    sectionReloadingKey,
+    reload: async () => {
+      profileState.value = 'idle';
+      try {
+        profile.value = await api.petpal.caregiver.profile();
+        profileState.value = 'ready';
+      } catch (error) {
+        profileState.value = 'error';
+        throw error;
+      }
+    },
+    getState: () => profileState.value,
+    successMessage: '资料区已刷新',
+    swallowError: true,
+  });
+}
+
+async function retryServices() {
+  await runPetPalSectionRetry({
+    key: 'services',
+    sectionReloadingKey,
+    reload: async () => {
+      servicesState.value = 'idle';
+      try {
+        services.value = await api.petpal.caregiver.services();
+        servicesState.value = 'ready';
+      } catch (error) {
+        servicesState.value = 'error';
+        throw error;
+      }
+    },
+    getState: () => servicesState.value,
+    successMessage: '服务区已刷新',
+    swallowError: true,
+  });
+}
+
+async function retryOrders() {
+  await runPetPalSectionRetry({
+    key: 'orders',
+    sectionReloadingKey,
+    reload: async () => {
+      ordersState.value = 'idle';
+      try {
+        const result = await api.petpal.caregiver.orders({ page: 1, pageSize: 20 });
+        orders.value = result.items;
+        ordersState.value = 'ready';
+      } catch (error) {
+        ordersState.value = 'error';
+        throw error;
+      }
+    },
+    getState: () => ordersState.value,
+    successMessage: '履约区已刷新',
+    swallowError: true,
+  });
 }
 
 onMounted(() => {

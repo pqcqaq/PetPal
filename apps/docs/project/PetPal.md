@@ -7029,6 +7029,62 @@ flowchart TD
 2. 继续补更细的系统级主动提醒、跨角色动态引导和更多弱网恢复细节，避免当前只停留在页面内回流。
 3. 在 Web / App 主路径都稳定后，再集中补更多验收向测试、审计收口与最终交付材料。
 
+### 14.144 2026-04-03（P3-M1 Slice 144）
+
+**概述**：继续推进 Web 前台收口，本轮把 notice / handoff / retry 机制从交易链路推广到资源页和主人 / 照料者总览，让宠物、需求、服务这类高频对象在保存后也能带着焦点回到正确列表，同时把总览页三段数据改成分区级恢复态。
+
+已完成：
+
+- 扩展 Web handoff query：
+  - `apps/web-frontend/src/pages/frontend/petpal/recovery.ts`
+    - 已补齐 `focusPetId / focusRequestId / focusServiceId`，与现有 `focusOrderId / focusRole / focusFilter / tab / notice` 一起组成统一 handoff 协议。
+- 收口资源页焦点回流：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetsView.vue`
+    - 已支持按 query 恢复焦点宠物，并在加载失败时只重试宠物清单。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerRequestsView.vue`
+    - 已支持按 query 恢复焦点需求。
+    - 需求清单与右侧匹配区现在分开维护状态，可只重试匹配区而不重刷整页。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverServicesView.vue`
+    - 已支持按 query 恢复焦点服务，并在服务清单失败时只重试服务区。
+- 接通资源表单保存后的回流：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetFormView.vue`
+    - 新建 / 编辑宠物后，已带 notice 和 `focusPetId` 回到宠物清单。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerRequestFormView.vue`
+    - 发布需求后，已带 notice 和 `focusRequestId` 回到需求队列。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverServiceFormView.vue`
+    - 新建 / 编辑服务后，已带 notice 和 `focusServiceId` 回到服务清单。
+- 收口主人 / 照料者总览：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+    - 宠物 / 需求 / 订单三块现在分别维护加载状态，可独立重试。
+    - “当前下一步”与总览卡片入口已开始带焦点需求、焦点订单等上下文，不再只是泛跳转。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue`
+    - 资料 / 服务 / 履约三块现在分别维护加载状态，可独立重试。
+    - “当前下一步”和卡片入口已开始带焦点服务、焦点履约订单等上下文。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，资源页焦点恢复和总览分区重试全部基于现有宠物、需求、服务、订单和照料者资料接口完成。
+- 已确认表单保存后的回流现在可以直接落到对应对象，而不是回到列表默认第一项。
+- 已确认主人 / 照料者总览的失败态不再退化为整页统一错误，而是可以按分区恢复，符合上一轮已经建立的 Web 收口标准。
+
+风险与缓解：
+
+- 风险：资源页和总览页已经支持焦点回流，但系统级主动提醒、表单页更深的跨页面回流以及少量辅助页中的说明式布局仍未完全统一。
+- 缓解：下一轮继续优先收口剩余辅助页和更强的主动提醒，把当前“页内可恢复”进一步推进到“系统主动分发下一步”。
+
+下一步（1-3）：
+
+1. 继续把 notice / handoff / retry 机制推广到剩余辅助页和表单完成后的更多返回路径，减少最后一批无上下文回跳。
+2. 继续补系统级主动提醒、跨角色动态引导和更细的弱网恢复细节，避免当前只停留在页面内回流。
+3. 在 Web / App 主路径都稳定后，再集中补更多验收向测试、审计收口与最终交付材料。
+
 ### 14.135 2026-04-02（P1-M1 Slice 127）
 
 **概述**：继续推进 App 核心任务页重构，本轮沿订单详情页往下收口，把沟通 / 履约 / 售后三块旧式信息区改成更接近手机 App 的任务工作区。

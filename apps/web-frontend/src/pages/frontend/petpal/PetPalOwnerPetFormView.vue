@@ -78,6 +78,7 @@ import { api } from '@/api/client';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import { buildPetPalDeskHandoffQuery } from './recovery';
 import { normalizePetPalTagText, petPalOwnerWorkspaceNav, petPalSpeciesOptions } from './shared';
 
 const route = useRoute();
@@ -182,14 +183,26 @@ async function submit() {
     };
 
     if (editingPetId.value) {
-      await api.petpal.pets.update(editingPetId.value, payload);
+      const result = await api.petpal.pets.update(editingPetId.value, payload);
       ElMessage.success('宠物档案已更新');
+      await router.push({
+        name: 'frontend-petpal-pets',
+        query: buildPetPalDeskHandoffQuery({
+          notice: '宠物档案已更新，可继续检查资料或直接为它发起新需求。',
+          focusPetId: result.id,
+        }),
+      });
     } else {
-      await api.petpal.pets.create(payload);
+      const result = await api.petpal.pets.create(payload);
       ElMessage.success('宠物档案已创建');
+      await router.push({
+        name: 'frontend-petpal-pets',
+        query: buildPetPalDeskHandoffQuery({
+          notice: '新宠物档案已创建，可直接继续编辑或为它发起需求。',
+          focusPetId: result.id,
+        }),
+      });
     }
-
-    await router.push({ name: 'frontend-petpal-pets' });
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '保存宠物档案失败'));
   } finally {

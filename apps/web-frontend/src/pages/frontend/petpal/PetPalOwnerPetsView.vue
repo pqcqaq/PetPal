@@ -9,6 +9,26 @@
     :actions="[{ label: '返回主人总览', to: { name: 'frontend-petpal' }, tone: 'secondary' }]"
     :stats="heroStats"
   >
+    <template v-if="pageNotice" #notice>
+      <PetPalDeskNotice eyebrow="Handoff" :title="pageNotice.title" :description="pageNotice.description" :tone="pageNotice.tone">
+        <template #actions>
+          <el-button
+            v-if="loadState === 'error'"
+            :loading="sectionReloadingKey === 'pets'"
+            @click="retryPets"
+          >
+            重试宠物清单
+          </el-button>
+          <RouterLink
+            v-else-if="highlightedPet"
+            :to="{ name: 'frontend-petpal-pet-edit', params: { id: highlightedPet.id } }"
+          >
+            继续编辑这只宠物
+          </RouterLink>
+        </template>
+      </PetPalDeskNotice>
+    </template>
+
     <PetPalDeskSection eyebrow="List" title="宠物清单" description="建档、更新和发需求各走各的入口。">
       <PetPalDeskEmpty
         v-if="!auth.isAuthenticated"
@@ -31,7 +51,7 @@
       </PetPalDeskEmpty>
 
       <div v-else class="petpal-sheet-list">
-        <div v-for="pet in pets" :key="pet.id" class="petpal-sheet-row">
+        <div v-for="pet in pets" :key="pet.id" class="petpal-sheet-row" :class="{ 'is-focused': pet.id === highlightedPetId }">
           <div class="petpal-sheet-row__copy">
             <h3 class="petpal-sheet-row__title">{{ pet.name }}</h3>
             <p class="petpal-sheet-row__desc">{{ pet.species }} · {{ pet.breed || '品种待补充' }} · {{ pet.gender }}</p>
@@ -63,18 +83,30 @@
 <script setup lang="ts">
 import type { PetProfileRecord } from '@rbac/api-common';
 import { computed, onMounted, ref } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import {
+  getPetPalQueryString,
+  mergePetPalPageNotice,
+  runPetPalSectionRetry,
+  type PetPalSectionLoadState,
+} from './recovery';
 import { petPalOwnerWorkspaceNav } from './shared';
 
 const auth = useAuthStore();
+const route = useRoute();
 const pets = ref<PetProfileRecord[]>([]);
+const loadState = ref<PetPalSectionLoadState>('idle');
+const sectionReloadingKey = ref<'' | 'pets'>('');
+const highlightedPetId = computed(() => getPetPalQueryString(route.query, 'focusPetId'));
+const highlightedPet = computed(() => pets.value.find((item) => item.id === highlightedPetId.value) ?? null);
 
 const heroStats = computed(() => {
   const withEmergencyContact = pets.value.filter((item) => item.emergencyContact?.phone).length;
@@ -86,20 +118,57 @@ const heroStats = computed(() => {
     { label: '下一步', value: pets.value.length ? '继续发需求' : '先建第一只', hint: '建档后再进入需求页' },
   ];
 });
+const pageNotice = computed(() => {
+  const description = mergePetPalPageNotice([
+    getPetPalQueryString(route.query, 'notice'),
+    loadState.value === 'error' ? '宠物清单暂未刷新完成，可直接重试当前页' : '',
+  ]);
+  if (!description) {
+    return null;
+  }
+  return {
+    title: loadState.value === 'error' ? '宠物清单暂未刷新完整' : '已回到宠物清单',
+    description,
+    tone: loadState.value === 'error' ? 'warning' as const : 'accent' as const,
+  };
+});
 
 async function loadPage() {
   if (!auth.isAuthenticated) {
     pets.value = [];
+    loadState.value = 'ready';
     return;
   }
   try {
+    loadState.value = 'idle';
     pets.value = await api.petpal.pets.list();
+    loadState.value = 'ready';
   } catch (error: unknown) {
+    loadState.value = 'error';
     ElMessage.error(getErrorMessage(error, '加载宠物档案失败'));
   }
+}
+
+async function retryPets() {
+  await runPetPalSectionRetry({
+    key: 'pets',
+    sectionReloadingKey,
+    reload: loadPage,
+    getState: () => loadState.value,
+    successMessage: '宠物清单已刷新',
+    swallowError: true,
+  });
 }
 
 onMounted(() => {
   void loadPage();
 });
 </script>
+
+<style scoped lang="scss">
+.petpal-sheet-row.is-focused {
+  margin-inline: -10px;
+  padding-inline: 10px;
+  background: rgba(244, 248, 255, 0.9);
+}
+</style>

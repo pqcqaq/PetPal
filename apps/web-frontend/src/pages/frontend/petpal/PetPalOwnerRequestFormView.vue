@@ -72,6 +72,7 @@ import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import { buildPetPalDeskHandoffQuery } from './recovery';
 import { normalizePetPalTagText, petPalOwnerWorkspaceNav, petPalServiceTypeOptions } from './shared';
 
 const route = useRoute();
@@ -124,7 +125,7 @@ async function submit() {
 
   submitting.value = true;
   try {
-    await api.petpal.requests.create({
+    const result = await api.petpal.requests.create({
       petId: form.petId,
       serviceType: form.serviceType,
       startTime: form.startTime.toISOString(),
@@ -134,7 +135,13 @@ async function submit() {
       demandTags: normalizePetPalTagText(form.demandTagsText),
     });
     ElMessage.success('需求已发布');
-    await router.push({ name: 'frontend-petpal-requests' });
+    await router.push({
+      name: 'frontend-petpal-requests',
+      query: buildPetPalDeskHandoffQuery({
+        notice: '新需求已发布，可直接查看这条需求的匹配结果并继续下单。',
+        focusRequestId: result.id,
+      }),
+    });
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '发布需求失败'));
   } finally {

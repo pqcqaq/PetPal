@@ -9,10 +9,37 @@
     :actions="[{ label: '返回主人总览', to: { name: 'frontend-petpal' }, tone: 'secondary' }]"
     :stats="heroStats"
   >
+    <template v-if="pageNotice" #notice>
+      <PetPalDeskNotice eyebrow="Handoff" :title="pageNotice.title" :description="pageNotice.description" :tone="pageNotice.tone">
+        <template #actions>
+          <el-button
+            v-if="requestsState === 'error'"
+            :loading="sectionReloadingKey === 'requests'"
+            @click="retryRequests"
+          >
+            重试需求清单
+          </el-button>
+          <el-button
+            v-if="matchesState === 'error' && selectedRequest"
+            :loading="sectionReloadingKey === 'matches'"
+            @click="retryMatches"
+          >
+            重试匹配区
+          </el-button>
+        </template>
+      </PetPalDeskNotice>
+    </template>
+
     <div class="petpal-split-grid">
       <PetPalDeskSection class="petpal-span-5" eyebrow="Requests" title="需求清单" description="先选中一条需求，再看右侧匹配结果。">
         <PetPalDeskEmpty
-          v-if="!requests.length"
+          v-if="requestsState === 'error'"
+          title="需求清单暂未刷新完成"
+          description="可以先重试需求清单，恢复后再继续处理匹配和建单。"
+        />
+
+        <PetPalDeskEmpty
+          v-else-if="!requests.length"
           title="当前没有需求"
           description="先创建一条新需求，再回到这里查看匹配结果和下单入口。"
         >
@@ -27,7 +54,7 @@
             :key="request.id"
             type="button"
             class="petpal-request-row"
-            :class="{ 'is-active': request.id === selectedRequestId }"
+            :class="{ 'is-active': request.id === selectedRequestId, 'is-focused': request.id === highlightedRequestId }"
             @click="selectRequest(request.id)"
           >
             <div class="petpal-sheet-row__copy">
@@ -72,7 +99,13 @@
           </div>
 
           <PetPalDeskEmpty
-            v-if="!matches.length"
+            v-if="matchesState === 'error'"
+            title="匹配结果暂未刷新完成"
+            description="可以只重试右侧匹配区，不需要重新加载整页需求清单。"
+          />
+
+          <PetPalDeskEmpty
+            v-else-if="!matches.length"
             title="还没有可用匹配结果"
             description="可能是当前需求仍在等待匹配，或者筛选条件较严格。"
           />
@@ -106,14 +139,21 @@
 
 <script setup lang="ts">
 import type { MatchedCaregiverRecord, MatchCaregiverQuery, ServiceRequestRecord } from '@rbac/api-common';
-import { computed, onMounted, ref } from 'vue';
-import { RouterLink, useRouter } from 'vue-router';
+import { computed, onMounted, ref, watch } from 'vue';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import {
+  getPetPalQueryString,
+  mergePetPalPageNotice,
+  runPetPalSectionRetry,
+  type PetPalSectionLoadState,
+} from './recovery';
 import {
   formatPetPalMoney,
   formatPetPalRange,
@@ -122,6 +162,7 @@ import {
   petPalOwnerWorkspaceNav,
 } from './shared';
 
+const route = useRoute();
 const router = useRouter();
 
 const requests = ref<ServiceRequestRecord[]>([]);
@@ -129,14 +170,34 @@ const matches = ref<MatchedCaregiverRecord[]>([]);
 const selectedRequestId = ref('');
 const matching = ref(false);
 const creatingOrderId = ref('');
+const requestsState = ref<PetPalSectionLoadState>('idle');
+const matchesState = ref<PetPalSectionLoadState>('idle');
+const sectionReloadingKey = ref<'' | 'requests' | 'matches'>('');
 
 const selectedRequest = computed(() => requests.value.find((item) => item.id === selectedRequestId.value) ?? null);
+const highlightedRequestId = computed(() => getPetPalQueryString(route.query, 'focusRequestId'));
 const heroStats = computed(() => [
   { label: '需求总数', value: String(requests.value.length), hint: '只在这里看需求状态' },
   { label: '活跃需求', value: String(requests.value.filter((item) => ['OPEN', 'MATCHED', 'MATCHING', 'CONFIRMED'].includes(item.status)).length), hint: '建议优先处理活跃条目' },
   { label: '当前匹配数', value: String(matches.value.length), hint: selectedRequest.value ? '按右侧选中需求展示' : '先选择一条需求' },
   { label: '下一步', value: '查看匹配', hint: '确认合适照料者后再创建订单' },
 ]);
+const pageNotice = computed(() => {
+  const description = mergePetPalPageNotice([
+    getPetPalQueryString(route.query, 'notice'),
+    requestsState.value === 'error' ? '需求清单暂未刷新完成，可先重试清单' : '',
+    matchesState.value === 'error' && selectedRequest.value ? '当前需求的匹配区暂未刷新完成，可只重试右侧匹配区' : '',
+  ]);
+  if (!description) {
+    return null;
+  }
+  const hasError = requestsState.value === 'error' || matchesState.value === 'error';
+  return {
+    title: hasError ? '需求队列还有部分内容未刷新完成' : '已回到需求队列',
+    description,
+    tone: hasError ? 'warning' as const : 'accent' as const,
+  };
+});
 
 function buildMatchQuery(request: ServiceRequestRecord): MatchCaregiverQuery {
   return {
@@ -147,28 +208,58 @@ function buildMatchQuery(request: ServiceRequestRecord): MatchCaregiverQuery {
   };
 }
 
-async function loadPage() {
+function applyRouteContext() {
+  if (highlightedRequestId.value && requests.value.some((item) => item.id === highlightedRequestId.value)) {
+    selectedRequestId.value = highlightedRequestId.value;
+    return;
+  }
+  if (!requests.value.some((item) => item.id === selectedRequestId.value)) {
+    selectedRequestId.value = requests.value[0]?.id || '';
+  }
+}
+
+async function loadRequests() {
+  requestsState.value = 'idle';
   try {
     requests.value = await api.petpal.requests.list();
-    if (requests.value.length) {
-      selectedRequestId.value = requests.value[0].id;
-      await loadMatches(requests.value[0]);
-    }
-  } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '加载需求队列失败'));
+    requestsState.value = 'ready';
+    applyRouteContext();
+  } catch (error) {
+    requestsState.value = 'error';
+    throw error;
   }
 }
 
 async function loadMatches(request: ServiceRequestRecord) {
   matching.value = true;
+  matchesState.value = 'idle';
   try {
     const result = await api.petpal.match.caregivers(buildMatchQuery(request));
     matches.value = result.items;
+    matchesState.value = 'ready';
   } catch (error: unknown) {
     matches.value = [];
+    matchesState.value = 'error';
     ElMessage.error(getErrorMessage(error, '加载匹配结果失败'));
   } finally {
     matching.value = false;
+  }
+}
+
+async function loadPage() {
+  try {
+    await loadRequests();
+    if (selectedRequest.value) {
+      await loadMatches(selectedRequest.value);
+    } else {
+      matches.value = [];
+      matchesState.value = 'ready';
+    }
+  } catch (error: unknown) {
+    requestsState.value = 'error';
+    matches.value = [];
+    matchesState.value = 'ready';
+    ElMessage.error(getErrorMessage(error, '加载需求队列失败'));
   }
 }
 
@@ -178,6 +269,36 @@ async function selectRequest(requestId: string) {
   if (target) {
     await loadMatches(target);
   }
+}
+
+async function retryRequests() {
+  await runPetPalSectionRetry({
+    key: 'requests',
+    sectionReloadingKey,
+    reload: async () => {
+      await loadRequests();
+      if (selectedRequest.value) {
+        await loadMatches(selectedRequest.value);
+      }
+    },
+    getState: () => requestsState.value,
+    successMessage: '需求清单已刷新',
+    swallowError: true,
+  });
+}
+
+async function retryMatches() {
+  if (!selectedRequest.value) {
+    return;
+  }
+  await runPetPalSectionRetry({
+    key: 'matches',
+    sectionReloadingKey,
+    reload: () => loadMatches(selectedRequest.value!),
+    getState: () => matchesState.value,
+    successMessage: '匹配结果已刷新',
+    swallowError: true,
+  });
 }
 
 async function createOrder(caregiverServiceId: string) {
@@ -202,6 +323,16 @@ async function createOrder(caregiverServiceId: string) {
 onMounted(() => {
   void loadPage();
 });
+
+watch(
+  () => route.query.focusRequestId,
+  async () => {
+    applyRouteContext();
+    if (selectedRequest.value) {
+      await loadMatches(selectedRequest.value);
+    }
+  },
+);
 </script>
 
 <style scoped lang="scss">
@@ -226,5 +357,11 @@ onMounted(() => {
 
 .petpal-request-row.is-active {
   color: #2563eb;
+}
+
+.petpal-request-row.is-focused {
+  margin-inline: -10px;
+  padding-inline: 16px;
+  background: rgba(244, 248, 255, 0.9);
 }
 </style>

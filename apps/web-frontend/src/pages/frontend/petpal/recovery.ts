@@ -47,6 +47,9 @@ export const getPetPalDeskSectionTab = (query: LocationQuery): PetPalDeskSection
 export const buildPetPalDeskHandoffQuery = (options: {
   notice?: string;
   focusOrderId?: string;
+  focusPetId?: string;
+  focusRequestId?: string;
+  focusServiceId?: string;
   focusRole?: PetPalDeskFocusRole;
   focusFilter?: PetPalDeskOrderFilter;
   tab?: PetPalDeskSectionTab;
@@ -57,6 +60,15 @@ export const buildPetPalDeskHandoffQuery = (options: {
   }
   if (options.focusOrderId?.trim()) {
     query.focusOrderId = options.focusOrderId.trim();
+  }
+  if (options.focusPetId?.trim()) {
+    query.focusPetId = options.focusPetId.trim();
+  }
+  if (options.focusRequestId?.trim()) {
+    query.focusRequestId = options.focusRequestId.trim();
+  }
+  if (options.focusServiceId?.trim()) {
+    query.focusServiceId = options.focusServiceId.trim();
   }
   if (options.focusRole) {
     query.focusRole = options.focusRole;

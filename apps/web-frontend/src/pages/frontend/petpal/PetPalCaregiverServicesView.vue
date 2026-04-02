@@ -9,6 +9,26 @@
     :actions="[{ label: '返回照料者总览', to: { name: 'frontend-petpal-caregiver' }, tone: 'secondary' }]"
     :stats="heroStats"
   >
+    <template v-if="pageNotice" #notice>
+      <PetPalDeskNotice eyebrow="Handoff" :title="pageNotice.title" :description="pageNotice.description" :tone="pageNotice.tone">
+        <template #actions>
+          <el-button
+            v-if="loadState === 'error'"
+            :loading="sectionReloadingKey === 'services'"
+            @click="retryServices"
+          >
+            重试服务清单
+          </el-button>
+          <RouterLink
+            v-else-if="highlightedService"
+            :to="{ name: 'frontend-petpal-caregiver-service-edit', params: { id: highlightedService.id } }"
+          >
+            继续编辑这个服务
+          </RouterLink>
+        </template>
+      </PetPalDeskNotice>
+    </template>
+
     <PetPalDeskSection eyebrow="Services" title="服务列表" description="如果还没完成入驻资料，请先去资料页补充。">
       <PetPalDeskEmpty
         v-if="!hasProfile"
@@ -31,7 +51,7 @@
       </PetPalDeskEmpty>
 
       <div v-else class="petpal-sheet-list">
-        <div v-for="service in services" :key="service.id" class="petpal-sheet-row">
+        <div v-for="service in services" :key="service.id" class="petpal-sheet-row" :class="{ 'is-focused': service.id === highlightedServiceId }">
           <div class="petpal-sheet-row__copy">
             <h3 class="petpal-sheet-row__title">{{ getPetPalServiceTypeLabel(service.serviceType) }} / {{ service.petSpecies }}</h3>
             <p class="petpal-sheet-row__desc">{{ formatPetPalMoney(service.pricePerUnit) }}/{{ service.unitType }} · {{ service.serviceCity || '城市待补充' }}</p>
@@ -53,21 +73,33 @@
 <script setup lang="ts">
 import type { CaregiverServiceRecord } from '@rbac/api-common';
 import { computed, onMounted, ref } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import {
+  getPetPalQueryString,
+  mergePetPalPageNotice,
+  runPetPalSectionRetry,
+  type PetPalSectionLoadState,
+} from './recovery';
 import {
   formatPetPalMoney,
   getPetPalServiceTypeLabel,
   petPalCaregiverWorkspaceNav,
 } from './shared';
 
+const route = useRoute();
 const hasProfile = ref(false);
 const services = ref<CaregiverServiceRecord[]>([]);
+const loadState = ref<PetPalSectionLoadState>('idle');
+const sectionReloadingKey = ref<'' | 'services'>('');
+const highlightedServiceId = computed(() => getPetPalQueryString(route.query, 'focusServiceId'));
+const highlightedService = computed(() => services.value.find((item) => item.id === highlightedServiceId.value) ?? null);
 
 const heroStats = computed(() => [
   { label: '服务总数', value: String(services.value.length), hint: '上架与停用都在这里' },
@@ -75,18 +107,45 @@ const heroStats = computed(() => [
   { label: '停用服务', value: String(services.value.filter((item) => !item.isActive).length), hint: '可随时重新上架' },
   { label: '资料状态', value: hasProfile.value ? '已建档' : '未建档', hint: '服务上架前建议先完成资料' },
 ]);
+const pageNotice = computed(() => {
+  const description = mergePetPalPageNotice([
+    getPetPalQueryString(route.query, 'notice'),
+    loadState.value === 'error' ? '服务清单暂未刷新完成，可直接重试当前页' : '',
+  ]);
+  if (!description) {
+    return null;
+  }
+  return {
+    title: loadState.value === 'error' ? '服务清单暂未刷新完整' : '已回到服务清单',
+    description,
+    tone: loadState.value === 'error' ? 'warning' as const : 'accent' as const,
+  };
+});
 
 async function loadPage() {
+  loadState.value = 'idle';
   const [profileResult, servicesResult] = await Promise.allSettled([
     api.petpal.caregiver.profile(),
     api.petpal.caregiver.services(),
   ]);
   hasProfile.value = profileResult.status === 'fulfilled';
   services.value = servicesResult.status === 'fulfilled' ? servicesResult.value : [];
+  loadState.value = profileResult.status === 'rejected' && servicesResult.status === 'rejected' ? 'error' : 'ready';
 
   if (profileResult.status === 'rejected' && servicesResult.status === 'rejected') {
     ElMessage.error(getErrorMessage(profileResult.reason, '加载服务清单失败'));
   }
+}
+
+async function retryServices() {
+  await runPetPalSectionRetry({
+    key: 'services',
+    sectionReloadingKey,
+    reload: loadPage,
+    getState: () => loadState.value,
+    successMessage: '服务清单已刷新',
+    swallowError: true,
+  });
 }
 
 async function toggleService(service: CaregiverServiceRecord) {
@@ -116,6 +175,12 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+.petpal-sheet-row.is-focused {
+  margin-inline: -10px;
+  padding-inline: 10px;
+  background: rgba(244, 248, 255, 0.9);
+}
+
 .petpal-link-button {
   padding: 0;
   border: 0;

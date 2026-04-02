@@ -66,6 +66,7 @@ import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import { buildPetPalDeskHandoffQuery } from './recovery';
 import { petPalCaregiverWorkspaceNav, petPalServiceTypeOptions, petPalSpeciesOptions } from './shared';
 
 const route = useRoute();
@@ -151,13 +152,26 @@ async function submit() {
     };
 
     if (editingServiceId.value) {
-      await api.petpal.caregiver.updateService(editingServiceId.value, payload);
+      const result = await api.petpal.caregiver.updateService(editingServiceId.value, payload);
       ElMessage.success('服务已更新');
+      await router.push({
+        name: 'frontend-petpal-caregiver-services',
+        query: buildPetPalDeskHandoffQuery({
+          notice: '服务配置已更新，可继续检查上下架状态或再次编辑。',
+          focusServiceId: result.id,
+        }),
+      });
     } else {
-      await api.petpal.caregiver.createService(payload);
+      const result = await api.petpal.caregiver.createService(payload);
       ElMessage.success('服务已创建');
+      await router.push({
+        name: 'frontend-petpal-caregiver-services',
+        query: buildPetPalDeskHandoffQuery({
+          notice: '新服务已创建，可继续微调报价或上架状态。',
+          focusServiceId: result.id,
+        }),
+      });
     }
-    await router.push({ name: 'frontend-petpal-caregiver-services' });
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '保存服务失败'));
   } finally {

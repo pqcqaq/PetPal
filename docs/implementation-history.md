@@ -112,6 +112,11 @@ Last updated: 2026-04-02
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerOrdersView.vue`、`PetPalMessagesView.vue`、`PetPalAftersalesView.vue`、`PetPalCaregiverOrdersView.vue` 现已支持按 query 恢复焦点订单、切回正确视角或筛选，并在加载失败时只重试当前工作台分区。
   - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue` 已支持按 `tab=messages|service|aftersales` 直接滚动到对应分区，同时把沟通区和售后区失败重试拆成局部动作。
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalOrderResultWorkbench.vue` 与 `PetPalRemindersView.vue` 已接通新的回流 query，不再把用户统一丢回无上下文的订单队列。
+- 2026-04-03 已继续收口 Web 资源页与总览页回流：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetsView.vue`、`PetPalOwnerRequestsView.vue`、`PetPalCaregiverServicesView.vue` 已支持按 query 恢复焦点宠物 / 需求 / 服务，并在列表或匹配区失败时提供定向重试。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetFormView.vue`、`PetPalOwnerRequestFormView.vue`、`PetPalCaregiverServiceFormView.vue` 保存成功后已带 notice 和焦点项回到对应列表，不再落回无上下文状态。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue` 与 `PetPalCaregiverView.vue` 已拆成分区级恢复态，宠物 / 需求 / 订单和资料 / 服务 / 履约现在都可独立重试。
+  - 主人 / 照料者总览里的“当前下一步”和卡片内入口也开始带上下文跳转，不再只是泛化的页面级跳转。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。
@@ -165,7 +170,7 @@ Last updated: 2026-04-02
 - App 端主人与照料者核心主流程已经拆开，照料者首页、履约订单、服务管理以及订单评价/投诉动作也已切到拆页结构；支付/退款/投诉/评价结果页已统一拆出，但系统级主动提醒和更深的动态引导仍未收口。
 - App 端订单详情已经基本完成“首屏决策 + 分栏任务区”重构，但订单列表、结果页与售后中心之间的跨页面主动回流仍可继续增强。
 - App 端订单列表已经开始从“筛选 + 卡片列表”转向“任务队列”，但与结果页、售后中心、消息中心之间的主动回流仍可继续增强。
-- Web 端结果页、订单队列、消息中心、售后中心、履约队列与订单详情之间已经建立焦点回流和局部失败重试，但主人 / 照料者总览及其他辅助页仍有少量说明式布局和弱网反馈细节待统一。
+- Web 端结果页、队列页、资源页和主人 / 照料者总览之间已经建立焦点回流与分区级重试，但表单页保存后的更多细粒度回流、系统级主动提醒和少量辅助页的说明式布局仍待统一。
 - 健康记录独立子表、收益分析、规则发布、违规处罚、运营看板等能力仍未形成完整前后端闭环。
 - 最终答辩所需的统一验收脚本、截图素材、图表与论文配套文档仍需集中整理。
 
@@ -195,7 +200,7 @@ Last updated: 2026-04-02
 - App 主人端已拆出独立需求详情页，并补入基础排序、筛选、对比和步骤化调整入口，但后续仍应继续补更细的照料者详情、更多筛选维度和原地改期能力，避免逻辑重新堆回新建页。
 - App 主人端需求详情和结算页已经补入首批照料者可信信息快照，主人首页与需求页也已开始转成更接近原生 App 的轻交互结构，但订单详情、售后页和评价页仍需继续按同样的动作优先标准重构。
 - App 主人端订单详情首屏、支付结果页、退款结果页、投诉结果页、评价结果页、售后中心、评价页和投诉页已经开始统一到动作优先结构。
-- Web 端订单详情、结果页、订单队列、消息中心、售后中心和履约队列已经开始统一到“焦点订单 + 下一步动作 + 局部恢复”的结构，但主人 / 照料者总览和其他辅助页仍需继续清理残余说明式布局。
+- Web 端订单详情、结果页、队列页、资源页以及主人 / 照料者总览已经开始统一到“焦点对象 + 下一步动作 + 局部恢复”的结构，但系统级主动提醒、少量辅助页和更深的保存后回流仍需继续收口。
 - Web 前台已进入主人 / 照料者路由拆分阶段，后续要继续把剩余高级兼容动作按角色迁出。
 - 以“真实验收”为目标，收口收益分析、规则治理、运营看板与补充测试。
 - 把最终交付材料从开发文档中拆出，单独整理验收脚本、演示路径、截图和答辩素材。
