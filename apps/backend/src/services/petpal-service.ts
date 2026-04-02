@@ -255,6 +255,7 @@ type CaregiverEarningsExportFilters = {
   endDate?: Date;
   serviceType?: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
   riskOnly?: boolean;
+  complaintStatus?: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
 };
 
 type ComplaintAdminScopeFilters = {
@@ -1970,6 +1971,16 @@ export const petpalService = {
           ? {
               amountRefunded: {
                 gt: 0,
+              },
+            }
+          : {}),
+        ...(normalizedFilters.complaintStatus
+          ? {
+              complaints: {
+                some: {
+                  deleteAt: null,
+                  status: normalizedFilters.complaintStatus,
+                },
               },
             }
           : {}),

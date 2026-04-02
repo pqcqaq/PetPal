@@ -75,6 +75,13 @@ export const petPalComplaintTypeOptions: Array<{ label: string; value: Complaint
   { label: '其他问题', value: 'OTHER' },
 ];
 
+export const petPalComplaintStatusOptions: Array<{ label: string; value: ComplaintStatus }> = [
+  { label: '待受理', value: 'OPEN' },
+  { label: '处理中', value: 'PROCESSING' },
+  { label: '已解决', value: 'RESOLVED' },
+  { label: '已驳回', value: 'REJECTED' },
+];
+
 export const petPalServiceLogOptions: Array<{ label: string; value: ServiceLogType; note: string }> = [
   { label: '签到', value: 'CHECK_IN', note: '到达后快速留痕' },
   { label: '喂养', value: 'FEED', note: '记录进食和饮水' },

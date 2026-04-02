@@ -195,6 +195,7 @@ const caregiverEarningsExportQuerySchema = z.object({
   endDate: z.coerce.date().optional(),
   serviceType: z.enum(['BOARDING', 'WALKING', 'FEEDING', 'DOOR_VISIT']).optional(),
   riskOnly: optionalBooleanQuerySchema,
+  complaintStatus: z.enum(['OPEN', 'PROCESSING', 'RESOLVED', 'REJECTED']).optional(),
 });
 
 const adminComplaintQuerySchema = z.object({

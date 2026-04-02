@@ -557,6 +557,7 @@ export interface CaregiverEarningsExportQuery {
   endDate?: string;
   serviceType?: PetServiceType;
   riskOnly?: boolean;
+  complaintStatus?: ComplaintStatus;
 }
 
 export interface MatchCaregiverQuery {

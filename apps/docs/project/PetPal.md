@@ -7296,6 +7296,57 @@ flowchart TD
 2. 继续评估是否把主人端与照料者端的导出筛选能力抽成共用工具条和共享模板基础设施。
 3. 在收益与售后视角继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.166 2026-04-03（P3-M1 Slice 166）
+
+**概述**：延续上一轮的退款风险专项导出，本轮继续把照料者经营明细补到“能按投诉进度复盘售后”的层面，新增投诉状态筛选，让照料者可以单独导出待受理、处理中或已结案的风险订单。
+
+已完成：
+
+- 照料者收益导出补投诉状态筛选：
+  - `packages/api-common/src/types/petpal.ts`
+    - 照料者经营导出查询契约新增 `complaintStatus`。
+  - `apps/backend/src/routes/petpal.ts`
+    - 照料者收益导出查询新增投诉状态枚举筛选。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 照料者经营导出筛选新增 `complaintStatus`。
+    - 当指定投诉状态时，导出只保留当前照料者名下、已完成且存在对应状态投诉单的订单，继续保留服务类型、退款风险和完成时间区间筛选。
+- Web 收益页补投诉状态导出入口：
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - 新增可复用的投诉状态选项集，统一收益页和后续售后视图的枚举文案。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 导出筛选条新增“导出全部投诉状态”下拉。
+    - 最近一次导出条件与常用模板现在会一并记住 `complaintStatus`，切换模板不会丢投诉风险视角。
+    - 导出提示文案已更新为“可按退款风险单或投诉状态导出经营明细”。
+- 定向集成测试补齐：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增投诉状态导出用例，验证 `complaintStatus=OPEN` 时只导出当前照料者名下仍待处理的投诉订单。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 --test-name-pattern "filters caregiver earnings export by complaint status" test/integration/petpal-api.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮仍未扩大导出数据域，投诉状态筛选只在当前照料者、已完成订单范围内做 `complaints.some(...)` 收窄。
+- 已确认投诉状态筛选与退款风险筛选、服务类型筛选、时间范围筛选可以并存，且模板持久化不会丢失任一维度。
+- 已确认投诉状态文案已收敛到共享选项集，避免收益页后续再次手写一套枚举文案。
+
+风险与缓解：
+
+- 风险：当前投诉风险视角仍只支持按状态导出，尚未继续细分投诉类型、责任角色和关闭结果摘要。
+- 缓解：下一轮如继续扩经营风险复盘，可再补投诉类型或责任角色筛选，或把退款 / 投诉组合条件沉淀为预设模板。
+
+下一步（1-3）：
+
+1. 继续评估是否围绕投诉类型、责任角色和退款类型补更细的经营风险导出维度。
+2. 继续评估是否把主人端与照料者端的导出筛选能力抽成共用工具条和共享模板基础设施。
+3. 在收益与售后视角继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
+
 ### 14.163 2026-04-03（P3-M1 Slice 163）
 
 **概述**：延续上一轮的收益导出筛选，本轮继续把照料者收益页的导出体验做成“可重复使用”的工作台能力，先补快捷时间窗和最近一次筛选持久化，避免每次回到页面都重新选范围。

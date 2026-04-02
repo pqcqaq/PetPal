@@ -154,6 +154,19 @@
                 :value="item.value"
               />
             </el-select>
+            <el-select
+              v-model="exportComplaintStatus"
+              clearable
+              placeholder="导出全部投诉状态"
+              class="petpal-export-toolbar__service"
+            >
+              <el-option
+                v-for="item in petPalComplaintStatusOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
             <el-checkbox v-model="exportRiskOnly">
               仅导出退款风险单
             </el-checkbox>
@@ -162,7 +175,7 @@
             </el-button>
           </div>
           <p class="petpal-export-toolbar__hint">
-            导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外只导出已发生退款的风险单，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
+            导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按退款风险单或投诉状态导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
           </p>
         </div>
 
@@ -410,6 +423,7 @@
 <script setup lang="ts">
 import type {
   PetServiceType,
+  ComplaintStatus,
   CaregiverEarningsOrderRecord,
   CaregiverEarningsSummaryRecord,
 } from '@rbac/api-common';
@@ -436,6 +450,7 @@ import {
   formatPetPalRange,
   getPetPalCaregiverAuditLabel,
   getPetPalServiceTypeLabel,
+  petPalComplaintStatusOptions,
   petPalCaregiverWorkspaceNav,
   petPalServiceTypeOptions,
 } from './shared';
@@ -450,6 +465,7 @@ type CaregiverEarningsExportFilterSnapshot = {
   startDate: string;
   endDate: string;
   serviceType: PetServiceType | '';
+  complaintStatus: ComplaintStatus | '';
   datePreset: EarningsExportDatePreset;
   riskOnly: boolean;
 };
@@ -475,6 +491,7 @@ const { state: exportPageState } = usePageState<CaregiverEarningsExportPageState
     startDate: '',
     endDate: '',
     serviceType: '',
+    complaintStatus: '',
     datePreset: '',
     riskOnly: false,
     templates: [],
@@ -543,6 +560,7 @@ const applyExportFilterSnapshot = (snapshot: CaregiverEarningsExportFilterSnapsh
   exportPageState.startDate = snapshot.startDate;
   exportPageState.endDate = snapshot.endDate;
   exportPageState.serviceType = snapshot.serviceType;
+  exportPageState.complaintStatus = snapshot.complaintStatus;
   exportPageState.datePreset = snapshot.datePreset;
   exportPageState.riskOnly = snapshot.riskOnly;
 };
@@ -550,6 +568,7 @@ const buildCurrentExportFilterSnapshot = (): CaregiverEarningsExportFilterSnapsh
   startDate: exportPageState.startDate,
   endDate: exportPageState.endDate,
   serviceType: exportPageState.serviceType,
+  complaintStatus: exportPageState.complaintStatus,
   datePreset: exportPageState.datePreset,
   riskOnly: exportPageState.riskOnly,
 });
@@ -558,6 +577,7 @@ const clearCurrentExportFilters = () => {
     startDate: '',
     endDate: '',
     serviceType: '',
+    complaintStatus: '',
     datePreset: '',
     riskOnly: false,
   });
@@ -615,6 +635,12 @@ const exportServiceType = computed<PetServiceType | ''>({
     exportPageState.serviceType = value || '';
   },
 });
+const exportComplaintStatus = computed<ComplaintStatus | ''>({
+  get: () => exportPageState.complaintStatus,
+  set: (value) => {
+    exportPageState.complaintStatus = value || '';
+  },
+});
 const exportRiskOnly = computed<boolean>({
   get: () => exportPageState.riskOnly,
   set: (value) => {
@@ -662,6 +688,7 @@ const activeExportPreset = computed(() => exportPageState.datePreset);
 const hasExportFilters = computed(() => Boolean(
   exportDateRange.value
   || exportServiceType.value
+  || exportComplaintStatus.value
   || exportRiskOnly.value,
 ));
 const revenueCards = computed(() => [
@@ -883,6 +910,7 @@ function buildEarningsExportRequest() {
     startDate: exportDateRange.value?.[0]?.toISOString(),
     endDate: exportDateRange.value?.[1]?.toISOString(),
     serviceType: exportServiceType.value || undefined,
+    complaintStatus: exportComplaintStatus.value || undefined,
     riskOnly: exportRiskOnly.value || undefined,
   });
 }
