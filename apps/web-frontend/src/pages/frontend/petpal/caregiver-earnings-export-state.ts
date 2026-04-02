@@ -15,6 +15,11 @@ import {
   applyPetPalExportSnapshot,
   clonePetPalExportSnapshot,
 } from './export-snapshot-helpers';
+import {
+  toPetPalOptionalQueryValue,
+  toPetPalOptionalTrimmedQueryText,
+  toPetPalOptionalTrueFlag,
+} from './export-query-values';
 
 export type EarningsExportDatePreset = '' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
 
@@ -115,16 +120,16 @@ export const hasCaregiverEarningsExportFilters = (
 export const buildCaregiverEarningsExportQuery = (
   snapshot: CaregiverEarningsExportFilterSnapshot,
 ): CaregiverEarningsExportQuery => ({
-  startDate: snapshot.startDate || undefined,
-  endDate: snapshot.endDate || undefined,
-  serviceType: snapshot.serviceType || undefined,
-  orderNoKeyword: snapshot.orderNoKeyword.trim() || undefined,
-  refundType: snapshot.refundType || undefined,
-  refundStatus: snapshot.refundStatus || undefined,
-  refundReasonKeyword: snapshot.refundReasonKeyword.trim() || undefined,
-  complaintStatus: snapshot.complaintStatus || undefined,
-  complaintType: snapshot.complaintType || undefined,
-  complaintKeyword: snapshot.complaintKeyword.trim() || undefined,
-  complaintTargetRole: snapshot.complaintTargetRole || undefined,
-  riskOnly: snapshot.riskOnly || undefined,
+  startDate: toPetPalOptionalQueryValue(snapshot.startDate),
+  endDate: toPetPalOptionalQueryValue(snapshot.endDate),
+  serviceType: toPetPalOptionalQueryValue(snapshot.serviceType),
+  orderNoKeyword: toPetPalOptionalTrimmedQueryText(snapshot.orderNoKeyword),
+  refundType: toPetPalOptionalQueryValue(snapshot.refundType),
+  refundStatus: toPetPalOptionalQueryValue(snapshot.refundStatus),
+  refundReasonKeyword: toPetPalOptionalTrimmedQueryText(snapshot.refundReasonKeyword),
+  complaintStatus: toPetPalOptionalQueryValue(snapshot.complaintStatus),
+  complaintType: toPetPalOptionalQueryValue(snapshot.complaintType),
+  complaintKeyword: toPetPalOptionalTrimmedQueryText(snapshot.complaintKeyword),
+  complaintTargetRole: toPetPalOptionalQueryValue(snapshot.complaintTargetRole),
+  riskOnly: toPetPalOptionalTrueFlag(snapshot.riskOnly),
 });

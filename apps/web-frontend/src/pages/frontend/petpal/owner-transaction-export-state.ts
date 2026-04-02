@@ -7,6 +7,10 @@ import {
   applyPetPalExportSnapshot,
   clonePetPalExportSnapshot,
 } from './export-snapshot-helpers';
+import {
+  toPetPalOptionalQueryValue,
+  toPetPalOptionalTrimmedQueryText,
+} from './export-query-values';
 
 export type OwnerTransactionExportFilterSnapshot = {
   startDate: string;
@@ -74,9 +78,9 @@ export const hasOwnerTransactionExportFilters = (
 export const buildOwnerTransactionExportQuery = (
   snapshot: OwnerTransactionExportFilterSnapshot,
 ): OwnerTransactionExportQuery => ({
-  startDate: snapshot.startDate || undefined,
-  endDate: snapshot.endDate || undefined,
-  serviceType: snapshot.serviceType || undefined,
-  orderStatus: snapshot.orderStatus || undefined,
-  orderNoKeyword: snapshot.orderNoKeyword.trim() || undefined,
+  startDate: toPetPalOptionalQueryValue(snapshot.startDate),
+  endDate: toPetPalOptionalQueryValue(snapshot.endDate),
+  serviceType: toPetPalOptionalQueryValue(snapshot.serviceType),
+  orderStatus: toPetPalOptionalQueryValue(snapshot.orderStatus),
+  orderNoKeyword: toPetPalOptionalTrimmedQueryText(snapshot.orderNoKeyword),
 });

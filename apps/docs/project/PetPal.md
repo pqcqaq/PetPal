@@ -7874,6 +7874,51 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.184 2026-04-03（P3-M1 Slice 184）
+
+**概述**：延续上一轮对 snapshot clone/apply 的共享化，本轮继续把三份导出状态模块里重复的 query 值归一化规则抽成共享 helper，统一承接空串转 `undefined`、关键词 `trim()` 和布尔旗标只在为 `true` 时透传的逻辑，减少 query builder 里的机械重复。
+
+已完成：
+
+- 提取共享 export query value helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/export-query-values.ts`
+    - 新增 `toPetPalOptionalQueryValue`，统一承接空串 / `null` / `undefined` 到 `undefined` 的归一化。
+    - 新增 `toPetPalOptionalTrimmedQueryText`，统一承接查询关键词的 `trim()` 与空值归一化。
+    - 新增 `toPetPalOptionalTrueFlag`，统一承接像 `riskOnly` 这类只在为 `true` 时透传的布尔旗标。
+- 三份导出状态模块改走共享 query value helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/owner-refund-export-state.ts`
+  - `apps/web-frontend/src/pages/frontend/petpal/owner-transaction-export-state.ts`
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-earnings-export-state.ts`
+    - 三份 `build*ExportQuery` 现已删除重复的 `|| undefined` 和 `trim() || undefined` 片段，统一改走共享序列化 helper。
+- 新增定向单测：
+  - `apps/web-frontend/test/petpal-export-query-values.test.ts`
+    - 覆盖空值归一化、关键词裁剪和布尔旗标透传三类共享行为。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-export-query-values.test.ts ..\\web-frontend\\test\\owner-refund-export-state.test.ts ..\\web-frontend\\test\\owner-transaction-export-state.test.ts ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增导出字段、后端契约或页面交互，只继续收口 Web 前端导出状态层的纯序列化规则。
+- 已确认三份状态模块的导出查询语义保持不变：关键词仍会在导出时做 `trim()`，空筛选仍不会透传，`riskOnly` 仍然只在为 `true` 时进入请求。
+- 已确认共享 helper 只负责 query 值归一化，不接管各状态模块的字段集合、has-filters 判定或 query shape 定义。
+
+风险与缓解：
+
+- 风险：虽然 query 值归一化也已共享，但三份状态模块仍各自维护 `has*Filters` 和空快照默认值，后续继续抽象时需要避免为了“更通用”而把不同业务字段强行统一。
+- 缓解：下一轮继续优先评估文本型筛选存在性判断和空快照默认值中是否只剩纯机械重复，再决定是否继续抽小 helper。
+
+下一步（1-3）：
+
+1. 继续评估三份导出状态模块里 `has*Filters` 的文本判定和布尔判定是否还存在纯机械重复，可以只抽最小 helper。
+2. 继续评估空快照默认值和字段清单能否进一步收口，但保持收益页特有字段和主人侧字段边界清晰。
+3. 在导出状态层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
 ### 14.183 2026-04-03（P3-M1 Slice 183）
 
 **概述**：延续上一轮把照料者收益导出状态抽成独立模块的收口，本轮继续处理三份导出状态文件里还在重复的字段级 snapshot 拷贝逻辑，把 clone/apply 这层再抽成共享 helper，让状态模块只保留字段清单和各自的查询语义。

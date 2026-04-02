@@ -15,6 +15,10 @@ import {
   applyPetPalExportSnapshot,
   clonePetPalExportSnapshot,
 } from './export-snapshot-helpers';
+import {
+  toPetPalOptionalQueryValue,
+  toPetPalOptionalTrimmedQueryText,
+} from './export-query-values';
 
 export type OwnerRefundExportFilterSnapshot = {
   startDate: string;
@@ -95,13 +99,13 @@ export const hasOwnerRefundExportFilters = (snapshot: OwnerRefundExportFilterSna
 export const buildOwnerRefundExportQuery = (
   snapshot: OwnerRefundExportFilterSnapshot,
 ): OwnerRefundExportQuery => ({
-  startDate: snapshot.startDate || undefined,
-  endDate: snapshot.endDate || undefined,
-  refundType: snapshot.refundType || undefined,
-  refundStatus: snapshot.refundStatus || undefined,
-  complaintStatus: snapshot.complaintStatus || undefined,
-  complaintType: snapshot.complaintType || undefined,
-  complaintTargetRole: snapshot.complaintTargetRole || undefined,
-  serviceType: snapshot.serviceType || undefined,
-  orderNoKeyword: snapshot.orderNoKeyword.trim() || undefined,
+  startDate: toPetPalOptionalQueryValue(snapshot.startDate),
+  endDate: toPetPalOptionalQueryValue(snapshot.endDate),
+  refundType: toPetPalOptionalQueryValue(snapshot.refundType),
+  refundStatus: toPetPalOptionalQueryValue(snapshot.refundStatus),
+  complaintStatus: toPetPalOptionalQueryValue(snapshot.complaintStatus),
+  complaintType: toPetPalOptionalQueryValue(snapshot.complaintType),
+  complaintTargetRole: toPetPalOptionalQueryValue(snapshot.complaintTargetRole),
+  serviceType: toPetPalOptionalQueryValue(snapshot.serviceType),
+  orderNoKeyword: toPetPalOptionalTrimmedQueryText(snapshot.orderNoKeyword),
 });
