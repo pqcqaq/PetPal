@@ -126,6 +126,9 @@ Last updated: 2026-04-02
 - 2026-04-02 已继续重构 App 通知页与帮助页：
   - `apps/app-frontend/src/pages/notifications/index.vue` 已改成“最急通知 + 范围轨道 + 紧凑收件箱”结构。
   - `apps/app-frontend/src/pages/help/index.vue` 已改成“问题类型入口 + 常用支持入口”结构，去掉 FAQ 长文和说明块。
+- 2026-04-02 已继续重构 App 支付结果页与退款结果页：
+  - `apps/app-frontend/src/pages/petpal/payment-result.vue` 已改成“支付结论 + 下一步动作 + 紧凑支付记录”结构。
+  - `apps/app-frontend/src/pages/petpal/refund-result.vue` 已改成“退款阶段 + 售后下一步 + 紧凑退款记录”结构。
 - 2026-04-01 已继续完成 App P2 照料者侧重构：
   - 照料者首页改为“今天先做这个 + 当前优先 + 今日订单 + 服务与收益”结构。
   - 履约订单页改为状态筛选 + 任务队列 + 就地服务记录面板，接单、签到、记录服务和签退都可直接执行。

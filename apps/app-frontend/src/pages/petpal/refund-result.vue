@@ -3,18 +3,13 @@
  * UX Blueprint
  * User: 已提交退款或正在回看退款结果的主人
  * Entry: 售后中心退款队列、订单详情售后分栏、退款结果回流
- * Core scenes:
- * 1. 首屏直接告诉用户退款现在在哪个阶段、已退多少、还剩多少可退
- * 2. 驳回、失败和部分退款必须给出明确下一步，避免用户自己猜该回订单还是继续售后
- * 3. 历史退款记录留在同页回看，不再要求用户翻订单长页时间线
+ * First screen: 先确认退款在哪个阶段、已经退了多少、下一步做什么
  * Primary action: 进入当前退款阶段对应的下一步
- * Secondary actions: 看沟通、回售后中心、回订单
- * Feedback: 退款阶段、最新退款金额、可退余额、投诉联动、历史退款记录
- * States: 加载中、无退款、待审核、待退款、部分退款成功、退款完成、驳回、失败
+ * Secondary actions: 看售后上下文、看沟通
+ * States: 加载中、无退款、待审核、待退款、部分退款、退款完成、驳回、失败
  */
 import type {
   ComplaintRecord,
-  ComplaintStatus,
   OrderDetailRecord,
   OrderRefundProgressRecord,
   RefundProgressStage,
@@ -23,10 +18,7 @@ import type {
 } from '@rbac/api-common'
 import { computed, ref } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
-import AppList from '@/components/app-list/app-list.vue'
-import AppListItem from '@/components/app-list-item/app-list-item.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { getOrderComplaints, getOrderDetail, getOrderRefundProgress } from '@/api/petpal'
@@ -64,12 +56,18 @@ definePage({
 
 type ViewTone = 'default' | 'primary' | 'success' | 'warning' | 'danger'
 
-interface ResultSignalCard {
+type SignalCard = {
   key: string
   title: string
   value: string
   hint: string
   tone: ViewTone
+}
+
+type SummaryRow = {
+  title: string
+  value: string
+  hint: string
 }
 
 const tokenStore = useTokenStore()
@@ -157,6 +155,7 @@ function inferRefundStage(): RefundProgressStage {
 }
 
 const refundStage = computed<RefundProgressStage>(() => inferRefundStage())
+
 const hasRefundActivity = computed(() => Boolean(
   refundStage.value !== 'NONE'
   || sortedRefunds.value.length > 0
@@ -181,32 +180,20 @@ function getRefundStatusTone(status: RefundStatus): ViewTone {
 
 const stageTone = computed<ViewTone>(() => getStageTone(refundStage.value))
 
-const resultHeadline = computed(() => {
+const focusTitle = computed(() => {
   if (!order.value) {
     return '正在同步退款结果'
   }
-  if (refundStage.value === 'PENDING_REVIEW') {
-    return '退款已提交'
-  }
-  if (refundStage.value === 'APPROVED_WAITING') {
-    return '退款处理中'
-  }
-  if (refundStage.value === 'PARTIAL_SUCCESS') {
-    return '已退回部分金额'
-  }
-  if (refundStage.value === 'FULL_SUCCESS') {
-    return '退款已完成'
-  }
-  if (refundStage.value === 'REJECTED') {
-    return '退款未通过'
-  }
-  if (refundStage.value === 'FAILED') {
-    return '退款处理失败'
-  }
+  if (refundStage.value === 'PENDING_REVIEW') return '退款已提交'
+  if (refundStage.value === 'APPROVED_WAITING') return '退款处理中'
+  if (refundStage.value === 'PARTIAL_SUCCESS') return '已退回部分金额'
+  if (refundStage.value === 'FULL_SUCCESS') return '退款已完成'
+  if (refundStage.value === 'REJECTED') return '退款未通过'
+  if (refundStage.value === 'FAILED') return '退款处理失败'
   return '当前没有退款申请'
 })
 
-const resultSummary = computed(() => {
+const focusSummary = computed(() => {
   if (!order.value) {
     return '正在同步这笔订单的退款结果。'
   }
@@ -214,7 +201,7 @@ const resultSummary = computed(() => {
     return '退款申请已经提交，现在先保留沟通和服务证据，等待平台审核。'
   }
   if (refundStage.value === 'APPROVED_WAITING') {
-    return '退款已经通过审核，下一步只需要等待退款渠道到账。'
+    return '退款已经通过审核，下一步只需要等待渠道到账。'
   }
   if (refundStage.value === 'PARTIAL_SUCCESS') {
     return '这单已经退回部分金额，剩余争议或余额可以继续在售后里处理。'
@@ -267,7 +254,7 @@ const heroTags = computed(() => {
   return tags
 })
 
-const signalCards = computed<ResultSignalCard[]>(() => {
+const signalCards = computed<SignalCard[]>(() => {
   if (!order.value) {
     return []
   }
@@ -283,7 +270,7 @@ const signalCards = computed<ResultSignalCard[]>(() => {
   return [
     {
       key: 'result',
-      title: '退款结果',
+      title: '结果',
       value: refundStage.value === 'FULL_SUCCESS' || refundStage.value === 'PARTIAL_SUCCESS'
         ? `已退 ¥${formatAmount(settledRefundAmount.value)}`
         : latestRefundAmount.value > 0
@@ -296,14 +283,14 @@ const signalCards = computed<ResultSignalCard[]>(() => {
     },
     {
       key: 'amount',
-      title: '金额进度',
+      title: '金额',
       value: `可退 ¥${formatAmount(refundableBalance.value)}`,
       hint: `申请 ¥${formatAmount(requestedRefundAmount.value)} · 已退 ¥${formatAmount(settledRefundAmount.value)}`,
       tone: refundableBalance.value > 0 ? 'warning' : 'success',
     },
     {
-      key: 'follow-up',
-      title: '后续处理',
+      key: 'follow',
+      title: '后续',
       value: activeComplaint.value
         ? `${getComplaintTypeLabel(activeComplaint.value.complaintType)} · ${getComplaintStatusLabel(activeComplaint.value.status)}`
         : unreadCount.value > 0
@@ -313,10 +300,32 @@ const signalCards = computed<ResultSignalCard[]>(() => {
         ? `最近更新 ${formatDateTime(activeComplaint.value.updatedAt)}`
         : order.value.conversation?.lastMessageAt
           ? `最近沟通 ${formatDateTime(order.value.conversation.lastMessageAt)}`
-          : refundStage.value === 'REJECTED' || refundStage.value === 'FAILED'
-            ? '如对结果有异议，可直接发起投诉'
-            : '需要时可返回订单继续沟通',
+          : '需要时可返回订单继续沟通',
       tone: activeComplaint.value ? 'danger' : unreadCount.value > 0 ? 'warning' : 'default',
+    },
+  ]
+})
+
+const summaryRows = computed<SummaryRow[]>(() => {
+  if (!order.value) {
+    return []
+  }
+
+  return [
+    {
+      title: '订单号',
+      value: order.value.orderNo,
+      hint: formatRange(order.value.appointmentStart, order.value.appointmentEnd),
+    },
+    {
+      title: '退款进度',
+      value: getRefundProgressStageLabel(refundStage.value),
+      hint: getRefundProgressStageHint(refundStage.value),
+    },
+    {
+      title: '金额汇总',
+      value: `已退 ¥${formatAmount(settledRefundAmount.value)}`,
+      hint: `已付 ¥${formatAmount(order.value.amountPaid)} · 可退 ¥${formatAmount(refundableBalance.value)}`,
     },
   ]
 })
@@ -340,14 +349,11 @@ const primaryActionLabel = computed(() => {
   return '返回订单'
 })
 
-const contextActionLabel = computed(() => {
-  if (!order.value) {
-    return '订单详情'
-  }
+const secondaryActionLabel = computed(() => {
   if (refundStage.value === 'PENDING_REVIEW' || refundStage.value === 'APPROVED_WAITING' || refundStage.value === 'PARTIAL_SUCCESS') {
-    return '售后中心'
+    return '售后上下文'
   }
-  return '订单详情'
+  return unreadCount.value > 0 ? '看沟通' : '订单详情'
 })
 
 function getRefundRecordHint(refund: RefundRecordDetail) {
@@ -414,12 +420,23 @@ function openPrimaryAction() {
   openOrderDetail('overview')
 }
 
-function openContextAction() {
-  if (refundStage.value === 'PENDING_REVIEW' || refundStage.value === 'APPROVED_WAITING' || refundStage.value === 'PARTIAL_SUCCESS') {
+function openSecondaryAction() {
+  if (!order.value) {
     openAftersales()
     return
   }
-  openOrderDetail('aftersales')
+
+  if (refundStage.value === 'PENDING_REVIEW' || refundStage.value === 'APPROVED_WAITING' || refundStage.value === 'PARTIAL_SUCCESS') {
+    openOrderDetail('aftersales')
+    return
+  }
+
+  if (unreadCount.value > 0) {
+    openOrderDetail('chat')
+    return
+  }
+
+  openOrderDetail('overview')
 }
 
 function goToLogin() {
@@ -483,170 +500,114 @@ onPullDownRefresh(() => {
 <template>
   <AppPageShell title="退款结果">
     <template v-if="tokenStore.hasLogin">
-      <template v-if="loading && !order">
-        <AppSection title="同步退款结果">
-          <AppStatus mode="loading" text="正在同步退款和订单状态" />
-        </AppSection>
-      </template>
+      <view v-if="loading && !order" class="refund-empty">
+        <AppStatus mode="loading" text="正在同步退款结果" />
+      </view>
 
-      <template v-else-if="order">
-        <template v-if="hasRefundActivity">
-          <AppSection title="退款结果">
-            <view class="refund-result-focus">
-              <view class="refund-result-focus__copy">
-                <view class="refund-result-focus__tags">
-                  <AppTag
-                    v-for="tag in heroTags"
-                    :key="tag.label"
-                    :type="tag.type"
-                  >
-                    {{ tag.label }}
-                  </AppTag>
-                </view>
-                <text class="refund-result-focus__title">{{ resultHeadline }}</text>
-                <text class="refund-result-focus__meta">{{ order.orderNo }} · {{ formatRange(order.appointmentStart, order.appointmentEnd) }}</text>
-                <text class="refund-result-focus__meta">订单已付 ¥{{ formatAmount(order.amountPaid) }} · 已退 ¥{{ formatAmount(settledRefundAmount) }}</text>
-                <text class="refund-result-focus__summary">{{ resultSummary }}</text>
-              </view>
-
-              <view class="refund-result-signal-grid">
-                <view
-                  v-for="signal in signalCards"
-                  :key="signal.key"
-                  class="refund-result-signal"
-                  :class="`refund-result-signal--${signal.tone}`"
-                >
-                  <text class="refund-result-signal__title">{{ signal.title }}</text>
-                  <text class="refund-result-signal__value">{{ signal.value }}</text>
-                  <text class="refund-result-signal__hint">{{ signal.hint }}</text>
-                </view>
-              </view>
+      <view v-else-if="order && hasRefundActivity" class="refund-page">
+        <view class="refund-focus">
+          <view class="refund-focus__copy">
+            <view class="refund-focus__tags">
+              <AppTag
+                v-for="tag in heroTags"
+                :key="tag.label"
+                :type="tag.type"
+              >
+                {{ tag.label }}
+              </AppTag>
             </view>
-          </AppSection>
+            <text class="refund-focus__title">{{ focusTitle }}</text>
+            <text class="refund-focus__meta">{{ order.orderNo }} · {{ formatRange(order.appointmentStart, order.appointmentEnd) }}</text>
+            <text class="refund-focus__summary">{{ focusSummary }}</text>
+          </view>
 
-          <AppSection title="当前订单">
-            <AppList>
-              <AppListItem
-                title="服务类型"
-                :label="serviceTypeLabels[order.serviceType]"
-                :value="getOrderStatusLabel(order.orderStatus)"
-                value-emphasis
-              />
-              <AppListItem
-                title="服务时间"
-                :label="formatRange(order.appointmentStart, order.appointmentEnd)"
-                :value="formatAmount(order.amountPaid)"
-              >
-                <template #value>
-                  <text class="refund-result-list-value refund-result-list-value--strong">已付 ¥{{ formatAmount(order.amountPaid) }}</text>
-                </template>
-              </AppListItem>
-              <AppListItem
-                title="退款进度"
-                :label="getRefundProgressStageHint(refundStage)"
-                :value="getRefundProgressStageLabel(refundStage)"
-                value-emphasis
-              />
-              <AppListItem
-                title="可退余额"
-                :label="`已退 ¥${formatAmount(settledRefundAmount)} · 申请 ¥${formatAmount(requestedRefundAmount)}`"
-                :value="`¥${formatAmount(refundableBalance)}`"
-                value-emphasis
-              />
-              <AppListItem
-                v-if="activeComplaint"
-                title="投诉联动"
-                :label="`${getComplaintTypeLabel(activeComplaint.complaintType)} · 最近更新 ${formatDateTime(activeComplaint.updatedAt)}`"
-                :value="getComplaintStatusLabel(activeComplaint.status)"
-                value-emphasis
-              />
-            </AppList>
-          </AppSection>
-
-          <AppSection v-if="refundProgress?.latestRefundNo || latestRefund" title="最近退款">
-            <AppList>
-              <AppListItem
-                title="退款单号"
-                :label="refundProgress?.latestReviewedAt || refundProgress?.latestAppliedAt || latestRefund?.reviewedAt || latestRefund?.updatedAt || latestRefund?.createdAt ? formatDateTime(refundProgress?.latestReviewedAt || refundProgress?.latestAppliedAt || latestRefund?.reviewedAt || latestRefund?.updatedAt || latestRefund?.createdAt || '') : '等待同步时间'"
-                :value="refundProgress?.latestRefundNo || latestRefund?.refundNo || '--'"
-                value-emphasis
-              />
-              <AppListItem
-                title="最近金额"
-                :label="refundProgress?.latestRefundReason || latestRefund?.refundReason || '当前没有补充退款原因'"
-                :value="`¥${formatAmount(latestRefundAmount)}`"
-                value-emphasis
-              />
-              <AppListItem
-                v-if="refundProgress?.latestRefundStatus || latestRefund?.refundStatus"
-                title="处理状态"
-                :label="refundProgress?.latestReviewedAt ? `审核于 ${formatDateTime(refundProgress.latestReviewedAt)}` : latestRefund?.reviewedAt ? `审核于 ${formatDateTime(latestRefund.reviewedAt)}` : '等待审核或到账回执'"
-                :value="refundStatusLabels[refundProgress?.latestRefundStatus || latestRefund?.refundStatus || 'PENDING']"
-                value-emphasis
-              />
-            </AppList>
-          </AppSection>
-
-          <AppSection v-if="sortedRefunds.length" :title="`退款记录 (${sortedRefunds.length})`">
-            <AppList>
-              <AppListItem
-                v-for="refund in sortedRefunds"
-                :key="refund.id"
-                :title="refund.refundNo"
-                :label="getRefundRecordHint(refund)"
-                :value="`¥${formatAmount(refund.refundAmount)}`"
-              >
-                <template #value>
-                  <view class="refund-result-payment-value">
-                    <AppTag :type="getRefundStatusTone(refund.refundStatus)">
-                      {{ refundStatusLabels[refund.refundStatus] }}
-                    </AppTag>
-                    <text class="refund-result-payment-value__amount">¥{{ formatAmount(refund.refundAmount) }}</text>
-                  </view>
-                </template>
-              </AppListItem>
-            </AppList>
-          </AppSection>
-
-          <view class="refund-result-actions">
-            <AppButton block :type="refundStage === 'REJECTED' || refundStage === 'FAILED' ? 'danger' : 'primary'" @click="openPrimaryAction">
+          <view class="refund-focus__actions">
+            <AppButton size="medium" :type="refundStage === 'REJECTED' || refundStage === 'FAILED' ? 'danger' : 'primary'" @click="openPrimaryAction">
               {{ primaryActionLabel }}
             </AppButton>
-            <AppButton block type="info" @click="openOrderDetail('chat')">
-              {{ unreadCount > 0 ? `看沟通 (${unreadCount})` : '去沟通' }}
-            </AppButton>
-            <AppButton block type="info" @click="openContextAction">
-              {{ contextActionLabel }}
+            <AppButton size="medium" type="info" @click="openSecondaryAction">
+              {{ secondaryActionLabel }}
             </AppButton>
           </view>
-        </template>
-
-        <template v-else>
-          <AppSection title="当前没有退款">
-            <AppStatus text="这笔订单当前没有可回看的退款结果。" />
-          </AppSection>
-          <view class="refund-result-actions">
-            <AppButton block type="info" @click="openOrderDetail('aftersales')">返回订单售后</AppButton>
-            <AppButton block type="info" @click="openAftersales">返回售后中心</AppButton>
-          </view>
-        </template>
-      </template>
-
-      <template v-else>
-        <AppSection title="退款结果不可用">
-          <AppStatus :text="error || '订单不存在或暂时无法查看退款结果'" />
-        </AppSection>
-        <view class="refund-result-actions">
-          <AppButton block type="info" @click="openAftersales">返回售后中心</AppButton>
         </view>
-      </template>
+
+        <view class="refund-signal-grid">
+          <view
+            v-for="signal in signalCards"
+            :key="signal.key"
+            class="refund-signal"
+            :class="`refund-signal--${signal.tone}`"
+          >
+            <text class="refund-signal__title">{{ signal.title }}</text>
+            <text class="refund-signal__value">{{ signal.value }}</text>
+            <text class="refund-signal__hint">{{ signal.hint }}</text>
+          </view>
+        </view>
+
+        <view class="refund-group">
+          <view
+            v-for="item in summaryRows"
+            :key="item.title"
+            class="refund-row"
+          >
+            <view class="refund-row__copy">
+              <text class="refund-row__title">{{ item.title }}</text>
+              <text class="refund-row__hint">{{ item.hint }}</text>
+            </view>
+            <text class="refund-row__value">{{ item.value }}</text>
+          </view>
+
+          <view v-if="activeComplaint" class="refund-row">
+            <view class="refund-row__copy">
+              <text class="refund-row__title">投诉联动</text>
+              <text class="refund-row__hint">{{ getComplaintTypeLabel(activeComplaint.complaintType) }} · 最近更新 {{ formatDateTime(activeComplaint.updatedAt) }}</text>
+            </view>
+            <text class="refund-row__value">{{ getComplaintStatusLabel(activeComplaint.status) }}</text>
+          </view>
+        </view>
+
+        <view v-if="sortedRefunds.length" class="refund-group">
+          <view class="refund-group__head">
+            <text class="refund-group__title">退款记录</text>
+            <AppTag type="default">{{ sortedRefunds.length }} 条</AppTag>
+          </view>
+
+          <view class="refund-record-list">
+            <view
+              v-for="refund in sortedRefunds"
+              :key="refund.id"
+              class="refund-row"
+            >
+              <view class="refund-row__copy">
+                <text class="refund-row__title">{{ refund.refundNo }}</text>
+                <text class="refund-row__hint">{{ getRefundRecordHint(refund) }}</text>
+              </view>
+              <view class="refund-row__meta">
+                <AppTag :type="getRefundStatusTone(refund.refundStatus)">
+                  {{ refundStatusLabels[refund.refundStatus] }}
+                </AppTag>
+                <text class="refund-row__value">¥{{ formatAmount(refund.refundAmount) }}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view v-else-if="order" class="refund-empty">
+        <AppStatus text="这笔订单当前没有可回看的退款结果。" />
+        <AppButton block type="info" @click="openOrderDetail('aftersales')">返回订单售后</AppButton>
+        <AppButton block type="info" @click="openAftersales">返回售后中心</AppButton>
+      </view>
+
+      <view v-else class="refund-empty">
+        <AppStatus :text="error || '订单不存在或暂时无法查看退款结果'" />
+        <AppButton block type="info" @click="openAftersales">返回售后中心</AppButton>
+      </view>
     </template>
 
     <template v-else>
-      <AppSection title="登录后查看退款结果">
-        <AppStatus text="登录后查看退款结果和下一步动作。" />
-      </AppSection>
-      <view class="refund-result-actions">
+      <view class="refund-empty">
+        <AppStatus text="登录后查看退款结果和下一步。" />
         <AppButton block @click="goToLogin">去登录</AppButton>
       </view>
     </template>
@@ -654,108 +615,148 @@ onPullDownRefresh(() => {
 </template>
 
 <style scoped lang="scss">
-.refund-result-focus,
-.refund-result-signal {
+.refund-page {
+  display: grid;
+  gap: 20rpx;
+  padding-bottom: 36rpx;
+}
+
+.refund-focus,
+.refund-group,
+.refund-empty {
   display: grid;
   gap: 16rpx;
-  padding: 24rpx;
-  border-radius: var(--app-shape-xl);
+  margin: 0 24rpx;
+  padding: 26rpx 28rpx;
   border: 1rpx solid var(--app-outline-variant);
-  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  border-radius: 30rpx;
   box-shadow: var(--app-elevation-1);
 }
 
-.refund-result-focus {
+.refund-focus {
   background:
     radial-gradient(circle at top right, rgba(236, 163, 31, 0.18), transparent 36%),
     linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
 }
 
-.refund-result-focus__copy {
+.refund-focus__copy,
+.refund-row__copy {
   display: grid;
-  gap: 10rpx;
+  gap: 8rpx;
 }
 
-.refund-result-focus__tags,
-.refund-result-payment-value {
+.refund-focus__tags,
+.refund-focus__actions,
+.refund-row__meta {
   display: flex;
-  gap: 12rpx;
   flex-wrap: wrap;
+  gap: 12rpx;
   align-items: center;
 }
 
-.refund-result-focus__title {
+.refund-focus__title,
+.refund-group__title,
+.refund-row__title {
   color: var(--app-text);
-  font-size: 34rpx;
-  line-height: 1.25;
+  font-size: 30rpx;
+  line-height: 1.28;
   font-weight: 700;
 }
 
-.refund-result-focus__meta,
-.refund-result-focus__summary,
-.refund-result-signal__title,
-.refund-result-signal__hint,
-.refund-result-list-value {
+.refund-focus__meta,
+.refund-focus__summary,
+.refund-signal__title,
+.refund-signal__hint,
+.refund-row__hint {
   color: var(--app-text-secondary);
   font-size: 22rpx;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
-.refund-result-focus__summary {
+.refund-focus__summary {
   color: var(--app-text);
 }
 
-.refund-result-list-value--strong {
-  color: var(--app-text);
-  font-weight: 600;
-}
-
-.refund-result-signal-grid {
+.refund-signal-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12rpx;
+  padding: 0 24rpx;
 }
 
-.refund-result-signal {
-  padding: 18rpx 20rpx;
+.refund-signal {
+  display: grid;
   gap: 10rpx;
+  padding: 20rpx;
+  border-radius: 24rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  box-shadow: var(--app-elevation-1);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
-.refund-result-signal--primary {
+.refund-signal--primary {
   background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
 }
 
-.refund-result-signal--success {
+.refund-signal--success {
   background: linear-gradient(180deg, var(--app-success-soft) 0%, var(--app-surface) 100%);
 }
 
-.refund-result-signal--warning {
+.refund-signal--warning {
   background: linear-gradient(180deg, var(--app-warning-soft) 0%, var(--app-surface) 100%);
 }
 
-.refund-result-signal--danger {
+.refund-signal--danger {
   background: linear-gradient(180deg, var(--app-danger-soft) 0%, var(--app-surface) 100%);
 }
 
-.refund-result-signal__value,
-.refund-result-payment-value__amount {
+.refund-signal__value,
+.refund-row__value {
   color: var(--app-text);
   font-size: 28rpx;
   line-height: 1.3;
   font-weight: 700;
 }
 
-.refund-result-actions {
-  padding: 0 32rpx 12rpx;
+.refund-group {
+  overflow: hidden;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
 }
 
-.refund-result-actions .app-button + .app-button {
-  margin-top: 16rpx;
+.refund-group__head,
+.refund-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.refund-record-list {
+  display: grid;
+}
+
+.refund-row {
+  padding: 24rpx 0;
+}
+
+.refund-row + .refund-row {
+  border-top: 1rpx solid var(--app-outline-variant);
+}
+
+.refund-empty {
+  background:
+    radial-gradient(circle at top right, rgba(53, 89, 224, 0.1), transparent 34%),
+    linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
 }
 
 @media (max-width: 680px) {
-  .refund-result-signal-grid {
+  .refund-signal-grid {
     grid-template-columns: 1fr;
+  }
+
+  .refund-group__head,
+  .refund-row {
+    align-items: flex-start;
   }
 }
 </style>
