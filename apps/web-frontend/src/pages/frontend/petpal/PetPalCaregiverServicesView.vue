@@ -97,9 +97,9 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
   getPetPalQueryString,
-  mergePetPalPageNotice,
   runPetPalSectionRetry,
   type PetPalSectionLoadState,
 } from './recovery';
@@ -141,20 +141,14 @@ const heroStats = computed(() => [
   { label: '停用服务', value: String(services.value.filter((item) => !item.isActive).length), hint: '可随时重新上架' },
   { label: '资料状态', value: hasProfile.value ? '已建档' : '未建档', hint: '服务上架前建议先完成资料' },
 ]);
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  warnings: [
     loadState.value === 'error' ? '服务清单暂未刷新完成，可直接重试当前页' : '',
-  ]);
-  if (!description) {
-    return null;
-  }
-  return {
-    title: loadState.value === 'error' ? '服务清单暂未刷新完整' : '已回到服务清单',
-    description,
-    tone: loadState.value === 'error' ? 'warning' as const : 'accent' as const,
-  };
-});
+  ],
+  successTitle: '已回到服务清单',
+  warningTitle: '服务清单暂未刷新完整',
+}));
 
 function buildServiceCreateRoute(notice: string) {
   return {

@@ -7202,6 +7202,44 @@ flowchart TD
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.155 2026-04-03（P3-M1 Slice 155）
+
+**概述**：继续推进 Web 前台收口，本轮把剩余一批主人 / 照料者资源页与订单队列页的 page notice 也迁到共享 helper，补齐宠物清单、主人订单、照料者资料、履约队列和服务清单这几类高频入口的统一反馈逻辑。
+
+已完成：
+
+- 第二批接入共享 notice helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerPetsView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerOrdersView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverProfileView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverOrdersView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverServicesView.vue`
+    - 这些资源页 / 队列页原先仍各自手写 `mergePetPalPageNotice()`、标题和 tone 判定，现统一改走 `buildPetPalPageNotice()`。
+    - 返回列表、局部弱网和刷新失败的说明现在遵循同一套 success / warning 标题切换规则。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮只调整 Web 前台资源页 / 队列页的 notice 计算，没有改动数据加载、筛选、表单提交或路由结构。
+- 主人侧宠物 / 订单页和照料者侧资料 / 订单 / 服务页现在与上一轮工作台、提醒、消息和售后页使用同一套 notice helper。
+
+风险与缓解：
+
+- 风险：表单页、订单详情页和结果工作台仍保留分散的 page notice 逻辑，最后一批还需继续统一。
+- 缓解：下一轮优先处理表单页、详情页和结果页，把 notice 规则基本全部收口后再进入验收向文档整理。
+
+下一步（1-3）：
+
+1. 继续把表单页、订单详情页和结果工作台的 page notice 迁到共享 helper，结束这一阶段的 notice 收敛。
+2. 开始补验收向测试说明、角色链路清单与交付材料索引。
+3. 在 Web / App 高频链路继续稳定后，再集中补最终答辩与论文支撑材料。
+
 ### 14.154 2026-04-03（P3-M1 Slice 154）
 
 **概述**：继续推进 Web 前台收口，本轮开始整理页面级反馈，把主人 / 照料者工作台、提醒中心、消息中心、需求队列和售后中心的 page notice 逻辑抽成共享 helper，统一 success / warning 标题和弱网说明拼接方式。

@@ -115,9 +115,9 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
   getPetPalQueryString,
-  mergePetPalPageNotice,
   runPetPalSectionRetry,
   type PetPalSectionLoadState,
 } from './recovery';
@@ -146,20 +146,14 @@ const materialDraft = reactive({
   url: '',
 });
 
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  warnings: [
     profileState.value === 'error' ? '入驻资料暂未刷新完成，可先重试当前页' : '',
-  ]);
-  if (!description) {
-    return null;
-  }
-  return {
-    title: profileState.value === 'error' ? '入驻资料暂未刷新完整' : '已进入入驻资料页',
-    description,
-    tone: profileState.value === 'error' ? 'warning' as const : 'accent' as const,
-  };
-});
+  ],
+  successTitle: '已进入入驻资料页',
+  warningTitle: '入驻资料暂未刷新完整',
+}));
 const pageActions = computed(() => [
   {
     label: '返回照料者总览',

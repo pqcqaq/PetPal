@@ -102,9 +102,9 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
   getPetPalQueryString,
-  mergePetPalPageNotice,
   runPetPalSectionRetry,
   type PetPalSectionLoadState,
 } from './recovery';
@@ -144,20 +144,14 @@ const heroStats = computed(() => {
     { label: '下一步', value: pets.value.length ? '继续发需求' : '先建第一只', hint: '建档后再进入需求页' },
   ];
 });
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  warnings: [
     loadState.value === 'error' ? '宠物清单暂未刷新完成，可直接重试当前页' : '',
-  ]);
-  if (!description) {
-    return null;
-  }
-  return {
-    title: loadState.value === 'error' ? '宠物清单暂未刷新完整' : '已回到宠物清单',
-    description,
-    tone: loadState.value === 'error' ? 'warning' as const : 'accent' as const,
-  };
-});
+  ],
+  successTitle: '已回到宠物清单',
+  warningTitle: '宠物清单暂未刷新完整',
+}));
 
 function buildOwnerPetCreateRoute(notice: string) {
   return {

@@ -88,10 +88,10 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
   getPetPalDeskOrderFilter,
   getPetPalQueryString,
-  mergePetPalPageNotice,
   runPetPalSectionRetry,
   type PetPalDeskOrderFilter,
   type PetPalSectionLoadState,
@@ -163,20 +163,14 @@ const heroStats = computed(() => [
   { label: '进行中', value: String(orders.value.filter((item) => ['PENDING_ACCEPT', 'ACCEPTED', 'SERVING'].includes(item.orderStatus)).length), hint: '需要持续跟进履约' },
   { label: '售后中', value: String(orders.value.filter((item) => isPetPalAftersalesStatus(item.orderStatus)).length), hint: '退款投诉去售后中心' },
 ]);
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  warnings: [
     loadState.value === 'error' ? '订单队列刷新失败，可直接重试当前页' : '',
-  ]);
-  if (!description) {
-    return null;
-  }
-  return {
-    title: loadState.value === 'error' ? '订单队列暂未刷新完整' : '已回到订单队列',
-    description,
-    tone: loadState.value === 'error' ? 'warning' as const : 'accent' as const,
-  };
-});
+  ],
+  successTitle: '已回到订单队列',
+  warningTitle: '订单队列暂未刷新完整',
+}));
 
 const unreadCount = (order: OrderRecord) => getPetPalConversationUnreadCount(order.conversation, 'owner');
 

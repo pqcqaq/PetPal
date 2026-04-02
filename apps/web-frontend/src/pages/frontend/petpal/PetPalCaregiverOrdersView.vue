@@ -137,9 +137,9 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalPageNotice,
   buildPetPalDeskHandoffQuery,
   getPetPalQueryString,
-  mergePetPalPageNotice,
   runPetPalSectionRetry,
   type PetPalSectionLoadState,
 } from './recovery';
@@ -182,20 +182,14 @@ const heroStats = computed(() => [
   { label: '服务中', value: String(orders.value.filter((item) => item.orderStatus === 'SERVING').length), hint: '签到后记得持续留痕' },
   { label: '已接单', value: String(orders.value.filter((item) => item.orderStatus === 'ACCEPTED').length), hint: '到达现场后再签到' },
 ]);
-const pageNotice = computed(() => {
-  const description = mergePetPalPageNotice([
-    getPetPalQueryString(route.query, 'notice'),
+const pageNotice = computed(() => buildPetPalPageNotice({
+  baseNotice: getPetPalQueryString(route.query, 'notice'),
+  warnings: [
     loadState.value === 'error' ? '履约订单刷新失败，可直接重试当前页' : '',
-  ]);
-  if (!description) {
-    return null;
-  }
-  return {
-    title: loadState.value === 'error' ? '履约队列暂未刷新完整' : '已回到履约队列',
-    description,
-    tone: loadState.value === 'error' ? 'warning' as const : 'accent' as const,
-  };
-});
+  ],
+  successTitle: '已回到履约队列',
+  warningTitle: '履约队列暂未刷新完整',
+}));
 
 const statusTone = (status: CaregiverOrderRecord['orderStatus']) => {
   if (status === 'SERVING') return 'is-success';
