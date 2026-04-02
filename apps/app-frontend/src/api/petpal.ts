@@ -1,4 +1,5 @@
 import type {
+  CaregiverEarningsSummaryRecord,
   CaregiverQualificationMaterialRecord,
   CaregiverOrderPage,
   CaregiverOrderQuery,
@@ -21,128 +22,151 @@ import type {
   UpdatePetPayload,
   UpsertCaregiverProfilePayload,
   UpsertCaregiverServicePayload,
-} from '@rbac/api-common'
-import { appApi } from './client'
+} from '@rbac/api-common';
+import { appApi } from './client';
 
 export function listPets() {
-  return appApi.petpal.pets.list()
+  return appApi.petpal.pets.list();
 }
 
 export function createPet(payload: CreatePetPayload) {
-  return appApi.petpal.pets.create(payload)
+  return appApi.petpal.pets.create(payload);
 }
 
 export function updatePet(id: string, payload: UpdatePetPayload) {
-  return appApi.petpal.pets.update(id, payload)
+  return appApi.petpal.pets.update(id, payload);
 }
 
 export function listServiceRequests() {
-  return appApi.petpal.requests.list()
+  return appApi.petpal.requests.list();
 }
 
 export function createServiceRequest(payload: CreateServiceRequestPayload) {
-  return appApi.petpal.requests.create(payload)
+  return appApi.petpal.requests.create(payload);
 }
 
 export function listOrders() {
-  return appApi.petpal.orders.list()
+  return appApi.petpal.orders.list();
 }
 
 export function createOwnerOrder(payload: CreateOwnerOrderPayload): Promise<OrderDetailRecord> {
-  return appApi.petpal.orders.create(payload)
+  return appApi.petpal.orders.create(payload);
 }
 
 export function getOrderDetail(id: string) {
-  return appApi.petpal.orders.detail(id)
+  return appApi.petpal.orders.detail(id);
 }
 
-export function payOwnerOrder(id: string, payload: PayOwnerOrderPayload): Promise<OrderDetailRecord> {
-  return appApi.petpal.orders.pay(id, payload)
+export function payOwnerOrder(
+  id: string,
+  payload: PayOwnerOrderPayload,
+): Promise<OrderDetailRecord> {
+  return appApi.petpal.orders.pay(id, payload);
 }
 
 export function getOrderMessages(id: string): Promise<OrderConversationDetailRecord> {
-  return appApi.petpal.orders.messages(id)
+  return appApi.petpal.orders.messages(id);
 }
 
-export function sendOrderMessage(id: string, payload: CreateOrderMessagePayload): Promise<OrderConversationDetailRecord> {
-  return appApi.petpal.orders.sendMessage(id, payload)
+export function sendOrderMessage(
+  id: string,
+  payload: CreateOrderMessagePayload,
+): Promise<OrderConversationDetailRecord> {
+  return appApi.petpal.orders.sendMessage(id, payload);
 }
 
 export function markOrderMessagesRead(id: string): Promise<OrderConversationRecord> {
-  return appApi.petpal.orders.markMessagesRead(id)
+  return appApi.petpal.orders.markMessagesRead(id);
 }
 
 export function getOrderRefundProgress(id: string): Promise<OrderRefundProgressRecord> {
-  return appApi.petpal.orders.refundProgress(id)
+  return appApi.petpal.orders.refundProgress(id);
 }
 
 export function getOrderComplaints(id: string): Promise<ComplaintRecord[]> {
-  return appApi.petpal.orders.complaints(id)
+  return appApi.petpal.orders.complaints(id);
 }
 
 export function confirmOrderComplete(id: string): Promise<OrderDetailRecord> {
-  return appApi.petpal.orders.confirmComplete(id)
+  return appApi.petpal.orders.confirmComplete(id);
 }
 
-export function reviewOrder(id: string, payload: CreateOrderReviewPayload): Promise<OrderDetailRecord> {
-  return appApi.petpal.orders.review(id, payload)
+export function reviewOrder(
+  id: string,
+  payload: CreateOrderReviewPayload,
+): Promise<OrderDetailRecord> {
+  return appApi.petpal.orders.review(id, payload);
 }
 
-export function createOrderComplaint(id: string, payload: CreateComplaintPayload): Promise<ComplaintRecord> {
-  return appApi.petpal.orders.createComplaint(id, payload)
+export function createOrderComplaint(
+  id: string,
+  payload: CreateComplaintPayload,
+): Promise<ComplaintRecord> {
+  return appApi.petpal.orders.createComplaint(id, payload);
 }
 
 export function matchCaregivers(query: MatchCaregiverQuery) {
-  return appApi.petpal.match.caregivers(query)
+  return appApi.petpal.match.caregivers(query);
 }
 
 export function getCaregiverProfile(): Promise<CaregiverProfileRecord> {
-  return appApi.petpal.caregiver.profile()
+  return appApi.petpal.caregiver.profile();
 }
 
-export function upsertCaregiverProfile(payload: UpsertCaregiverProfilePayload): Promise<CaregiverProfileRecord> {
-  return appApi.petpal.caregiver.upsertProfile(payload)
+export function upsertCaregiverProfile(
+  payload: UpsertCaregiverProfilePayload,
+): Promise<CaregiverProfileRecord> {
+  return appApi.petpal.caregiver.upsertProfile(payload);
 }
 
-export type { CaregiverQualificationMaterialRecord }
+export function getCaregiverEarningsSummary(): Promise<CaregiverEarningsSummaryRecord> {
+  return appApi.petpal.caregiver.earningsSummary();
+}
+
+export type { CaregiverQualificationMaterialRecord };
 
 export function listCaregiverServices(): Promise<CaregiverServiceRecord[]> {
-  return appApi.petpal.caregiver.services()
+  return appApi.petpal.caregiver.services();
 }
 
-export function createCaregiverService(payload: UpsertCaregiverServicePayload): Promise<CaregiverServiceRecord> {
-  return appApi.petpal.caregiver.createService(payload)
+export function createCaregiverService(
+  payload: UpsertCaregiverServicePayload,
+): Promise<CaregiverServiceRecord> {
+  return appApi.petpal.caregiver.createService(payload);
 }
 
-export function updateCaregiverService(id: string, payload: UpsertCaregiverServicePayload): Promise<CaregiverServiceRecord> {
-  return appApi.petpal.caregiver.updateService(id, payload)
+export function updateCaregiverService(
+  id: string,
+  payload: UpsertCaregiverServicePayload,
+): Promise<CaregiverServiceRecord> {
+  return appApi.petpal.caregiver.updateService(id, payload);
 }
 
 export function listCaregiverOrders(query?: CaregiverOrderQuery): Promise<CaregiverOrderPage> {
-  return appApi.petpal.caregiver.orders(query)
+  return appApi.petpal.caregiver.orders(query);
 }
 
 export function acceptCaregiverOrder(orderId: string): Promise<OrderDetailRecord> {
-  return appApi.petpal.caregiver.acceptOrder(orderId)
+  return appApi.petpal.caregiver.acceptOrder(orderId);
 }
 
 export function checkInCaregiverOrder(
   orderId: string,
   payload?: { note?: string; geo?: Record<string, unknown> },
 ): Promise<OrderDetailRecord> {
-  return appApi.petpal.caregiver.checkInOrder(orderId, payload)
+  return appApi.petpal.caregiver.checkInOrder(orderId, payload);
 }
 
 export function addCaregiverServiceLog(
   orderId: string,
   payload: CreateServiceLogPayload,
 ): Promise<OrderDetailRecord> {
-  return appApi.petpal.caregiver.addServiceLog(orderId, payload)
+  return appApi.petpal.caregiver.addServiceLog(orderId, payload);
 }
 
 export function checkOutCaregiverOrder(
   orderId: string,
   payload?: { note?: string; geo?: Record<string, unknown> },
 ): Promise<OrderDetailRecord> {
-  return appApi.petpal.caregiver.checkOutOrder(orderId, payload)
+  return appApi.petpal.caregiver.checkOutOrder(orderId, payload);
 }

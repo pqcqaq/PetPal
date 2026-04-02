@@ -45,6 +45,7 @@ import type {
   ComplaintRecord,
   CaregiverAuditPayload,
   CaregiverAuditPage,
+  CaregiverEarningsSummaryRecord,
   CaregiverAuditQuery,
   CaregiverOrderPage,
   CaregiverOrderQuery,
@@ -321,10 +322,9 @@ export const createApiFactory = (options: ClientOptions) => {
       ...userCrud,
       permissionSources: (id: string) =>
         client.request<UserPermissionSource>({ url: `/users/${id}/permission-sources` }),
-      roles: createOptionSearch<
-        PaginatedRoleSummaries['items'][number],
-        PaginatedRoleSummaries
-      >('/users/options/roles'),
+      roles: createOptionSearch<PaginatedRoleSummaries['items'][number], PaginatedRoleSummaries>(
+        '/users/options/roles',
+      ),
     },
     roles: {
       ...roleCrud,
@@ -366,9 +366,7 @@ export const createApiFactory = (options: ClientOptions) => {
         permissions: createOptionSearch<
           PaginatedPermissionSummaries['items'][number],
           PaginatedPermissionSummaries
-        >(
-          '/oauth/applications/options/permissions',
-        ),
+        >('/oauth/applications/options/permissions'),
       },
     },
     menus: {
@@ -378,9 +376,7 @@ export const createApiFactory = (options: ClientOptions) => {
       permissions: createOptionSearch<
         PaginatedPermissionSummaries['items'][number],
         PaginatedPermissionSummaries
-      >(
-        '/menus/options/permissions',
-      ),
+      >('/menus/options/permissions'),
     },
     files: {
       prepareUpload: (payload: UploadPreparePayload) =>
@@ -398,11 +394,9 @@ export const createApiFactory = (options: ClientOptions) => {
     },
     attachments: {
       ...attachmentCrud,
-      images: createOptionSearch<
-        MediaAssetRecord,
-        PaginatedMediaAssets,
-        MediaAssetListQuery
-      >('/attachments/options/images'),
+      images: createOptionSearch<MediaAssetRecord, PaginatedMediaAssets, MediaAssetListQuery>(
+        '/attachments/options/images',
+      ),
     },
     live: {
       history: (params?: Record<string, string | number | boolean | undefined>) =>
@@ -503,7 +497,10 @@ export const createApiFactory = (options: ClientOptions) => {
           '/petpal/orders/refunds/export',
           'petpal-owner-refunds.xlsx',
         ),
-        exportRefunds: (id: string, params?: OwnerOrderRefundExportQuery): DownloadRequestConfig => ({
+        exportRefunds: (
+          id: string,
+          params?: OwnerOrderRefundExportQuery,
+        ): DownloadRequestConfig => ({
           url: `/petpal/orders/${id}/refunds/export`,
           method: 'GET',
           params,
@@ -525,12 +522,17 @@ export const createApiFactory = (options: ClientOptions) => {
             method: 'PUT',
             data: payload,
           }),
+        earningsSummary: () =>
+          client.request<CaregiverEarningsSummaryRecord>({
+            url: '/petpal/caregiver/earnings-summary',
+          }),
         orders: (query?: CaregiverOrderQuery) =>
           client.request<CaregiverOrderPage>({
             url: '/petpal/caregiver/orders',
             params: query as unknown as QueryParams,
           }),
-        services: () => client.request<CaregiverServiceRecord[]>({ url: '/petpal/caregiver/services' }),
+        services: () =>
+          client.request<CaregiverServiceRecord[]>({ url: '/petpal/caregiver/services' }),
         createService: (payload: UpsertCaregiverServicePayload) =>
           client.request<CaregiverServiceRecord>({
             url: '/petpal/caregiver/services',
@@ -548,7 +550,10 @@ export const createApiFactory = (options: ClientOptions) => {
             url: `/petpal/caregiver/orders/${orderId}/accept`,
             method: 'POST',
           }),
-        checkInOrder: (orderId: string, payload?: { note?: string; geo?: Record<string, unknown> }) =>
+        checkInOrder: (
+          orderId: string,
+          payload?: { note?: string; geo?: Record<string, unknown> },
+        ) =>
           client.request<OrderDetailRecord>({
             url: `/petpal/caregiver/orders/${orderId}/check-in`,
             method: 'POST',
@@ -560,7 +565,10 @@ export const createApiFactory = (options: ClientOptions) => {
             method: 'POST',
             data: payload,
           }),
-        checkOutOrder: (orderId: string, payload?: { note?: string; geo?: Record<string, unknown> }) =>
+        checkOutOrder: (
+          orderId: string,
+          payload?: { note?: string; geo?: Record<string, unknown> },
+        ) =>
           client.request<OrderDetailRecord>({
             url: `/petpal/caregiver/orders/${orderId}/check-out`,
             method: 'POST',
@@ -675,4 +683,3 @@ export const createApiFactory = (options: ClientOptions) => {
     },
   };
 };
-

@@ -47,11 +47,24 @@ export type OrderTimelineEventType =
   | 'REFUND_DONE';
 export type OrderOperatorRole = 'OWNER' | 'CAREGIVER' | 'ADMIN' | 'SYSTEM';
 export type OrderMessageSenderRole = Extract<OrderOperatorRole, 'OWNER' | 'CAREGIVER'>;
-export type ServiceLogType = 'CHECK_IN' | 'FEED' | 'WALK' | 'PLAY' | 'HEALTH' | 'CHECK_OUT' | 'NOTE';
+export type ServiceLogType =
+  | 'CHECK_IN'
+  | 'FEED'
+  | 'WALK'
+  | 'PLAY'
+  | 'HEALTH'
+  | 'CHECK_OUT'
+  | 'NOTE';
 export type ComplaintTargetRole = 'CAREGIVER' | 'PLATFORM';
 export type ComplaintType = 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
 export type ComplaintStatus = 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
-export type ComplaintActionType = 'OPEN' | 'ASSIGN' | 'INVESTIGATE' | 'CALL_USER' | 'PENALTY' | 'CLOSE';
+export type ComplaintActionType =
+  | 'OPEN'
+  | 'ASSIGN'
+  | 'INVESTIGATE'
+  | 'CALL_USER'
+  | 'PENALTY'
+  | 'CLOSE';
 
 type AmountValue = number | string;
 
@@ -354,6 +367,54 @@ export interface CaregiverOrderPage {
     total: number;
     totalPages: number;
   };
+}
+
+export interface CaregiverEarningsOrderRecord {
+  id: string;
+  orderNo: string;
+  serviceType: PetServiceType;
+  appointmentStart: string;
+  appointmentEnd: string;
+  amountPaid: AmountValue;
+  amountRefunded: AmountValue;
+  orderStatus: OrderStatus;
+  ownerNickname: string;
+  petName: string | null;
+  locationText: string | null;
+}
+
+export interface CaregiverServiceRevenueMixRecord {
+  serviceType: PetServiceType;
+  revenue: AmountValue;
+  orderCount: number;
+  averageTicket: AmountValue;
+  shareRatio: number;
+}
+
+export interface CaregiverEarningsSummaryRecord {
+  profile: {
+    auditStatus: CaregiverAuditStatus;
+    ratingAvg: AmountValue;
+    ratingCount: number;
+    serviceCity: string | null;
+    experienceYears: number;
+    serviceRadiusKm: number;
+  };
+  totals: {
+    totalIncome: AmountValue;
+    recentThirtyDayIncome: AmountValue;
+    averageTicket: AmountValue;
+    refundExposure: AmountValue;
+    completedOrderCount: number;
+    activeOrderCount: number;
+    aftersalesOrderCount: number;
+    aftersalesRiskRate: number;
+    activeServiceCount: number;
+    totalServiceCount: number;
+  };
+  latestActiveOrder: CaregiverEarningsOrderRecord | null;
+  recentCompletedOrders: CaregiverEarningsOrderRecord[];
+  serviceRevenueMix: CaregiverServiceRevenueMixRecord[];
 }
 
 export interface CreateServiceLogPayload {

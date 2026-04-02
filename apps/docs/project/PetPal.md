@@ -158,17 +158,17 @@ erDiagram
 
 #### 表：user
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 用户主键 |
-| phone | varchar(20) | unique | 手机号 |
-| email | varchar(128) | unique nullable | 邮箱 |
-| password_hash | varchar(255) | not null | 密码哈希 |
-| status | varchar(20) | index | active/disabled/locked |
-| realname_status | varchar(20) | index | unverified/pending/verified/rejected |
-| last_login_at | timestamptz | nullable | 最后登录时间 |
-| created_at | timestamptz | not null | 创建时间 |
-| updated_at | timestamptz | not null | 更新时间 |
+| 字段            | 类型         | 约束            | 说明                                 |
+| --------------- | ------------ | --------------- | ------------------------------------ |
+| id              | uuid         | PK              | 用户主键                             |
+| phone           | varchar(20)  | unique          | 手机号                               |
+| email           | varchar(128) | unique nullable | 邮箱                                 |
+| password_hash   | varchar(255) | not null        | 密码哈希                             |
+| status          | varchar(20)  | index           | active/disabled/locked               |
+| realname_status | varchar(20)  | index           | unverified/pending/verified/rejected |
+| last_login_at   | timestamptz  | nullable        | 最后登录时间                         |
+| created_at      | timestamptz  | not null        | 创建时间                             |
+| updated_at      | timestamptz  | not null        | 更新时间                             |
 
 索引建议：
 
@@ -177,22 +177,22 @@ erDiagram
 
 #### 表：role
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 角色主键 |
-| code | varchar(30) | unique | owner/caregiver/admin |
-| name | varchar(50) | not null | 角色名称 |
-| is_system | boolean | default true | 是否系统角色 |
+| 字段      | 类型        | 约束         | 说明                  |
+| --------- | ----------- | ------------ | --------------------- |
+| id        | uuid        | PK           | 角色主键              |
+| code      | varchar(30) | unique       | owner/caregiver/admin |
+| name      | varchar(50) | not null     | 角色名称              |
+| is_system | boolean     | default true | 是否系统角色          |
 
 #### 表：user_role
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 关联主键 |
-| user_id | uuid | FK user.id | 用户 |
-| role_id | uuid | FK role.id | 角色 |
-| is_active | boolean | default true | 是否启用 |
-| created_at | timestamptz | not null | 创建时间 |
+| 字段       | 类型        | 约束         | 说明     |
+| ---------- | ----------- | ------------ | -------- |
+| id         | uuid        | PK           | 关联主键 |
+| user_id    | uuid        | FK user.id   | 用户     |
+| role_id    | uuid        | FK role.id   | 角色     |
+| is_active  | boolean     | default true | 是否启用 |
+| created_at | timestamptz | not null     | 创建时间 |
 
 索引建议：
 
@@ -202,41 +202,41 @@ erDiagram
 
 #### 表：user_verification
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 认证记录主键 |
-| user_id | uuid | FK user.id | 用户 |
-| real_name | varchar(50) | not null | 真实姓名 |
-| id_type | varchar(20) | not null | 证件类型 |
-| id_no_masked | varchar(50) | not null | 脱敏证件号 |
-| verify_provider | varchar(50) | nullable | 认证服务商 |
-| verify_result | varchar(20) | index | pending/pass/reject |
-| reject_reason | varchar(255) | nullable | 拒绝原因 |
-| submitted_at | timestamptz | not null | 提交时间 |
-| reviewed_at | timestamptz | nullable | 审核时间 |
+| 字段            | 类型         | 约束       | 说明                |
+| --------------- | ------------ | ---------- | ------------------- |
+| id              | uuid         | PK         | 认证记录主键        |
+| user_id         | uuid         | FK user.id | 用户                |
+| real_name       | varchar(50)  | not null   | 真实姓名            |
+| id_type         | varchar(20)  | not null   | 证件类型            |
+| id_no_masked    | varchar(50)  | not null   | 脱敏证件号          |
+| verify_provider | varchar(50)  | nullable   | 认证服务商          |
+| verify_result   | varchar(20)  | index      | pending/pass/reject |
+| reject_reason   | varchar(255) | nullable   | 拒绝原因            |
+| submitted_at    | timestamptz  | not null   | 提交时间            |
+| reviewed_at     | timestamptz  | nullable   | 审核时间            |
 
 ### 4.3.2 宠物档案域
 
 #### 表：pet_profile
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 宠物主键 |
-| owner_id | uuid | FK user.id | 宠物主人 |
-| name | varchar(50) | not null | 宠物名 |
-| species | varchar(20) | index | dog/cat/other |
-| breed | varchar(50) | nullable | 品种 |
-| gender | varchar(10) | nullable | 性别 |
-| birthday | date | nullable | 出生日期 |
-| weight_kg | numeric(5,2) | nullable | 体重 |
-| neutered | boolean | default false | 是否绝育 |
-| temperament_tags | jsonb | default [] | 性格标签 |
-| feeding_note | text | nullable | 喂食说明 |
-| allergy_note | text | nullable | 过敏说明 |
-| medical_note | text | nullable | 就诊史 / 用药 / 医疗说明 |
-| emergency_contact | jsonb | nullable | 紧急联系人 |
-| created_at | timestamptz | not null | 创建时间 |
-| updated_at | timestamptz | not null | 更新时间 |
+| 字段              | 类型         | 约束          | 说明                     |
+| ----------------- | ------------ | ------------- | ------------------------ |
+| id                | uuid         | PK            | 宠物主键                 |
+| owner_id          | uuid         | FK user.id    | 宠物主人                 |
+| name              | varchar(50)  | not null      | 宠物名                   |
+| species           | varchar(20)  | index         | dog/cat/other            |
+| breed             | varchar(50)  | nullable      | 品种                     |
+| gender            | varchar(10)  | nullable      | 性别                     |
+| birthday          | date         | nullable      | 出生日期                 |
+| weight_kg         | numeric(5,2) | nullable      | 体重                     |
+| neutered          | boolean      | default false | 是否绝育                 |
+| temperament_tags  | jsonb        | default []    | 性格标签                 |
+| feeding_note      | text         | nullable      | 喂食说明                 |
+| allergy_note      | text         | nullable      | 过敏说明                 |
+| medical_note      | text         | nullable      | 就诊史 / 用药 / 医疗说明 |
+| emergency_contact | jsonb        | nullable      | 紧急联系人               |
+| created_at        | timestamptz  | not null      | 创建时间                 |
+| updated_at        | timestamptz  | not null      | 更新时间                 |
 
 索引建议：
 
@@ -250,37 +250,37 @@ erDiagram
 
 #### 表：pet_health_record
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 健康记录主键 |
-| pet_id | uuid | FK pet_profile.id | 宠物 |
-| record_type | varchar(20) | index | vaccine/allergy/disease/medication |
-| title | varchar(100) | not null | 记录标题 |
-| content | text | not null | 详情 |
-| file_urls | jsonb | default [] | 附件 URL |
-| occurred_at | timestamptz | nullable | 发生时间 |
-| created_at | timestamptz | not null | 创建时间 |
+| 字段        | 类型         | 约束              | 说明                               |
+| ----------- | ------------ | ----------------- | ---------------------------------- |
+| id          | uuid         | PK                | 健康记录主键                       |
+| pet_id      | uuid         | FK pet_profile.id | 宠物                               |
+| record_type | varchar(20)  | index             | vaccine/allergy/disease/medication |
+| title       | varchar(100) | not null          | 记录标题                           |
+| content     | text         | not null          | 详情                               |
+| file_urls   | jsonb        | default []        | 附件 URL                           |
+| occurred_at | timestamptz  | nullable          | 发生时间                           |
+| created_at  | timestamptz  | not null          | 创建时间                           |
 
 ### 4.3.3 照料者与服务域
 
 #### 表：caregiver_profile
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 照料者主键 |
-| user_id | uuid | FK user.id unique | 用户映射 |
-| intro | text | nullable | 自我介绍 |
-| experience_years | int | default 0 | 从业年限 |
-| service_radius_km | int | default 5 | 服务半径 |
-| service_city | varchar(50) | index | 服务城市 |
-| specialty_tags | jsonb | default [] | 照护专长标签 |
-| service_commitment | text | nullable | 服务承诺 |
-| qualification_materials | jsonb | default [] | 资质材料摘要列表 |
-| rating_avg | numeric(3,2) | default 5.0 | 平均评分 |
-| rating_count | int | default 0 | 评价数 |
-| audit_status | varchar(20) | index | pending/approved/rejected |
-| created_at | timestamptz | not null | 创建时间 |
-| updated_at | timestamptz | not null | 更新时间 |
+| 字段                    | 类型         | 约束              | 说明                      |
+| ----------------------- | ------------ | ----------------- | ------------------------- |
+| id                      | uuid         | PK                | 照料者主键                |
+| user_id                 | uuid         | FK user.id unique | 用户映射                  |
+| intro                   | text         | nullable          | 自我介绍                  |
+| experience_years        | int          | default 0         | 从业年限                  |
+| service_radius_km       | int          | default 5         | 服务半径                  |
+| service_city            | varchar(50)  | index             | 服务城市                  |
+| specialty_tags          | jsonb        | default []        | 照护专长标签              |
+| service_commitment      | text         | nullable          | 服务承诺                  |
+| qualification_materials | jsonb        | default []        | 资质材料摘要列表          |
+| rating_avg              | numeric(3,2) | default 5.0       | 平均评分                  |
+| rating_count            | int          | default 0         | 评价数                    |
+| audit_status            | varchar(20)  | index             | pending/approved/rejected |
+| created_at              | timestamptz  | not null          | 创建时间                  |
+| updated_at              | timestamptz  | not null          | 更新时间                  |
 
 实现备注（2026-04-01 当前代码基线）：
 
@@ -292,17 +292,17 @@ erDiagram
 
 #### 表：caregiver_qualification
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 资质主键 |
-| caregiver_id | uuid | FK caregiver_profile.id | 照料者 |
-| cert_type | varchar(50) | index | 证书类型 |
-| cert_no | varchar(100) | nullable | 证书编号 |
-| file_url | varchar(255) | not null | 证书文件 |
-| valid_from | date | nullable | 生效日 |
-| valid_to | date | nullable | 到期日 |
-| verify_status | varchar(20) | index | pending/pass/reject |
-| created_at | timestamptz | not null | 创建时间 |
+| 字段          | 类型         | 约束                    | 说明                |
+| ------------- | ------------ | ----------------------- | ------------------- |
+| id            | uuid         | PK                      | 资质主键            |
+| caregiver_id  | uuid         | FK caregiver_profile.id | 照料者              |
+| cert_type     | varchar(50)  | index                   | 证书类型            |
+| cert_no       | varchar(100) | nullable                | 证书编号            |
+| file_url      | varchar(255) | not null                | 证书文件            |
+| valid_from    | date         | nullable                | 生效日              |
+| valid_to      | date         | nullable                | 到期日              |
+| verify_status | varchar(20)  | index                   | pending/pass/reject |
+| created_at    | timestamptz  | not null                | 创建时间            |
 
 实现备注（2026-04-01 当前代码基线）：
 
@@ -312,20 +312,20 @@ erDiagram
 
 #### 表：caregiver_service
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 服务项主键 |
-| caregiver_id | uuid | FK caregiver_profile.id | 照料者 |
-| service_type | varchar(30) | index | boarding/walking/feeding/door_visit |
-| pet_species | varchar(20) | index | dog/cat/other |
-| price_per_unit | numeric(10,2) | not null | 单价 |
-| unit_type | varchar(20) | not null | hour/day/times |
-| min_notice_hours | int | default 2 | 最小提前预约时长 |
-| available_slots | jsonb | not null | 可服务时段 |
-| service_geo | geography(Point, 4326) | index | 服务中心点 |
-| is_active | boolean | default true | 是否上架 |
-| created_at | timestamptz | not null | 创建时间 |
-| updated_at | timestamptz | not null | 更新时间 |
+| 字段             | 类型                   | 约束                    | 说明                                |
+| ---------------- | ---------------------- | ----------------------- | ----------------------------------- |
+| id               | uuid                   | PK                      | 服务项主键                          |
+| caregiver_id     | uuid                   | FK caregiver_profile.id | 照料者                              |
+| service_type     | varchar(30)            | index                   | boarding/walking/feeding/door_visit |
+| pet_species      | varchar(20)            | index                   | dog/cat/other                       |
+| price_per_unit   | numeric(10,2)          | not null                | 单价                                |
+| unit_type        | varchar(20)            | not null                | hour/day/times                      |
+| min_notice_hours | int                    | default 2               | 最小提前预约时长                    |
+| available_slots  | jsonb                  | not null                | 可服务时段                          |
+| service_geo      | geography(Point, 4326) | index                   | 服务中心点                          |
+| is_active        | boolean                | default true            | 是否上架                            |
+| created_at       | timestamptz            | not null                | 创建时间                            |
+| updated_at       | timestamptz            | not null                | 更新时间                            |
 
 索引建议：
 
@@ -335,21 +335,21 @@ erDiagram
 
 #### 表：service_request
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 需求主键 |
-| owner_id | uuid | FK user.id | 发布人 |
-| pet_id | uuid | FK pet_profile.id | 宠物 |
-| service_type | varchar(30) | index | 服务类型 |
-| start_time | timestamptz | index | 开始时间 |
-| end_time | timestamptz | index | 结束时间 |
-| location_text | varchar(255) | not null | 服务地点 |
-| location_geo | geography(Point, 4326) | index | 服务坐标 |
-| budget_amount | numeric(10,2) | nullable | 预算 |
-| demand_tags | jsonb | default [] | 需求标签 |
-| status | varchar(20) | index | open/matched/closed/cancelled |
-| created_at | timestamptz | not null | 创建时间 |
-| updated_at | timestamptz | not null | 更新时间 |
+| 字段          | 类型                   | 约束              | 说明                          |
+| ------------- | ---------------------- | ----------------- | ----------------------------- |
+| id            | uuid                   | PK                | 需求主键                      |
+| owner_id      | uuid                   | FK user.id        | 发布人                        |
+| pet_id        | uuid                   | FK pet_profile.id | 宠物                          |
+| service_type  | varchar(30)            | index             | 服务类型                      |
+| start_time    | timestamptz            | index             | 开始时间                      |
+| end_time      | timestamptz            | index             | 结束时间                      |
+| location_text | varchar(255)           | not null          | 服务地点                      |
+| location_geo  | geography(Point, 4326) | index             | 服务坐标                      |
+| budget_amount | numeric(10,2)          | nullable          | 预算                          |
+| demand_tags   | jsonb                  | default []        | 需求标签                      |
+| status        | varchar(20)            | index             | open/matched/closed/cancelled |
+| created_at    | timestamptz            | not null          | 创建时间                      |
+| updated_at    | timestamptz            | not null          | 更新时间                      |
 
 索引建议：
 
@@ -357,25 +357,25 @@ erDiagram
 
 #### 表：order_main
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 订单主键 |
-| order_no | varchar(32) | unique | 业务订单号 |
-| owner_id | uuid | FK user.id | 主人 |
-| caregiver_id | uuid | FK caregiver_profile.id | 照料者 |
-| service_request_id | uuid | FK service_request.id nullable | 来源需求 |
-| service_type | varchar(30) | index | 服务类型 |
-| appointment_start | timestamptz | index | 预约开始 |
-| appointment_end | timestamptz | index | 预约结束 |
-| amount_total | numeric(10,2) | not null | 应付总额 |
-| amount_adjusted | numeric(10,2) | default 0 | 调价金额（补差价可为正） |
-| amount_paid | numeric(10,2) | default 0 | 已付金额 |
-| amount_refunded | numeric(10,2) | default 0 | 已退金额 |
-| order_status | varchar(30) | index | pending_accept/accepted/serving/completed/cancelled/disputed/partial_refunded/refunded |
-| cancel_reason | varchar(255) | nullable | 取消原因 |
-| closed_at | timestamptz | nullable | 关闭时间 |
-| created_at | timestamptz | not null | 创建时间 |
-| updated_at | timestamptz | not null | 更新时间 |
+| 字段               | 类型          | 约束                           | 说明                                                                                   |
+| ------------------ | ------------- | ------------------------------ | -------------------------------------------------------------------------------------- |
+| id                 | uuid          | PK                             | 订单主键                                                                               |
+| order_no           | varchar(32)   | unique                         | 业务订单号                                                                             |
+| owner_id           | uuid          | FK user.id                     | 主人                                                                                   |
+| caregiver_id       | uuid          | FK caregiver_profile.id        | 照料者                                                                                 |
+| service_request_id | uuid          | FK service_request.id nullable | 来源需求                                                                               |
+| service_type       | varchar(30)   | index                          | 服务类型                                                                               |
+| appointment_start  | timestamptz   | index                          | 预约开始                                                                               |
+| appointment_end    | timestamptz   | index                          | 预约结束                                                                               |
+| amount_total       | numeric(10,2) | not null                       | 应付总额                                                                               |
+| amount_adjusted    | numeric(10,2) | default 0                      | 调价金额（补差价可为正）                                                               |
+| amount_paid        | numeric(10,2) | default 0                      | 已付金额                                                                               |
+| amount_refunded    | numeric(10,2) | default 0                      | 已退金额                                                                               |
+| order_status       | varchar(30)   | index                          | pending_accept/accepted/serving/completed/cancelled/disputed/partial_refunded/refunded |
+| cancel_reason      | varchar(255)  | nullable                       | 取消原因                                                                               |
+| closed_at          | timestamptz   | nullable                       | 关闭时间                                                                               |
+| created_at         | timestamptz   | not null                       | 创建时间                                                                               |
+| updated_at         | timestamptz   | not null                       | 更新时间                                                                               |
 
 索引建议：
 
@@ -386,72 +386,72 @@ erDiagram
 
 #### 表：order_timeline
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | bigserial | PK | 主键 |
-| order_id | uuid | FK order_main.id | 订单 |
-| event_type | varchar(30) | index | created/accepted/checkin/checkout/completed/cancelled/refund_applied/refund_done |
-| operator_role | varchar(20) | index | owner/caregiver/admin/system |
-| operator_id | uuid | nullable | 操作人 |
-| event_payload | jsonb | nullable | 事件详情 |
-| created_at | timestamptz | not null | 创建时间 |
+| 字段          | 类型        | 约束             | 说明                                                                             |
+| ------------- | ----------- | ---------------- | -------------------------------------------------------------------------------- |
+| id            | bigserial   | PK               | 主键                                                                             |
+| order_id      | uuid        | FK order_main.id | 订单                                                                             |
+| event_type    | varchar(30) | index            | created/accepted/checkin/checkout/completed/cancelled/refund_applied/refund_done |
+| operator_role | varchar(20) | index            | owner/caregiver/admin/system                                                     |
+| operator_id   | uuid        | nullable         | 操作人                                                                           |
+| event_payload | jsonb       | nullable         | 事件详情                                                                         |
+| created_at    | timestamptz | not null         | 创建时间                                                                         |
 
 #### 表：service_log
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 服务日志主键 |
-| order_id | uuid | FK order_main.id | 订单 |
-| caregiver_id | uuid | FK caregiver_profile.id | 照料者 |
-| log_type | varchar(20) | index | checkin/feed/walk/play/health/checkout |
-| text_note | text | nullable | 文字说明 |
-| media_urls | jsonb | default [] | 图片/视频 |
-| geo | jsonb | nullable | 打卡坐标 |
-| happened_at | timestamptz | index | 发生时间 |
-| created_at | timestamptz | not null | 创建时间 |
+| 字段         | 类型        | 约束                    | 说明                                   |
+| ------------ | ----------- | ----------------------- | -------------------------------------- |
+| id           | uuid        | PK                      | 服务日志主键                           |
+| order_id     | uuid        | FK order_main.id        | 订单                                   |
+| caregiver_id | uuid        | FK caregiver_profile.id | 照料者                                 |
+| log_type     | varchar(20) | index                   | checkin/feed/walk/play/health/checkout |
+| text_note    | text        | nullable                | 文字说明                               |
+| media_urls   | jsonb       | default []              | 图片/视频                              |
+| geo          | jsonb       | nullable                | 打卡坐标                               |
+| happened_at  | timestamptz | index                   | 发生时间                               |
+| created_at   | timestamptz | not null                | 创建时间                               |
 
 ### 4.3.5 沟通、支付、评价与投诉域
 
 #### 表：message_session
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 会话主键 |
-| order_id | uuid | FK order_main.id unique | 订单会话 |
-| owner_id | uuid | FK user.id | 主人 |
-| caregiver_id | uuid | FK caregiver_profile.id | 照料者 |
-| last_message_at | timestamptz | index | 最近消息时间 |
-| created_at | timestamptz | not null | 创建时间 |
+| 字段            | 类型        | 约束                    | 说明         |
+| --------------- | ----------- | ----------------------- | ------------ |
+| id              | uuid        | PK                      | 会话主键     |
+| order_id        | uuid        | FK order_main.id unique | 订单会话     |
+| owner_id        | uuid        | FK user.id              | 主人         |
+| caregiver_id    | uuid        | FK caregiver_profile.id | 照料者       |
+| last_message_at | timestamptz | index                   | 最近消息时间 |
+| created_at      | timestamptz | not null                | 创建时间     |
 
 #### 表：message
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | bigserial | PK | 消息主键 |
-| session_id | uuid | FK message_session.id | 会话 |
-| sender_role | varchar(20) | index | owner/caregiver/admin/system |
-| sender_id | uuid | nullable | 发送方 |
-| message_type | varchar(20) | index | text/image/video/system |
-| content | text | not null | 内容 |
-| ext | jsonb | nullable | 扩展字段 |
-| created_at | timestamptz | index | 发送时间 |
+| 字段         | 类型        | 约束                  | 说明                         |
+| ------------ | ----------- | --------------------- | ---------------------------- |
+| id           | bigserial   | PK                    | 消息主键                     |
+| session_id   | uuid        | FK message_session.id | 会话                         |
+| sender_role  | varchar(20) | index                 | owner/caregiver/admin/system |
+| sender_id    | uuid        | nullable              | 发送方                       |
+| message_type | varchar(20) | index                 | text/image/video/system      |
+| content      | text        | not null              | 内容                         |
+| ext          | jsonb       | nullable              | 扩展字段                     |
+| created_at   | timestamptz | index                 | 发送时间                     |
 
 #### 表：payment_record
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 支付记录主键 |
-| order_id | uuid | FK order_main.id | 订单 |
-| pay_no | varchar(40) | unique | 支付单号 |
-| biz_type | varchar(20) | index | deposit/balance/adjustment |
-| pay_channel | varchar(20) | index | wechat/alipay/card |
-| pay_status | varchar(20) | index | pending/paid/failed/closed |
-| pay_amount | numeric(10,2) | not null | 支付金额 |
-| channel_txn_id | varchar(80) | unique nullable | 三方交易流水号 |
-| paid_at | timestamptz | nullable | 支付时间 |
-| channel_payload | jsonb | nullable | 渠道回执 |
-| created_at | timestamptz | not null | 创建时间 |
-| updated_at | timestamptz | not null | 更新时间 |
+| 字段            | 类型          | 约束             | 说明                       |
+| --------------- | ------------- | ---------------- | -------------------------- |
+| id              | uuid          | PK               | 支付记录主键               |
+| order_id        | uuid          | FK order_main.id | 订单                       |
+| pay_no          | varchar(40)   | unique           | 支付单号                   |
+| biz_type        | varchar(20)   | index            | deposit/balance/adjustment |
+| pay_channel     | varchar(20)   | index            | wechat/alipay/card         |
+| pay_status      | varchar(20)   | index            | pending/paid/failed/closed |
+| pay_amount      | numeric(10,2) | not null         | 支付金额                   |
+| channel_txn_id  | varchar(80)   | unique nullable  | 三方交易流水号             |
+| paid_at         | timestamptz   | nullable         | 支付时间                   |
+| channel_payload | jsonb         | nullable         | 渠道回执                   |
+| created_at      | timestamptz   | not null         | 创建时间                   |
+| updated_at      | timestamptz   | not null         | 更新时间                   |
 
 索引建议：
 
@@ -460,21 +460,21 @@ erDiagram
 
 #### 表：refund_record
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 退款记录主键 |
-| order_id | uuid | FK order_main.id | 订单 |
-| payment_id | uuid | FK payment_record.id nullable | 关联支付单 |
-| refund_no | varchar(40) | unique | 退款单号 |
-| apply_user_id | uuid | FK user.id | 发起人 |
-| refund_type | varchar(20) | index | full/partial |
-| refund_reason | varchar(255) | not null | 退款原因 |
-| refund_amount | numeric(10,2) | not null | 退款金额 |
-| refund_status | varchar(20) | index | pending/approved/rejected/success/failed |
-| channel_refund_id | varchar(80) | unique nullable | 三方退款流水号 |
-| reviewed_by | uuid | FK user.id nullable | 审核人 |
-| reviewed_at | timestamptz | nullable | 审核时间 |
-| created_at | timestamptz | not null | 创建时间 |
+| 字段              | 类型          | 约束                          | 说明                                     |
+| ----------------- | ------------- | ----------------------------- | ---------------------------------------- |
+| id                | uuid          | PK                            | 退款记录主键                             |
+| order_id          | uuid          | FK order_main.id              | 订单                                     |
+| payment_id        | uuid          | FK payment_record.id nullable | 关联支付单                               |
+| refund_no         | varchar(40)   | unique                        | 退款单号                                 |
+| apply_user_id     | uuid          | FK user.id                    | 发起人                                   |
+| refund_type       | varchar(20)   | index                         | full/partial                             |
+| refund_reason     | varchar(255)  | not null                      | 退款原因                                 |
+| refund_amount     | numeric(10,2) | not null                      | 退款金额                                 |
+| refund_status     | varchar(20)   | index                         | pending/approved/rejected/success/failed |
+| channel_refund_id | varchar(80)   | unique nullable               | 三方退款流水号                           |
+| reviewed_by       | uuid          | FK user.id nullable           | 审核人                                   |
+| reviewed_at       | timestamptz   | nullable                      | 审核时间                                 |
+| created_at        | timestamptz   | not null                      | 创建时间                                 |
 
 索引建议：
 
@@ -483,74 +483,74 @@ erDiagram
 
 #### 表：review
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 评价主键 |
-| order_id | uuid | FK order_main.id unique | 订单 |
-| owner_id | uuid | FK user.id | 评价人 |
-| caregiver_id | uuid | FK caregiver_profile.id | 被评价照料者 |
-| rating | int | check 1..5 | 星级 |
-| tags | jsonb | default [] | 评价标签 |
-| content | text | nullable | 评价内容 |
-| is_anonymous | boolean | default false | 是否匿名 |
-| created_at | timestamptz | not null | 创建时间 |
+| 字段         | 类型        | 约束                    | 说明         |
+| ------------ | ----------- | ----------------------- | ------------ |
+| id           | uuid        | PK                      | 评价主键     |
+| order_id     | uuid        | FK order_main.id unique | 订单         |
+| owner_id     | uuid        | FK user.id              | 评价人       |
+| caregiver_id | uuid        | FK caregiver_profile.id | 被评价照料者 |
+| rating       | int         | check 1..5              | 星级         |
+| tags         | jsonb       | default []              | 评价标签     |
+| content      | text        | nullable                | 评价内容     |
+| is_anonymous | boolean     | default false           | 是否匿名     |
+| created_at   | timestamptz | not null                | 创建时间     |
 
 #### 表：complaint
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 投诉主键 |
-| order_id | uuid | FK order_main.id | 关联订单 |
-| complainant_id | uuid | FK user.id | 投诉人 |
-| target_role | varchar(20) | index | caregiver/platform |
-| complaint_type | varchar(30) | index | safety/fee/service/fraud/other |
-| description | text | not null | 投诉描述 |
-| evidence_urls | jsonb | default [] | 证据附件 |
-| status | varchar(20) | index | open/processing/resolved/rejected |
-| result_summary | varchar(255) | nullable | 处理结论 |
-| created_at | timestamptz | not null | 创建时间 |
-| closed_at | timestamptz | nullable | 结案时间 |
+| 字段           | 类型         | 约束             | 说明                              |
+| -------------- | ------------ | ---------------- | --------------------------------- |
+| id             | uuid         | PK               | 投诉主键                          |
+| order_id       | uuid         | FK order_main.id | 关联订单                          |
+| complainant_id | uuid         | FK user.id       | 投诉人                            |
+| target_role    | varchar(20)  | index            | caregiver/platform                |
+| complaint_type | varchar(30)  | index            | safety/fee/service/fraud/other    |
+| description    | text         | not null         | 投诉描述                          |
+| evidence_urls  | jsonb        | default []       | 证据附件                          |
+| status         | varchar(20)  | index            | open/processing/resolved/rejected |
+| result_summary | varchar(255) | nullable         | 处理结论                          |
+| created_at     | timestamptz  | not null         | 创建时间                          |
+| closed_at      | timestamptz  | nullable         | 结案时间                          |
 
 #### 表：complaint_process_log
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | bigserial | PK | 主键 |
-| complaint_id | uuid | FK complaint.id | 投诉 |
-| action_type | varchar(30) | index | assign/investigate/call_user/penalty/close |
-| operator_id | uuid | FK user.id | 处理人 |
-| note | text | nullable | 处理说明 |
-| created_at | timestamptz | not null | 创建时间 |
+| 字段         | 类型        | 约束            | 说明                                       |
+| ------------ | ----------- | --------------- | ------------------------------------------ |
+| id           | bigserial   | PK              | 主键                                       |
+| complaint_id | uuid        | FK complaint.id | 投诉                                       |
+| action_type  | varchar(30) | index           | assign/investigate/call_user/penalty/close |
+| operator_id  | uuid        | FK user.id      | 处理人                                     |
+| note         | text        | nullable        | 处理说明                                   |
+| created_at   | timestamptz | not null        | 创建时间                                   |
 
 ### 4.3.6 平台治理与审计域
 
 #### 表：platform_rule
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | uuid | PK | 规则主键 |
-| rule_code | varchar(50) | unique | 规则编码 |
-| rule_name | varchar(100) | not null | 规则名称 |
-| rule_version | varchar(20) | not null | 版本号 |
-| content_md | text | not null | 规则内容 |
-| effective_at | timestamptz | not null | 生效时间 |
-| status | varchar(20) | index | draft/published/archived |
-| created_by | uuid | FK user.id | 创建人 |
-| created_at | timestamptz | not null | 创建时间 |
+| 字段         | 类型         | 约束       | 说明                     |
+| ------------ | ------------ | ---------- | ------------------------ |
+| id           | uuid         | PK         | 规则主键                 |
+| rule_code    | varchar(50)  | unique     | 规则编码                 |
+| rule_name    | varchar(100) | not null   | 规则名称                 |
+| rule_version | varchar(20)  | not null   | 版本号                   |
+| content_md   | text         | not null   | 规则内容                 |
+| effective_at | timestamptz  | not null   | 生效时间                 |
+| status       | varchar(20)  | index      | draft/published/archived |
+| created_by   | uuid         | FK user.id | 创建人                   |
+| created_at   | timestamptz  | not null   | 创建时间                 |
 
 #### 表：operation_audit_log
 
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | bigserial | PK | 主键 |
-| actor_id | uuid | nullable | 操作人 |
-| actor_role | varchar(20) | index | owner/caregiver/admin/system |
-| action | varchar(100) | index | 行为标识 |
-| resource_type | varchar(50) | index | 资源类型 |
-| resource_id | varchar(64) | nullable | 资源 ID |
-| request_id | varchar(64) | index | 请求追踪号 |
-| detail | jsonb | nullable | 详情 |
-| created_at | timestamptz | not null | 创建时间 |
+| 字段          | 类型         | 约束     | 说明                         |
+| ------------- | ------------ | -------- | ---------------------------- |
+| id            | bigserial    | PK       | 主键                         |
+| actor_id      | uuid         | nullable | 操作人                       |
+| actor_role    | varchar(20)  | index    | owner/caregiver/admin/system |
+| action        | varchar(100) | index    | 行为标识                     |
+| resource_type | varchar(50)  | index    | 资源类型                     |
+| resource_id   | varchar(64)  | nullable | 资源 ID                      |
+| request_id    | varchar(64)  | index    | 请求追踪号                   |
+| detail        | jsonb        | nullable | 详情                         |
+| created_at    | timestamptz  | not null | 创建时间                     |
 
 ### 4.4 Redis 设计
 
@@ -758,13 +758,13 @@ flowchart LR
 
 ### 11.1 重点风险与处理建议
 
-| 风险点 | 影响 | 建议 |
-| --- | --- | --- |
-| 地理字段使用 PostGIS，但未在迁移脚本启用扩展 | 上线后查询失败 | 在首个迁移中执行 `CREATE EXTENSION IF NOT EXISTS postgis;` |
-| 订单金额聚合在并发回调下可能被覆盖 | 金额错账 | 采用数据库事务 + 行级锁（`FOR UPDATE`）+ 幂等键 |
-| 多身份切换仅在前端切状态 | 越权风险 | 后端基于 user_role 与 activeRole 双重校验并写审计日志 |
-| 多次退款可能超过已支付金额 | 财务风险 | 增加 `CHECK (amount_paid - amount_refunded >= 0)` 与服务层二次校验 |
-| 消息通知服务未定义失败补偿策略 | 通知丢失 | 建立 outbox 表 + 重试任务 + 死信告警 |
+| 风险点                                       | 影响           | 建议                                                               |
+| -------------------------------------------- | -------------- | ------------------------------------------------------------------ |
+| 地理字段使用 PostGIS，但未在迁移脚本启用扩展 | 上线后查询失败 | 在首个迁移中执行 `CREATE EXTENSION IF NOT EXISTS postgis;`         |
+| 订单金额聚合在并发回调下可能被覆盖           | 金额错账       | 采用数据库事务 + 行级锁（`FOR UPDATE`）+ 幂等键                    |
+| 多身份切换仅在前端切状态                     | 越权风险       | 后端基于 user_role 与 activeRole 双重校验并写审计日志              |
+| 多次退款可能超过已支付金额                   | 财务风险       | 增加 `CHECK (amount_paid - amount_refunded >= 0)` 与服务层二次校验 |
+| 消息通知服务未定义失败补偿策略               | 通知丢失       | 建立 outbox 表 + 重试任务 + 死信告警                               |
 
 ### 11.2 规则落地优先级
 
@@ -1044,14 +1044,14 @@ flowchart TB
 
 ### 13.3 优先级开发计划
 
-| 优先级 | 主题 | 目标 | 输出 | 完成判定 |
-| --- | --- | --- | --- | --- |
-| P0 | 已完成基线 | 保持现有回调治理、主人最小闭环、照料者入驻审核、订单消息基线稳定 | 现有代码、测试、文档 | 不回退已有能力 |
-| P1 | App 主人主流程重构 | 完成主人主流程页面拆分和订单详情分视图 | App 新页面、导航、交互基线 | App 不再以单一超级页承载主人主流程 |
-| P2 | App 照料者 / 消息 / 售后 / 账户收口 | 完成照料者工作流、消息中心、售后页与账户页拆分 | App 子页面、状态反馈、动效规则 | App 主人和照料者两条主流程都可独立完成 |
-| P3 | Web 前台页面拆分 | 将 Web 主人 / 照料者前台按路由拆分，弱化超级页面 | Web 路由、新页面、兼容跳转 | Web 前台不再依赖 `PetPalOwnerView.vue` 承载完整业务树 |
-| P4 | 业务缺口与治理补完 | 补齐身份中心、跨订单消息、健康域、收益分析、规则治理和运营看板 | 模型、接口、页面、治理能力 | 剩余核心功能域不再存在明显空白 |
-| P5 | 审计、测试与答辩材料 | 完成定向测试、代码审计、手工验收和论文素材收口 | 测试报告、风险清单、素材包 | 项目进入可验收、可答辩状态 |
+| 优先级 | 主题                                | 目标                                                             | 输出                           | 完成判定                                              |
+| ------ | ----------------------------------- | ---------------------------------------------------------------- | ------------------------------ | ----------------------------------------------------- |
+| P0     | 已完成基线                          | 保持现有回调治理、主人最小闭环、照料者入驻审核、订单消息基线稳定 | 现有代码、测试、文档           | 不回退已有能力                                        |
+| P1     | App 主人主流程重构                  | 完成主人主流程页面拆分和订单详情分视图                           | App 新页面、导航、交互基线     | App 不再以单一超级页承载主人主流程                    |
+| P2     | App 照料者 / 消息 / 售后 / 账户收口 | 完成照料者工作流、消息中心、售后页与账户页拆分                   | App 子页面、状态反馈、动效规则 | App 主人和照料者两条主流程都可独立完成                |
+| P3     | Web 前台页面拆分                    | 将 Web 主人 / 照料者前台按路由拆分，弱化超级页面                 | Web 路由、新页面、兼容跳转     | Web 前台不再依赖 `PetPalOwnerView.vue` 承载完整业务树 |
+| P4     | 业务缺口与治理补完                  | 补齐身份中心、跨订单消息、健康域、收益分析、规则治理和运营看板   | 模型、接口、页面、治理能力     | 剩余核心功能域不再存在明显空白                        |
+| P5     | 审计、测试与答辩材料                | 完成定向测试、代码审计、手工验收和论文素材收口                   | 测试报告、风险清单、素材包     | 项目进入可验收、可答辩状态                            |
 
 约束说明：
 
@@ -1060,18 +1060,18 @@ flowchart TB
 
 ### 13.4 功能域覆盖矩阵
 
-| 功能域 | 必交功能 | 当前状态 | 目标优先级 |
-| --- | --- | --- | --- |
-| 账户与身份 | 登录/注册、实名状态、Owner/Caregiver 双身份、activeRole 审计、设备与安全设置基础态 | 部分完成 | P2 |
-| 宠物档案 | 基础档案、健康记录、习惯配置、紧急联系人 | 最小闭环已完成，健康域未完整 | P1 |
-| 照料者入驻 | 档案、资质、服务设置、审核状态、审核动作 | 基本完成 | P2 |
-| 需求与匹配 | 发布需求、筛选、排序、地理距离、推荐缓存 | 最小闭环已完成，策略未完善 | P1 |
-| 订单与履约 | 接单、签到、服务日志、完成确认、超时处理、时间线 | 基本完成，超时治理未完善 | P2 |
-| 消息与回传 | 订单会话、图文消息、过程媒体、未读数 | 基本完成，跨订单聚合、提醒中心和通知中心已完成，仍缺系统主动通知 | P2 |
-| 支付与退款 | 多次支付、补差价、部分退款、回调审计、对账 | 核心已完成 | P4 |
-| 评价与投诉 | 评价、标签、投诉、处理日志、仲裁结论 | 基本完成，售后中心、帮助体系和通知收口已落地，仍缺更主动触达 | P2 |
-| 管理治理 | 审核台、纠纷处理、违规处罚、规则发布、指标看板 | 部分完成 | P4 |
-| 可观测与审计 | request_id 串联、关键动作审计、导出留痕 | 部分完成 | P5 |
+| 功能域       | 必交功能                                                                           | 当前状态                                                         | 目标优先级 |
+| ------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------- |
+| 账户与身份   | 登录/注册、实名状态、Owner/Caregiver 双身份、activeRole 审计、设备与安全设置基础态 | 部分完成                                                         | P2         |
+| 宠物档案     | 基础档案、健康记录、习惯配置、紧急联系人                                           | 最小闭环已完成，健康域未完整                                     | P1         |
+| 照料者入驻   | 档案、资质、服务设置、审核状态、审核动作                                           | 基本完成                                                         | P2         |
+| 需求与匹配   | 发布需求、筛选、排序、地理距离、推荐缓存                                           | 最小闭环已完成，策略未完善                                       | P1         |
+| 订单与履约   | 接单、签到、服务日志、完成确认、超时处理、时间线                                   | 基本完成，超时治理未完善                                         | P2         |
+| 消息与回传   | 订单会话、图文消息、过程媒体、未读数                                               | 基本完成，跨订单聚合、提醒中心和通知中心已完成，仍缺系统主动通知 | P2         |
+| 支付与退款   | 多次支付、补差价、部分退款、回调审计、对账                                         | 核心已完成                                                       | P4         |
+| 评价与投诉   | 评价、标签、投诉、处理日志、仲裁结论                                               | 基本完成，售后中心、帮助体系和通知收口已落地，仍缺更主动触达     | P2         |
+| 管理治理     | 审核台、纠纷处理、违规处罚、规则发布、指标看板                                     | 部分完成                                                         | P4         |
+| 可观测与审计 | request_id 串联、关键动作审计、导出留痕                                            | 部分完成                                                         | P5         |
 
 ### 13.5 P1-M2：接单履约闭环
 
@@ -1376,16 +1376,16 @@ Uni：
 
 ### 13.12 当前风险追踪表（持续更新）
 
-| 编号 | 风险描述 | 风险优先级 | 负责人角色 | 状态 | 目标优先级 |
-| --- | --- | --- | --- | --- | --- |
-| R-001 | 支付并发回调导致金额聚合竞态 | P0 | 后端 | Mitigated（Serializable + Retry） | P0 |
-| R-002 | PostGIS 迁移在不同环境不一致 | P0 | 后端/运维 | Open | P5 |
-| R-003 | activeRole 被篡改导致越权访问 | P0 | 后端 | Mitigated（Server-side Validation 基线已具备，前端身份中心待补齐） | P2 |
-| R-004 | 履约状态机缺少完整守卫导致状态逆行 | P1 | 后端 | Open | P2 |
-| R-005 | 投诉/仲裁流程缺乏统一规则版本与审计 | P1 | 后端/产品 | Open | P4 |
-| R-006 | Uni 端关键流程缺失导致答辩演示不完整 | P1 | 前端 | Open | P1 |
-| R-007 | 多端导出、权限与审计边界可能不一致 | P1 | 全栈 | Open | P5 |
-| R-008 | 排序策略切换后指标回落 | P2 | 产品/后端 | Open | P4 |
+| 编号  | 风险描述                             | 风险优先级 | 负责人角色 | 状态                                                               | 目标优先级 |
+| ----- | ------------------------------------ | ---------- | ---------- | ------------------------------------------------------------------ | ---------- |
+| R-001 | 支付并发回调导致金额聚合竞态         | P0         | 后端       | Mitigated（Serializable + Retry）                                  | P0         |
+| R-002 | PostGIS 迁移在不同环境不一致         | P0         | 后端/运维  | Open                                                               | P5         |
+| R-003 | activeRole 被篡改导致越权访问        | P0         | 后端       | Mitigated（Server-side Validation 基线已具备，前端身份中心待补齐） | P2         |
+| R-004 | 履约状态机缺少完整守卫导致状态逆行   | P1         | 后端       | Open                                                               | P2         |
+| R-005 | 投诉/仲裁流程缺乏统一规则版本与审计  | P1         | 后端/产品  | Open                                                               | P4         |
+| R-006 | Uni 端关键流程缺失导致答辩演示不完整 | P1         | 前端       | Open                                                               | P1         |
+| R-007 | 多端导出、权限与审计边界可能不一致   | P1         | 全栈       | Open                                                               | P5         |
+| R-008 | 排序策略切换后指标回落               | P2         | 产品/后端  | Open                                                               | P4         |
 
 ### 13.13 优先级执行序列图
 
@@ -1418,29 +1418,29 @@ flowchart TD
 
 当前完成度估算：
 
-| 维度 | 当前判断 | 说明 |
-| --- | --- | --- |
-| 后端能力 | 约 85% | 主人端、照料者端、售后、回调治理和后台治理核心接口已具备 |
-| Web 端 | 约 80% | 主人服务台、订单详情、退款/投诉、PetPal 后台治理工作区已基本成型 |
-| App 端 | 约 83% | 主人与照料者核心流程页面已拆开，并完成 Material 3 设计基线、角色入口、起步向导、资料/设置/帮助/账户支持、提醒/通知与应用内主动催办信号等关键入口统一；仍缺系统级主动推送与更深的动态引导 |
-| 测试与审计 | 约 75% | 后端 PetPal 集成测试较完整，前端仍缺统一收口验证与验收材料 |
-| 整体项目 | 约 83% | 已明显超出最小原型，App 主流程和体验基线更完整，但仍未达到文档定义的完整交付态 |
+| 维度       | 当前判断 | 说明                                                                                                                                                                                     |
+| ---------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 后端能力   | 约 85%   | 主人端、照料者端、售后、回调治理和后台治理核心接口已具备                                                                                                                                 |
+| Web 端     | 约 80%   | 主人服务台、订单详情、退款/投诉、PetPal 后台治理工作区已基本成型                                                                                                                         |
+| App 端     | 约 83%   | 主人与照料者核心流程页面已拆开，并完成 Material 3 设计基线、角色入口、起步向导、资料/设置/帮助/账户支持、提醒/通知与应用内主动催办信号等关键入口统一；仍缺系统级主动推送与更深的动态引导 |
+| 测试与审计 | 约 75%   | 后端 PetPal 集成测试较完整，前端仍缺统一收口验证与验收材料                                                                                                                               |
+| 整体项目   | 约 83%   | 已明显超出最小原型，App 主流程和体验基线更完整，但仍未达到文档定义的完整交付态                                                                                                           |
 
 当前真实状态汇总：
 
-| 功能域 | 当前状态 | 说明 |
-| --- | --- | --- |
-| 账户与身份 | 部分完成 | 登录注册、基础权限、activeRole 基线已具备，但双身份中心、切换审计和身份级隔离前端体验仍未完全收口 |
-| 宠物档案 | 部分完成 | 基础建档、列表、需求挂接已完成；健康记录、精细化习惯信息仍未形成完整前后端闭环 |
-| 需求与匹配 | 基本完成 | 主人端发布需求、匹配照料者、订单关联已具备；推荐策略和体验层还可继续增强 |
-| 照料者入驻 | 基本完成 | 档案、服务项、审核状态、后台审核页已具备；资质实体化、材料上传和运营导出仍有缺口 |
-| 履约链路 | 基本完成 | 接单、签到、服务日志、签退、确认完成已落地到后端、Web 和 App；超时治理与收益联动仍未补齐 |
-| 支付与退款 | 基本完成 | 支付/退款记录、回调审计、退款进度、导出能力已具备 |
-| 评价与投诉 | 基本完成 | Web 端已支持评价、投诉、售后时间线；App 端也已具备订单详情提交、独立售后中心、帮助体系、提醒与通知收口能力，但仍缺更主动的系统触达 |
-| 管理后台 | 基本完成 | 根级 `/petpal-admin/*` 已承载投诉、照料者审核、回调审计、告警队列；处罚、规则发布、运营看板仍未补齐 |
-| 消息与在线沟通 | 基本完成 | 订单详情会话、附件回传、跨订单消息中心、未读态、提醒中心、通知中心和 Web/App 摘要已落地；仍缺系统级主动提醒、推送与后台触达 |
-| 收益与数据分析 | 部分完成 | App 已补收益与表现页，可基于订单聚合看净收入、评分和售后风险；后端专门统计接口与平台运营指标仍未完整实现 |
-| 文档与答辩材料 | 部分完成 | 计划、进度日志和实现历史持续更新中，但完整验收脚本、截图、演示素材尚未收齐 |
+| 功能域         | 当前状态 | 说明                                                                                                                               |
+| -------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 账户与身份     | 部分完成 | 登录注册、基础权限、activeRole 基线已具备，但双身份中心、切换审计和身份级隔离前端体验仍未完全收口                                  |
+| 宠物档案       | 部分完成 | 基础建档、列表、需求挂接已完成；健康记录、精细化习惯信息仍未形成完整前后端闭环                                                     |
+| 需求与匹配     | 基本完成 | 主人端发布需求、匹配照料者、订单关联已具备；推荐策略和体验层还可继续增强                                                           |
+| 照料者入驻     | 基本完成 | 档案、服务项、审核状态、后台审核页已具备；资质实体化、材料上传和运营导出仍有缺口                                                   |
+| 履约链路       | 基本完成 | 接单、签到、服务日志、签退、确认完成已落地到后端、Web 和 App；超时治理与收益联动仍未补齐                                           |
+| 支付与退款     | 基本完成 | 支付/退款记录、回调审计、退款进度、导出能力已具备                                                                                  |
+| 评价与投诉     | 基本完成 | Web 端已支持评价、投诉、售后时间线；App 端也已具备订单详情提交、独立售后中心、帮助体系、提醒与通知收口能力，但仍缺更主动的系统触达 |
+| 管理后台       | 基本完成 | 根级 `/petpal-admin/*` 已承载投诉、照料者审核、回调审计、告警队列；处罚、规则发布、运营看板仍未补齐                                |
+| 消息与在线沟通 | 基本完成 | 订单详情会话、附件回传、跨订单消息中心、未读态、提醒中心、通知中心和 Web/App 摘要已落地；仍缺系统级主动提醒、推送与后台触达        |
+| 收益与数据分析 | 部分完成 | App 已补收益与表现页，可基于订单聚合看净收入、评分和售后风险；后端专门统计接口与平台运营指标仍未完整实现                           |
+| 文档与答辩材料 | 部分完成 | 计划、进度日志和实现历史持续更新中，但完整验收脚本、截图、演示素材尚未收齐                                                         |
 
 已与文档目标基本对齐的部分：
 
@@ -1517,11 +1517,11 @@ flowchart TD
 
 更新后的完成度判断：
 
-| 维度 | 上一轮判断 | 本轮判断 | 说明 |
-| --- | --- | --- | --- |
-| Web 端 | 约 80% | 约 82% | 后台默认落点、权限回退与 PetPal 根级后台入口已进一步收口 |
-| App 端 | 约 50% | 约 65% | 已从基础展示页提升到双工作台 + 订单动作闭环 |
-| 整体项目 | 约 70% | 约 76% | 最大短板仍是消息、治理补完与最终验收层 |
+| 维度     | 上一轮判断 | 本轮判断 | 说明                                                     |
+| -------- | ---------- | -------- | -------------------------------------------------------- |
+| Web 端   | 约 80%     | 约 82%   | 后台默认落点、权限回退与 PetPal 根级后台入口已进一步收口 |
+| App 端   | 约 50%     | 约 65%   | 已从基础展示页提升到双工作台 + 订单动作闭环              |
+| 整体项目 | 约 70%     | 约 76%   | 最大短板仍是消息、治理补完与最终验收层                   |
 
 本轮后仍未完成的重点：
 
@@ -1570,11 +1570,11 @@ flowchart TD
 
 更新后的完成度判断：
 
-| 维度 | 上一轮判断 | 本轮判断 | 说明 |
-| --- | --- | --- | --- |
-| Web 端 | 约 82% | 约 85% | 主人端健康档案与管理端资质审核可视化进一步收口 |
-| App 端 | 约 65% | 约 72% | 主工作台新增宠物健康档案编辑与照料者资质材料上传 |
-| 整体项目 | 约 76% | 约 80% | 真实业务闭环继续增强，但消息、收益与平台治理仍是主要缺口 |
+| 维度     | 上一轮判断 | 本轮判断 | 说明                                                     |
+| -------- | ---------- | -------- | -------------------------------------------------------- |
+| Web 端   | 约 82%     | 约 85%   | 主人端健康档案与管理端资质审核可视化进一步收口           |
+| App 端   | 约 65%     | 约 72%   | 主工作台新增宠物健康档案编辑与照料者资质材料上传         |
+| 整体项目 | 约 76%     | 约 80%   | 真实业务闭环继续增强，但消息、收益与平台治理仍是主要缺口 |
 
 本轮后仍未完成的重点：
 
@@ -1607,11 +1607,11 @@ flowchart TD
 
 更新后的完成度判断：
 
-| 维度 | 上一轮判断 | 本轮判断 | 说明 |
-| --- | --- | --- | --- |
-| Web 端 | 约 85% | 约 87% | 订单详情和工作台都已具备消息摘要与未读入口 |
-| App 端 | 约 72% | 约 76% | 订单详情已具备真实消息发送与附件回传，工作台入口同步补齐 |
-| 整体项目 | 约 80% | 约 83% | 即时沟通主链路已补齐，主要缺口收敛到消息中心、收益与治理层 |
+| 维度     | 上一轮判断 | 本轮判断 | 说明                                                       |
+| -------- | ---------- | -------- | ---------------------------------------------------------- |
+| Web 端   | 约 85%     | 约 87%   | 订单详情和工作台都已具备消息摘要与未读入口                 |
+| App 端   | 约 72%     | 约 76%   | 订单详情已具备真实消息发送与附件回传，工作台入口同步补齐   |
+| 整体项目 | 约 80%     | 约 83%   | 即时沟通主链路已补齐，主要缺口收敛到消息中心、收益与治理层 |
 
 本轮后仍未完成的重点：
 
@@ -3350,7 +3350,7 @@ flowchart TD
       - 且当前用户存在 `auditStatus=APPROVED` 的照料者档案
       - 且该订单确实归属于该照料者
       - 且订单状态处于 `ACCEPTED` / `SERVING` / `COMPLETED`
-      时，允许执行上传预签名和上传完成回调。
+        时，允许执行上传预签名和上传完成回调。
     - 这样不会放开通用附件上传，只对白名单业务标签生效。
 - Web 履约工作台：
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
@@ -7200,6 +7200,56 @@ flowchart TD
 
 1. 继续扫描提醒中心、照料者服务管理和剩余辅助入口，收掉最后一批 handoff 不一致点。
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
+3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
+
+### 14.159 2026-04-03（P3-M1 Slice 159）
+
+**概述**：延续上一轮照料者收益页，本轮把收益聚合从前端临时拼装收口到后端摘要接口，并同步切到 Web / App 两端的统一收益口径。
+
+已完成：
+
+- 新增照料者收益摘要契约与接口：
+  - `packages/api-common/src/types/petpal.ts`
+  - `packages/api-common/src/api/factory.ts`
+  - `apps/backend/src/routes/petpal.ts`
+  - `apps/backend/src/services/petpal-service.ts`
+    - 新增 `CaregiverEarningsSummaryRecord`、`CaregiverEarningsOrderRecord`、`CaregiverServiceRevenueMixRecord` 统一收益契约。
+    - 新增 `GET /api/petpal/caregiver/earnings-summary`，由后端直接聚合累计收入、近 30 天收入、平均客单价、售后风险、最近完成订单、当前最优先履约单和服务收入结构。
+    - 未审核通过的照料者现在返回零值收益摘要，而不是直接报错，便于前端保持一致的空态和引导逻辑。
+- Web / App 收益页切到新摘要：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+  - `apps/app-frontend/src/pages/petpal/caregiver-earnings.vue`
+  - `apps/app-frontend/src/api/petpal.ts`
+    - Web 收益页已移除前端订单本地聚合，改为直接消费收益摘要，同时保留原有 desk shell、handoff notice 和复盘入口。
+    - App 收益页已切到同一份收益摘要契约，并补齐近 30 天收入、售后风险、服务收入结构和最近完成订单展示。
+- 定向测试补齐：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 已补“未审核照料者返回空收益摘要”和“已审核照料者收益聚合正确”两条集成测试，覆盖服务数、订单数、收入、售后敞口和收入结构聚合。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `node --import tsx --test --test-concurrency=1 --test-name-pattern "caregiver earnings summary" test/integration/petpal-api.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 本轮已把照料者收益页的核心聚合口径从前端局部实现上移到后端接口，Web / App 现在消费同一份摘要数据。
+- 已确认未审核照料者仍可进入收益页，但会拿到零值摘要和稳定空态，不会因为 403 打断照料者侧主线。
+- 已确认最近完成订单、当前履约优先单和服务收入结构都由后端统一裁剪，前端不再各自决定“看哪些订单、怎么算收入”。
+
+风险与缓解：
+
+- 风险：当前收益摘要仍偏运营概览，尚未补到更细的日 / 周 / 月趋势、对账口径或导出型经营分析。
+- 缓解：下一轮继续评估是否补趋势维度、筛选维度和经营导出，避免把“收益摘要已统一”误判为收益分析整体已经收口。
+
+下一步（1-3）：
+
+1. 继续评估是否补照料者收益趋势、经营导出和更细的筛选维度。
+2. 继续补系统级主动提醒、保存后回流和更细的弱网恢复说明。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
 ### 14.158 2026-04-03（P3-M1 Slice 158）

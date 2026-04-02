@@ -1,10 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { Prisma, PrismaClient } from '../lib/prisma-generated';
-import type {
-  CaregiverProfile,
-  PetProfile,
-  ServiceRequest,
-} from '../lib/prisma-generated';
+import type { CaregiverProfile, PetProfile, ServiceRequest } from '../lib/prisma-generated';
 import { env } from '../config/env';
 import { badRequest, forbidden, notFound } from '../utils/errors';
 import { withSnowflakeId } from '../utils/persistence';
@@ -20,18 +16,14 @@ const toNumber = (value: Prisma.Decimal | number | null | undefined) => {
   return Number(value);
 };
 
-const calcDistanceKm = (
-  fromLat: number,
-  fromLng: number,
-  toLat: number,
-  toLng: number,
-) => {
+const calcDistanceKm = (fromLat: number, fromLng: number, toLat: number, toLng: number) => {
   const radius = 6371;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const dLat = toRad(toLat - fromLat);
   const dLng = toRad(toLng - fromLng);
-  const a = Math.sin(dLat / 2) ** 2
-    + Math.cos(toRad(fromLat)) * Math.cos(toRad(toLat)) * Math.sin(dLng / 2) ** 2;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(fromLat)) * Math.cos(toRad(toLat)) * Math.sin(dLng / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Number((radius * c).toFixed(3));
 };
@@ -73,7 +65,15 @@ const assertOrderAmountInvariant = (order: {
   amountAdjusted: Prisma.Decimal | number;
   amountPaid: Prisma.Decimal | number;
   amountRefunded: Prisma.Decimal | number;
-  orderStatus?: 'PENDING_ACCEPT' | 'ACCEPTED' | 'SERVING' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'PARTIAL_REFUNDED' | 'REFUNDED';
+  orderStatus?:
+    | 'PENDING_ACCEPT'
+    | 'ACCEPTED'
+    | 'SERVING'
+    | 'COMPLETED'
+    | 'CANCELLED'
+    | 'DISPUTED'
+    | 'PARTIAL_REFUNDED'
+    | 'REFUNDED';
 }) => {
   const amountTotal = toNumber(order.amountTotal);
   const amountAdjusted = toNumber(order.amountAdjusted);
@@ -88,6 +88,11 @@ const assertOrderAmountInvariant = (order: {
     throw badRequest('Invalid order amount invariant: paid amount is not enough');
   }
 };
+
+const calcNetIncome = (
+  amountPaid: Prisma.Decimal | number | null | undefined,
+  amountRefunded: Prisma.Decimal | number | null | undefined,
+) => Math.max(toNumber(amountPaid) - toNumber(amountRefunded), 0);
 
 type CallbackAuditQueryFilters = {
   callbackType?: 'PAYMENT_CALLBACK' | 'REFUND_CALLBACK';
@@ -126,7 +131,15 @@ type OwnerRefundExportFilters = {
 
 type OwnerTransactionExportRow = {
   orderNo: string;
-  orderStatus: 'PENDING_ACCEPT' | 'ACCEPTED' | 'SERVING' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'PARTIAL_REFUNDED' | 'REFUNDED';
+  orderStatus:
+    | 'PENDING_ACCEPT'
+    | 'ACCEPTED'
+    | 'SERVING'
+    | 'COMPLETED'
+    | 'CANCELLED'
+    | 'DISPUTED'
+    | 'PARTIAL_REFUNDED'
+    | 'REFUNDED';
   serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
   appointmentStart: Date;
   appointmentEnd: Date;
@@ -148,7 +161,15 @@ type OwnerTransactionExportRow = {
 
 type OwnerRefundExportRow = {
   orderNo: string;
-  orderStatus: 'PENDING_ACCEPT' | 'ACCEPTED' | 'SERVING' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'PARTIAL_REFUNDED' | 'REFUNDED';
+  orderStatus:
+    | 'PENDING_ACCEPT'
+    | 'ACCEPTED'
+    | 'SERVING'
+    | 'COMPLETED'
+    | 'CANCELLED'
+    | 'DISPUTED'
+    | 'PARTIAL_REFUNDED'
+    | 'REFUNDED';
   serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
   appointmentStart: Date;
   appointmentEnd: Date;
@@ -237,7 +258,9 @@ const normalizeOwnerTransactionExportRange = (
   now = new Date(),
 ) => {
   const endDate = filters.endDate ?? now;
-  const startDate = filters.startDate ?? new Date(endDate.getTime() - (OWNER_TRANSACTION_EXPORT_DEFAULT_DAYS * DAY_IN_MS));
+  const startDate =
+    filters.startDate ??
+    new Date(endDate.getTime() - OWNER_TRANSACTION_EXPORT_DEFAULT_DAYS * DAY_IN_MS);
 
   if (startDate.getTime() > endDate.getTime()) {
     throw badRequest('startDate must be earlier than endDate');
@@ -262,7 +285,9 @@ type CallbackFailureAlertPayload = {
   requestId: string;
 };
 
-const buildCallbackAuditWhere = (filters: CallbackAuditQueryFilters): Prisma.CallbackAuditWhereInput => {
+const buildCallbackAuditWhere = (
+  filters: CallbackAuditQueryFilters,
+): Prisma.CallbackAuditWhereInput => {
   const where: Prisma.CallbackAuditWhereInput = {};
 
   if (filters.callbackType) {
@@ -300,17 +325,18 @@ const buildCallbackAuditWhere = (filters: CallbackAuditQueryFilters): Prisma.Cal
 const enqueueCallbackFailureAlert = async (
   tx: Prisma.TransactionClient,
   payload: CallbackFailureAlertPayload,
-) => tx.callbackAlertOutbox.create({
-  data: withSnowflakeId({
-    callbackAuditId: payload.callbackAuditId,
-    payload: payload as unknown as Prisma.InputJsonValue,
-    eventType: 'CALLBACK_FAILURE_ALERT',
-    status: 'PENDING',
-    retryCount: 0,
-    maxRetries: 5,
-    nextRetryAt: new Date(),
-  }),
-});
+) =>
+  tx.callbackAlertOutbox.create({
+    data: withSnowflakeId({
+      callbackAuditId: payload.callbackAuditId,
+      payload: payload as unknown as Prisma.InputJsonValue,
+      eventType: 'CALLBACK_FAILURE_ALERT',
+      status: 'PENDING',
+      retryCount: 0,
+      maxRetries: 5,
+      nextRetryAt: new Date(),
+    }),
+  });
 
 const buildCallbackAlertOutboxWhere = (
   filters: CallbackAlertOutboxQueryFilters,
@@ -529,6 +555,50 @@ const toOrderRecord = (order: OrderListEntity) => ({
   conversation: toOrderConversationRecord(order.conversation),
 });
 
+const caregiverEarningsOrderSelect = {
+  id: true,
+  orderNo: true,
+  serviceType: true,
+  appointmentStart: true,
+  appointmentEnd: true,
+  amountPaid: true,
+  amountRefunded: true,
+  orderStatus: true,
+  owner: {
+    select: {
+      nickname: true,
+    },
+  },
+  serviceRequest: {
+    select: {
+      locationText: true,
+      pet: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.OrderMainSelect;
+
+type CaregiverEarningsOrderEntity = Prisma.OrderMainGetPayload<{
+  select: typeof caregiverEarningsOrderSelect;
+}>;
+
+const toCaregiverEarningsOrderRecord = (order: CaregiverEarningsOrderEntity) => ({
+  id: order.id,
+  orderNo: order.orderNo,
+  serviceType: order.serviceType,
+  appointmentStart: order.appointmentStart,
+  appointmentEnd: order.appointmentEnd,
+  amountPaid: toNumber(order.amountPaid),
+  amountRefunded: toNumber(order.amountRefunded),
+  orderStatus: order.orderStatus,
+  ownerNickname: order.owner.nickname,
+  petName: order.serviceRequest?.pet?.name ?? null,
+  locationText: order.serviceRequest?.locationText ?? null,
+});
+
 const getApprovedCaregiverProfile = async (
   client: Prisma.TransactionClient | PrismaClient,
   userId: string,
@@ -560,11 +630,8 @@ const normalizeMessageContent = (content?: string | null) => {
   return normalized ? normalized.slice(0, 1000) : null;
 };
 
-const normalizeMessageMediaUrls = (mediaUrls?: string[]) => [...new Set(
-  (mediaUrls ?? [])
-    .map(url => url.trim())
-    .filter(Boolean),
-)].slice(0, 10);
+const normalizeMessageMediaUrls = (mediaUrls?: string[]) =>
+  [...new Set((mediaUrls ?? []).map((url) => url.trim()).filter(Boolean))].slice(0, 10);
 
 const buildMessagePreview = (content: string | null, mediaUrls: string[]) => {
   if (content) {
@@ -635,17 +702,18 @@ const loadOrderConversationParticipant = async (
 const ensureOrderConversation = async (
   client: Prisma.TransactionClient | PrismaClient,
   orderId: string,
-) => client.orderConversation.upsert({
-  where: {
-    orderId,
-  },
-  create: withSnowflakeId({
-    orderId,
-    ownerUnreadCount: 0,
-    caregiverUnreadCount: 0,
-  }),
-  update: {},
-});
+) =>
+  client.orderConversation.upsert({
+    where: {
+      orderId,
+    },
+    create: withSnowflakeId({
+      orderId,
+      ownerUnreadCount: 0,
+      caregiverUnreadCount: 0,
+    }),
+    update: {},
+  });
 
 const loadOrderConversationDetail = async (
   client: Prisma.TransactionClient | PrismaClient,
@@ -669,20 +737,31 @@ const appendOrderTimeline = async (
   client: Prisma.TransactionClient,
   payload: {
     orderId: string;
-    eventType: 'CREATED' | 'ACCEPTED' | 'CHECKED_IN' | 'SERVICE_LOGGED' | 'CHECKED_OUT' | 'COMPLETED' | 'DISPUTED' | 'CANCELLED' | 'REFUND_APPLIED' | 'REFUND_DONE';
+    eventType:
+      | 'CREATED'
+      | 'ACCEPTED'
+      | 'CHECKED_IN'
+      | 'SERVICE_LOGGED'
+      | 'CHECKED_OUT'
+      | 'COMPLETED'
+      | 'DISPUTED'
+      | 'CANCELLED'
+      | 'REFUND_APPLIED'
+      | 'REFUND_DONE';
     operatorRole: 'OWNER' | 'CAREGIVER' | 'ADMIN' | 'SYSTEM';
     operatorId?: string | null;
     eventPayload?: Prisma.InputJsonValue;
   },
-) => client.orderTimeline.create({
-  data: withSnowflakeId({
-    orderId: payload.orderId,
-    eventType: payload.eventType,
-    operatorRole: payload.operatorRole,
-    operatorId: payload.operatorId ?? null,
-    eventPayload: payload.eventPayload ?? Prisma.JsonNull,
-  }),
-});
+) =>
+  client.orderTimeline.create({
+    data: withSnowflakeId({
+      orderId: payload.orderId,
+      eventType: payload.eventType,
+      operatorRole: payload.operatorRole,
+      operatorId: payload.operatorId ?? null,
+      eventPayload: payload.eventPayload ?? Prisma.JsonNull,
+    }),
+  });
 
 const appendServiceLog = async (
   client: Prisma.TransactionClient,
@@ -695,17 +774,18 @@ const appendServiceLog = async (
     geo?: Record<string, unknown> | null;
     happenedAt?: Date;
   },
-) => client.serviceLog.create({
-  data: withSnowflakeId({
-    orderId: payload.orderId,
-    caregiverId: payload.caregiverId,
-    logType: payload.logType,
-    textNote: payload.textNote?.trim() || null,
-    mediaUrls: (payload.mediaUrls ?? []) as Prisma.InputJsonValue,
-    geo: payload.geo ? payload.geo as Prisma.InputJsonValue : Prisma.JsonNull,
-    happenedAt: payload.happenedAt ?? new Date(),
-  }),
-});
+) =>
+  client.serviceLog.create({
+    data: withSnowflakeId({
+      orderId: payload.orderId,
+      caregiverId: payload.caregiverId,
+      logType: payload.logType,
+      textNote: payload.textNote?.trim() || null,
+      mediaUrls: (payload.mediaUrls ?? []) as Prisma.InputJsonValue,
+      geo: payload.geo ? (payload.geo as Prisma.InputJsonValue) : Prisma.JsonNull,
+      happenedAt: payload.happenedAt ?? new Date(),
+    }),
+  });
 
 const appendComplaintProcessLog = async (
   client: Prisma.TransactionClient,
@@ -715,42 +795,32 @@ const appendComplaintProcessLog = async (
     operatorId?: string | null;
     note?: string | null;
   },
-) => client.complaintProcessLog.create({
-  data: withSnowflakeId({
-    complaintId: payload.complaintId,
-    actionType: payload.actionType,
-    operatorId: payload.operatorId ?? null,
-    note: payload.note?.trim() || null,
-  }),
-});
+) =>
+  client.complaintProcessLog.create({
+    data: withSnowflakeId({
+      complaintId: payload.complaintId,
+      actionType: payload.actionType,
+      operatorId: payload.operatorId ?? null,
+      note: payload.note?.trim() || null,
+    }),
+  });
 
-const normalizeReviewTags = (tags?: string[]) => [...new Set(
-  (tags ?? [])
-    .map((item) => item.trim())
-    .filter(Boolean),
-)].slice(0, 8);
+const normalizeReviewTags = (tags?: string[]) =>
+  [...new Set((tags ?? []).map((item) => item.trim()).filter(Boolean))].slice(0, 8);
 
-const normalizeEvidenceUrls = (urls?: string[]) => [...new Set(
-  (urls ?? [])
-    .map((item) => item.trim())
-    .filter(Boolean),
-)].slice(0, 10);
+const normalizeEvidenceUrls = (urls?: string[]) =>
+  [...new Set((urls ?? []).map((item) => item.trim()).filter(Boolean))].slice(0, 10);
 
-const toStringArray = (value: Prisma.JsonValue | null | undefined) => Array.isArray(value)
-  ? value.filter((item): item is string => typeof item === 'string')
-  : [];
+const toStringArray = (value: Prisma.JsonValue | null | undefined) =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 
-const toRecord = (value: Prisma.JsonValue | null | undefined) => (
+const toRecord = (value: Prisma.JsonValue | null | undefined) =>
   value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null
-);
+    ? (value as Record<string, unknown>)
+    : null;
 
-const normalizeTagList = (tags?: string[], limit = 12) => [...new Set(
-  (tags ?? [])
-    .map((item) => item.trim())
-    .filter(Boolean),
-)].slice(0, limit);
+const normalizeTagList = (tags?: string[], limit = 12) =>
+  [...new Set((tags ?? []).map((item) => item.trim()).filter(Boolean))].slice(0, limit);
 
 const normalizePetEmergencyContact = (
   contact?: {
@@ -791,29 +861,31 @@ const toPetEmergencyContact = (value: Prisma.JsonValue | null | undefined) => {
   return {
     name,
     phone,
-    relation: typeof record.relation === 'string' && record.relation.trim()
-      ? record.relation.trim()
-      : null,
+    relation:
+      typeof record.relation === 'string' && record.relation.trim() ? record.relation.trim() : null,
   };
 };
 
-const normalizeQualificationMaterials = (materials?: Array<{
-  fileId: string;
-  url: string;
-  name: string;
-  mimeType: string;
-  size: number;
-  uploadedAt: Date;
-}>) => (materials ?? [])
-  .map((item) => ({
-    fileId: item.fileId.trim(),
-    url: item.url.trim(),
-    name: item.name.trim(),
-    mimeType: item.mimeType.trim(),
-    size: Math.max(1, Math.trunc(item.size)),
-    uploadedAt: item.uploadedAt.toISOString(),
-  }))
-  .filter((item) => item.fileId && item.url && item.name && item.mimeType);
+const normalizeQualificationMaterials = (
+  materials?: Array<{
+    fileId: string;
+    url: string;
+    name: string;
+    mimeType: string;
+    size: number;
+    uploadedAt: Date;
+  }>,
+) =>
+  (materials ?? [])
+    .map((item) => ({
+      fileId: item.fileId.trim(),
+      url: item.url.trim(),
+      name: item.name.trim(),
+      mimeType: item.mimeType.trim(),
+      size: Math.max(1, Math.trunc(item.size)),
+      uploadedAt: item.uploadedAt.toISOString(),
+    }))
+    .filter((item) => item.fileId && item.url && item.name && item.mimeType);
 
 const toQualificationMaterials = (value: Prisma.JsonValue | null | undefined) => {
   if (!Array.isArray(value)) {
@@ -832,18 +904,28 @@ const toQualificationMaterials = (value: Prisma.JsonValue | null | undefined) =>
     const uploadedAt = typeof item.uploadedAt === 'string' ? item.uploadedAt : '';
     const size = typeof item.size === 'number' ? Math.trunc(item.size) : Number(item.size ?? 0);
 
-    if (!fileId || !url || !name || !mimeType || !uploadedAt || !Number.isFinite(size) || size <= 0) {
+    if (
+      !fileId ||
+      !url ||
+      !name ||
+      !mimeType ||
+      !uploadedAt ||
+      !Number.isFinite(size) ||
+      size <= 0
+    ) {
       return [];
     }
 
-    return [{
-      fileId,
-      url,
-      name,
-      mimeType,
-      size,
-      uploadedAt,
-    }];
+    return [
+      {
+        fileId,
+        url,
+        name,
+        mimeType,
+        size,
+        uploadedAt,
+      },
+    ];
   });
 };
 
@@ -884,7 +966,11 @@ const estimateServiceUnits = (payload: {
   if (normalizedUnitType.includes('HALF')) {
     return Math.max(1, Math.ceil(durationHours / 12));
   }
-  if (normalizedUnitType.includes('VISIT') || normalizedUnitType.includes('TIME') || normalizedUnitType.includes('TRIP')) {
+  if (
+    normalizedUnitType.includes('VISIT') ||
+    normalizedUnitType.includes('TIME') ||
+    normalizedUnitType.includes('TRIP')
+  ) {
     return 1;
   }
   if (payload.serviceType === 'BOARDING') {
@@ -980,7 +1066,7 @@ const toComplaintRecord = (complaint: ComplaintEntity) => ({
   closedAt: complaint.closedAt,
   createdAt: complaint.createdAt,
   updatedAt: complaint.updatedAt,
-  processLogs: complaint.processLogs.map(log => ({
+  processLogs: complaint.processLogs.map((log) => ({
     id: log.id,
     complaintId: log.complaintId,
     actionType: log.actionType,
@@ -1005,19 +1091,24 @@ const toComplaintAdminRecord = (complaint: ComplaintAdminEntity) => ({
 const loadOrderComplaintsByOrderId = async (
   client: Prisma.TransactionClient | PrismaClient,
   orderId: string,
-) => client.complaint.findMany({
-  where: {
-    orderId,
-    deleteAt: null,
-  },
-  include: complaintInclude,
-  orderBy: {
-    createdAt: 'desc',
-  },
-});
+) =>
+  client.complaint.findMany({
+    where: {
+      orderId,
+      deleteAt: null,
+    },
+    include: complaintInclude,
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
 
 const getComplaintAdminSlaMeta = (complaint: Pick<ComplaintEntity, 'status' | 'createdAt'>) => {
-  if (!ACTIVE_COMPLAINT_STATUSES.includes(complaint.status as typeof ACTIVE_COMPLAINT_STATUSES[number])) {
+  if (
+    !ACTIVE_COMPLAINT_STATUSES.includes(
+      complaint.status as (typeof ACTIVE_COMPLAINT_STATUSES)[number],
+    )
+  ) {
     return {
       slaStatus: null,
       slaDeadlineAt: null,
@@ -1028,11 +1119,8 @@ const getComplaintAdminSlaMeta = (complaint: Pick<ComplaintEntity, 'status' | 'c
   const remainingMs = deadline.getTime() - Date.now();
 
   return {
-    slaStatus: remainingMs < 0
-      ? 'OVERDUE'
-      : remainingMs <= COMPLAINT_SLA_WARNING_MS
-        ? 'DUE_SOON'
-        : 'NORMAL',
+    slaStatus:
+      remainingMs < 0 ? 'OVERDUE' : remainingMs <= COMPLAINT_SLA_WARNING_MS ? 'DUE_SOON' : 'NORMAL',
     slaDeadlineAt: deadline,
   };
 };
@@ -1081,7 +1169,9 @@ const buildComplaintAdminSlaWhere = (
   };
 };
 
-const buildComplaintAdminWhere = (filters: ComplaintAdminScopeFilters): Prisma.ComplaintWhereInput => {
+const buildComplaintAdminWhere = (
+  filters: ComplaintAdminScopeFilters,
+): Prisma.ComplaintWhereInput => {
   const keyword = filters.keyword?.trim();
   const slaWhere = buildComplaintAdminSlaWhere(filters.slaStatus);
 
@@ -1094,51 +1184,51 @@ const buildComplaintAdminWhere = (filters: ComplaintAdminScopeFilters): Prisma.C
     AND: slaWhere ? [slaWhere] : undefined,
     OR: keyword
       ? [
-        {
-          description: {
-            contains: keyword,
-          },
-        },
-        {
-          resultSummary: {
-            contains: keyword,
-          },
-        },
-        {
-          order: {
-            orderNo: {
+          {
+            description: {
               contains: keyword,
             },
           },
-        },
-        {
-          order: {
-            owner: {
-              nickname: {
+          {
+            resultSummary: {
+              contains: keyword,
+            },
+          },
+          {
+            order: {
+              orderNo: {
                 contains: keyword,
               },
             },
           },
-        },
-        {
-          order: {
-            caregiver: {
-              user: {
+          {
+            order: {
+              owner: {
                 nickname: {
                   contains: keyword,
                 },
               },
             },
           },
-        },
-        {
-          assignedAdmin: {
-            nickname: {
-              contains: keyword,
+          {
+            order: {
+              caregiver: {
+                user: {
+                  nickname: {
+                    contains: keyword,
+                  },
+                },
+              },
             },
           },
-        },
-      ]
+          {
+            assignedAdmin: {
+              nickname: {
+                contains: keyword,
+              },
+            },
+          },
+        ]
       : undefined,
   };
 };
@@ -1156,42 +1246,46 @@ const toComplaintAdminStatsBaseFilters = (
 const loadAdminComplaintById = async (
   client: Prisma.TransactionClient | PrismaClient,
   complaintId: string,
-) => client.complaint.findFirst({
-  where: {
-    id: complaintId,
-    deleteAt: null,
-  },
-  include: complaintAdminInclude,
-});
+) =>
+  client.complaint.findFirst({
+    where: {
+      id: complaintId,
+      deleteAt: null,
+    },
+    include: complaintAdminInclude,
+  });
 
 const loadComplaintAdminAssignee = async (
   client: Prisma.TransactionClient | PrismaClient,
   assigneeId: string,
-) => client.user.findFirst({
-  where: {
-    id: assigneeId.trim(),
-    deleteAt: null,
-    status: 'ACTIVE',
-    roles: {
-      some: {
-        role: {
-          code: {
-            in: ['super-admin', 'ops-manager'],
+) =>
+  client.user.findFirst({
+    where: {
+      id: assigneeId.trim(),
+      deleteAt: null,
+      status: 'ACTIVE',
+      roles: {
+        some: {
+          role: {
+            code: {
+              in: ['super-admin', 'ops-manager'],
+            },
           },
         },
       },
     },
-  },
-  select: {
-    id: true,
-    nickname: true,
-  },
-});
+    select: {
+      id: true,
+      nickname: true,
+    },
+  });
 
-function assertComplaintUpdatable(complaint: {
-  id: string;
-  status: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
-} | null): asserts complaint is {
+function assertComplaintUpdatable(
+  complaint: {
+    id: string;
+    status: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
+  } | null,
+): asserts complaint is {
   id: string;
   status: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
 } {
@@ -1270,7 +1364,15 @@ const closeComplaintInTransaction = async (
 const buildOwnerRefundProgress = (order: {
   amountPaid: Prisma.Decimal | number;
   amountRefunded: Prisma.Decimal | number;
-  orderStatus: 'PENDING_ACCEPT' | 'ACCEPTED' | 'SERVING' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'PARTIAL_REFUNDED' | 'REFUNDED';
+  orderStatus:
+    | 'PENDING_ACCEPT'
+    | 'ACCEPTED'
+    | 'SERVING'
+    | 'COMPLETED'
+    | 'CANCELLED'
+    | 'DISPUTED'
+    | 'PARTIAL_REFUNDED'
+    | 'REFUNDED';
   refunds: Array<{
     refundNo: string;
     refundAmount: Prisma.Decimal | number;
@@ -1282,14 +1384,16 @@ const buildOwnerRefundProgress = (order: {
 }): OwnerRefundProgressRecord => {
   const refunds = order.refunds;
   const latestRefund = refunds[refunds.length - 1] ?? null;
-  const pendingCount = refunds.filter(item => item.refundStatus === 'PENDING').length;
-  const approvedCount = refunds.filter(item => item.refundStatus === 'APPROVED').length;
-  const successCount = refunds.filter(item => item.refundStatus === 'SUCCESS').length;
-  const rejectedCount = refunds.filter(item => item.refundStatus === 'REJECTED').length;
-  const failedCount = refunds.filter(item => item.refundStatus === 'FAILED').length;
+  const pendingCount = refunds.filter((item) => item.refundStatus === 'PENDING').length;
+  const approvedCount = refunds.filter((item) => item.refundStatus === 'APPROVED').length;
+  const successCount = refunds.filter((item) => item.refundStatus === 'SUCCESS').length;
+  const rejectedCount = refunds.filter((item) => item.refundStatus === 'REJECTED').length;
+  const failedCount = refunds.filter((item) => item.refundStatus === 'FAILED').length;
   const requestedRefundAmount = refunds.reduce((sum, item) => sum + toNumber(item.refundAmount), 0);
   const settledRefundAmount = toNumber(order.amountRefunded);
-  const refundableBalance = Number(Math.max(0, toNumber(order.amountPaid) - settledRefundAmount).toFixed(2));
+  const refundableBalance = Number(
+    Math.max(0, toNumber(order.amountPaid) - settledRefundAmount).toFixed(2),
+  );
 
   let stage: OwnerRefundProgressStage = 'NONE';
   if (approvedCount > 0) {
@@ -1297,7 +1401,10 @@ const buildOwnerRefundProgress = (order: {
   } else if (pendingCount > 0) {
     stage = 'PENDING_REVIEW';
   } else if (successCount > 0) {
-    stage = order.orderStatus === 'REFUNDED' || refundableBalance <= 0 ? 'FULL_SUCCESS' : 'PARTIAL_SUCCESS';
+    stage =
+      order.orderStatus === 'REFUNDED' || refundableBalance <= 0
+        ? 'FULL_SUCCESS'
+        : 'PARTIAL_SUCCESS';
   } else if (latestRefund?.refundStatus === 'REJECTED') {
     stage = 'REJECTED';
   } else if (latestRefund?.refundStatus === 'FAILED') {
@@ -1336,12 +1443,14 @@ const writeCallbackAlertReplayLog = async (input: {
   }
 
   await prisma.callbackAlertReplayLog.createMany({
-    data: outboxIds.map((outboxId) => withSnowflakeId({
-      callbackOutboxId: outboxId,
-      actionType: input.actionType,
-      actorId: input.actorId ?? null,
-      note: input.note ?? null,
-    })),
+    data: outboxIds.map((outboxId) =>
+      withSnowflakeId({
+        callbackOutboxId: outboxId,
+        actionType: input.actionType,
+        actorId: input.actorId ?? null,
+        note: input.note ?? null,
+      }),
+    ),
   });
 };
 
@@ -1368,22 +1477,25 @@ export const petpalService = {
     return toCaregiverProfileRecord(created);
   },
 
-  async upsertCaregiverProfile(userId: string, payload: {
-    intro?: string;
-    experienceYears?: number;
-    serviceRadiusKm?: number;
-    serviceCity?: string;
-    specialtyTags?: string[];
-    serviceCommitment?: string;
-    qualificationMaterials?: Array<{
-      fileId: string;
-      url: string;
-      name: string;
-      mimeType: string;
-      size: number;
-      uploadedAt: Date;
-    }>;
-  }) {
+  async upsertCaregiverProfile(
+    userId: string,
+    payload: {
+      intro?: string;
+      experienceYears?: number;
+      serviceRadiusKm?: number;
+      serviceCity?: string;
+      specialtyTags?: string[];
+      serviceCommitment?: string;
+      qualificationMaterials?: Array<{
+        fileId: string;
+        url: string;
+        name: string;
+        mimeType: string;
+        size: number;
+        uploadedAt: Date;
+      }>;
+    },
+  ) {
     const current = await petpalService.getOrCreateCaregiverProfile(userId);
     const nextAuditStatus = current.auditStatus === 'REJECTED' ? 'PENDING' : current.auditStatus;
 
@@ -1396,9 +1508,7 @@ export const petpalService = {
         experienceYears: payload.experienceYears ?? current.experienceYears,
         serviceRadiusKm: payload.serviceRadiusKm ?? current.serviceRadiusKm,
         serviceCity: payload.serviceCity?.trim() || null,
-        specialtyTags: payload.specialtyTags
-          ? normalizeTagList(payload.specialtyTags)
-          : undefined,
+        specialtyTags: payload.specialtyTags ? normalizeTagList(payload.specialtyTags) : undefined,
         serviceCommitment: payload.serviceCommitment?.trim() || null,
         qualificationMaterials: payload.qualificationMaterials
           ? normalizeQualificationMaterials(payload.qualificationMaterials)
@@ -1407,6 +1517,203 @@ export const petpalService = {
       },
     });
     return toCaregiverProfileRecord(updated);
+  },
+
+  async getCaregiverEarningsSummary(userId: string) {
+    const caregiverProfile = await petpalService.getOrCreateCaregiverProfile(userId);
+    const serviceWhere: Prisma.CaregiverServiceWhereInput = {
+      caregiverId: caregiverProfile.id,
+      deleteAt: null,
+    };
+
+    const [totalServiceCount, activeServiceCount] = await Promise.all([
+      prisma.caregiverService.count({ where: serviceWhere }),
+      prisma.caregiverService.count({
+        where: {
+          ...serviceWhere,
+          isActive: true,
+        },
+      }),
+    ]);
+
+    const profile = {
+      auditStatus: caregiverProfile.auditStatus,
+      ratingAvg: toNumber(caregiverProfile.ratingAvg),
+      ratingCount: caregiverProfile.ratingCount,
+      serviceCity: caregiverProfile.serviceCity,
+      experienceYears: caregiverProfile.experienceYears,
+      serviceRadiusKm: caregiverProfile.serviceRadiusKm,
+    };
+
+    if (caregiverProfile.auditStatus !== 'APPROVED') {
+      return {
+        profile,
+        totals: {
+          totalIncome: 0,
+          recentThirtyDayIncome: 0,
+          averageTicket: 0,
+          refundExposure: 0,
+          completedOrderCount: 0,
+          activeOrderCount: 0,
+          aftersalesOrderCount: 0,
+          aftersalesRiskRate: 0,
+          activeServiceCount,
+          totalServiceCount,
+        },
+        latestActiveOrder: null,
+        recentCompletedOrders: [],
+        serviceRevenueMix: [],
+      };
+    }
+
+    const completedWhere: Prisma.OrderMainWhereInput = {
+      deleteAt: null,
+      caregiverId: caregiverProfile.id,
+      orderStatus: 'COMPLETED',
+    };
+    const recentThirtyDayThreshold = new Date(Date.now() - 30 * DAY_IN_MS);
+    const activeWhere: Prisma.OrderMainWhereInput = {
+      deleteAt: null,
+      caregiverId: caregiverProfile.id,
+      orderStatus: {
+        in: ['PENDING_ACCEPT', 'ACCEPTED', 'SERVING'],
+      },
+    };
+    const aftersalesWhere: Prisma.OrderMainWhereInput = {
+      deleteAt: null,
+      caregiverId: caregiverProfile.id,
+      orderStatus: {
+        in: ['DISPUTED', 'PARTIAL_REFUNDED', 'REFUNDED'],
+      },
+    };
+
+    const [
+      completedOrderCount,
+      completedAggregate,
+      recentThirtyDayAggregate,
+      activeOrderCount,
+      aftersalesRows,
+      serviceRevenueRows,
+      latestActiveOrder,
+      recentCompletedOrders,
+    ] = await Promise.all([
+      prisma.orderMain.count({ where: completedWhere }),
+      prisma.orderMain.aggregate({
+        where: completedWhere,
+        _sum: {
+          amountPaid: true,
+          amountRefunded: true,
+        },
+      }),
+      prisma.orderMain.aggregate({
+        where: {
+          ...completedWhere,
+          appointmentEnd: {
+            gte: recentThirtyDayThreshold,
+          },
+        },
+        _sum: {
+          amountPaid: true,
+          amountRefunded: true,
+        },
+      }),
+      prisma.orderMain.count({ where: activeWhere }),
+      prisma.orderMain.findMany({
+        where: aftersalesWhere,
+        select: {
+          amountPaid: true,
+          amountRefunded: true,
+        },
+      }),
+      prisma.orderMain.groupBy({
+        by: ['serviceType'],
+        where: completedWhere,
+        _count: {
+          _all: true,
+        },
+        _sum: {
+          amountPaid: true,
+          amountRefunded: true,
+        },
+      }),
+      prisma.orderMain.findFirst({
+        where: activeWhere,
+        select: caregiverEarningsOrderSelect,
+        orderBy: [
+          {
+            appointmentStart: 'asc',
+          },
+          {
+            createdAt: 'desc',
+          },
+        ],
+      }),
+      prisma.orderMain.findMany({
+        where: completedWhere,
+        select: caregiverEarningsOrderSelect,
+        orderBy: [
+          {
+            appointmentEnd: 'desc',
+          },
+          {
+            createdAt: 'desc',
+          },
+        ],
+        take: 6,
+      }),
+    ]);
+
+    const totalIncome = calcNetIncome(
+      completedAggregate._sum.amountPaid,
+      completedAggregate._sum.amountRefunded,
+    );
+    const recentThirtyDayIncome = calcNetIncome(
+      recentThirtyDayAggregate._sum.amountPaid,
+      recentThirtyDayAggregate._sum.amountRefunded,
+    );
+    const refundExposure = aftersalesRows.reduce(
+      (sum, row) => sum + calcNetIncome(row.amountPaid, row.amountRefunded),
+      0,
+    );
+    const aftersalesOrderCount = aftersalesRows.length;
+    const averageTicket =
+      completedOrderCount > 0 ? Number((totalIncome / completedOrderCount).toFixed(2)) : 0;
+    const aftersalesRiskRate =
+      completedOrderCount + aftersalesOrderCount > 0
+        ? Number((aftersalesOrderCount / (completedOrderCount + aftersalesOrderCount)).toFixed(4))
+        : 0;
+
+    return {
+      profile,
+      totals: {
+        totalIncome: Number(totalIncome.toFixed(2)),
+        recentThirtyDayIncome: Number(recentThirtyDayIncome.toFixed(2)),
+        averageTicket,
+        refundExposure: Number(refundExposure.toFixed(2)),
+        completedOrderCount,
+        activeOrderCount,
+        aftersalesOrderCount,
+        aftersalesRiskRate,
+        activeServiceCount,
+        totalServiceCount,
+      },
+      latestActiveOrder: latestActiveOrder
+        ? toCaregiverEarningsOrderRecord(latestActiveOrder)
+        : null,
+      recentCompletedOrders: recentCompletedOrders.map(toCaregiverEarningsOrderRecord),
+      serviceRevenueMix: serviceRevenueRows
+        .map((row) => {
+          const revenue = calcNetIncome(row._sum.amountPaid, row._sum.amountRefunded);
+          return {
+            serviceType: row.serviceType,
+            revenue: Number(revenue.toFixed(2)),
+            orderCount: row._count._all,
+            averageTicket: row._count._all > 0 ? Number((revenue / row._count._all).toFixed(2)) : 0,
+            shareRatio: totalIncome > 0 ? Number((revenue / totalIncome).toFixed(4)) : 0,
+          };
+        })
+        .sort((left, right) => Number(right.revenue) - Number(left.revenue)),
+    };
   },
 
   async listCaregiverServices(userId: string) {
@@ -1423,18 +1730,21 @@ export const petpalService = {
     });
   },
 
-  async createCaregiverService(userId: string, payload: {
-    serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
-    petSpecies: 'DOG' | 'CAT' | 'OTHER';
-    pricePerUnit: number;
-    unitType: string;
-    minNoticeHours?: number;
-    availableSlots?: unknown;
-    serviceCity?: string;
-    serviceLat?: number;
-    serviceLng?: number;
-    isActive?: boolean;
-  }) {
+  async createCaregiverService(
+    userId: string,
+    payload: {
+      serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+      petSpecies: 'DOG' | 'CAT' | 'OTHER';
+      pricePerUnit: number;
+      unitType: string;
+      minNoticeHours?: number;
+      availableSlots?: unknown;
+      serviceCity?: string;
+      serviceLat?: number;
+      serviceLng?: number;
+      isActive?: boolean;
+    },
+  ) {
     const profile = await petpalService.getOrCreateCaregiverProfile(userId);
 
     return prisma.caregiverService.create({
@@ -1454,18 +1764,22 @@ export const petpalService = {
     });
   },
 
-  async updateCaregiverService(userId: string, serviceId: string, payload: {
-    serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
-    petSpecies: 'DOG' | 'CAT' | 'OTHER';
-    pricePerUnit: number;
-    unitType: string;
-    minNoticeHours?: number;
-    availableSlots?: unknown;
-    serviceCity?: string;
-    serviceLat?: number;
-    serviceLng?: number;
-    isActive?: boolean;
-  }) {
+  async updateCaregiverService(
+    userId: string,
+    serviceId: string,
+    payload: {
+      serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+      petSpecies: 'DOG' | 'CAT' | 'OTHER';
+      pricePerUnit: number;
+      unitType: string;
+      minNoticeHours?: number;
+      availableSlots?: unknown;
+      serviceCity?: string;
+      serviceLat?: number;
+      serviceLng?: number;
+      isActive?: boolean;
+    },
+  ) {
     const profile = await petpalService.getOrCreateCaregiverProfile(userId);
 
     const existing = await prisma.caregiverService.findFirst({
@@ -1518,7 +1832,10 @@ export const petpalService = {
       throw notFound('Caregiver profile not found');
     }
 
-    if (status === 'APPROVED' && toQualificationMaterials(existing.qualificationMaterials).length === 0) {
+    if (
+      status === 'APPROVED' &&
+      toQualificationMaterials(existing.qualificationMaterials).length === 0
+    ) {
       throw badRequest('Caregiver qualification materials are required before approval');
     }
 
@@ -1546,24 +1863,24 @@ export const petpalService = {
       serviceCity: payload.city?.trim() || undefined,
       OR: payload.keyword?.trim()
         ? [
-          {
-            user: {
-              nickname: {
+            {
+              user: {
+                nickname: {
+                  contains: payload.keyword.trim(),
+                },
+              },
+            },
+            {
+              intro: {
                 contains: payload.keyword.trim(),
               },
             },
-          },
-          {
-            intro: {
-              contains: payload.keyword.trim(),
+            {
+              serviceCommitment: {
+                contains: payload.keyword.trim(),
+              },
             },
-          },
-          {
-            serviceCommitment: {
-              contains: payload.keyword.trim(),
-            },
-          },
-        ]
+          ]
         : undefined,
     };
 
@@ -1596,7 +1913,7 @@ export const petpalService = {
     ]);
 
     return {
-      items: rows.map(item => ({
+      items: rows.map((item) => ({
         id: item.id,
         userId: item.userId,
         nickname: item.user.nickname,
@@ -1626,7 +1943,15 @@ export const petpalService = {
     userId: string;
     page: number;
     pageSize: number;
-    status?: 'PENDING_ACCEPT' | 'ACCEPTED' | 'SERVING' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'PARTIAL_REFUNDED' | 'REFUNDED';
+    status?:
+      | 'PENDING_ACCEPT'
+      | 'ACCEPTED'
+      | 'SERVING'
+      | 'COMPLETED'
+      | 'CANCELLED'
+      | 'DISPUTED'
+      | 'PARTIAL_REFUNDED'
+      | 'REFUNDED';
   }) {
     const caregiverProfile = await getApprovedCaregiverProfile(prisma, payload.userId);
     const where: Prisma.OrderMainWhereInput = {
@@ -1720,24 +2045,27 @@ export const petpalService = {
     return rows.map(toPetProfileRecord);
   },
 
-  async createPet(ownerId: string, payload: {
-    name: string;
-    species: 'DOG' | 'CAT' | 'OTHER';
-    breed?: string;
-    gender?: 'MALE' | 'FEMALE' | 'UNKNOWN';
-    birthday?: Date;
-    weightKg?: number;
-    neutered?: boolean;
-    temperamentTags?: string[];
-    feedingNote?: string;
-    allergyNote?: string;
-    medicalNote?: string;
-    emergencyContact?: {
+  async createPet(
+    ownerId: string,
+    payload: {
       name: string;
-      phone: string;
-      relation?: string;
-    };
-  }) {
+      species: 'DOG' | 'CAT' | 'OTHER';
+      breed?: string;
+      gender?: 'MALE' | 'FEMALE' | 'UNKNOWN';
+      birthday?: Date;
+      weightKg?: number;
+      neutered?: boolean;
+      temperamentTags?: string[];
+      feedingNote?: string;
+      allergyNote?: string;
+      medicalNote?: string;
+      emergencyContact?: {
+        name: string;
+        phone: string;
+        relation?: string;
+      };
+    },
+  ) {
     const pet = await prisma.petProfile.create({
       data: withSnowflakeId({
         ownerId,
@@ -1758,24 +2086,28 @@ export const petpalService = {
     return toPetProfileRecord(pet);
   },
 
-  async updatePet(ownerId: string, petId: string, payload: {
-    name: string;
-    species: 'DOG' | 'CAT' | 'OTHER';
-    breed?: string;
-    gender?: 'MALE' | 'FEMALE' | 'UNKNOWN';
-    birthday?: Date;
-    weightKg?: number;
-    neutered?: boolean;
-    temperamentTags?: string[];
-    feedingNote?: string;
-    allergyNote?: string;
-    medicalNote?: string;
-    emergencyContact?: {
+  async updatePet(
+    ownerId: string,
+    petId: string,
+    payload: {
       name: string;
-      phone: string;
-      relation?: string;
-    };
-  }) {
+      species: 'DOG' | 'CAT' | 'OTHER';
+      breed?: string;
+      gender?: 'MALE' | 'FEMALE' | 'UNKNOWN';
+      birthday?: Date;
+      weightKg?: number;
+      neutered?: boolean;
+      temperamentTags?: string[];
+      feedingNote?: string;
+      allergyNote?: string;
+      medicalNote?: string;
+      emergencyContact?: {
+        name: string;
+        phone: string;
+        relation?: string;
+      };
+    },
+  ) {
     const pet = await prisma.petProfile.findFirst({
       where: {
         id: petId,
@@ -1844,17 +2176,20 @@ export const petpalService = {
     });
   },
 
-  async createRequest(ownerId: string, payload: {
-    petId: string;
-    serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
-    startTime: Date;
-    endTime: Date;
-    locationText: string;
-    locationLat?: number;
-    locationLng?: number;
-    budgetAmount?: number;
-    demandTags?: unknown;
-  }): Promise<ServiceRequest> {
+  async createRequest(
+    ownerId: string,
+    payload: {
+      petId: string;
+      serviceType: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+      startTime: Date;
+      endTime: Date;
+      locationText: string;
+      locationLat?: number;
+      locationLng?: number;
+      budgetAmount?: number;
+      demandTags?: unknown;
+    },
+  ): Promise<ServiceRequest> {
     const pet = await prisma.petProfile.findFirst({
       where: {
         id: payload.petId,
@@ -1884,10 +2219,13 @@ export const petpalService = {
     });
   },
 
-  async createOwnerOrder(ownerId: string, payload: {
-    requestId: string;
-    caregiverServiceId: string;
-  }) {
+  async createOwnerOrder(
+    ownerId: string,
+    payload: {
+      requestId: string;
+      caregiverServiceId: string;
+    },
+  ) {
     return runSerializableTransaction(async (tx) => {
       const requestRecord = await tx.serviceRequest.findFirst({
         where: {
@@ -2064,7 +2402,9 @@ export const petpalService = {
     return orders.map(toOrderRecord);
   },
 
-  async listOwnerTransactionExportRows(filters: OwnerTransactionExportFilters = {}): Promise<OwnerTransactionExportRow[]> {
+  async listOwnerTransactionExportRows(
+    filters: OwnerTransactionExportFilters = {},
+  ): Promise<OwnerTransactionExportRow[]> {
     const actorId = getRequestActorId();
     if (!actorId) {
       throw forbidden('Authentication required');
@@ -2146,9 +2486,9 @@ export const petpalService = {
         amountRefunded,
         netPaid: Number((amountPaid - amountRefunded).toFixed(2)),
         paymentCount: order.payments.length,
-        paymentNos: order.payments.map(item => item.payNo),
+        paymentNos: order.payments.map((item) => item.payNo),
         refundCount: order.refunds.length,
-        refundNos: order.refunds.map(item => item.refundNo),
+        refundNos: order.refunds.map((item) => item.refundNo),
         latestRefundStatus: latestRefund?.refundStatus ?? null,
         latestRefundReviewedAt: latestRefund?.reviewedAt ?? null,
         complaintCount: order.complaints.length,
@@ -2159,7 +2499,9 @@ export const petpalService = {
     });
   },
 
-  async listOwnerRefundExportRows(filters: OwnerRefundExportFilters = {}): Promise<OwnerRefundExportRow[]> {
+  async listOwnerRefundExportRows(
+    filters: OwnerRefundExportFilters = {},
+  ): Promise<OwnerRefundExportRow[]> {
     const actorId = getRequestActorId();
     if (!actorId) {
       throw forbidden('Authentication required');
@@ -2265,7 +2607,7 @@ export const petpalService = {
       });
     });
 
-    return refunds.map(refund => ({
+    return refunds.map((refund) => ({
       orderNo: refund.order.orderNo,
       orderStatus: refund.order.orderStatus,
       serviceType: refund.order.serviceType,
@@ -2284,7 +2626,10 @@ export const petpalService = {
     }));
   },
 
-  async listOwnerOrderRefundExportRows(ownerId: string, orderId: string): Promise<OwnerOrderRefundExportRow[]> {
+  async listOwnerOrderRefundExportRows(
+    ownerId: string,
+    orderId: string,
+  ): Promise<OwnerOrderRefundExportRow[]> {
     const order = await prisma.orderMain.findFirst({
       where: {
         id: orderId,
@@ -2320,7 +2665,7 @@ export const petpalService = {
       throw notFound('Order not found');
     }
 
-    return order.refunds.map(refund => ({
+    return order.refunds.map((refund) => ({
       orderNo: order.orderNo,
       refundNo: refund.refundNo,
       refundType: refund.refundType,
@@ -2363,9 +2708,13 @@ export const petpalService = {
     return toOrderDetailRecord(order);
   },
 
-  async payOwnerOrder(ownerId: string, orderId: string, payload: {
-    payChannel: 'WECHAT_PAY' | 'ALIPAY' | 'BALANCE';
-  }) {
+  async payOwnerOrder(
+    ownerId: string,
+    orderId: string,
+    payload: {
+      payChannel: 'WECHAT_PAY' | 'ALIPAY' | 'BALANCE';
+    },
+  ) {
     return runSerializableTransaction(async (tx) => {
       const order = await tx.orderMain.findFirst({
         where: {
@@ -2393,31 +2742,38 @@ export const petpalService = {
         throw badRequest('Only pending orders can be paid');
       }
 
-      const grossAmount = toRoundedAmount(toNumber(order.amountTotal) + toNumber(order.amountAdjusted));
-      const outstandingAmount = toRoundedAmount(Math.max(0, grossAmount - toNumber(order.amountPaid)));
+      const grossAmount = toRoundedAmount(
+        toNumber(order.amountTotal) + toNumber(order.amountAdjusted),
+      );
+      const outstandingAmount = toRoundedAmount(
+        Math.max(0, grossAmount - toNumber(order.amountPaid)),
+      );
 
       if (outstandingAmount <= 0) {
         return loadOrderDetailById(tx, order.id);
       }
 
-      const reusablePayment = order.payments.find(item => item.payStatus === 'PENDING')
-        ?? order.payments.find(item => item.payStatus === 'FAILED' || item.payStatus === 'CLOSED');
+      const reusablePayment =
+        order.payments.find((item) => item.payStatus === 'PENDING') ??
+        order.payments.find((item) => item.payStatus === 'FAILED' || item.payStatus === 'CLOSED');
 
       const paymentId = reusablePayment
         ? reusablePayment.id
-        : (await tx.paymentRecord.create({
-            data: withSnowflakeId({
-              orderId: order.id,
-              payNo: createPetPalBizNo('PAY'),
-              bizType: 'BALANCE',
-              payChannel: payload.payChannel,
-              payStatus: 'PENDING',
-              payAmount: outstandingAmount,
-            }),
-            select: {
-              id: true,
-            },
-          })).id;
+        : (
+            await tx.paymentRecord.create({
+              data: withSnowflakeId({
+                orderId: order.id,
+                payNo: createPetPalBizNo('PAY'),
+                bizType: 'BALANCE',
+                payChannel: payload.payChannel,
+                payStatus: 'PENDING',
+                payAmount: outstandingAmount,
+              }),
+              select: {
+                id: true,
+              },
+            })
+          ).id;
 
       await tx.paymentRecord.update({
         where: {
@@ -2455,10 +2811,14 @@ export const petpalService = {
     return loadOrderConversationDetail(prisma, orderId);
   },
 
-  async createOrderMessage(userId: string, orderId: string, payload: {
-    content?: string;
-    mediaUrls?: string[];
-  }) {
+  async createOrderMessage(
+    userId: string,
+    orderId: string,
+    payload: {
+      content?: string;
+      mediaUrls?: string[];
+    },
+  ) {
     return runSerializableTransaction(async (tx) => {
       const participant = await loadOrderConversationParticipant(tx, userId, orderId);
       const content = normalizeMessageContent(payload.content);
@@ -2485,25 +2845,26 @@ export const petpalService = {
         where: {
           id: conversation.id,
         },
-        data: participant.actorRole === 'OWNER'
-          ? {
-              updateId: userId,
-              ownerUnreadCount: 0,
-              caregiverUnreadCount: {
-                increment: 1,
+        data:
+          participant.actorRole === 'OWNER'
+            ? {
+                updateId: userId,
+                ownerUnreadCount: 0,
+                caregiverUnreadCount: {
+                  increment: 1,
+                },
+                lastMessageAt: now,
+                lastMessagePreview: buildMessagePreview(content, mediaUrls),
+              }
+            : {
+                updateId: userId,
+                ownerUnreadCount: {
+                  increment: 1,
+                },
+                caregiverUnreadCount: 0,
+                lastMessageAt: now,
+                lastMessagePreview: buildMessagePreview(content, mediaUrls),
               },
-              lastMessageAt: now,
-              lastMessagePreview: buildMessagePreview(content, mediaUrls),
-            }
-          : {
-              updateId: userId,
-              ownerUnreadCount: {
-                increment: 1,
-              },
-              caregiverUnreadCount: 0,
-              lastMessageAt: now,
-              lastMessagePreview: buildMessagePreview(content, mediaUrls),
-            },
       });
 
       return loadOrderConversationDetail(tx, orderId);
@@ -2519,15 +2880,16 @@ export const petpalService = {
         where: {
           id: conversation.id,
         },
-        data: participant.actorRole === 'OWNER'
-          ? {
-              updateId: userId,
-              ownerUnreadCount: 0,
-            }
-          : {
-              updateId: userId,
-              caregiverUnreadCount: 0,
-            },
+        data:
+          participant.actorRole === 'OWNER'
+            ? {
+                updateId: userId,
+                ownerUnreadCount: 0,
+              }
+            : {
+                updateId: userId,
+                caregiverUnreadCount: 0,
+              },
       });
 
       const updated = await tx.orderConversation.findUnique({
@@ -2545,7 +2907,10 @@ export const petpalService = {
     });
   },
 
-  async getOwnerOrderRefundProgress(ownerId: string, orderId: string): Promise<OwnerRefundProgressRecord> {
+  async getOwnerOrderRefundProgress(
+    ownerId: string,
+    orderId: string,
+  ): Promise<OwnerRefundProgressRecord> {
     const order = await prisma.orderMain.findFirst({
       where: {
         id: orderId,
@@ -2630,10 +2995,14 @@ export const petpalService = {
     });
   },
 
-  async checkInCaregiverOrder(userId: string, orderId: string, payload?: {
-    note?: string;
-    geo?: Record<string, unknown>;
-  }) {
+  async checkInCaregiverOrder(
+    userId: string,
+    orderId: string,
+    payload?: {
+      note?: string;
+      geo?: Record<string, unknown>;
+    },
+  ) {
     return runSerializableTransaction(async (tx) => {
       const caregiverProfile = await getApprovedCaregiverProfile(tx, userId);
       const order = await tx.orderMain.findFirst({
@@ -2694,14 +3063,18 @@ export const petpalService = {
     });
   },
 
-  async addCaregiverServiceLog(userId: string, orderId: string, payload: {
-    logType: 'CHECK_IN' | 'FEED' | 'WALK' | 'PLAY' | 'HEALTH' | 'CHECK_OUT' | 'NOTE';
-    textNote?: string;
-    mediaUrls?: string[];
-    geo?: Record<string, unknown>;
-    happenedAt?: Date;
-  }) {
-    if (!payload.textNote?.trim() && !(payload.mediaUrls?.length)) {
+  async addCaregiverServiceLog(
+    userId: string,
+    orderId: string,
+    payload: {
+      logType: 'CHECK_IN' | 'FEED' | 'WALK' | 'PLAY' | 'HEALTH' | 'CHECK_OUT' | 'NOTE';
+      textNote?: string;
+      mediaUrls?: string[];
+      geo?: Record<string, unknown>;
+      happenedAt?: Date;
+    },
+  ) {
+    if (!payload.textNote?.trim() && !payload.mediaUrls?.length) {
       throw badRequest('Service log requires text note or media');
     }
 
@@ -2757,10 +3130,14 @@ export const petpalService = {
     });
   },
 
-  async checkOutCaregiverOrder(userId: string, orderId: string, payload?: {
-    note?: string;
-    geo?: Record<string, unknown>;
-  }) {
+  async checkOutCaregiverOrder(
+    userId: string,
+    orderId: string,
+    payload?: {
+      note?: string;
+      geo?: Record<string, unknown>;
+    },
+  ) {
     return runSerializableTransaction(async (tx) => {
       const caregiverProfile = await getApprovedCaregiverProfile(tx, userId);
       const order = await tx.orderMain.findFirst({
@@ -2869,12 +3246,16 @@ export const petpalService = {
     });
   },
 
-  async createOwnerOrderReview(ownerId: string, orderId: string, payload: {
-    rating: number;
-    tags?: string[];
-    content?: string;
-    isAnonymous?: boolean;
-  }) {
+  async createOwnerOrderReview(
+    ownerId: string,
+    orderId: string,
+    payload: {
+      rating: number;
+      tags?: string[];
+      content?: string;
+      isAnonymous?: boolean;
+    },
+  ) {
     return runSerializableTransaction(async (tx) => {
       const order = await tx.orderMain.findFirst({
         where: {
@@ -2937,7 +3318,8 @@ export const petpalService = {
 
       const currentRatingAvg = toNumber(caregiverProfile.ratingAvg);
       const nextRatingCount = caregiverProfile.ratingCount + 1;
-      const nextRatingAvg = ((currentRatingAvg * caregiverProfile.ratingCount) + payload.rating) / nextRatingCount;
+      const nextRatingAvg =
+        (currentRatingAvg * caregiverProfile.ratingCount + payload.rating) / nextRatingCount;
 
       await tx.caregiverProfile.update({
         where: {
@@ -2973,12 +3355,16 @@ export const petpalService = {
     return complaints.map(toComplaintRecord);
   },
 
-  async createOwnerOrderComplaint(ownerId: string, orderId: string, payload: {
-    targetRole: 'CAREGIVER' | 'PLATFORM';
-    complaintType: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
-    description: string;
-    evidenceUrls?: string[];
-  }) {
+  async createOwnerOrderComplaint(
+    ownerId: string,
+    orderId: string,
+    payload: {
+      targetRole: 'CAREGIVER' | 'PLATFORM';
+      complaintType: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
+      description: string;
+      evidenceUrls?: string[];
+    },
+  ) {
     return runSerializableTransaction(async (tx) => {
       const order = await tx.orderMain.findFirst({
         where: {
@@ -2996,7 +3382,11 @@ export const petpalService = {
         throw notFound('Order not found');
       }
 
-      if (!['SERVING', 'COMPLETED', 'PARTIAL_REFUNDED', 'REFUNDED', 'DISPUTED'].includes(order.orderStatus)) {
+      if (
+        !['SERVING', 'COMPLETED', 'PARTIAL_REFUNDED', 'REFUNDED', 'DISPUTED'].includes(
+          order.orderStatus,
+        )
+      ) {
         throw badRequest('Only serving or settled orders can create complaints');
       }
 
@@ -3105,7 +3495,15 @@ export const petpalService = {
   async queryAdminComplaintStats(filters: ComplaintAdminScopeFilters, actorId: string) {
     const baseFilters = toComplaintAdminStatsBaseFilters(filters);
     const baseWhere = buildComplaintAdminWhere(baseFilters);
-    const [total, statusRows, dueSoonCount, overdueCount, unassignedCount, assignedToMeCount, processingAssignedToMeCount] = await Promise.all([
+    const [
+      total,
+      statusRows,
+      dueSoonCount,
+      overdueCount,
+      unassignedCount,
+      assignedToMeCount,
+      processingAssignedToMeCount,
+    ] = await Promise.all([
       prisma.complaint.count({ where: baseWhere }),
       prisma.complaint.groupBy({
         by: ['status'],
@@ -3159,15 +3557,18 @@ export const petpalService = {
       }),
     ]);
 
-    const byStatus = statusRows.reduce<ComplaintStatusCounter>((accumulator, row) => {
-      accumulator[row.status] = row._count._all;
-      return accumulator;
-    }, {
-      OPEN: 0,
-      PROCESSING: 0,
-      RESOLVED: 0,
-      REJECTED: 0,
-    });
+    const byStatus = statusRows.reduce<ComplaintStatusCounter>(
+      (accumulator, row) => {
+        accumulator[row.status] = row._count._all;
+        return accumulator;
+      },
+      {
+        OPEN: 0,
+        PROCESSING: 0,
+        RESOLVED: 0,
+        REJECTED: 0,
+      },
+    );
 
     return {
       total,
@@ -3191,11 +3592,9 @@ export const petpalService = {
     },
   ) {
     return runSerializableTransaction(async (tx) => {
-      const complaintIds = [...new Set(
-        payload.complaintIds
-          .map(item => item.trim())
-          .filter(Boolean),
-      )];
+      const complaintIds = [
+        ...new Set(payload.complaintIds.map((item) => item.trim()).filter(Boolean)),
+      ];
 
       if (complaintIds.length === 0) {
         throw badRequest('Complaint ids are required');
@@ -3226,7 +3625,7 @@ export const petpalService = {
       complaints.forEach(assertComplaintUpdatable);
 
       for (const complaintId of complaintIds) {
-        const complaint = complaints.find(item => item.id === complaintId)!;
+        const complaint = complaints.find((item) => item.id === complaintId)!;
         await assignComplaintInTransaction(tx, {
           complaintId,
           actorId,
@@ -3246,13 +3645,13 @@ export const petpalService = {
         include: complaintAdminInclude,
       });
 
-      const complaintMap = new Map(updatedComplaints.map(item => [item.id, item]));
+      const complaintMap = new Map(updatedComplaints.map((item) => [item.id, item]));
 
       return {
         requestedCount: complaintIds.length,
         updatedCount: updatedComplaints.length,
         items: complaintIds
-          .map(id => complaintMap.get(id))
+          .map((id) => complaintMap.get(id))
           .filter((item): item is ComplaintAdminEntity => Boolean(item))
           .map(toComplaintAdminRecord),
       };
@@ -3268,11 +3667,9 @@ export const petpalService = {
     },
   ) {
     return runSerializableTransaction(async (tx) => {
-      const complaintIds = [...new Set(
-        payload.complaintIds
-          .map(item => item.trim())
-          .filter(Boolean),
-      )];
+      const complaintIds = [
+        ...new Set(payload.complaintIds.map((item) => item.trim()).filter(Boolean)),
+      ];
 
       if (complaintIds.length === 0) {
         throw badRequest('Complaint ids are required');
@@ -3304,7 +3701,7 @@ export const petpalService = {
       complaints.forEach(assertComplaintUpdatable);
 
       for (const complaintId of complaintIds) {
-        const complaint = complaints.find(item => item.id === complaintId)!;
+        const complaint = complaints.find((item) => item.id === complaintId)!;
         await closeComplaintInTransaction(tx, {
           complaintId,
           actorId,
@@ -3324,13 +3721,13 @@ export const petpalService = {
         include: complaintAdminInclude,
       });
 
-      const complaintMap = new Map(updatedComplaints.map(item => [item.id, item]));
+      const complaintMap = new Map(updatedComplaints.map((item) => [item.id, item]));
 
       return {
         requestedCount: complaintIds.length,
         updatedCount: updatedComplaints.length,
         items: complaintIds
-          .map(id => complaintMap.get(id))
+          .map((id) => complaintMap.get(id))
           .filter((item): item is ComplaintAdminEntity => Boolean(item))
           .map(toComplaintAdminRecord),
       };
@@ -3482,12 +3879,10 @@ export const petpalService = {
     const rows = services.map((service) => {
       const serviceLat = service.serviceLat == null ? null : Number(service.serviceLat);
       const serviceLng = service.serviceLng == null ? null : Number(service.serviceLng);
-      const distanceKm = payload.lat != null
-        && payload.lng != null
-        && serviceLat != null
-        && serviceLng != null
-        ? calcDistanceKm(payload.lat, payload.lng, serviceLat, serviceLng)
-        : null;
+      const distanceKm =
+        payload.lat != null && payload.lng != null && serviceLat != null && serviceLng != null
+          ? calcDistanceKm(payload.lat, payload.lng, serviceLat, serviceLng)
+          : null;
 
       return {
         serviceId: service.id,
@@ -3568,7 +3963,7 @@ export const petpalService = {
 
       if (payment.payStatus === 'PAID') {
         const idempotent = payment.channelTxnId === payload.channelTxnId;
-        
+
         // Create audit record for retry/idempotent callback if auditInfo is provided
         if (payload.auditInfo) {
           const callbackAudit = await tx.callbackAudit.create({
@@ -3600,7 +3995,7 @@ export const petpalService = {
             });
           }
         }
-        
+
         return {
           idempotent,
           paymentId: payment.id,
@@ -3610,9 +4005,10 @@ export const petpalService = {
       }
 
       const nextStatus = payload.success ? 'PAID' : 'FAILED';
-      const nextPaidAmount = payload.success && payload.paidAmount != null
-        ? payload.paidAmount
-        : toNumber(payment.payAmount);
+      const nextPaidAmount =
+        payload.success && payload.paidAmount != null
+          ? payload.paidAmount
+          : toNumber(payment.payAmount);
 
       await tx.paymentRecord.update({
         where: {
@@ -3699,13 +4095,17 @@ export const petpalService = {
 
       const amountPaid = paidRows.reduce((sum, row) => sum + toNumber(row.payAmount), 0);
       const amountRefunded = refundedRows.reduce((sum, row) => sum + toNumber(row.refundAmount), 0);
-      const required = toNumber(order.amountTotal) + toNumber(order.amountAdjusted) - amountRefunded;
+      const required =
+        toNumber(order.amountTotal) + toNumber(order.amountAdjusted) - amountRefunded;
 
-      const nextOrderStatus = amountRefunded > 0
-        ? (amountRefunded >= toNumber(order.amountTotal) + toNumber(order.amountAdjusted)
-          ? 'REFUNDED'
-          : 'PARTIAL_REFUNDED')
-        : (amountPaid >= required ? 'ACCEPTED' : order.orderStatus);
+      const nextOrderStatus =
+        amountRefunded > 0
+          ? amountRefunded >= toNumber(order.amountTotal) + toNumber(order.amountAdjusted)
+            ? 'REFUNDED'
+            : 'PARTIAL_REFUNDED'
+          : amountPaid >= required
+            ? 'ACCEPTED'
+            : order.orderStatus;
 
       await tx.orderMain.update({
         where: {
@@ -3761,7 +4161,7 @@ export const petpalService = {
 
       if (refund.refundStatus === 'SUCCESS') {
         const idempotent = refund.channelRefundId === payload.channelRefundId;
-        
+
         // Create audit record for retry/idempotent callback if auditInfo is provided
         if (payload.auditInfo) {
           const callbackAudit = await tx.callbackAudit.create({
@@ -3793,7 +4193,7 @@ export const petpalService = {
             });
           }
         }
-        
+
         return {
           idempotent,
           refundId: refund.id,
@@ -3887,9 +4287,12 @@ export const petpalService = {
       const amountRefunded = refundedRows.reduce((sum, row) => sum + toNumber(row.refundAmount), 0);
       const gross = toNumber(order.amountTotal) + toNumber(order.amountAdjusted);
 
-      const nextOrderStatus = amountRefunded > 0
-        ? (amountRefunded >= gross ? 'REFUNDED' : 'PARTIAL_REFUNDED')
-        : order.orderStatus;
+      const nextOrderStatus =
+        amountRefunded > 0
+          ? amountRefunded >= gross
+            ? 'REFUNDED'
+            : 'PARTIAL_REFUNDED'
+          : order.orderStatus;
 
       await tx.orderMain.update({
         where: {
@@ -3974,12 +4377,7 @@ export const petpalService = {
   async queryCallbackAuditStats(filters: CallbackAuditQueryFilters) {
     const where = buildCallbackAuditWhere(filters);
 
-    const [
-      total,
-      byStatusRows,
-      byTypeRows,
-      bySourceModeRows,
-    ] = await Promise.all([
+    const [total, byStatusRows, byTypeRows, bySourceModeRows] = await Promise.all([
       prisma.callbackAudit.count({ where }),
       prisma.callbackAudit.groupBy({
         by: ['callbackStatus'],
@@ -4109,7 +4507,10 @@ export const petpalService = {
 
   async queryCallbackAlertOutboxStats(filters: CallbackAlertOutboxQueryFilters) {
     const where = buildCallbackAlertOutboxWhere(filters);
-    const processingTimeoutMinutes = Math.min(240, Math.max(1, filters.processingTimeoutMinutes ?? 10));
+    const processingTimeoutMinutes = Math.min(
+      240,
+      Math.max(1, filters.processingTimeoutMinutes ?? 10),
+    );
     const processingTimeoutAt = new Date(Date.now() - processingTimeoutMinutes * 60_000);
     const [total, statusRows, oldestPending, oldestDead, stuckProcessingCount] = await Promise.all([
       prisma.callbackAlertOutbox.count({ where }),
@@ -4239,7 +4640,7 @@ export const petpalService = {
       },
     });
 
-    const ids = deadRows.map(item => item.id);
+    const ids = deadRows.map((item) => item.id);
     if (!ids.length) {
       return {
         requested: take,
@@ -4422,18 +4823,19 @@ export const petpalService = {
       byAction[row.actionType as 'REQUEUE' | 'REQUEUE_DEAD_BATCH'] = row._count._all;
     });
 
-    const batchReplayRatio = total > 0
-      ? Number((byAction.REQUEUE_DEAD_BATCH / total).toFixed(4))
-      : 0;
+    const batchReplayRatio =
+      total > 0 ? Number((byAction.REQUEUE_DEAD_BATCH / total).toFixed(4)) : 0;
     const dominanceThreshold = Number((filters?.dominanceThreshold ?? 0.7).toFixed(4));
     const dominanceMinSamples = filters?.dominanceMinSamples ?? 5;
-    const isBatchReplayDominant = total >= dominanceMinSamples && batchReplayRatio >= dominanceThreshold;
+    const isBatchReplayDominant =
+      total >= dominanceMinSamples && batchReplayRatio >= dominanceThreshold;
     const staleThresholdMinutes = filters?.staleThresholdMinutes ?? 30;
     const latestReplayAt = latestReplay?.createdAt.toISOString() ?? null;
     const minutesSinceLastReplay = latestReplay
       ? Math.floor((Date.now() - latestReplay.createdAt.getTime()) / 60000)
       : null;
-    const isReplayStale = minutesSinceLastReplay !== null && minutesSinceLastReplay >= staleThresholdMinutes;
+    const isReplayStale =
+      minutesSinceLastReplay !== null && minutesSinceLastReplay >= staleThresholdMinutes;
 
     return {
       total,

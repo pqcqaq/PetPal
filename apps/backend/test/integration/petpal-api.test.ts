@@ -166,7 +166,9 @@ describe('PetPal API integration', () => {
       .expect(200);
 
     assert.ok(
-      listRequestsResponse.body.data.some((item: { id: string }) => item.id === createRequestResponse.body.data.id),
+      listRequestsResponse.body.data.some(
+        (item: { id: string }) => item.id === createRequestResponse.body.data.id,
+      ),
     );
   });
 
@@ -259,7 +261,11 @@ describe('PetPal API integration', () => {
       Number(payResponse.body.data.amountPaid),
       Number(payResponse.body.data.amountTotal) + Number(payResponse.body.data.amountAdjusted),
     );
-    assert.ok(payResponse.body.data.payments.some((item: { payStatus: string }) => item.payStatus === 'PAID'));
+    assert.ok(
+      payResponse.body.data.payments.some(
+        (item: { payStatus: string }) => item.payStatus === 'PAID',
+      ),
+    );
 
     const persistedPayment = await prisma.paymentRecord.findFirst({
       where: {
@@ -413,7 +419,11 @@ describe('PetPal API integration', () => {
     assert.equal(matchResponse.body.data.items[0].intro, '5 年宠物照料经验，擅长犬猫日常照料。');
     assert.equal(matchResponse.body.data.items[0].experienceYears, 5);
     assert.equal(matchResponse.body.data.items[0].serviceRadiusKm, 8);
-    assert.deepEqual(matchResponse.body.data.items[0].specialtyTags, ['犬类社交', '幼宠适应', '上门喂养']);
+    assert.deepEqual(matchResponse.body.data.items[0].specialtyTags, [
+      '犬类社交',
+      '幼宠适应',
+      '上门喂养',
+    ]);
     assert.equal(
       matchResponse.body.data.items[0].serviceCommitment,
       '支持每日图文反馈，紧急情况 10 分钟内联系主人。',
@@ -558,7 +568,10 @@ describe('PetPal API integration', () => {
       '2 小时内响应，异常情况 10 分钟内同步给主人',
     );
     assert.equal(enrichedProfileResponse.body.data.qualificationMaterials.length, 1);
-    assert.equal(enrichedProfileResponse.body.data.qualificationMaterials[0].fileId, 'file-qualification-1');
+    assert.equal(
+      enrichedProfileResponse.body.data.qualificationMaterials[0].fileId,
+      'file-qualification-1',
+    );
     assert.equal(
       enrichedProfileResponse.body.data.qualificationMaterials[0].uploadedAt,
       qualificationUploadedAt,
@@ -588,23 +601,305 @@ describe('PetPal API integration', () => {
 
     assert.ok(approvedCaregiver);
     assert.deepEqual(approvedCaregiver.specialtyTags, ['幼宠', '猫咪', '上门照护']);
-    assert.equal(
-      approvedCaregiver.serviceCommitment,
-      '2 小时内响应，异常情况 10 分钟内同步给主人',
-    );
+    assert.equal(approvedCaregiver.serviceCommitment, '2 小时内响应，异常情况 10 分钟内同步给主人');
     assert.equal(approvedCaregiver.qualificationMaterialCount, 1);
     assert.equal(approvedCaregiver.qualificationMaterials[0].fileId, 'file-qualification-1');
   });
 
+  it('returns empty caregiver earnings summary before approval', async () => {
+    const { app } = context;
+    const memberSession = await loginAs(app, 'user', 'User123!');
+
+    const summaryResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings-summary')
+      .set('Authorization', `Bearer ${memberSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(summaryResponse.body.data.profile.auditStatus, 'PENDING');
+    assert.equal(summaryResponse.body.data.totals.totalIncome, 0);
+    assert.equal(summaryResponse.body.data.totals.recentThirtyDayIncome, 0);
+    assert.equal(summaryResponse.body.data.totals.averageTicket, 0);
+    assert.equal(summaryResponse.body.data.totals.refundExposure, 0);
+    assert.equal(summaryResponse.body.data.totals.completedOrderCount, 0);
+    assert.equal(summaryResponse.body.data.totals.activeOrderCount, 0);
+    assert.equal(summaryResponse.body.data.totals.aftersalesOrderCount, 0);
+    assert.equal(summaryResponse.body.data.totals.aftersalesRiskRate, 0);
+    assert.equal(summaryResponse.body.data.totals.activeServiceCount, 0);
+    assert.equal(summaryResponse.body.data.totals.totalServiceCount, 0);
+    assert.equal(summaryResponse.body.data.latestActiveOrder, null);
+    assert.deepEqual(summaryResponse.body.data.recentCompletedOrders, []);
+    assert.deepEqual(summaryResponse.body.data.serviceRevenueMix, []);
+  });
+
+  it('supports caregiver earnings summary aggregation', async () => {
+    const { app, prisma } = context;
+    const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
+    const ownerSession = await loginAs(app, 'user', 'User123!');
+
+    const caregiverProfileResponse = await request(app)
+      .get('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    await prisma.caregiverProfile.update({
+      where: {
+        id: caregiverProfileResponse.body.data.id,
+      },
+      data: {
+        auditStatus: 'APPROVED',
+        serviceCity: '杭州',
+        experienceYears: 6,
+        serviceRadiusKm: 10,
+      },
+    });
+
+    const baselineResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings-summary')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    const ownerPet = await prisma.petProfile.findFirst({
+      where: {
+        ownerId: ownerSession.user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    assert.ok(ownerPet);
+
+    await request(app)
+      .post('/api/petpal/caregiver/services')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .send({
+        serviceType: 'WALKING',
+        petSpecies: 'DOG',
+        pricePerUnit: 68,
+        unitType: 'HOUR',
+        minNoticeHours: 4,
+        availableSlots: [{ day: 'SAT', windows: ['08:00-12:00'] }],
+        serviceCity: '杭州',
+        serviceLat: 30.206,
+        serviceLng: 120.211,
+        isActive: true,
+      })
+      .expect(200);
+
+    await request(app)
+      .post('/api/petpal/caregiver/services')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .send({
+        serviceType: 'FEEDING',
+        petSpecies: 'CAT',
+        pricePerUnit: 45,
+        unitType: 'TIME',
+        minNoticeHours: 2,
+        availableSlots: [{ day: 'SUN', windows: ['18:00-21:00'] }],
+        serviceCity: '杭州',
+        serviceLat: 30.208,
+        serviceLng: 120.215,
+        isActive: false,
+      })
+      .expect(200);
+
+    const suffix = Date.now().toString(36);
+    const createRequest = async (
+      key: string,
+      serviceType: 'WALKING' | 'FEEDING' | 'DOOR_VISIT' | 'BOARDING',
+      startTime: Date,
+      endTime: Date,
+    ) =>
+      prisma.serviceRequest.create({
+        data: {
+          id: `req-earnings-${key}-${suffix}`,
+          ownerId: ownerSession.user.id,
+          petId: ownerPet.id,
+          serviceType,
+          startTime,
+          endTime,
+          locationText: `杭州市滨江区-${key}`,
+          locationLat: 30.206,
+          locationLng: 120.211,
+          budgetAmount: 88,
+          demandTags: [key],
+          status: 'MATCHED',
+          matchedCaregiverId: caregiverProfileResponse.body.data.id,
+        },
+      });
+
+    const recentCompletedRequest = await createRequest(
+      'recent',
+      'WALKING',
+      new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000),
+    );
+    const olderCompletedRequest = await createRequest(
+      'older',
+      'FEEDING',
+      new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
+      new Date(Date.now() - 45 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000),
+    );
+    const activeRequest = await createRequest(
+      'active',
+      'DOOR_VISIT',
+      new Date('2000-01-01T08:00:00.000Z'),
+      new Date('2000-01-01T09:00:00.000Z'),
+    );
+    const aftersalesRequest = await createRequest(
+      'aftersales',
+      'BOARDING',
+      new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+    );
+
+    const recentCompletedOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earnings-recent-${suffix}`,
+        orderNo: `PP-EARN-R-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: recentCompletedRequest.id,
+        serviceType: 'WALKING',
+        appointmentStart: recentCompletedRequest.startTime,
+        appointmentEnd: recentCompletedRequest.endTime,
+        amountTotal: 120,
+        amountAdjusted: 0,
+        amountPaid: 120,
+        amountRefunded: 20,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date(),
+      },
+    });
+
+    await prisma.orderMain.create({
+      data: {
+        id: `order-earnings-older-${suffix}`,
+        orderNo: `PP-EARN-O-${Date.now() + 1}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: olderCompletedRequest.id,
+        serviceType: 'FEEDING',
+        appointmentStart: olderCompletedRequest.startTime,
+        appointmentEnd: olderCompletedRequest.endTime,
+        amountTotal: 80,
+        amountAdjusted: 0,
+        amountPaid: 80,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date(),
+      },
+    });
+
+    const activeOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earnings-active-${suffix}`,
+        orderNo: `PP-EARN-A-${Date.now() + 2}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: activeRequest.id,
+        serviceType: 'DOOR_VISIT',
+        appointmentStart: activeRequest.startTime,
+        appointmentEnd: activeRequest.endTime,
+        amountTotal: 90,
+        amountAdjusted: 0,
+        amountPaid: 90,
+        amountRefunded: 0,
+        orderStatus: 'SERVING',
+      },
+    });
+
+    await prisma.orderMain.create({
+      data: {
+        id: `order-earnings-aftersales-${suffix}`,
+        orderNo: `PP-EARN-S-${Date.now() + 3}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: aftersalesRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: aftersalesRequest.startTime,
+        appointmentEnd: aftersalesRequest.endTime,
+        amountTotal: 150,
+        amountAdjusted: 0,
+        amountPaid: 150,
+        amountRefunded: 40,
+        orderStatus: 'PARTIAL_REFUNDED',
+        closedAt: new Date(),
+      },
+    });
+
+    const summaryResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings-summary')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    const baselineTotals = baselineResponse.body.data.totals;
+    const totals = summaryResponse.body.data.totals;
+    const baselineMix = new Map<string, { revenue: number; orderCount: number }>(
+      baselineResponse.body.data.serviceRevenueMix.map(
+        (item: { serviceType: string; revenue: number; orderCount: number }) => [
+          item.serviceType,
+          { revenue: Number(item.revenue), orderCount: item.orderCount },
+        ],
+      ),
+    );
+    const currentMix = new Map<string, { revenue: number; orderCount: number }>(
+      summaryResponse.body.data.serviceRevenueMix.map(
+        (item: { serviceType: string; revenue: number; orderCount: number }) => [
+          item.serviceType,
+          { revenue: Number(item.revenue), orderCount: item.orderCount },
+        ],
+      ),
+    );
+
+    assert.equal(Number(totals.totalIncome) - Number(baselineTotals.totalIncome), 180);
+    assert.equal(
+      Number(totals.recentThirtyDayIncome) - Number(baselineTotals.recentThirtyDayIncome),
+      100,
+    );
+    assert.equal(totals.completedOrderCount - baselineTotals.completedOrderCount, 2);
+    assert.equal(totals.activeOrderCount - baselineTotals.activeOrderCount, 1);
+    assert.equal(totals.aftersalesOrderCount - baselineTotals.aftersalesOrderCount, 1);
+    assert.equal(Number(totals.refundExposure) - Number(baselineTotals.refundExposure), 110);
+    assert.equal(totals.totalServiceCount - baselineTotals.totalServiceCount, 2);
+    assert.equal(totals.activeServiceCount - baselineTotals.activeServiceCount, 1);
+    assert.equal(
+      Number(totals.aftersalesRiskRate),
+      Number(
+        (
+          totals.aftersalesOrderCount /
+          (totals.completedOrderCount + totals.aftersalesOrderCount)
+        ).toFixed(4),
+      ),
+    );
+    assert.equal(summaryResponse.body.data.latestActiveOrder.id, activeOrder.id);
+    assert.ok(
+      summaryResponse.body.data.recentCompletedOrders.some(
+        (item: { id: string; orderNo: string }) =>
+          item.id === recentCompletedOrder.id && item.orderNo === recentCompletedOrder.orderNo,
+      ),
+    );
+    assert.equal(
+      (currentMix.get('WALKING')?.revenue ?? 0) - (baselineMix.get('WALKING')?.revenue ?? 0),
+      100,
+    );
+    assert.equal(
+      (currentMix.get('WALKING')?.orderCount ?? 0) - (baselineMix.get('WALKING')?.orderCount ?? 0),
+      1,
+    );
+    assert.equal(
+      (currentMix.get('FEEDING')?.revenue ?? 0) - (baselineMix.get('FEEDING')?.revenue ?? 0),
+      80,
+    );
+    assert.equal(
+      (currentMix.get('FEEDING')?.orderCount ?? 0) - (baselineMix.get('FEEDING')?.orderCount ?? 0),
+      1,
+    );
+  });
+
   it('supports caregiver fulfillment actions and owner completion workflow', async () => {
-    const {
-      app,
-      prisma,
-      ownerSession,
-      caregiverSession,
-      caregiverProfile,
-      order,
-    } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverSession, caregiverProfile, order } =
+      await createFulfillmentScenario();
 
     const caregiverOrdersResponse = await request(app)
       .get('/api/petpal/caregiver/orders')
@@ -613,9 +908,7 @@ describe('PetPal API integration', () => {
       .expect(200);
 
     assert.ok(
-      caregiverOrdersResponse.body.data.items.some(
-        (item: { id: string }) => item.id === order.id,
-      ),
+      caregiverOrdersResponse.body.data.items.some((item: { id: string }) => item.id === order.id),
     );
 
     const acceptResponse = await request(app)
@@ -671,15 +964,16 @@ describe('PetPal API integration', () => {
     );
     assert.ok(
       addLogResponse.body.data.serviceLogs.some(
-        (item: { logType: string; textNote: string; mediaUrls: string[] }) => item.logType === 'NOTE'
-          && item.textNote.includes('30 分钟遛狗'),
+        (item: { logType: string; textNote: string; mediaUrls: string[] }) =>
+          item.logType === 'NOTE' && item.textNote.includes('30 分钟遛狗'),
       ),
     );
     assert.ok(
       addLogResponse.body.data.serviceLogs.some(
-        (item: { logType: string; mediaUrls: string[] }) => item.logType === 'NOTE'
-          && item.mediaUrls.includes('https://static.example.test/petpal/service-log-1.jpg')
-          && item.mediaUrls.includes('https://static.example.test/petpal/service-log-2.mp4'),
+        (item: { logType: string; mediaUrls: string[] }) =>
+          item.logType === 'NOTE' &&
+          item.mediaUrls.includes('https://static.example.test/petpal/service-log-1.jpg') &&
+          item.mediaUrls.includes('https://static.example.test/petpal/service-log-2.mp4'),
       ),
     );
 
@@ -734,15 +1028,16 @@ describe('PetPal API integration', () => {
     );
     assert.ok(
       ownerDetailResponse.body.data.serviceLogs.some(
-        (item: { logType: string; textNote: string | null; mediaUrls: string[] }) => item.logType === 'NOTE'
-          && item.textNote?.includes('30 分钟遛狗'),
+        (item: { logType: string; textNote: string | null; mediaUrls: string[] }) =>
+          item.logType === 'NOTE' && item.textNote?.includes('30 分钟遛狗'),
       ),
     );
     assert.ok(
       ownerDetailResponse.body.data.serviceLogs.some(
-        (item: { logType: string; mediaUrls: string[] }) => item.logType === 'NOTE'
-          && item.mediaUrls.includes('https://static.example.test/petpal/service-log-1.jpg')
-          && item.mediaUrls.includes('https://static.example.test/petpal/service-log-2.mp4'),
+        (item: { logType: string; mediaUrls: string[] }) =>
+          item.logType === 'NOTE' &&
+          item.mediaUrls.includes('https://static.example.test/petpal/service-log-1.jpg') &&
+          item.mediaUrls.includes('https://static.example.test/petpal/service-log-2.mp4'),
       ),
     );
     assert.ok(
@@ -793,9 +1088,7 @@ describe('PetPal API integration', () => {
         targetRole: 'CAREGIVER',
         complaintType: 'SERVICE',
         description: '服务完成后发现沟通与交付细节存在争议，希望平台介入核查',
-        evidenceUrls: [
-          'https://static.example.test/petpal/complaint-1.jpg',
-        ],
+        evidenceUrls: ['https://static.example.test/petpal/complaint-1.jpg'],
       })
       .expect(200);
 
@@ -815,7 +1108,10 @@ describe('PetPal API integration', () => {
       })
       .expect(400);
 
-    assert.equal(duplicateComplaintResponse.body.message, 'Active complaint already exists for order');
+    assert.equal(
+      duplicateComplaintResponse.body.message,
+      'Active complaint already exists for order',
+    );
 
     const complaintListResponse = await request(app)
       .get(`/api/petpal/orders/${order.id}/complaints`)
@@ -854,8 +1150,8 @@ describe('PetPal API integration', () => {
       Number(persistedCaregiverProfile.ratingAvg),
       Number(
         (
-          ((Number(caregiverProfile.ratingAvg) * caregiverProfile.ratingCount) + 5)
-          / (caregiverProfile.ratingCount + 1)
+          (Number(caregiverProfile.ratingAvg) * caregiverProfile.ratingCount + 5) /
+          (caregiverProfile.ratingCount + 1)
         ).toFixed(2),
       ),
     );
@@ -882,12 +1178,7 @@ describe('PetPal API integration', () => {
   });
 
   it('supports order messaging loop for owner and caregiver participants', async () => {
-    const {
-      app,
-      ownerSession,
-      caregiverSession,
-      order,
-    } = await createFulfillmentScenario();
+    const { app, ownerSession, caregiverSession, order } = await createFulfillmentScenario();
 
     const ownerSendResponse = await request(app)
       .post(`/api/petpal/orders/${order.id}/messages`)
@@ -926,10 +1217,9 @@ describe('PetPal API integration', () => {
 
     assert.equal(caregiverMessagesResponse.body.data.messages.length, 1);
     assert.equal(caregiverMessagesResponse.body.data.messages[0].senderRole, 'OWNER');
-    assert.deepEqual(
-      caregiverMessagesResponse.body.data.messages[0].mediaUrls,
-      ['https://static.example.test/petpal/order-message-1.jpg'],
-    );
+    assert.deepEqual(caregiverMessagesResponse.body.data.messages[0].mediaUrls, [
+      'https://static.example.test/petpal/order-message-1.jpg',
+    ]);
     assert.equal(caregiverMessagesResponse.body.data.caregiverUnreadCount, 1);
 
     const caregiverReadResponse = await request(app)
@@ -994,13 +1284,8 @@ describe('PetPal API integration', () => {
   });
 
   it('rejects unapproved caregivers and unrelated caregivers from fulfillment access', async () => {
-    const {
-      app,
-      prisma,
-      caregiverSession,
-      caregiverProfile,
-      order,
-    } = await createFulfillmentScenario();
+    const { app, prisma, caregiverSession, caregiverProfile, order } =
+      await createFulfillmentScenario();
 
     await prisma.caregiverProfile.update({
       where: {
@@ -1067,19 +1352,17 @@ describe('PetPal API integration', () => {
   });
 
   it('rejects invalid fulfillment transitions and malformed service logs', async () => {
-    const {
-      app,
-      ownerSession,
-      caregiverSession,
-      order,
-    } = await createFulfillmentScenario();
+    const { app, ownerSession, caregiverSession, order } = await createFulfillmentScenario();
 
     const earlyConfirmResponse = await request(app)
       .post(`/api/petpal/orders/${order.id}/confirm-complete`)
       .set('Authorization', `Bearer ${ownerSession.tokens.accessToken}`)
       .expect(400);
 
-    assert.equal(earlyConfirmResponse.body.message, 'Only serving orders can be completed by owner');
+    assert.equal(
+      earlyConfirmResponse.body.message,
+      'Only serving orders can be completed by owner',
+    );
 
     const earlyCheckoutResponse = await request(app)
       .post(`/api/petpal/caregiver/orders/${order.id}/check-out`)
@@ -1123,7 +1406,10 @@ describe('PetPal API integration', () => {
       })
       .expect(400);
 
-    assert.equal(earlyComplaintResponse.body.message, 'Only serving or settled orders can create complaints');
+    assert.equal(
+      earlyComplaintResponse.body.message,
+      'Only serving or settled orders can create complaints',
+    );
 
     await request(app)
       .post(`/api/petpal/caregiver/orders/${order.id}/accept`)
@@ -1149,12 +1435,7 @@ describe('PetPal API integration', () => {
   });
 
   it('allows owner to export transaction records within the recent year window', async () => {
-    const {
-      app,
-      prisma,
-      ownerSession,
-      caregiverProfile,
-    } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverProfile } = await createFulfillmentScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
 
     const foreignOrder = await prisma.orderMain.create({
@@ -1213,7 +1494,7 @@ describe('PetPal API integration', () => {
     });
 
     assert.equal(exportedOrders.length, exportedOrderNos.length);
-    assert.ok(exportedOrders.every(item => item.ownerId === ownerSession.user.id));
+    assert.ok(exportedOrders.every((item) => item.ownerId === ownerSession.user.id));
 
     const oversizeRangeResponse = await request(app)
       .get('/api/petpal/orders/transactions/export')
@@ -1228,13 +1509,8 @@ describe('PetPal API integration', () => {
   });
 
   it('allows owner to export refund detail rows for the current order only', async () => {
-    const {
-      app,
-      prisma,
-      ownerSession,
-      caregiverProfile,
-      order,
-    } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverProfile, order } =
+      await createFulfillmentScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
     const suffix = Date.now().toString(36);
 
@@ -1326,7 +1602,7 @@ describe('PetPal API integration', () => {
       (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
     ).filter(Boolean);
 
-    assert.ok(exportedOrderNos.every(item => item === order.orderNo));
+    assert.ok(exportedOrderNos.every((item) => item === order.orderNo));
 
     const foreignResponse = await request(app)
       .get(`/api/petpal/orders/${foreignOrder.id}/refunds/export`)
@@ -1337,13 +1613,8 @@ describe('PetPal API integration', () => {
   });
 
   it('allows owner to export refund detail rows within the recent year window', async () => {
-    const {
-      app,
-      prisma,
-      ownerSession,
-      caregiverProfile,
-      order,
-    } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverProfile, order } =
+      await createFulfillmentScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
     const suffix = Date.now().toString(36);
 
@@ -1472,7 +1743,7 @@ describe('PetPal API integration', () => {
     });
 
     assert.equal(exportedOrders.length, exportedOrderNos.length);
-    assert.ok(exportedOrders.every(item => item.ownerId === ownerSession.user.id));
+    assert.ok(exportedOrders.every((item) => item.ownerId === ownerSession.user.id));
 
     const oversizeRangeResponse = await request(app)
       .get('/api/petpal/orders/refunds/export')
@@ -1487,13 +1758,8 @@ describe('PetPal API integration', () => {
   });
 
   it('filters owner refund export by date range and refund status', async () => {
-    const {
-      app,
-      prisma,
-      ownerSession,
-      caregiverProfile,
-      order,
-    } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverProfile, order } =
+      await createFulfillmentScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
     const suffix = Date.now().toString(36);
 
@@ -1623,12 +1889,7 @@ describe('PetPal API integration', () => {
   });
 
   it('filters owner refund export by service type and order keyword', async () => {
-    const {
-      app,
-      prisma,
-      ownerSession,
-      caregiverProfile,
-    } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverProfile } = await createFulfillmentScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
     const suffix = Date.now().toString(36);
 
@@ -1787,12 +2048,7 @@ describe('PetPal API integration', () => {
   });
 
   it('filters owner refund export by refund type', async () => {
-    const {
-      app,
-      prisma,
-      ownerSession,
-      caregiverProfile,
-    } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverProfile } = await createFulfillmentScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
     const suffix = Date.now().toString(36);
 
@@ -1929,17 +2185,12 @@ describe('PetPal API integration', () => {
     });
 
     assert.equal(exportedRefunds.length, exportedRefundNos.length);
-    assert.ok(exportedRefunds.every(item => item.refundType === 'FULL'));
-    assert.ok(exportedRefunds.every(item => item.order.ownerId === ownerSession.user.id));
+    assert.ok(exportedRefunds.every((item) => item.refundType === 'FULL'));
+    assert.ok(exportedRefunds.every((item) => item.order.ownerId === ownerSession.user.id));
   });
 
   it('filters owner refund export by complaint status', async () => {
-    const {
-      app,
-      prisma,
-      ownerSession,
-      caregiverProfile,
-    } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverProfile } = await createFulfillmentScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
     const suffix = Date.now().toString(36);
     const keyword = `REFUND-COMPLAINT-${suffix}`.toUpperCase();
@@ -2152,17 +2403,16 @@ describe('PetPal API integration', () => {
     });
 
     assert.equal(exportedRefunds.length, exportedRefundNos.length);
-    assert.ok(exportedRefunds.every(item => item.order.ownerId === ownerSession.user.id));
-    assert.ok(exportedRefunds.every(item => item.order.complaints.some(complaint => complaint.status === 'OPEN')));
+    assert.ok(exportedRefunds.every((item) => item.order.ownerId === ownerSession.user.id));
+    assert.ok(
+      exportedRefunds.every((item) =>
+        item.order.complaints.some((complaint) => complaint.status === 'OPEN'),
+      ),
+    );
   });
 
   it('filters owner refund export by complaint type', async () => {
-    const {
-      app,
-      prisma,
-      ownerSession,
-      caregiverProfile,
-    } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverProfile } = await createFulfillmentScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
     const suffix = Date.now().toString(36);
     const keyword = `REFUND-COMPLAINT-TYPE-${suffix}`.toUpperCase();
@@ -2374,17 +2624,16 @@ describe('PetPal API integration', () => {
     });
 
     assert.equal(exportedRefunds.length, exportedRefundNos.length);
-    assert.ok(exportedRefunds.every(item => item.order.ownerId === ownerSession.user.id));
-    assert.ok(exportedRefunds.every(item => item.order.complaints.some(complaint => complaint.complaintType === 'SERVICE')));
+    assert.ok(exportedRefunds.every((item) => item.order.ownerId === ownerSession.user.id));
+    assert.ok(
+      exportedRefunds.every((item) =>
+        item.order.complaints.some((complaint) => complaint.complaintType === 'SERVICE'),
+      ),
+    );
   });
 
   it('filters owner refund export by complaint target role', async () => {
-    const {
-      app,
-      prisma,
-      ownerSession,
-      caregiverProfile,
-    } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverProfile } = await createFulfillmentScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
     const suffix = Date.now().toString(36);
     const keyword = `REFUND-COMPLAINT-ROLE-${suffix}`.toUpperCase();
@@ -2596,18 +2845,17 @@ describe('PetPal API integration', () => {
     });
 
     assert.equal(exportedRefunds.length, exportedRefundNos.length);
-    assert.ok(exportedRefunds.every(item => item.order.ownerId === ownerSession.user.id));
-    assert.ok(exportedRefunds.every(item => item.order.complaints.some(complaint => complaint.targetRole === 'PLATFORM')));
+    assert.ok(exportedRefunds.every((item) => item.order.ownerId === ownerSession.user.id));
+    assert.ok(
+      exportedRefunds.every((item) =>
+        item.order.complaints.some((complaint) => complaint.targetRole === 'PLATFORM'),
+      ),
+    );
   });
 
   it('returns owner refund progress snapshots for pending, approved and successful refunds', async () => {
-    const {
-      app,
-      prisma,
-      ownerSession,
-      caregiverSession,
-      order,
-    } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverSession, order } =
+      await createFulfillmentScenario();
 
     const refund = await prisma.refundRecord.create({
       data: {
@@ -2688,12 +2936,7 @@ describe('PetPal API integration', () => {
   });
 
   it('allows admin to assign, investigate and close complaints', async () => {
-    const {
-      app,
-      ownerSession,
-      caregiverSession,
-      order,
-    } = await createFulfillmentScenario();
+    const { app, ownerSession, caregiverSession, order } = await createFulfillmentScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
 
     await request(app)
@@ -2772,7 +3015,10 @@ describe('PetPal API integration', () => {
       .expect(200);
 
     assert.equal(closeResponse.body.data.status, 'RESOLVED');
-    assert.equal(closeResponse.body.data.resultSummary, '已核实签到超时，平台已协调退款并完成结案。');
+    assert.equal(
+      closeResponse.body.data.resultSummary,
+      '已核实签到超时，平台已协调退款并完成结案。',
+    );
     assert.ok(closeResponse.body.data.closedAt);
     assert.equal(closeResponse.body.data.processLogs.at(-1)?.actionType, 'CLOSE');
 
@@ -2798,13 +3044,8 @@ describe('PetPal API integration', () => {
   });
 
   it('supports SLA filters for complaint admin list', async () => {
-    const {
-      app,
-      prisma,
-      ownerSession,
-      caregiverSession,
-      order,
-    } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverSession, order } =
+      await createFulfillmentScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
 
     await request(app)
@@ -2829,7 +3070,7 @@ describe('PetPal API integration', () => {
       .expect(200);
 
     const complaintId = complaintResponse.body.data.id as string;
-    const dueSoonCreatedAt = new Date(Date.now() - (21 * 60 * 60 * 1000));
+    const dueSoonCreatedAt = new Date(Date.now() - 21 * 60 * 60 * 1000);
     await prisma.complaint.update({
       where: { id: complaintId },
       data: {
@@ -2851,12 +3092,12 @@ describe('PetPal API integration', () => {
     assert.ok(dueSoonResponse.body.data.items[0].slaDeadlineAt);
     assert.ok(
       Math.abs(
-        new Date(dueSoonResponse.body.data.items[0].slaDeadlineAt).getTime()
-          - (dueSoonCreatedAt.getTime() + (24 * 60 * 60 * 1000)),
+        new Date(dueSoonResponse.body.data.items[0].slaDeadlineAt).getTime() -
+          (dueSoonCreatedAt.getTime() + 24 * 60 * 60 * 1000),
       ) < 1_000,
     );
 
-    const overdueCreatedAt = new Date(Date.now() - (26 * 60 * 60 * 1000));
+    const overdueCreatedAt = new Date(Date.now() - 26 * 60 * 60 * 1000);
     await prisma.complaint.update({
       where: { id: complaintId },
       data: {
@@ -2930,10 +3171,7 @@ describe('PetPal API integration', () => {
       .post('/api/petpal/admin/complaints/batch-assign')
       .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
       .send({
-        complaintIds: [
-          firstComplaint.body.data.id,
-          secondComplaint.body.data.id,
-        ],
+        complaintIds: [firstComplaint.body.data.id, secondComplaint.body.data.id],
         assigneeId: adminSession.user.id,
         note: '夜班值守统一接手处理。',
       })
@@ -2942,21 +3180,23 @@ describe('PetPal API integration', () => {
     assert.equal(batchAssignResponse.body.data.requestedCount, 2);
     assert.equal(batchAssignResponse.body.data.updatedCount, 2);
     assert.equal(batchAssignResponse.body.data.items.length, 2);
-    assert.ok(batchAssignResponse.body.data.items.every((item: { assignedAdminId: string; status: string; processLogs: Array<{ actionType: string; note?: string | null }> }) =>
-      item.assignedAdminId === adminSession.user.id
-      && item.status === 'PROCESSING'
-      && item.processLogs.at(-1)?.actionType === 'ASSIGN'
-      && item.processLogs.at(-1)?.note === '夜班值守统一接手处理。',
-    ));
+    assert.ok(
+      batchAssignResponse.body.data.items.every(
+        (item: {
+          assignedAdminId: string;
+          status: string;
+          processLogs: Array<{ actionType: string; note?: string | null }>;
+        }) =>
+          item.assignedAdminId === adminSession.user.id &&
+          item.status === 'PROCESSING' &&
+          item.processLogs.at(-1)?.actionType === 'ASSIGN' &&
+          item.processLogs.at(-1)?.note === '夜班值守统一接手处理。',
+      ),
+    );
   });
 
   it('forbids non-admin users from accessing complaint admin endpoints', async () => {
-    const {
-      app,
-      ownerSession,
-      caregiverSession,
-      order,
-    } = await createFulfillmentScenario();
+    const { app, ownerSession, caregiverSession, order } = await createFulfillmentScenario();
 
     await request(app)
       .post(`/api/petpal/caregiver/orders/${order.id}/accept`)
@@ -3321,7 +3561,7 @@ describe('PetPal API integration', () => {
     });
 
     assert.equal(idempotentAudits.length, 2, 'Should have 2 audit records (initial + idempotent)');
-    assert.ok(idempotentAudits.every(a => a.callbackStatus === 'SUCCESS'));
+    assert.ok(idempotentAudits.every((a) => a.callbackStatus === 'SUCCESS'));
 
     // Setup: Create refund for audit testing
     const refund = await prisma.refundRecord.create({
@@ -3397,7 +3637,11 @@ describe('PetPal API integration', () => {
     });
 
     assert.ok(failedRefundAudit, 'Failed refund audit record should exist');
-    assert.equal(failedRefundAudit.callbackStatus, 'FAILURE', 'Failed audit status should be FAILURE');
+    assert.equal(
+      failedRefundAudit.callbackStatus,
+      'FAILURE',
+      'Failed audit status should be FAILURE',
+    );
   });
 
   it('admin can query callback audit logs with filters', async () => {
@@ -3457,7 +3701,11 @@ describe('PetPal API integration', () => {
       .expect(200);
 
     assert.ok(Array.isArray(paymentAuditsResponse.body.data.items));
-    assert.ok(paymentAuditsResponse.body.data.items.every((a: any) => a.callbackType === 'PAYMENT_CALLBACK'));
+    assert.ok(
+      paymentAuditsResponse.body.data.items.every(
+        (a: any) => a.callbackType === 'PAYMENT_CALLBACK',
+      ),
+    );
 
     // Test: Query with status filter
     const successAuditsResponse = await request(app)
@@ -3467,7 +3715,9 @@ describe('PetPal API integration', () => {
 
     assert.ok(Array.isArray(successAuditsResponse.body.data.items));
     assert.ok(successAuditsResponse.body.data.items.length > 0);
-    assert.ok(successAuditsResponse.body.data.items.every((a: any) => a.callbackStatus === 'SUCCESS'));
+    assert.ok(
+      successAuditsResponse.body.data.items.every((a: any) => a.callbackStatus === 'SUCCESS'),
+    );
 
     // Test: Query with source mode filter
     const tokenAuditsResponse = await request(app)
@@ -3682,7 +3932,9 @@ describe('PetPal API integration', () => {
       .expect(200);
 
     assert.ok(
-      replayLogsAfterBatchRetry.body.data.items.some((item: any) => item.actionType === 'REQUEUE_DEAD_BATCH'),
+      replayLogsAfterBatchRetry.body.data.items.some(
+        (item: any) => item.actionType === 'REQUEUE_DEAD_BATCH',
+      ),
     );
 
     const filteredReplayLogs = await request(app)
@@ -3693,8 +3945,16 @@ describe('PetPal API integration', () => {
 
     assert.ok(Array.isArray(filteredReplayLogs.body.data.items));
     assert.ok(filteredReplayLogs.body.data.items.length >= 1);
-    assert.ok(filteredReplayLogs.body.data.items.every((item: any) => item.actionType === 'REQUEUE_DEAD_BATCH'));
-    assert.ok(filteredReplayLogs.body.data.items.every((item: any) => item.actorId === adminSession.user.id));
+    assert.ok(
+      filteredReplayLogs.body.data.items.every(
+        (item: any) => item.actionType === 'REQUEUE_DEAD_BATCH',
+      ),
+    );
+    assert.ok(
+      filteredReplayLogs.body.data.items.every(
+        (item: any) => item.actorId === adminSession.user.id,
+      ),
+    );
 
     const replayLogStatsResponse = await request(app)
       .get(`/api/petpal/admin/callback-alert-outbox/${outboxId}/replay-logs/stats`)
@@ -3708,12 +3968,12 @@ describe('PetPal API integration', () => {
     assert.ok(typeof replayLogStatsResponse.body.data.batchReplayRatio === 'number');
     assert.ok(typeof replayLogStatsResponse.body.data.isBatchReplayDominant === 'boolean');
     assert.ok(
-      replayLogStatsResponse.body.data.latestReplayAt === null
-      || typeof replayLogStatsResponse.body.data.latestReplayAt === 'string',
+      replayLogStatsResponse.body.data.latestReplayAt === null ||
+        typeof replayLogStatsResponse.body.data.latestReplayAt === 'string',
     );
     assert.ok(
-      replayLogStatsResponse.body.data.minutesSinceLastReplay === null
-      || typeof replayLogStatsResponse.body.data.minutesSinceLastReplay === 'number',
+      replayLogStatsResponse.body.data.minutesSinceLastReplay === null ||
+        typeof replayLogStatsResponse.body.data.minutesSinceLastReplay === 'number',
     );
     assert.ok(typeof replayLogStatsResponse.body.data.dominanceThreshold === 'number');
     assert.ok(typeof replayLogStatsResponse.body.data.dominanceMinSamples === 'number');
@@ -3767,25 +4027,13 @@ describe('PetPal API integration', () => {
     const memberSession = await loginAs(app, 'user', 'User123!');
     const authHeader = { Authorization: `Bearer ${memberSession.tokens.accessToken}` };
 
-    await request(app)
-      .get('/api/petpal/admin/callback-audits')
-      .set(authHeader)
-      .expect(403);
+    await request(app).get('/api/petpal/admin/callback-audits').set(authHeader).expect(403);
 
-    await request(app)
-      .get('/api/petpal/admin/callback-audits/stats')
-      .set(authHeader)
-      .expect(403);
+    await request(app).get('/api/petpal/admin/callback-audits/stats').set(authHeader).expect(403);
 
-    await request(app)
-      .get('/api/petpal/admin/callback-audits/export')
-      .set(authHeader)
-      .expect(403);
+    await request(app).get('/api/petpal/admin/callback-audits/export').set(authHeader).expect(403);
 
-    await request(app)
-      .get('/api/petpal/admin/callback-alert-outbox')
-      .set(authHeader)
-      .expect(403);
+    await request(app).get('/api/petpal/admin/callback-alert-outbox').set(authHeader).expect(403);
 
     await request(app)
       .get('/api/petpal/admin/callback-alert-outbox/stats')
@@ -3824,10 +4072,7 @@ describe('PetPal API integration', () => {
       .send({ status: 'APPROVED' })
       .expect(403);
 
-    await request(app)
-      .get('/api/petpal/admin/caregivers')
-      .set(authHeader)
-      .expect(403);
+    await request(app).get('/api/petpal/admin/caregivers').set(authHeader).expect(403);
   });
 
   it('allows manager to read callback audits but forbids export', async () => {
@@ -3836,25 +4081,13 @@ describe('PetPal API integration', () => {
     const managerSession = await loginAs(app, 'manager', 'Manager123!');
     const authHeader = { Authorization: `Bearer ${managerSession.tokens.accessToken}` };
 
-    await request(app)
-      .get('/api/petpal/admin/callback-audits')
-      .set(authHeader)
-      .expect(200);
+    await request(app).get('/api/petpal/admin/callback-audits').set(authHeader).expect(200);
 
-    await request(app)
-      .get('/api/petpal/admin/callback-audits/stats')
-      .set(authHeader)
-      .expect(200);
+    await request(app).get('/api/petpal/admin/callback-audits/stats').set(authHeader).expect(200);
 
-    await request(app)
-      .get('/api/petpal/admin/callback-audits/export')
-      .set(authHeader)
-      .expect(403);
+    await request(app).get('/api/petpal/admin/callback-audits/export').set(authHeader).expect(403);
 
-    await request(app)
-      .get('/api/petpal/admin/callback-alert-outbox')
-      .set(authHeader)
-      .expect(200);
+    await request(app).get('/api/petpal/admin/callback-alert-outbox').set(authHeader).expect(200);
 
     await request(app)
       .get('/api/petpal/admin/callback-alert-outbox/stats')
