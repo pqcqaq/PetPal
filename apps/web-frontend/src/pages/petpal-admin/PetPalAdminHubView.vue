@@ -1,107 +1,143 @@
 <template>
   <section class="petpal-admin-hub">
-    <div class="petpal-admin-hub__hero">
-      <p class="petpal-admin-hub__eyebrow">PetPal Admin</p>
-      <h1>后台总览</h1>
-      <div class="petpal-admin-hub__signals">
-        <article v-for="item in signalCards" :key="item.label">
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
-          <small>{{ item.hint }}</small>
-        </article>
+    <header class="petpal-admin-hub__hero">
+      <div class="petpal-admin-hub__hero-copy">
+        <p class="petpal-admin-hub__eyebrow">PetPal Admin</p>
+        <h1>先处理当前最紧急的治理事项</h1>
+        <p>
+          当前值班账号是 {{ currentAdminDisplayName }}。后台入口不再承担信息展示，只保留摘要、优先队列和直接处理动作。
+        </p>
       </div>
+
       <div class="petpal-admin-hub__hero-actions">
         <el-button plain :loading="overviewLoading" @click="loadHubOverview">刷新治理摘要</el-button>
         <p v-if="overviewNotice" class="petpal-admin-hub__notice">
           {{ overviewNotice }}
         </p>
       </div>
-    </div>
 
-    <div v-if="metricCards.length" class="petpal-admin-hub__metrics">
-      <RouterLink
-        v-for="card in metricCards"
-        :key="card.label"
-        :to="card.to"
-        class="petpal-admin-metric"
-        :class="`is-${card.tone}`"
-      >
-        <span>{{ card.label }}</span>
-        <strong>{{ card.value }}</strong>
-        <small>{{ card.hint }}</small>
-      </RouterLink>
-    </div>
+      <dl class="petpal-admin-hub__hero-meta">
+        <div v-for="item in signalCards" :key="item.label" class="petpal-admin-hub__hero-meta-item">
+          <dt>{{ item.label }}</dt>
+          <dd>{{ item.value }}</dd>
+          <p>{{ item.hint }}</p>
+        </div>
+      </dl>
+    </header>
 
-    <section v-if="priorityItems.length" class="petpal-admin-hub__priority">
+    <section v-if="priorityItems.length" class="petpal-admin-hub__section">
       <header class="petpal-admin-hub__section-header">
-        <p>优先关注</p>
-        <h2>当前治理摘要</h2>
+        <p>优先队列</p>
+        <h2>现在先处理</h2>
       </header>
-      <div class="petpal-admin-hub__priority-list">
+      <div class="petpal-admin-hub__stack-list">
         <RouterLink
           v-for="item in priorityItems"
           :key="item.title"
           :to="item.to"
-          class="petpal-admin-priority"
+          class="petpal-admin-hub__stack-row"
           :class="`is-${item.tone}`"
         >
-          <strong>{{ item.title }}</strong>
-          <p>{{ item.detail }}</p>
+          <div class="petpal-admin-hub__stack-copy">
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.detail }}</p>
+          </div>
+          <span class="petpal-admin-hub__stack-action">进入处理</span>
         </RouterLink>
       </div>
     </section>
 
-    <section v-if="quickActions.length" class="petpal-admin-hub__quick-actions">
+    <section v-if="metricCards.length" class="petpal-admin-hub__section">
+      <header class="petpal-admin-hub__section-header">
+        <p>实时摘要</p>
+        <h2>只保留当前账号真的要看的计数</h2>
+      </header>
+      <div class="petpal-admin-hub__stack-list">
+        <RouterLink
+          v-for="card in metricCards"
+          :key="card.label"
+          :to="card.to"
+          class="petpal-admin-hub__stack-row"
+          :class="`is-${card.tone}`"
+        >
+          <div class="petpal-admin-hub__stat-copy">
+            <span>{{ card.label }}</span>
+            <strong>{{ card.value }}</strong>
+          </div>
+          <div class="petpal-admin-hub__stack-copy">
+            <p>{{ card.hint }}</p>
+          </div>
+          <span class="petpal-admin-hub__stack-action">查看队列</span>
+        </RouterLink>
+      </div>
+    </section>
+
+    <section v-if="quickActions.length" class="petpal-admin-hub__section">
       <header class="petpal-admin-hub__section-header">
         <p>值班动作</p>
-        <h2>直接处理</h2>
+        <h2>直接处理，不先跳介绍页</h2>
       </header>
-      <div class="petpal-admin-hub__quick-action-list">
+      <div class="petpal-admin-hub__stack-list">
         <template v-for="action in quickActions" :key="action.title">
           <button
             v-if="action.kind === 'button'"
-            class="petpal-admin-quick-action"
+            class="petpal-admin-hub__stack-row petpal-admin-hub__stack-row--button"
             :class="`is-${action.tone}`"
             type="button"
             :disabled="action.disabled"
             @click="action.run"
           >
-            <strong>{{ action.title }}</strong>
-            <p>{{ action.detail }}</p>
+            <div class="petpal-admin-hub__stack-copy">
+              <strong>{{ action.title }}</strong>
+              <p>{{ action.detail }}</p>
+            </div>
+            <span class="petpal-admin-hub__stack-action">
+              {{ action.disabled ? '处理中' : '立即执行' }}
+            </span>
           </button>
           <RouterLink
             v-else
             :to="action.to"
-            class="petpal-admin-quick-action"
+            class="petpal-admin-hub__stack-row"
             :class="`is-${action.tone}`"
           >
-            <strong>{{ action.title }}</strong>
-            <p>{{ action.detail }}</p>
+            <div class="petpal-admin-hub__stack-copy">
+              <strong>{{ action.title }}</strong>
+              <p>{{ action.detail }}</p>
+            </div>
+            <span class="petpal-admin-hub__stack-action">进入处理</span>
           </RouterLink>
         </template>
       </div>
     </section>
 
-    <div class="petpal-admin-hub__grid">
-      <RouterLink
-        v-for="item in accessibleItems"
-        :key="item.to"
-        :to="item.to"
-        class="petpal-admin-card"
-      >
-        <div class="petpal-admin-card__icon">
-          <UnoIcon :name="item.icon" :size="22" />
-        </div>
-        <div class="petpal-admin-card__copy">
-          <small>{{ item.caption }}</small>
-          <h2>{{ item.title }}</h2>
-          <p>{{ item.description }}</p>
-        </div>
-      </RouterLink>
-    </div>
+    <section v-if="accessibleItems.length" class="petpal-admin-hub__section">
+      <header class="petpal-admin-hub__section-header">
+        <p>治理工作区</p>
+        <h2>按权限进入对应后台</h2>
+      </header>
+      <div class="petpal-admin-hub__workspace-list">
+        <RouterLink
+          v-for="item in accessibleItems"
+          :key="item.to"
+          :to="item.to"
+          class="petpal-admin-hub__workspace-row"
+        >
+          <div class="petpal-admin-hub__workspace-icon">
+            <UnoIcon :name="item.icon" :size="20" />
+          </div>
+          <div class="petpal-admin-hub__workspace-copy">
+            <small>{{ item.caption }}</small>
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.description }}</p>
+          </div>
+          <span class="petpal-admin-hub__stack-action">打开</span>
+        </RouterLink>
+      </div>
+    </section>
 
     <el-empty
-      v-if="accessibleItems.length === 0"
+      v-else
       description="当前账号还没有可用的 PetPal 后台权限，请先分配后台角色或业务权限。"
     />
   </section>
@@ -524,19 +560,34 @@ watch(
 <style scoped lang="scss">
 .petpal-admin-hub {
   display: grid;
-  gap: 20px;
+  gap: 18px;
+  max-width: 980px;
+  margin: 0 auto;
 }
 
-.petpal-admin-hub__hero {
+.petpal-admin-hub__hero,
+.petpal-admin-hub__section {
   display: grid;
-  gap: 14px;
+  gap: 18px;
   padding: 28px;
   border: 1px solid rgba(32, 72, 67, 0.12);
   border-radius: 28px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 22px 48px rgba(24, 62, 57, 0.08);
+}
+
+.petpal-admin-hub__hero {
   background:
-    radial-gradient(circle at top right, rgba(232, 251, 246, 0.9), transparent 28%),
-    linear-gradient(135deg, rgba(248, 253, 250, 0.94) 0%, rgba(235, 245, 240, 0.92) 100%);
-  box-shadow: 0 24px 52px rgba(24, 62, 57, 0.08);
+    radial-gradient(circle at top right, rgba(232, 251, 246, 0.88), transparent 28%),
+    linear-gradient(135deg, rgba(248, 253, 250, 0.96) 0%, rgba(237, 245, 241, 0.94) 100%);
+}
+
+.petpal-admin-hub__hero-copy,
+.petpal-admin-hub__section-header,
+.petpal-admin-hub__stack-copy,
+.petpal-admin-hub__workspace-copy {
+  display: grid;
+  gap: 8px;
 }
 
 .petpal-admin-hub__eyebrow {
@@ -548,53 +599,31 @@ watch(
   text-transform: uppercase;
 }
 
-.petpal-admin-hub__hero h1 {
+.petpal-admin-hub__hero h1,
+.petpal-admin-hub__section-header h2 {
   margin: 0;
   color: #183e39;
-  font-size: clamp(30px, 4vw, 44px);
   line-height: 1.02;
 }
 
-.petpal-admin-hub__hero p {
-  max-width: 760px;
+.petpal-admin-hub__hero h1 {
+  font-size: clamp(34px, 4vw, 50px);
+}
+
+.petpal-admin-hub__hero p:not(.petpal-admin-hub__eyebrow),
+.petpal-admin-hub__stack-copy p,
+.petpal-admin-hub__workspace-copy p,
+.petpal-admin-hub__hero-meta-item p {
   margin: 0;
   color: #556a62;
-  line-height: 1.8;
-}
-
-.petpal-admin-hub__signals {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
-.petpal-admin-hub__signals article {
-  display: grid;
-  gap: 6px;
-  padding: 16px 18px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(32, 72, 67, 0.08);
-}
-
-.petpal-admin-hub__signals span {
-  color: #698077;
-  font-size: 12px;
-}
-
-.petpal-admin-hub__signals strong {
-  color: #183e39;
-  font-size: 20px;
-}
-
-.petpal-admin-hub__signals small {
-  color: #6c837b;
-  line-height: 1.6;
+  line-height: 1.78;
 }
 
 .petpal-admin-hub__hero-actions {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .petpal-admin-hub__notice {
@@ -603,232 +632,189 @@ watch(
   font-size: 13px;
 }
 
-.petpal-admin-hub__metrics {
+.petpal-admin-hub__hero-meta {
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.petpal-admin-metric {
-  display: grid;
-  gap: 8px;
-  padding: 18px 20px;
-  border-radius: 24px;
-  border: 1px solid rgba(32, 72, 67, 0.08);
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 16px 36px rgba(24, 62, 57, 0.05);
-}
-
-.petpal-admin-metric span {
-  color: #698077;
-  font-size: 12px;
-}
-
-.petpal-admin-metric strong {
-  color: #183e39;
-  font-size: clamp(28px, 3vw, 36px);
-  line-height: 1;
-}
-
-.petpal-admin-metric small {
-  color: #5c726a;
-  line-height: 1.7;
-}
-
-.petpal-admin-metric.is-accent {
-  border-color: rgba(26, 111, 94, 0.18);
-  background: linear-gradient(180deg, rgba(241, 252, 248, 0.94), rgba(255, 255, 255, 0.88));
-}
-
-.petpal-admin-metric.is-warning {
-  border-color: rgba(169, 124, 46, 0.2);
-  background: linear-gradient(180deg, rgba(255, 249, 235, 0.94), rgba(255, 255, 255, 0.9));
-}
-
-.petpal-admin-metric.is-danger {
-  border-color: rgba(169, 67, 50, 0.18);
-  background: linear-gradient(180deg, rgba(255, 244, 242, 0.95), rgba(255, 255, 255, 0.9));
-}
-
-.petpal-admin-hub__priority {
-  display: grid;
-  gap: 14px;
-}
-
-.petpal-admin-hub__section-header {
-  display: grid;
-  gap: 6px;
-}
-
-.petpal-admin-hub__section-header p,
-.petpal-admin-hub__section-header h2 {
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 0;
 }
 
-.petpal-admin-hub__section-header p {
-  color: #6d847c;
-  font-size: 12px;
+.petpal-admin-hub__hero-meta-item {
+  display: grid;
+  gap: 6px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(24, 62, 57, 0.1);
+}
+
+.petpal-admin-hub__hero-meta-item dt {
+  color: #698077;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
+.petpal-admin-hub__hero-meta-item dd {
+  margin: 0;
+  color: #183e39;
+  font-size: 22px;
+  line-height: 1.18;
+}
+
+.petpal-admin-hub__section-header p {
+  margin: 0;
+  color: #6d847c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
 .petpal-admin-hub__section-header h2 {
-  color: #183e39;
-  font-size: 24px;
+  font-size: 26px;
 }
 
-.petpal-admin-hub__priority-list {
+.petpal-admin-hub__stack-list,
+.petpal-admin-hub__workspace-list {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
-.petpal-admin-priority {
+.petpal-admin-hub__stack-row,
+.petpal-admin-hub__workspace-row {
   display: grid;
-  gap: 8px;
-  padding: 18px 20px;
-  border-radius: 22px;
-  border: 1px solid rgba(32, 72, 67, 0.08);
-  background: rgba(255, 255, 255, 0.84);
+  gap: 16px;
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 18px 0;
+  border-top: 1px solid rgba(24, 62, 57, 0.1);
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
 }
 
-.petpal-admin-priority strong,
-.petpal-admin-priority p {
-  margin: 0;
+.petpal-admin-hub__stack-row:first-child,
+.petpal-admin-hub__workspace-row:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
-.petpal-admin-priority strong {
+.petpal-admin-hub__stack-row strong,
+.petpal-admin-hub__workspace-copy strong {
   color: #183e39;
+  font-size: 18px;
 }
 
-.petpal-admin-priority p {
-  color: #5b7269;
-  line-height: 1.7;
+.petpal-admin-hub__stack-row.is-warning,
+.petpal-admin-hub__stack-row.is-danger,
+.petpal-admin-hub__stack-row.is-accent,
+.petpal-admin-hub__stack-row.is-neutral,
+.petpal-admin-hub__workspace-row {
+  cursor: pointer;
 }
 
-.petpal-admin-priority.is-warning {
-  border-color: rgba(169, 124, 46, 0.22);
+.petpal-admin-hub__stack-row.is-warning {
+  border-color: rgba(169, 124, 46, 0.24);
 }
 
-.petpal-admin-priority.is-danger {
-  border-color: rgba(169, 67, 50, 0.2);
+.petpal-admin-hub__stack-row.is-danger {
+  border-color: rgba(169, 67, 50, 0.24);
 }
 
-.petpal-admin-hub__quick-actions {
-  display: grid;
-  gap: 14px;
+.petpal-admin-hub__stack-row.is-accent {
+  border-color: rgba(26, 111, 94, 0.24);
 }
 
-.petpal-admin-hub__quick-action-list {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-}
-
-.petpal-admin-quick-action {
-  display: grid;
-  gap: 8px;
+.petpal-admin-hub__stack-row--button {
   width: 100%;
-  padding: 18px 20px;
   text-align: left;
-  border-radius: 22px;
-  border: 1px solid rgba(32, 72, 67, 0.08);
-  background: rgba(255, 255, 255, 0.84);
+  background: transparent;
 }
 
-.petpal-admin-quick-action strong,
-.petpal-admin-quick-action p {
-  margin: 0;
-}
-
-.petpal-admin-quick-action strong {
-  color: #183e39;
-}
-
-.petpal-admin-quick-action p {
-  color: #5b7269;
-  line-height: 1.7;
-}
-
-.petpal-admin-quick-action.is-accent {
-  border-color: rgba(26, 111, 94, 0.18);
-}
-
-.petpal-admin-quick-action.is-warning {
-  border-color: rgba(169, 124, 46, 0.2);
-}
-
-.petpal-admin-quick-action.is-danger {
-  border-color: rgba(169, 67, 50, 0.2);
-}
-
-.petpal-admin-quick-action:disabled {
+.petpal-admin-hub__stack-row:disabled {
   cursor: wait;
   opacity: 0.72;
 }
 
-.petpal-admin-hub__grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.petpal-admin-card {
-  display: grid;
-  gap: 14px;
-  padding: 20px;
-  border: 1px solid rgba(32, 72, 67, 0.08);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 18px 42px rgba(24, 62, 57, 0.06);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-}
-
-.petpal-admin-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(24, 62, 57, 0.16);
-  box-shadow: 0 24px 52px rgba(24, 62, 57, 0.1);
-}
-
-.petpal-admin-card__icon {
+.petpal-admin-hub__stack-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: #183e39;
-  color: #f4fbf8;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(24, 62, 57, 0.12);
+  border-radius: 999px;
+  color: #35534b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.petpal-admin-card__copy {
+.petpal-admin-hub__stat-copy {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
-.petpal-admin-card__copy small {
+.petpal-admin-hub__stat-copy span {
+  color: #698077;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.petpal-admin-hub__stat-copy strong {
+  color: #183e39;
+  font-size: clamp(26px, 3vw, 34px);
+  line-height: 1;
+}
+
+.petpal-admin-hub__workspace-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.petpal-admin-hub__workspace-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(24, 62, 57, 0.08);
+  color: #183e39;
+}
+
+.petpal-admin-hub__workspace-copy small {
   color: #6d847c;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.petpal-admin-card__copy h2 {
-  margin: 0;
-  color: #183e39;
-  font-size: 20px;
-}
-
-.petpal-admin-card__copy p {
-  margin: 0;
-  color: #5a6f67;
-  line-height: 1.7;
-}
-
 @media (max-width: 900px) {
-  .petpal-admin-hub__hero {
+  .petpal-admin-hub__hero,
+  .petpal-admin-hub__section {
     padding: 22px;
+  }
+
+  .petpal-admin-hub__hero-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .petpal-admin-hub__stack-row,
+  .petpal-admin-hub__workspace-row {
+    grid-template-columns: 1fr;
+  }
+
+  .petpal-admin-hub__workspace-row {
+    justify-items: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .petpal-admin-hub__stack-row,
+  .petpal-admin-hub__workspace-row {
+    transition: none;
   }
 }
 </style>
