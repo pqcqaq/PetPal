@@ -1,11 +1,20 @@
 <script lang="ts" setup>
+/**
+ * UX Blueprint
+ * User: 已登录主人，维护宠物档案并准备继续发需求
+ * Entry: 从主人首页、需求页、订单空态进入
+ * First screen: 先切换当前宠物，再决定是预览档案还是进入某个编辑分区
+ * Primary action: 保存当前宠物资料或直接用当前宠物发需求
+ * Secondary actions: 新增宠物、切换宠物、在基础/照料/健康/紧急四个分区间切换
+ * States: 未登录、无宠物、新建宠物、查看既有宠物、保存中
+ */
 import type { PetGender, PetProfileRecord, PetSpecies } from '@rbac/api-common'
 import { computed, reactive, ref } from 'vue'
 import AppButton from '@/components/app-button/app-button.vue'
+import AppCard from '@/components/app-card/app-card.vue'
 import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
 import AppInput from '@/components/app-input/app-input.vue'
 import AppPageShell from '@/components/app-page-shell/app-page-shell.vue'
-import AppSection from '@/components/app-section/app-section.vue'
 import AppStatus from '@/components/app-status/app-status.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import { createPet, listPets, updatePet } from '@/api/petpal'
@@ -39,13 +48,22 @@ definePage({
 })
 
 type YesNoChoice = 'YES' | 'NO'
+type PetEditorSection = 'PROFILE' | 'CARE' | 'HEALTH' | 'EMERGENCY'
+
+const editorSectionOptions = [
+  { label: '基础', value: 'PROFILE' },
+  { label: '照料', value: 'CARE' },
+  { label: '健康', value: 'HEALTH' },
+  { label: '紧急', value: 'EMERGENCY' },
+]
 
 const tokenStore = useTokenStore()
 
 const loading = ref(false)
 const saving = ref(false)
 const pets = ref<PetProfileRecord[]>([])
-const editingPetId = ref('')
+const selectedPetId = ref('')
+const editorSection = ref<PetEditorSection>('PROFILE')
 const petTemperamentTagsText = ref('')
 
 const petForm = reactive({
@@ -64,19 +82,68 @@ const petForm = reactive({
   emergencyRelation: '',
 })
 
-const pageDescription = computed(() => (
-  tokenStore.hasLogin
-    ? '把宠物基础信息、饮食提醒、健康备注和紧急联系人拆分出来，形成可复用的电子档案。'
-    : '登录后即可维护宠物档案。'
-))
-
+const focusPet = computed(() => pets.value.find(item => item.id === selectedPetId.value) ?? null)
+const isCreateMode = computed(() => !selectedPetId.value)
+const completedSectionCount = computed(() => {
+  const checks = [
+    Boolean(petForm.name.trim() && petForm.species),
+    Boolean(petTemperamentTagsText.value.trim() || petForm.feedingNote.trim()),
+    Boolean(petForm.allergyNote.trim() || petForm.medicalNote.trim()),
+    Boolean(petForm.emergencyName.trim() && petForm.emergencyPhone.trim()),
+  ]
+  return checks.filter(Boolean).length
+})
+const heroTitle = computed(() => focusPet.value ? focusPet.value.name : '新建宠物')
+const heroSummary = computed(() => {
+  if (focusPet.value) {
+    return `${speciesLabels[focusPet.value.species]}${focusPet.value.breed ? ` · ${focusPet.value.breed}` : ''}`
+  }
+  if (!pets.value.length) {
+    return '先建第一只宠物，后面发布需求会直接复用这些资料。'
+  }
+  return '切到新建模式，补一只新的宠物档案。'
+})
 const summaryCards = computed(() => [
-  { label: '宠物总数', value: String(pets.value.length), hint: pets.value.length ? '每个宠物都可以独立复用到需求发布。' : '还没有建立宠物档案。' },
-  { label: '可直接下单', value: String(pets.value.length), hint: pets.value.length ? '资料越完整，后续匹配越顺畅。' : '需要至少建立一只宠物。' },
+  {
+    label: '宠物总数',
+    value: String(pets.value.length),
+    hint: pets.value.length ? '直接切换当前宠物' : '先创建第一只',
+  },
+  {
+    label: '当前完成度',
+    value: `${completedSectionCount.value}/4`,
+    hint: completedSectionCount.value >= 3 ? '已经接近可用' : '建议补齐四个分区',
+  },
+  {
+    label: '可直接下单',
+    value: pets.value.length ? '可用' : '未就绪',
+    hint: pets.value.length ? '当前宠物可直接进入需求页' : '先保存档案',
+  },
 ])
+const spotlightTags = computed(() => focusPet.value?.temperamentTags ?? [])
+const spotlightNotes = computed(() => {
+  if (!focusPet.value) {
+    return []
+  }
+
+  const notes = [
+    { label: '喂养', value: focusPet.value.feedingNote || '' },
+    { label: '过敏', value: focusPet.value.allergyNote || '' },
+    { label: '健康', value: focusPet.value.medicalNote || '' },
+  ]
+
+  if (focusPet.value.emergencyContact) {
+    notes.push({
+      label: '紧急',
+      value: `${focusPet.value.emergencyContact.name} · ${focusPet.value.emergencyContact.phone}${focusPet.value.emergencyContact.relation ? ` · ${focusPet.value.emergencyContact.relation}` : ''}`,
+    })
+  }
+
+  return notes.filter(item => item.value)
+})
+const saveButtonLabel = computed(() => selectedPetId.value ? '保存修改' : '保存并继续')
 
 function resetPetForm() {
-  editingPetId.value = ''
   petForm.name = ''
   petForm.species = 'DOG'
   petForm.gender = 'UNKNOWN'
@@ -93,8 +160,8 @@ function resetPetForm() {
   petTemperamentTagsText.value = ''
 }
 
-function startEditPet(pet: PetProfileRecord) {
-  editingPetId.value = pet.id
+function applyPetToForm(pet: PetProfileRecord) {
+  selectedPetId.value = pet.id
   petForm.name = pet.name
   petForm.species = pet.species
   petForm.gender = pet.gender
@@ -111,8 +178,58 @@ function startEditPet(pet: PetProfileRecord) {
   petTemperamentTagsText.value = joinTagText(pet.temperamentTags)
 }
 
+function openCreateMode() {
+  selectedPetId.value = ''
+  editorSection.value = 'PROFILE'
+  resetPetForm()
+}
+
+function selectPet(petId: string) {
+  const pet = pets.value.find(item => item.id === petId)
+  if (!pet) {
+    return
+  }
+  editorSection.value = 'PROFILE'
+  applyPetToForm(pet)
+}
+
+function syncFocusPet(preferredPetId?: string) {
+  if (!pets.value.length) {
+    openCreateMode()
+    return
+  }
+
+  const preferred = preferredPetId
+    ? pets.value.find(item => item.id === preferredPetId)
+    : undefined
+  if (preferred) {
+    applyPetToForm(preferred)
+    return
+  }
+
+  const current = selectedPetId.value
+    ? pets.value.find(item => item.id === selectedPetId.value)
+    : undefined
+  if (current) {
+    applyPetToForm(current)
+    return
+  }
+
+  applyPetToForm(pets.value[0])
+}
+
+function resetEditor() {
+  if (focusPet.value) {
+    applyPetToForm(focusPet.value)
+    return
+  }
+  resetPetForm()
+  editorSection.value = 'PROFILE'
+}
+
 function openRequestFlow(petId?: string) {
-  const suffix = petId ? `?petId=${petId}` : ''
+  const currentPetId = petId || selectedPetId.value
+  const suffix = currentPetId ? `?petId=${currentPetId}` : ''
   uni.redirectTo({ url: `${PETPAL_REQUEST_PAGE}${suffix}` })
 }
 
@@ -120,7 +237,7 @@ function goToLogin() {
   uni.navigateTo({ url: LOGIN_PAGE })
 }
 
-async function loadPage(showError = false) {
+async function loadPage(showError = false, preferredPetId?: string) {
   if (!tokenStore.hasLogin || loading.value) {
     uni.stopPullDownRefresh()
     return
@@ -129,6 +246,7 @@ async function loadPage(showError = false) {
   loading.value = true
   try {
     pets.value = await listPets()
+    syncFocusPet(preferredPetId)
   }
   catch (error: unknown) {
     if (showError) {
@@ -147,6 +265,7 @@ async function loadPage(showError = false) {
 async function submitPet() {
   if (!petForm.name.trim()) {
     uni.showToast({ title: '请先填写宠物名称', icon: 'none' })
+    editorSection.value = 'PROFILE'
     return
   }
 
@@ -173,21 +292,20 @@ async function submitPet() {
         : undefined,
     }
 
-    if (editingPetId.value) {
-      await updatePet(editingPetId.value, payload)
-      uni.showToast({ title: '宠物档案已更新', icon: 'none' })
-    }
-    else {
-      await createPet(payload)
-      uni.showToast({ title: '宠物档案已保存', icon: 'none' })
-    }
+    const savedPet = selectedPetId.value
+      ? await updatePet(selectedPetId.value, payload)
+      : await createPet(payload)
 
-    resetPetForm()
-    await loadPage(false)
+    uni.showToast({
+      title: selectedPetId.value ? '宠物档案已更新' : '宠物档案已保存',
+      icon: 'none',
+    })
+
+    await loadPage(false, savedPet.id)
   }
   catch (error: unknown) {
     uni.showToast({
-      title: getErrorMessage(error, editingPetId.value ? '更新宠物档案失败' : '保存宠物档案失败'),
+      title: getErrorMessage(error, selectedPetId.value ? '更新宠物档案失败' : '保存宠物档案失败'),
       icon: 'none',
     })
   }
@@ -209,15 +327,27 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <AppPageShell title="宠物档案" :description="pageDescription">
+  <AppPageShell title="宠物档案">
     <template v-if="tokenStore.hasLogin">
       <OwnerFlowNav
         :current-path="PETPAL_PETS_PAGE"
-        title="宠物资料独立管理"
-        description="档案、习性、喂养和紧急联系人独立维护，后续每次发布需求都直接复用这些信息。"
+        title="宠物档案"
       />
 
-      <AppSection title="档案概览">
+      <AppCard>
+        <view class="pet-hero">
+          <view class="pet-hero__copy">
+            <text class="pet-hero__eyebrow">{{ isCreateMode ? '新宠物' : '当前宠物' }}</text>
+            <text class="pet-hero__title">{{ heroTitle }}</text>
+            <text class="pet-hero__summary">{{ heroSummary }}</text>
+          </view>
+
+          <view class="pet-hero__actions">
+            <AppButton size="medium" type="info" @click="openCreateMode">新增宠物</AppButton>
+            <AppButton v-if="focusPet" size="medium" @click="openRequestFlow(focusPet.id)">用它发需求</AppButton>
+          </view>
+        </view>
+
         <view class="pet-metric-grid">
           <view v-for="item in summaryCards" :key="item.label" class="pet-metric-card">
             <text class="pet-metric-card__label">{{ item.label }}</text>
@@ -225,229 +355,372 @@ onPullDownRefresh(() => {
             <text class="pet-metric-card__hint">{{ item.hint }}</text>
           </view>
         </view>
-      </AppSection>
+      </AppCard>
 
-      <AppSection title="编辑档案" description="先把基础资料录全，再补充饮食、医疗和应急信息。">
-        <view class="pet-form-block">
-          <AppInput v-model="petForm.name" label="宠物名" placeholder="例如：可乐" />
-          <AppInput v-model="petForm.breed" label="品种" placeholder="例如：柴犬 / 英短" />
-          <AppInput v-model="petForm.birthday" label="生日" placeholder="例如：2024-05-06" />
-          <AppInput v-model="petForm.weightKg" label="体重" placeholder="例如：5" type="digit" />
+      <AppCard v-if="pets.length" title="切换宠物">
+        <scroll-view class="pet-switcher" scroll-x enable-flex>
+          <view class="pet-switcher__track">
+            <view
+              v-for="pet in pets"
+              :key="pet.id"
+              class="pet-switcher__card"
+              :class="{ 'is-active': pet.id === selectedPetId }"
+              @click="selectPet(pet.id)"
+            >
+              <view class="pet-switcher__card-head">
+                <text class="pet-switcher__name">{{ pet.name }}</text>
+                <AppTag :type="pet.neutered ? 'success' : 'warning'">
+                  {{ pet.neutered ? '已绝育' : '未绝育' }}
+                </AppTag>
+              </view>
+              <text class="pet-switcher__meta">
+                {{ speciesLabels[pet.species] }}{{ pet.breed ? ` · ${pet.breed}` : '' }}
+              </text>
+              <text class="pet-switcher__hint">
+                {{ formatPetTagSummary(pet.temperamentTags) }}
+              </text>
+            </view>
 
-          <view class="pet-form-group">
-            <text class="pet-form-group__label">宠物种类</text>
-            <AppChoiceChips v-model="petForm.species" :options="speciesOptions" />
+            <view class="pet-switcher__add" @click="openCreateMode">
+              <text class="pet-switcher__add-icon">+</text>
+              <text class="pet-switcher__add-text">新增宠物</text>
+            </view>
+          </view>
+        </scroll-view>
+      </AppCard>
+
+      <AppCard v-if="focusPet" title="当前档案">
+        <view class="pet-spotlight">
+          <view class="pet-spotlight__head">
+            <view class="pet-spotlight__headline">
+              <text class="pet-spotlight__title">{{ focusPet.name }}</text>
+              <text class="pet-spotlight__meta">
+                {{ speciesLabels[focusPet.species] }}{{ focusPet.breed ? ` · ${focusPet.breed}` : '' }} · {{ genderLabels[focusPet.gender] }}
+              </text>
+            </view>
+            <AppButton size="medium" type="info" @click="openRequestFlow(focusPet.id)">发布需求</AppButton>
           </view>
 
-          <view class="pet-form-group">
-            <text class="pet-form-group__label">性别</text>
-            <AppChoiceChips v-model="petForm.gender" :options="genderOptions" />
+          <view class="pet-spotlight__stats">
+            <view class="pet-spotlight__stat">
+              <text class="pet-spotlight__stat-label">生日</text>
+              <text class="pet-spotlight__stat-value">{{ formatDate(focusPet.birthday) }}</text>
+            </view>
+            <view class="pet-spotlight__stat">
+              <text class="pet-spotlight__stat-label">体重</text>
+              <text class="pet-spotlight__stat-value">{{ focusPet.weightKg || '-' }}kg</text>
+            </view>
+            <view class="pet-spotlight__stat">
+              <text class="pet-spotlight__stat-label">档案完成度</text>
+              <text class="pet-spotlight__stat-value">{{ completedSectionCount }}/4</text>
+            </view>
           </view>
 
-          <view class="pet-form-group">
-            <text class="pet-form-group__label">是否绝育</text>
-            <AppChoiceChips v-model="petForm.neutered" :options="yesNoOptions" />
+          <view v-if="spotlightTags.length" class="pet-tags">
+            <AppTag v-for="tag in spotlightTags" :key="tag" type="primary">
+              {{ tag }}
+            </AppTag>
           </view>
 
-          <AppInput v-model="petTemperamentTagsText" label="习性标签" placeholder="例如：怕生，亲人，喜欢零食" />
+          <view v-if="spotlightNotes.length" class="pet-note-grid">
+            <view v-for="item in spotlightNotes" :key="item.label" class="pet-note-card">
+              <text class="pet-note-card__label">{{ item.label }}</text>
+              <text class="pet-note-card__value">{{ item.value }}</text>
+            </view>
+          </view>
+        </view>
+      </AppCard>
 
-          <textarea
-            v-model="petForm.feedingNote"
-            class="pet-textarea"
-            :maxlength="240"
-            auto-height
-            placeholder="记录日常喂养频率、忌口、奖励方式"
-          />
-          <textarea
-            v-model="petForm.allergyNote"
-            class="pet-textarea"
-            :maxlength="180"
-            auto-height
-            placeholder="记录过敏源、禁用食物或环境注意事项"
-          />
-          <textarea
-            v-model="petForm.medicalNote"
-            class="pet-textarea"
-            :maxlength="240"
-            auto-height
-            placeholder="记录疾病史、用药提醒和健康观察重点"
-          />
+      <AppCard :title="isCreateMode ? '新建宠物' : `编辑 ${petForm.name || '宠物档案'}`">
+        <view class="pet-editor">
+          <AppChoiceChips v-model="editorSection" :options="editorSectionOptions" />
 
-          <AppInput v-model="petForm.emergencyName" label="紧急联系人" placeholder="例如：张三" />
-          <AppInput v-model="petForm.emergencyPhone" label="紧急电话" placeholder="例如：13800000000" />
-          <AppInput v-model="petForm.emergencyRelation" label="关系说明" placeholder="例如：家人 / 宠物医院" />
+          <template v-if="editorSection === 'PROFILE'">
+            <view class="pet-editor__group">
+              <AppInput v-model="petForm.name" label="宠物名" placeholder="例如：可乐" />
+              <AppInput v-model="petForm.breed" label="品种" placeholder="例如：柴犬 / 英短" />
+              <AppInput v-model="petForm.birthday" label="生日" placeholder="例如：2024-05-06" />
+              <AppInput v-model="petForm.weightKg" label="体重" placeholder="例如：5" type="digit" />
 
-          <view class="pet-action-row">
-            <AppButton size="medium" type="info" @click="resetPetForm">重置</AppButton>
+              <view class="pet-editor__chips">
+                <text class="pet-editor__label">宠物种类</text>
+                <AppChoiceChips v-model="petForm.species" :options="speciesOptions" />
+              </view>
+
+              <view class="pet-editor__chips">
+                <text class="pet-editor__label">性别</text>
+                <AppChoiceChips v-model="petForm.gender" :options="genderOptions" />
+              </view>
+
+              <view class="pet-editor__chips">
+                <text class="pet-editor__label">是否绝育</text>
+                <AppChoiceChips v-model="petForm.neutered" :options="yesNoOptions" />
+              </view>
+            </view>
+          </template>
+
+          <template v-else-if="editorSection === 'CARE'">
+            <view class="pet-editor__group">
+              <AppInput v-model="petTemperamentTagsText" label="习性标签" placeholder="例如：怕生，亲人，喜欢零食" />
+              <view class="pet-editor__textarea-block">
+                <text class="pet-editor__label">喂养提醒</text>
+                <textarea
+                  v-model="petForm.feedingNote"
+                  class="pet-textarea"
+                  :maxlength="240"
+                  auto-height
+                  placeholder="记录喂食频率、忌口、安抚方式"
+                />
+              </view>
+            </view>
+          </template>
+
+          <template v-else-if="editorSection === 'HEALTH'">
+            <view class="pet-editor__group">
+              <view class="pet-editor__textarea-block">
+                <text class="pet-editor__label">过敏与禁忌</text>
+                <textarea
+                  v-model="petForm.allergyNote"
+                  class="pet-textarea"
+                  :maxlength="180"
+                  auto-height
+                  placeholder="记录过敏源、禁用食物或环境注意事项"
+                />
+              </view>
+              <view class="pet-editor__textarea-block">
+                <text class="pet-editor__label">健康观察</text>
+                <textarea
+                  v-model="petForm.medicalNote"
+                  class="pet-textarea"
+                  :maxlength="240"
+                  auto-height
+                  placeholder="记录疾病史、用药提醒和需要重点观察的状态"
+                />
+              </view>
+            </view>
+          </template>
+
+          <template v-else>
+            <view class="pet-editor__group">
+              <AppInput v-model="petForm.emergencyName" label="紧急联系人" placeholder="例如：张三" />
+              <AppInput v-model="petForm.emergencyPhone" label="紧急电话" placeholder="例如：13800000000" />
+              <AppInput v-model="petForm.emergencyRelation" label="关系说明" placeholder="例如：家人 / 宠物医院" />
+            </view>
+          </template>
+
+          <view class="pet-editor__footer">
+            <AppButton size="medium" type="info" @click="resetEditor">
+              {{ focusPet ? '恢复当前档案' : '清空重填' }}
+            </AppButton>
             <AppButton size="medium" :loading="saving" @click="submitPet">
-              {{ editingPetId ? '更新档案' : '保存档案' }}
+              {{ saveButtonLabel }}
             </AppButton>
           </view>
         </view>
-      </AppSection>
-
-      <AppSection title="已建档宠物" description="从这里快速编辑既有档案或直接带入发布需求。">
-        <view v-if="pets.length" class="pet-card-list">
-          <view v-for="pet in pets" :key="pet.id" class="pet-card">
-            <view class="pet-card__header">
-              <view class="pet-card__headline">
-                <text class="pet-card__title">{{ pet.name }}</text>
-                <text class="pet-card__meta">
-                  {{ speciesLabels[pet.species] }}{{ pet.breed ? ` · ${pet.breed}` : '' }} · {{ genderLabels[pet.gender] }}
-                </text>
-              </view>
-              <AppTag :type="pet.neutered ? 'success' : 'warning'">
-                {{ pet.neutered ? '已绝育' : '未绝育' }}
-              </AppTag>
-            </view>
-
-            <view class="pet-card__detail-grid">
-              <text>生日：{{ formatDate(pet.birthday) }}</text>
-              <text>体重：{{ pet.weightKg || '-' }}kg</text>
-              <text>习性：{{ formatPetTagSummary(pet.temperamentTags) }}</text>
-            </view>
-
-            <view v-if="pet.feedingNote || pet.allergyNote || pet.medicalNote" class="pet-card__notes">
-              <text v-if="pet.feedingNote">喂养：{{ pet.feedingNote }}</text>
-              <text v-if="pet.allergyNote">过敏：{{ pet.allergyNote }}</text>
-              <text v-if="pet.medicalNote">医疗：{{ pet.medicalNote }}</text>
-            </view>
-
-            <view v-if="pet.emergencyContact" class="pet-card__detail-grid">
-              <text>紧急联系人：{{ pet.emergencyContact.name }}</text>
-              <text>联系电话：{{ pet.emergencyContact.phone }}</text>
-              <text>关系：{{ pet.emergencyContact.relation || '未填写' }}</text>
-            </view>
-
-            <view class="pet-action-row">
-              <AppButton size="medium" type="info" @click="startEditPet(pet)">编辑档案</AppButton>
-              <AppButton size="medium" @click="openRequestFlow(pet.id)">用它发布需求</AppButton>
-            </view>
-          </view>
-        </view>
-        <view v-else class="pet-empty">
-          <AppStatus :mode="loading ? 'loading' : 'empty'" :text="loading ? '正在同步宠物档案' : '当前还没有宠物档案'" />
-        </view>
-      </AppSection>
+      </AppCard>
     </template>
 
     <template v-else>
-      <AppSection title="开始管理宠物档案">
-        <view class="pet-empty pet-empty--login">
-          <AppStatus text="登录后即可维护宠物档案。" />
+      <AppCard title="登录后继续">
+        <view class="pet-login-state">
+          <AppStatus text="登录后即可切换宠物、维护档案并直接带入需求发布。" />
+          <AppButton block @click="goToLogin">去登录</AppButton>
         </view>
-        <AppButton block @click="goToLogin">去登录</AppButton>
-      </AppSection>
+      </AppCard>
     </template>
   </AppPageShell>
 </template>
 
 <style scoped lang="scss">
-.pet-metric-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.pet-hero,
+.pet-hero__actions,
+.pet-spotlight__head,
+.pet-switcher__card-head,
+.pet-editor__footer {
+  display: flex;
+  justify-content: space-between;
   gap: 16rpx;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
-.pet-metric-card,
-.pet-card {
+.pet-hero {
+  align-items: center;
+}
+
+.pet-hero__copy {
   display: grid;
-  gap: 12rpx;
-  padding: 24rpx;
-  border-radius: 26rpx;
-  border: 1rpx solid var(--app-border);
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfb 100%);
-  box-shadow: 0 12rpx 30rpx rgba(15, 23, 42, 0.06);
+  gap: 8rpx;
 }
 
-.pet-metric-card__label {
+.pet-hero__eyebrow {
   color: var(--app-text-muted);
   font-size: 22rpx;
+  letter-spacing: 0.08em;
 }
 
-.pet-metric-card__value {
+.pet-hero__title,
+.pet-spotlight__title {
   color: var(--app-text);
-  font-size: 40rpx;
-  line-height: 1.05;
+  font-size: 42rpx;
+  line-height: 1.06;
   font-weight: 700;
 }
 
-.pet-metric-card__hint,
-.pet-card__meta,
-.pet-card__detail-grid,
-.pet-card__notes {
-  color: var(--app-text-secondary);
-  font-size: 22rpx;
-  line-height: 1.7;
-}
-
-.pet-form-block,
-.pet-card-list,
-.pet-card__headline,
-.pet-card__detail-grid,
-.pet-card__notes {
-  display: grid;
-  gap: 16rpx;
-}
-
-.pet-form-group {
-  display: grid;
-  gap: 12rpx;
-}
-
-.pet-form-group__label {
+.pet-hero__summary,
+.pet-switcher__meta,
+.pet-switcher__hint,
+.pet-spotlight__meta,
+.pet-note-card__value,
+.pet-metric-card__hint {
   color: var(--app-text-secondary);
   font-size: 24rpx;
-  line-height: 1.5;
+  line-height: 1.65;
+}
+
+.pet-metric-grid,
+.pet-spotlight__stats,
+.pet-note-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-top: 18rpx;
+}
+
+.pet-metric-card,
+.pet-spotlight__stat,
+.pet-note-card {
+  display: grid;
+  gap: 8rpx;
+  padding: 22rpx;
+  border-radius: 24rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+}
+
+.pet-metric-card__label,
+.pet-spotlight__stat-label,
+.pet-note-card__label,
+.pet-editor__label {
+  color: var(--app-text-muted);
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+
+.pet-metric-card__value,
+.pet-spotlight__stat-value {
+  color: var(--app-text);
+  font-size: 34rpx;
+  line-height: 1.1;
+  font-weight: 700;
+}
+
+.pet-switcher {
+  width: 100%;
+}
+
+.pet-switcher__track {
+  display: flex;
+  gap: 18rpx;
+  padding-bottom: 6rpx;
+}
+
+.pet-switcher__card,
+.pet-switcher__add {
+  width: 300rpx;
+  min-height: 200rpx;
+  flex: 0 0 auto;
+  display: grid;
+  align-content: space-between;
+  gap: 12rpx;
+  padding: 22rpx;
+  border-radius: 28rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
+  box-shadow: var(--app-elevation-1);
+  box-sizing: border-box;
+}
+
+.pet-switcher__card.is-active {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--app-accent-soft) 0%, var(--app-surface) 100%);
+  box-shadow: var(--app-elevation-2);
+}
+
+.pet-switcher__name,
+.pet-switcher__add-text {
+  color: var(--app-text);
+  font-size: 30rpx;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.pet-switcher__add {
+  place-items: center;
+  justify-items: center;
+}
+
+.pet-switcher__add-icon {
+  color: var(--app-accent);
+  font-size: 68rpx;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.pet-spotlight,
+.pet-editor,
+.pet-editor__group,
+.pet-editor__chips,
+.pet-editor__textarea-block {
+  display: grid;
+  gap: 18rpx;
+}
+
+.pet-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
 }
 
 .pet-textarea {
   width: 100%;
-  min-height: 150rpx;
+  min-height: 172rpx;
   padding: 24rpx;
-  border-radius: 22rpx;
-  border: 1rpx solid var(--app-border);
-  background: var(--app-surface);
+  border-radius: 24rpx;
+  border: 1rpx solid var(--app-outline-variant);
+  background: linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-container) 100%);
   color: var(--app-text);
   box-sizing: border-box;
   line-height: 1.7;
 }
 
-.pet-card__header {
-  display: flex;
-  justify-content: space-between;
-  gap: 16rpx;
-  align-items: flex-start;
+.pet-editor__footer {
+  position: sticky;
+  bottom: 20rpx;
+  padding: 18rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(18rpx);
+  box-shadow: 0 16rpx 42rpx rgba(15, 23, 42, 0.08);
 }
 
-.pet-card__title {
-  color: var(--app-text);
-  font-size: 30rpx;
-  line-height: 1.3;
-  font-weight: 700;
-}
-
-.pet-action-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-}
-
-.pet-empty {
-  padding: 8rpx 0;
-}
-
-.pet-empty--login {
-  padding-bottom: 28rpx;
+.pet-login-state {
+  display: grid;
+  gap: 22rpx;
 }
 
 @media (max-width: 680px) {
-  .pet-metric-grid {
+  .pet-metric-grid,
+  .pet-spotlight__stats,
+  .pet-note-grid {
     grid-template-columns: 1fr;
   }
 
-  .pet-card__header {
+  .pet-hero,
+  .pet-spotlight__head,
+  .pet-editor__footer {
     flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

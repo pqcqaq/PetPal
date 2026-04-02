@@ -312,6 +312,7 @@ flowchart TD
 - `pages/petpal/request-detail.vue` 已继续补入匹配排序、候选快速切换和“改时间地点 / 改预算要求”直达动作，不再只靠一组静态候选卡片。
 - `pages/petpal/request-detail.vue` 已继续补入基础筛选与横向候选对比，用户可直接按预算内 / 更近 / 更稳筛候选，并就地比较预估金额、评分和距离。
 - `pages/petpal/request-detail.vue` 已继续补入照料者可信信息快照，当前选中区与对比板可直接看到经验、提前预约时长、服务范围、专长与服务承诺。
+- `pages/petpal/pets.vue` 已继续重构为“宠物切换 + 当前档案预览 + 分区编辑”结构，宠物资料不再以整页长表单直接压到首屏。
 - `pages/petpal/checkout.vue` 已继续补入照料者可信信息区，支付前可直接确认介绍、专长、服务承诺和预约限制，不再只看金额。
 - `pages/petpal/payment-result.vue` 已新增独立支付结果页，把“是否到账、当前阶段、下一步做什么”从 `checkout` 中拆出。
 - `pages/petpal/refund-result.vue` 已新增独立退款结果页，把“退到哪一步、已退多少、下一步怎么做”从订单详情长页里拆出。

@@ -105,6 +105,10 @@ Last updated: 2026-04-02
   - 新增 `apps/web-frontend/src/pages/frontend/petpal/PetPalPaymentResultView.vue`、`PetPalRefundResultView.vue`、`PetPalComplaintResultView.vue`、`PetPalReviewResultView.vue` 以及共享 `PetPalOrderResultWorkbench.vue`，把支付 / 退款 / 投诉 / 评价统一承接到独立结果工作台。
   - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue` 已新增支付 / 退款 / 投诉 / 评价结果入口，并支持通过 query action 直开评价 / 投诉动作。
   - Web 端评价与投诉提交成功后已直接回流对应结果页，不再只停留在订单详情弹窗成功提示。
+- 2026-04-02 已继续重构 App 宠物档案页：
+  - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
+  - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。
+  - 页面头部已补齐 UX Blueprint，页面内已去掉原先偏说明式的长描述，改为状态和动作优先。
 - 2026-04-01 已继续完成 App P2 照料者侧重构：
   - 照料者首页改为“今天先做这个 + 当前优先 + 今日订单 + 服务与收益”结构。
   - 履约订单页改为状态筛选 + 任务队列 + 就地服务记录面板，接单、签到、记录服务和签退都可直接执行。
