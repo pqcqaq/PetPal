@@ -5,8 +5,8 @@
     summary="待支付、履约中、已完成和售后中的订单都统一在这里切换查看。"
     :nav-items="petPalOwnerWorkspaceNav"
     active-name="frontend-petpal-orders"
-    :primary-action="{ label: '回主人总览', to: { name: 'frontend-petpal' }, tone: 'secondary' }"
-    :actions="[{ label: '售后中心', to: { name: 'frontend-petpal-aftersales' }, tone: 'secondary' }]"
+    :primary-action="primaryAction"
+    :actions="pageActions"
     :stats="heroStats"
   >
     <template v-if="pageNotice" #notice>
@@ -130,6 +130,32 @@ const filteredOrders = computed(() => orders.value.filter((item) => {
 }));
 const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
 const highlightedOrder = computed(() => orders.value.find((item) => item.id === highlightedOrderId.value) ?? null);
+const activeAftersalesOrder = computed(() => (
+  highlightedOrder.value && isPetPalAftersalesStatus(highlightedOrder.value.orderStatus)
+    ? highlightedOrder.value
+    : orders.value.find((item) => isPetPalAftersalesStatus(item.orderStatus)) ?? null
+));
+const primaryAction = computed(() => ({
+  label: '回主人总览',
+  to: buildOwnerDashboardRoute(
+    orders.value.length
+      ? '这里已经回到主人总览，可继续决定先处理订单、售后还是宠物任务。'
+      : '这里已经回到主人总览，可继续从宠物建档和需求开始主人主流程。',
+  ),
+  tone: 'secondary' as const,
+}));
+const pageActions = computed(() => [
+  {
+    label: '售后中心',
+    to: buildAftersalesRoute(
+      activeAftersalesOrder.value
+        ? '这里已经定位到当前最急的一笔售后订单，可直接继续跟进退款或投诉。'
+        : '这里已经回到售后中心，可继续查看退款和投诉摘要。',
+      activeAftersalesOrder.value?.id,
+    ),
+    tone: 'secondary' as const,
+  },
+]);
 
 const heroStats = computed(() => [
   { label: '订单总数', value: String(orders.value.length), hint: '主人全部交易记录' },
@@ -169,6 +195,23 @@ const resolveOrderFilter = (order: OrderRecord): PetPalDeskOrderFilter => {
   }
   return 'all';
 };
+
+function buildOwnerDashboardRoute(notice: string) {
+  return {
+    name: 'frontend-petpal',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
+
+function buildAftersalesRoute(notice: string, orderId?: string) {
+  return {
+    name: 'frontend-petpal-aftersales',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(orderId ? { focusOrderId: orderId } : {}),
+    }),
+  };
+}
 
 function buildOrderDetailLink(order: OrderRecord) {
   return {

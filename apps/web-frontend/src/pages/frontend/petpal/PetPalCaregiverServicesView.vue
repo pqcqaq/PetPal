@@ -6,7 +6,7 @@
     :nav-items="petPalCaregiverWorkspaceNav"
     active-name="frontend-petpal-caregiver-services"
     :primary-action="primaryAction"
-    :actions="[{ label: '返回照料者总览', to: { name: 'frontend-petpal-caregiver' }, tone: 'secondary' }]"
+    :actions="pageActions"
     :stats="heroStats"
   >
     <template v-if="pageNotice" #notice>
@@ -121,6 +121,19 @@ const primaryAction = computed(() => ({
   to: buildServiceCreateRoute('这里已经定位到新建服务页，可直接继续填写价格、城市和上架状态。'),
   tone: 'primary' as const,
 }));
+const pageActions = computed(() => [
+  {
+    label: '返回照料者总览',
+    to: buildCaregiverDashboardRoute(
+      hasProfile.value
+        ? services.value.length
+          ? '这里已经回到照料者总览，可继续查看服务状态或履约任务。'
+          : '这里已经回到照料者总览，可继续开始第一个服务或查看履约状态。'
+        : '这里已经回到照料者总览，可继续先补齐入驻资料后再维护服务。',
+    ),
+    tone: 'secondary' as const,
+  },
+]);
 
 const heroStats = computed(() => [
   { label: '服务总数', value: String(services.value.length), hint: '上架与停用都在这里' },
@@ -146,6 +159,13 @@ const pageNotice = computed(() => {
 function buildServiceCreateRoute(notice: string) {
   return {
     name: 'frontend-petpal-caregiver-service-create',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
+
+function buildCaregiverDashboardRoute(notice: string) {
+  return {
+    name: 'frontend-petpal-caregiver',
     query: buildPetPalDeskHandoffQuery({ notice }),
   };
 }

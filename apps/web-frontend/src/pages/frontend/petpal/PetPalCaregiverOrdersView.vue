@@ -5,7 +5,7 @@
     summary="履约页只服务当前订单动作，资料和服务配置都回各自页面维护。"
     :nav-items="petPalCaregiverWorkspaceNav"
     active-name="frontend-petpal-caregiver-orders"
-    :actions="[{ label: '返回照料者总览', to: { name: 'frontend-petpal-caregiver' }, tone: 'secondary' }]"
+    :actions="pageActions"
     :stats="heroStats"
   >
     <template v-if="pageNotice" #notice>
@@ -163,6 +163,19 @@ const serviceLogForm = reactive({
 
 const activeOrder = computed(() => orders.value.find((item) => item.id === selectedOrderId.value) ?? null);
 const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
+const pageActions = computed(() => [
+  {
+    label: '返回照料者总览',
+    to: buildCaregiverDashboardRoute(
+      activeOrder.value
+        ? '这里已经回到照料者总览，可继续处理当前履约、服务或资料维护。'
+        : orders.value.length
+          ? '这里已经回到照料者总览，可继续查看履约、服务或资料状态。'
+          : '这里已经回到照料者总览，可继续查看资料和服务入口。',
+    ),
+    tone: 'secondary' as const,
+  },
+]);
 const heroStats = computed(() => [
   { label: '订单总数', value: String(orders.value.length), hint: '照料者全部履约订单' },
   { label: '待接单', value: String(orders.value.filter((item) => item.orderStatus === 'PENDING_ACCEPT').length), hint: '优先处理新订单' },
@@ -189,6 +202,13 @@ const statusTone = (status: CaregiverOrderRecord['orderStatus']) => {
   if (status === 'PENDING_ACCEPT' || status === 'ACCEPTED') return 'is-warning';
   return '';
 };
+
+function buildCaregiverDashboardRoute(notice: string) {
+  return {
+    name: 'frontend-petpal-caregiver',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
 
 function buildOrderDetailLink(orderId: string) {
   return {

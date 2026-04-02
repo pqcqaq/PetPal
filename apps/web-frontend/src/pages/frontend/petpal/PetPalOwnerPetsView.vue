@@ -6,7 +6,7 @@
     :nav-items="petPalOwnerWorkspaceNav"
     active-name="frontend-petpal-pets"
     :primary-action="primaryAction"
-    :actions="[{ label: '返回主人总览', to: { name: 'frontend-petpal' }, tone: 'secondary' }]"
+    :actions="pageActions"
     :stats="heroStats"
   >
     <template v-if="pageNotice" #notice>
@@ -122,6 +122,17 @@ const primaryAction = computed(() => ({
   to: buildOwnerPetCreateRoute('这里已经定位到新建宠物档案，可先补齐第一只宠物后再回来继续主人任务。'),
   tone: 'primary' as const,
 }));
+const pageActions = computed(() => [
+  {
+    label: '返回主人总览',
+    to: buildOwnerDashboardRoute(
+      pets.value.length
+        ? '这里已经回到主人总览，可继续为宠物发需求、查看订单或处理售后。'
+        : '这里已经回到主人总览，可继续开始第一只宠物档案。',
+    ),
+    tone: 'secondary' as const,
+  },
+]);
 
 const heroStats = computed(() => {
   const withEmergencyContact = pets.value.filter((item) => item.emergencyContact?.phone).length;
@@ -151,6 +162,13 @@ const pageNotice = computed(() => {
 function buildOwnerPetCreateRoute(notice: string) {
   return {
     name: 'frontend-petpal-pet-create',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
+
+function buildOwnerDashboardRoute(notice: string) {
+  return {
+    name: 'frontend-petpal',
     query: buildPetPalDeskHandoffQuery({ notice }),
   };
 }

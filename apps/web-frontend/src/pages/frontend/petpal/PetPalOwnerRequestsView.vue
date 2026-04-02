@@ -6,7 +6,7 @@
     :nav-items="petPalOwnerWorkspaceNav"
     active-name="frontend-petpal-requests"
     :primary-action="primaryAction"
-    :actions="[{ label: '返回主人总览', to: { name: 'frontend-petpal' }, tone: 'secondary' }]"
+    :actions="pageActions"
     :stats="heroStats"
   >
     <template v-if="pageNotice" #notice>
@@ -187,6 +187,17 @@ const primaryAction = computed(() => ({
   },
   tone: 'primary' as const,
 }));
+const pageActions = computed(() => [
+  {
+    label: '返回主人总览',
+    to: buildOwnerDashboardRoute(
+      requests.value.length
+        ? '这里已经回到主人总览，可继续查看活跃需求、订单或消息。'
+        : '这里已经回到主人总览，可继续开始新的照料需求。',
+    ),
+    tone: 'secondary' as const,
+  },
+]);
 const heroStats = computed(() => [
   { label: '需求总数', value: String(requests.value.length), hint: '只在这里看需求状态' },
   { label: '活跃需求', value: String(requests.value.filter((item) => ['OPEN', 'MATCHED', 'MATCHING', 'CONFIRMED'].includes(item.status)).length), hint: '建议优先处理活跃条目' },
@@ -209,6 +220,13 @@ const pageNotice = computed(() => {
     tone: hasError ? 'warning' as const : 'accent' as const,
   };
 });
+
+function buildOwnerDashboardRoute(notice: string) {
+  return {
+    name: 'frontend-petpal',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
+}
 
 function buildMatchQuery(request: ServiceRequestRecord): MatchCaregiverQuery {
   return {

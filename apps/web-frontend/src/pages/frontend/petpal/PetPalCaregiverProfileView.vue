@@ -5,7 +5,7 @@
     summary="这页只负责入驻资料，不承接服务上架和履约动作。"
     :nav-items="petPalCaregiverWorkspaceNav"
     active-name="frontend-petpal-caregiver-profile"
-    :actions="[{ label: '返回照料者总览', to: { name: 'frontend-petpal-caregiver' }, tone: 'secondary' }]"
+    :actions="pageActions"
     :stats="heroStats"
   >
     <template v-if="pageNotice" #notice>
@@ -160,6 +160,17 @@ const pageNotice = computed(() => {
     tone: profileState.value === 'error' ? 'warning' as const : 'accent' as const,
   };
 });
+const pageActions = computed(() => [
+  {
+    label: '返回照料者总览',
+    to: buildCaregiverDashboardRoute(
+      profile.value
+        ? '这里已经回到照料者总览，可继续查看审核状态、维护服务或处理履约任务。'
+        : '这里已经回到照料者总览，可继续决定先完善入驻资料还是查看其他入口。',
+    ),
+    tone: 'secondary' as const,
+  },
+]);
 
 const heroStats = computed(() => [
   { label: '审核状态', value: profile.value ? getPetPalCaregiverAuditLabel(profile.value.auditStatus) : '待提交', hint: '保存后平台可继续审核' },
@@ -213,6 +224,13 @@ function appendMaterial() {
   ];
   materialDraft.name = '';
   materialDraft.url = '';
+}
+
+function buildCaregiverDashboardRoute(notice: string) {
+  return {
+    name: 'frontend-petpal-caregiver',
+    query: buildPetPalDeskHandoffQuery({ notice }),
+  };
 }
 
 function removeMaterial(fileId: string) {
