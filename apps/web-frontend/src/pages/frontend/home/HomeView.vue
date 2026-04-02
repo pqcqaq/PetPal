@@ -2,8 +2,8 @@
   <div class="frontend-page">
     <section class="frontend-page__hero">
       <p class="frontend-page__eyebrow">宠托帮 PetPal</p>
-      <h1>把主人、照料者和治理入口拆开，让用户直接去办事。</h1>
-      <p>首页不再承担产品宣讲，只保留进入主人服务台、照料者工作台和后台治理的最快路径。</p>
+      <h1>选择你现在要进入的工作区。</h1>
+      <p>首页只做分流，不再承担介绍、宣讲或功能罗列。主人、照料者和后台治理都各走各的路径。</p>
       <div class="frontend-page__hero-actions">
         <RouterLink class="frontend-page__button is-primary" to="/petpal">进入主人服务台</RouterLink>
         <RouterLink class="frontend-page__button is-secondary" to="/petpal/caregiver">进入照料者工作台</RouterLink>
@@ -11,32 +11,31 @@
       </div>
     </section>
 
-    <section class="frontend-page__section-grid">
-      <article v-for="item in signals" :key="item.label" class="frontend-card home-grid-span-4">
-        <span class="frontend-card__eyebrow">{{ item.label }}</span>
-        <h2>{{ item.value }}</h2>
-        <p>{{ item.note }}</p>
-      </article>
+    <section class="frontend-page__section">
+      <h2>直接进入</h2>
+      <p>每个入口只保留自己的任务，不再把查看、创建、编辑、售后混在一个巨型门户页里。</p>
+      <div class="frontend-route-list">
+        <div v-for="item in routes" :key="item.title" class="frontend-route-row">
+          <div class="frontend-route-row__copy">
+            <span class="frontend-route-row__eyebrow">{{ item.eyebrow }}</span>
+            <h3 class="frontend-route-row__title">{{ item.title }}</h3>
+            <p class="frontend-route-row__meta">{{ item.description }}</p>
+          </div>
+          <div class="frontend-route-row__tail">
+            <RouterLink :to="item.to">{{ item.action }}</RouterLink>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section class="frontend-page__section-grid">
-      <article v-for="card in cards" :key="card.title" class="frontend-card home-grid-span-4">
-        <span class="frontend-card__eyebrow">{{ card.eyebrow }}</span>
-        <h2>{{ card.title }}</h2>
-        <p>{{ card.description }}</p>
-        <ul class="home-list">
-          <li v-for="item in card.bullets" :key="item">{{ item }}</li>
-        </ul>
-      </article>
-    </section>
-
-    <section class="frontend-card">
-      <span class="frontend-card__eyebrow">后台治理</span>
-      <h2>后台已经从前台说明页里抽离。</h2>
-      <div class="home-admin-strip">
-        <div v-for="item in highlights" :key="item.title" class="home-admin-strip__item">
-          <strong>{{ item.title }}</strong>
-          <p>{{ item.description }}</p>
+    <section class="frontend-page__section">
+      <h2>当前重构结果</h2>
+      <p>这里只保留最少但必要的判断信息，帮助用户快速知道产品现在怎么用。</p>
+      <div class="frontend-summary-strip">
+        <div v-for="item in signals" :key="item.label">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+          <p>{{ item.note }}</p>
         </div>
       </div>
     </section>
@@ -46,53 +45,34 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
-import { adminHighlights, capabilityCards, projectSignals } from '../frontend-content';
+import { projectSignals } from '../frontend-content';
 import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();
 const signals = projectSignals.map((item) => ({ ...item }));
-const cards = capabilityCards.map((item) => ({ ...item, bullets: [...item.bullets] }));
-const highlights = adminHighlights.map((item) => ({ ...item }));
 const adminTarget = computed(() => auth.isAuthenticated ? '/petpal-admin' : '/login');
 const adminLabel = computed(() => auth.isAuthenticated ? '进入 PetPal 后台' : '登录 PetPal 后台');
+const routes = computed(() => [
+  {
+    eyebrow: 'Owner',
+    title: '主人服务台',
+    description: '继续宠物建档、需求发布、订单跟进、消息和售后处理。',
+    action: '进入主人服务台',
+    to: '/petpal',
+  },
+  {
+    eyebrow: 'Caregiver',
+    title: '照料者工作台',
+    description: '继续入驻资料、服务设置、履约留痕和收益查看。',
+    action: '进入照料者工作台',
+    to: '/petpal/caregiver',
+  },
+  {
+    eyebrow: 'Admin',
+    title: '后台治理',
+    description: auth.isAuthenticated ? '投诉、审核、回调排查都直接进入后台工作区。' : '后台入口需要先登录，不再经过介绍页。',
+    action: adminLabel.value,
+    to: adminTarget.value,
+  },
+]);
 </script>
-
-<style scoped lang="scss">
-.home-grid-span-4 {
-  grid-column: span 4;
-}
-
-.home-list {
-  margin: 0;
-  padding-left: 18px;
-  color: #62584f;
-  line-height: 1.8;
-}
-
-.home-admin-strip {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.home-admin-strip__item {
-  display: grid;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(44, 37, 29, 0.1);
-}
-
-.home-admin-strip__item strong {
-  color: #2b241f;
-}
-
-@media (max-width: 1080px) {
-  .home-grid-span-4 {
-    grid-column: span 12;
-  }
-
-  .home-admin-strip {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

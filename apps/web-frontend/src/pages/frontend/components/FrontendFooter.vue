@@ -1,11 +1,10 @@
 <template>
   <footer class="frontend-footer">
     <div class="frontend-footer__inner">
-      <section class="frontend-footer__intro">
-        <p class="frontend-footer__eyebrow">PetPal</p>
-        <strong>宠托帮</strong>
-        <small>入口只做分流，真正的操作放进各自工作台。</small>
-      </section>
+      <div class="frontend-footer__meta">
+        <strong>PetPal</strong>
+        <small>公开页只做分流。</small>
+      </div>
 
       <section class="frontend-footer__links">
         <div>
@@ -38,37 +37,29 @@ defineProps<{
 
 .frontend-footer__inner {
   display: grid;
-  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1fr);
+  grid-template-columns: minmax(180px, auto) minmax(0, 1fr);
   gap: 18px;
   width: min(1180px, calc(100vw - 32px));
   margin: 0 auto;
   padding: 0 0 28px;
 }
 
-.frontend-footer__intro {
-  display: grid;
-  gap: 8px;
+.frontend-footer__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 18px 0;
   border-top: 1px solid rgba(44, 37, 29, 0.1);
 }
 
-.frontend-footer__eyebrow {
-  margin: 0;
-  color: #8f6c4f;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-}
-
-.frontend-footer__intro strong {
+.frontend-footer__meta strong {
   color: #2b241f;
-  font-size: 20px;
+  font-size: 18px;
 }
 
-.frontend-footer__intro small {
+.frontend-footer__meta small {
   color: #6b625a;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 
 .frontend-footer__links {
@@ -101,6 +92,11 @@ defineProps<{
 @media (max-width: 900px) {
   .frontend-footer__inner {
     grid-template-columns: 1fr;
+  }
+
+  .frontend-footer__meta {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

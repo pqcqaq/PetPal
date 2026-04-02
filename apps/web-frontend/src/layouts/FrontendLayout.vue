@@ -135,6 +135,33 @@ const userLabel = computed(() => auth.isAuthenticated ? `当前用户 · ${auth.
   grid-template-columns: repeat(12, minmax(0, 1fr));
 }
 
+:deep(.frontend-page__section) {
+  display: grid;
+  gap: 14px;
+  padding-top: 6px;
+}
+
+:deep(.frontend-page__section + .frontend-page__section) {
+  padding-top: 22px;
+  border-top: 1px solid rgba(44, 37, 29, 0.1);
+}
+
+:deep(.frontend-page__section h2) {
+  margin: 0;
+  font-family: 'Playfair Display', 'STSong', serif;
+  color: #2b241f;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.04;
+}
+
+:deep(.frontend-page__section > p) {
+  margin: 0;
+  max-width: 780px;
+  color: #62584f;
+  font-size: 14px;
+  line-height: 1.78;
+}
+
 :deep(.frontend-card) {
   display: grid;
   gap: 12px;
@@ -166,6 +193,103 @@ const userLabel = computed(() => auth.isAuthenticated ? `当前用户 · ${auth.
   line-height: 1.72;
 }
 
+:deep(.frontend-route-list),
+:deep(.frontend-summary-strip),
+:deep(.frontend-note-list) {
+  display: grid;
+  gap: 12px;
+}
+
+:deep(.frontend-route-row) {
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px 0;
+  border-top: 1px solid rgba(44, 37, 29, 0.1);
+}
+
+:deep(.frontend-route-row:first-child) {
+  padding-top: 0;
+  border-top: 0;
+}
+
+:deep(.frontend-route-row__copy) {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 6px;
+}
+
+:deep(.frontend-route-row__eyebrow),
+:deep(.frontend-summary-strip span) {
+  color: #8f7b69;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+:deep(.frontend-route-row__title) {
+  margin: 0;
+  color: #2b241f;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+:deep(.frontend-route-row__meta),
+:deep(.frontend-note-list) {
+  margin: 0;
+  color: #62584f;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+:deep(.frontend-route-row__tail) {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  min-width: 146px;
+  text-align: right;
+}
+
+:deep(.frontend-route-row__tail a),
+:deep(.frontend-route-row__tail button) {
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+:deep(.frontend-summary-strip) {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+:deep(.frontend-summary-strip > div) {
+  display: grid;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(44, 37, 29, 0.08);
+}
+
+:deep(.frontend-summary-strip strong) {
+  color: #2b241f;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+:deep(.frontend-summary-strip p) {
+  margin: 0;
+  color: #62584f;
+  font-size: 14px;
+  line-height: 1.72;
+}
+
+:deep(.frontend-note-list) {
+  padding-left: 18px;
+}
+
 @media (max-width: 900px) {
   .frontend-shell__main {
     padding-top: 14px;
@@ -177,6 +301,17 @@ const userLabel = computed(() => auth.isAuthenticated ? `当前用户 · ${auth.
 
   :deep(.frontend-page__section-grid) {
     grid-template-columns: 1fr;
+  }
+
+  :deep(.frontend-route-row) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  :deep(.frontend-route-row__tail) {
+    justify-items: start;
+    min-width: 0;
+    text-align: left;
   }
 }
 
