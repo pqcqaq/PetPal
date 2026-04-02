@@ -7202,6 +7202,55 @@ flowchart TD
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.162 2026-04-03（P3-M1 Slice 162）
+
+**概述**：延续上一轮的经营明细导出，本轮继续把收益导出补到可筛选状态，先收口时间范围和服务类型两个高频维度，避免照料者每次导出后再到表格里手工删行。
+
+已完成：
+
+- 收益导出补筛选契约与后端过滤：
+  - `packages/api-common/src/types/petpal.ts`
+  - `packages/api-common/src/api/factory.ts`
+  - `apps/backend/src/services/petpal-service.ts`
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增 `CaregiverEarningsExportQuery`，导出链路开始显式支持 `startDate / endDate / serviceType`。
+    - `GET /api/petpal/caregiver/earnings/export` 现在会按完成单的 `appointmentEnd` 过滤时间范围，并支持按服务类型裁剪导出内容。
+    - 已补开始时间晚于结束时间、超长时间窗的后端校验，继续沿用既有导出范围约束。
+- Web 收益页补导出筛选条：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 收益总览区现在支持直接选择导出日期范围和服务类型，并可一键清空筛选。
+    - 页面已明确写出“筛选只影响经营明细，不改变当前摘要和趋势口径”，避免把导出筛选误读成页面统计筛选。
+- 定向测试补强：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 已把收益导出集成测试收紧为“时间窗 + 服务类型”组合过滤断言。
+    - 继续校验非目标订单：超范围完成单、服务类型不匹配完成单、进行中订单和其他照料者订单都不会混入结果。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- 使用 `apps/backend/test/support/backend-testkit.ts` 同一测试基建执行定向脚本，已确认收益导出筛选只命中目标时间窗和服务类型。
+
+代码审计结论：
+
+- 本轮没有改收益摘要接口，筛选能力只作用于经营导出，避免把“页面看板筛选”和“导出筛选”混成一套状态。
+- 已确认时间范围和收益摘要的“近 30 天 / 趋势”保持同样的 `appointmentEnd` 口径，不会出现页面按预约结束统计、导出却按关闭时间筛选的偏差。
+- 已确认导出筛选依旧只针对当前照料者自己的已完成订单，不会因为新增查询参数而放宽数据边界。
+
+风险与缓解：
+
+- 风险：当前收益导出虽然已能按时间和服务类型裁剪，但还没有保存模板、常用时间窗和售后风险导出视角。
+- 缓解：下一轮继续评估是否补导出模板、快捷时间窗或把售后暴露单单独做成经营补充视图。
+
+下一步（1-3）：
+
+1. 继续评估是否为收益导出补快捷时间窗、模板保存或售后风险补充视图。
+2. 继续补系统级主动提醒、保存后回流和更细的弱网恢复说明。
+3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
+
 ### 14.161 2026-04-03（P3-M1 Slice 161）
 
 **概述**：延续上一轮补齐的收益趋势，本轮继续把照料者收益中心补到“可带走”的层面，新增经营明细导出，让收益页不只会看，还能做线下对账与阶段复盘。
@@ -7230,8 +7279,9 @@ flowchart TD
 
 验证结果：
 
-- `node --import tsx --test --test-concurrency=1 --test-name-pattern "caregiver earnings" test/integration/petpal-api.test.ts` 通过。
+- `pnpm -C apps/backend lint` 通过。
 - `pnpm --filter @rbac/web-frontend build` 通过。
+- 使用 `apps/backend/test/support/backend-testkit.ts` 同一测试基建执行定向脚本，已确认空工作簿和“只导出本人已完成订单”两条导出行为。
 
 代码审计结论：
 

@@ -173,7 +173,11 @@ const ownerRefundExportQuerySchema = z.object({
 });
 
 const ownerOrderRefundExportQuerySchema = z.object({});
-const caregiverEarningsExportQuerySchema = z.object({});
+const caregiverEarningsExportQuerySchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  serviceType: z.enum(['BOARDING', 'WALKING', 'FEEDING', 'DOOR_VISIT']).optional(),
+});
 
 const adminComplaintQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
@@ -708,7 +712,7 @@ petpalRouter.get(
     fileName: () => createTimestampedExcelFileName('petpal-caregiver-earnings'),
     sheetName: 'PetPal Caregiver Earnings',
     parseQuery: (query) => caregiverEarningsExportQuerySchema.parse(query ?? {}),
-    queryRows: () => petpalService.listCaregiverEarningsExportRows(),
+    queryRows: (query) => petpalService.listCaregiverEarningsExportRows(query),
     columns: [
       { header: '订单号', width: 24, value: (row) => row.orderNo },
       {

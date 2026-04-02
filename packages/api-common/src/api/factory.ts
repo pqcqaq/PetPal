@@ -45,6 +45,7 @@ import type {
   ComplaintRecord,
   CaregiverAuditPayload,
   CaregiverAuditPage,
+  CaregiverEarningsExportQuery,
   CaregiverEarningsSummaryRecord,
   CaregiverAuditQuery,
   CaregiverOrderPage,
@@ -526,7 +527,7 @@ export const createApiFactory = (options: ClientOptions) => {
           client.request<CaregiverEarningsSummaryRecord>({
             url: '/petpal/caregiver/earnings-summary',
           }),
-        exportEarnings: createDownloadEndpoint(
+        exportEarnings: createDownloadEndpoint<CaregiverEarningsExportQuery>(
           '/petpal/caregiver/earnings/export',
           'petpal-caregiver-earnings.xlsx',
         ),

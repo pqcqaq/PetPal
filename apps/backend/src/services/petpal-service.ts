@@ -250,6 +250,12 @@ type CaregiverEarningsExportRow = {
   closedAt: Date | null;
 };
 
+type CaregiverEarningsExportFilters = {
+  startDate?: Date;
+  endDate?: Date;
+  serviceType?: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
+};
+
 type ComplaintAdminScopeFilters = {
   status?: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
   complaintType?: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
@@ -411,6 +417,23 @@ const normalizeOwnerTransactionExportRange = (
     startDate,
     endDate,
   };
+};
+
+const normalizeCaregiverEarningsExportFilters = (
+  filters: CaregiverEarningsExportFilters,
+): CaregiverEarningsExportFilters => {
+  if (filters.startDate && filters.endDate) {
+    if (filters.startDate.getTime() > filters.endDate.getTime()) {
+      throw badRequest('startDate must be earlier than endDate');
+    }
+
+    const rangeDays = (filters.endDate.getTime() - filters.startDate.getTime()) / DAY_IN_MS;
+    if (rangeDays > OWNER_TRANSACTION_EXPORT_MAX_DAYS) {
+      throw badRequest(`Export date range cannot exceed ${OWNER_TRANSACTION_EXPORT_MAX_DAYS} days`);
+    }
+  }
+
+  return filters;
 };
 
 type CallbackFailureAlertPayload = {
@@ -1915,12 +1938,15 @@ export const petpalService = {
     });
   },
 
-  async listCaregiverEarningsExportRows(): Promise<CaregiverEarningsExportRow[]> {
+  async listCaregiverEarningsExportRows(
+    filters: CaregiverEarningsExportFilters = {},
+  ): Promise<CaregiverEarningsExportRow[]> {
     const actorId = getRequestActorId();
     if (!actorId) {
       throw forbidden('Authentication required');
     }
 
+    const normalizedFilters = normalizeCaregiverEarningsExportFilters(filters);
     const caregiverProfile = await petpalService.getOrCreateCaregiverProfile(actorId);
     if (caregiverProfile.auditStatus !== 'APPROVED') {
       return [];
@@ -1931,6 +1957,27 @@ export const petpalService = {
         caregiverId: caregiverProfile.id,
         deleteAt: null,
         orderStatus: 'COMPLETED',
+        ...(normalizedFilters.serviceType
+          ? {
+              serviceType: normalizedFilters.serviceType,
+            }
+          : {}),
+        ...(normalizedFilters.startDate || normalizedFilters.endDate
+          ? {
+              appointmentEnd: {
+                ...(normalizedFilters.startDate
+                  ? {
+                      gte: normalizedFilters.startDate,
+                    }
+                  : {}),
+                ...(normalizedFilters.endDate
+                  ? {
+                      lte: normalizedFilters.endDate,
+                    }
+                  : {}),
+              },
+            }
+          : {}),
       },
       orderBy: [
         {

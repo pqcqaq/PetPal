@@ -967,7 +967,7 @@ describe('PetPal API integration', () => {
     );
   });
 
-  it('exports caregiver earnings rows for completed orders only', async () => {
+  it('filters caregiver earnings export by appointment end range and service type', async () => {
     const { app, prisma } = context;
     const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
     const ownerSession = await loginAs(app, 'user', 'User123!');
@@ -993,15 +993,27 @@ describe('PetPal API integration', () => {
       },
       select: {
         id: true,
+        name: true,
       },
     });
 
     assert.ok(ownerPet);
 
+    const ownerRecord = await prisma.user.findUnique({
+      where: {
+        id: ownerSession.user.id,
+      },
+      select: {
+        nickname: true,
+      },
+    });
+
+    assert.ok(ownerRecord);
+
     const suffix = Date.now().toString(36);
-    const completedRequest = await prisma.serviceRequest.create({
+    const matchedRequest = await prisma.serviceRequest.create({
       data: {
-        id: `req-earn-export-completed-${suffix}`,
+        id: `req-earn-export-matched-${suffix}`,
         ownerId: ownerSession.user.id,
         petId: ownerPet.id,
         serviceType: 'WALKING',
@@ -1012,6 +1024,42 @@ describe('PetPal API integration', () => {
         locationLng: 120.211,
         budgetAmount: 88,
         demandTags: ['export-completed'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const outOfRangeRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-out-of-range-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'WALKING',
+        startTime: new Date('2026-03-15T09:00:00.000Z'),
+        endTime: new Date('2026-03-15T10:00:00.000Z'),
+        locationText: '杭州市滨江区导出-超范围',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 98,
+        demandTags: ['export-out-of-range'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const mismatchedServiceRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-mismatched-service-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'FEEDING',
+        startTime: new Date('2026-04-01T18:00:00.000Z'),
+        endTime: new Date('2026-04-01T18:30:00.000Z'),
+        locationText: '杭州市滨江区导出-服务不匹配',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 58,
+        demandTags: ['export-mismatched-service'],
         status: 'MATCHED',
         matchedCaregiverId: caregiverProfileResponse.body.data.id,
       },
@@ -1081,16 +1129,16 @@ describe('PetPal API integration', () => {
       },
     });
 
-    const completedOrder = await prisma.orderMain.create({
+    const matchedOrder = await prisma.orderMain.create({
       data: {
-        id: `order-earn-export-completed-${suffix}`,
+        id: `order-earn-export-matched-${suffix}`,
         orderNo: `PP-EARN-EXPORT-${Date.now()}`,
         ownerId: ownerSession.user.id,
         caregiverId: caregiverProfileResponse.body.data.id,
-        serviceRequestId: completedRequest.id,
+        serviceRequestId: matchedRequest.id,
         serviceType: 'WALKING',
-        appointmentStart: completedRequest.startTime,
-        appointmentEnd: completedRequest.endTime,
+        appointmentStart: matchedRequest.startTime,
+        appointmentEnd: matchedRequest.endTime,
         amountTotal: 120,
         amountAdjusted: 0,
         amountPaid: 120,
@@ -1100,10 +1148,48 @@ describe('PetPal API integration', () => {
       },
     });
 
+    const outOfRangeOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-out-of-range-${suffix}`,
+        orderNo: `PP-EARN-OUT-RANGE-${Date.now() + 1}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: outOfRangeRequest.id,
+        serviceType: 'WALKING',
+        appointmentStart: outOfRangeRequest.startTime,
+        appointmentEnd: outOfRangeRequest.endTime,
+        amountTotal: 98,
+        amountAdjusted: 0,
+        amountPaid: 98,
+        amountRefunded: 8,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-03-15T10:15:00.000Z'),
+      },
+    });
+
+    const mismatchedServiceOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-mismatched-service-${suffix}`,
+        orderNo: `PP-EARN-MISMATCH-${Date.now() + 2}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: mismatchedServiceRequest.id,
+        serviceType: 'FEEDING',
+        appointmentStart: mismatchedServiceRequest.startTime,
+        appointmentEnd: mismatchedServiceRequest.endTime,
+        amountTotal: 58,
+        amountAdjusted: 0,
+        amountPaid: 58,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-01T18:40:00.000Z'),
+      },
+    });
+
     const activeOrder = await prisma.orderMain.create({
       data: {
         id: `order-earn-export-active-${suffix}`,
-        orderNo: `PP-EARN-ACTIVE-${Date.now() + 1}`,
+        orderNo: `PP-EARN-ACTIVE-${Date.now() + 3}`,
         ownerId: ownerSession.user.id,
         caregiverId: caregiverProfileResponse.body.data.id,
         serviceRequestId: activeRequest.id,
@@ -1121,7 +1207,7 @@ describe('PetPal API integration', () => {
     const foreignOrder = await prisma.orderMain.create({
       data: {
         id: `order-earn-export-foreign-${suffix}`,
-        orderNo: `PP-EARN-FOREIGN-${Date.now() + 2}`,
+        orderNo: `PP-EARN-FOREIGN-${Date.now() + 4}`,
         ownerId: adminSession.user.id,
         caregiverId: foreignCaregiverProfile.id,
         serviceRequestId: foreignRequest.id,
@@ -1139,6 +1225,11 @@ describe('PetPal API integration', () => {
 
     const exportResponse = await request(app)
       .get('/api/petpal/caregiver/earnings/export')
+      .query({
+        startDate: '2026-04-01T00:00:00.000Z',
+        endDate: '2026-04-02T00:00:00.000Z',
+        serviceType: 'WALKING',
+      })
       .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
       .buffer(true)
       .parse(binaryParser)
@@ -1159,11 +1250,13 @@ describe('PetPal API integration', () => {
       (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
     ).filter(Boolean);
 
-    assert.ok(exportedOrderNos.includes(completedOrder.orderNo));
+    assert.deepEqual(exportedOrderNos, [matchedOrder.orderNo]);
+    assert.ok(!exportedOrderNos.includes(outOfRangeOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(mismatchedServiceOrder.orderNo));
     assert.ok(!exportedOrderNos.includes(activeOrder.orderNo));
     assert.ok(!exportedOrderNos.includes(foreignOrder.orderNo));
 
-    const completedRowIndex = exportedOrderNos.indexOf(completedOrder.orderNo);
+    const completedRowIndex = exportedOrderNos.indexOf(matchedOrder.orderNo);
     assert.ok(completedRowIndex >= 0);
 
     const completedRow = worksheet.getRow(completedRowIndex + 2);

@@ -44,7 +44,7 @@
           </el-button>
           <ListExportButton
             v-else
-            :request="() => api.petpal.caregiver.exportEarnings()"
+            :request="buildEarningsExportRequest"
             label="导出经营明细"
             pending-label="导出中"
             error-message="导出收益明细失败"
@@ -89,13 +89,47 @@
         </template>
       </PetPalDeskEmpty>
 
-      <div v-else class="petpal-metric-grid">
-        <article v-for="item in revenueCards" :key="item.label" class="petpal-metric-card">
-          <p>{{ item.label }}</p>
-          <strong>{{ item.value }}</strong>
-          <span>{{ item.hint }}</span>
-        </article>
-      </div>
+      <template v-else>
+        <div class="petpal-export-toolbar">
+          <div class="petpal-export-toolbar__filters">
+            <el-date-picker
+              v-model="exportDateRange"
+              type="daterange"
+              range-separator="至"
+              start-placeholder="导出开始日期"
+              end-placeholder="导出结束日期"
+              clearable
+            />
+            <el-select
+              v-model="exportServiceType"
+              clearable
+              placeholder="导出全部服务类型"
+              class="petpal-export-toolbar__service"
+            >
+              <el-option
+                v-for="item in petPalServiceTypeOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+            <el-button v-if="hasExportFilters" text @click="clearExportFilters">
+              清空导出筛选
+            </el-button>
+          </div>
+          <p class="petpal-export-toolbar__hint">
+            导出筛选只影响经营明细，不改变当前摘要和趋势口径。
+          </p>
+        </div>
+
+        <div class="petpal-metric-grid">
+          <article v-for="item in revenueCards" :key="item.label" class="petpal-metric-card">
+            <p>{{ item.label }}</p>
+            <strong>{{ item.value }}</strong>
+            <span>{{ item.hint }}</span>
+          </article>
+        </div>
+      </template>
     </PetPalDeskSection>
 
     <div class="petpal-split-grid">
@@ -331,6 +365,7 @@
 
 <script setup lang="ts">
 import type {
+  PetServiceType,
   CaregiverEarningsOrderRecord,
   CaregiverEarningsSummaryRecord,
 } from '@rbac/api-common';
@@ -357,12 +392,15 @@ import {
   getPetPalCaregiverAuditLabel,
   getPetPalServiceTypeLabel,
   petPalCaregiverWorkspaceNav,
+  petPalServiceTypeOptions,
 } from './shared';
 
 const route = useRoute();
 const summary = ref<CaregiverEarningsSummaryRecord | null>(null);
 const summaryState = ref<PetPalSectionLoadState>('idle');
 const sectionReloadingKey = ref<'' | 'summary'>('');
+const exportDateRange = ref<[Date, Date] | null>(null);
+const exportServiceType = ref<PetServiceType | ''>('');
 
 const emptyTotals: CaregiverEarningsSummaryRecord['totals'] = {
   totalIncome: 0,
@@ -429,6 +467,7 @@ const trendGroups = computed(() =>
   })),
 );
 const hasTrendData = computed(() => totals.value.completedOrderCount > 0);
+const hasExportFilters = computed(() => Boolean(exportDateRange.value || exportServiceType.value));
 const revenueCards = computed(() => [
   {
     label: '累计收入',
@@ -542,6 +581,19 @@ function buildProfileRoute(notice: string) {
     name: 'frontend-petpal-caregiver-profile',
     query: buildPetPalDeskHandoffQuery({ notice }),
   };
+}
+
+function clearExportFilters() {
+  exportDateRange.value = null;
+  exportServiceType.value = '';
+}
+
+function buildEarningsExportRequest() {
+  return api.petpal.caregiver.exportEarnings({
+    startDate: exportDateRange.value?.[0]?.toISOString(),
+    endDate: exportDateRange.value?.[1]?.toISOString(),
+    serviceType: exportServiceType.value || undefined,
+  });
 }
 
 function buildOrderDetailLink(orderId: string) {
@@ -666,6 +718,30 @@ onMounted(() => {
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.petpal-export-toolbar {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.petpal-export-toolbar__filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.petpal-export-toolbar__service {
+  width: 220px;
+}
+
+.petpal-export-toolbar__hint {
+  margin: 0;
+  color: #6b625a;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .petpal-metric-grid--compact {
@@ -892,6 +968,14 @@ onMounted(() => {
 @media (max-width: 720px) {
   .petpal-section-actions {
     align-items: stretch;
+  }
+
+  .petpal-export-toolbar__filters {
+    align-items: stretch;
+  }
+
+  .petpal-export-toolbar__service {
+    width: 100%;
   }
 
   .petpal-metric-grid,
