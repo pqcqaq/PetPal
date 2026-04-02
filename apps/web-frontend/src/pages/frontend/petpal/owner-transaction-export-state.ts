@@ -3,6 +3,10 @@ import {
   parsePetPalExportDateRange,
   withPetPalExportDateRange,
 } from './export-date-range';
+import {
+  applyPetPalExportSnapshot,
+  clonePetPalExportSnapshot,
+} from './export-snapshot-helpers';
 
 export type OwnerTransactionExportFilterSnapshot = {
   startDate: string;
@@ -16,6 +20,14 @@ export type OwnerTransactionExportTemplate = OwnerTransactionExportFilterSnapsho
   name: string;
 };
 
+const ownerTransactionExportSnapshotKeys = [
+  'startDate',
+  'endDate',
+  'serviceType',
+  'orderStatus',
+  'orderNoKeyword',
+] as const satisfies ReadonlyArray<keyof OwnerTransactionExportFilterSnapshot>;
+
 export const createEmptyOwnerTransactionExportFilterSnapshot =
 (): OwnerTransactionExportFilterSnapshot => ({
   startDate: '',
@@ -27,25 +39,15 @@ export const createEmptyOwnerTransactionExportFilterSnapshot =
 
 export const cloneOwnerTransactionExportFilterSnapshot = (
   snapshot: OwnerTransactionExportFilterSnapshot,
-): OwnerTransactionExportFilterSnapshot => ({
-  startDate: snapshot.startDate,
-  endDate: snapshot.endDate,
-  serviceType: snapshot.serviceType,
-  orderStatus: snapshot.orderStatus,
-  orderNoKeyword: snapshot.orderNoKeyword,
-});
+): OwnerTransactionExportFilterSnapshot => clonePetPalExportSnapshot(
+  snapshot,
+  ownerTransactionExportSnapshotKeys,
+);
 
 export const applyOwnerTransactionExportFilterSnapshot = (
   target: OwnerTransactionExportFilterSnapshot,
   snapshot: OwnerTransactionExportFilterSnapshot,
-) => {
-  target.startDate = snapshot.startDate;
-  target.endDate = snapshot.endDate;
-  target.serviceType = snapshot.serviceType;
-  target.orderStatus = snapshot.orderStatus;
-  target.orderNoKeyword = snapshot.orderNoKeyword;
-  return target;
-};
+) => applyPetPalExportSnapshot(target, snapshot, ownerTransactionExportSnapshotKeys);
 
 export const parseOwnerTransactionExportDateRange = (
   snapshot: OwnerTransactionExportFilterSnapshot,

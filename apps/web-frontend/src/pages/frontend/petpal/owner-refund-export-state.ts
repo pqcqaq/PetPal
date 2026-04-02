@@ -11,6 +11,10 @@ import {
   parsePetPalExportDateRange,
   withPetPalExportDateRange,
 } from './export-date-range';
+import {
+  applyPetPalExportSnapshot,
+  clonePetPalExportSnapshot,
+} from './export-snapshot-helpers';
 
 export type OwnerRefundExportFilterSnapshot = {
   startDate: string;
@@ -28,6 +32,18 @@ export type OwnerRefundExportTemplate = OwnerRefundExportFilterSnapshot & {
   name: string;
 };
 
+const ownerRefundExportSnapshotKeys = [
+  'startDate',
+  'endDate',
+  'refundType',
+  'refundStatus',
+  'complaintStatus',
+  'complaintType',
+  'complaintTargetRole',
+  'serviceType',
+  'orderNoKeyword',
+] as const satisfies ReadonlyArray<keyof OwnerRefundExportFilterSnapshot>;
+
 export const createEmptyOwnerRefundExportFilterSnapshot = (): OwnerRefundExportFilterSnapshot => ({
   startDate: '',
   endDate: '',
@@ -42,33 +58,15 @@ export const createEmptyOwnerRefundExportFilterSnapshot = (): OwnerRefundExportF
 
 export const cloneOwnerRefundExportFilterSnapshot = (
   snapshot: OwnerRefundExportFilterSnapshot,
-): OwnerRefundExportFilterSnapshot => ({
-  startDate: snapshot.startDate,
-  endDate: snapshot.endDate,
-  refundType: snapshot.refundType,
-  refundStatus: snapshot.refundStatus,
-  complaintStatus: snapshot.complaintStatus,
-  complaintType: snapshot.complaintType,
-  complaintTargetRole: snapshot.complaintTargetRole,
-  serviceType: snapshot.serviceType,
-  orderNoKeyword: snapshot.orderNoKeyword,
-});
+): OwnerRefundExportFilterSnapshot => clonePetPalExportSnapshot(
+  snapshot,
+  ownerRefundExportSnapshotKeys,
+);
 
 export const applyOwnerRefundExportFilterSnapshot = (
   target: OwnerRefundExportFilterSnapshot,
   snapshot: OwnerRefundExportFilterSnapshot,
-) => {
-  target.startDate = snapshot.startDate;
-  target.endDate = snapshot.endDate;
-  target.refundType = snapshot.refundType;
-  target.refundStatus = snapshot.refundStatus;
-  target.complaintStatus = snapshot.complaintStatus;
-  target.complaintType = snapshot.complaintType;
-  target.complaintTargetRole = snapshot.complaintTargetRole;
-  target.serviceType = snapshot.serviceType;
-  target.orderNoKeyword = snapshot.orderNoKeyword;
-  return target;
-};
+) => applyPetPalExportSnapshot(target, snapshot, ownerRefundExportSnapshotKeys);
 
 export const parseOwnerRefundExportDateRange = (
   snapshot: OwnerRefundExportFilterSnapshot,

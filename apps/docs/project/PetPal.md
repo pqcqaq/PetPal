@@ -7874,6 +7874,52 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.183 2026-04-03（P3-M1 Slice 183）
+
+**概述**：延续上一轮把照料者收益导出状态抽成独立模块的收口，本轮继续处理三份导出状态文件里还在重复的字段级 snapshot 拷贝逻辑，把 clone/apply 这层再抽成共享 helper，让状态模块只保留字段清单和各自的查询语义。
+
+已完成：
+
+- 提取共享 export snapshot helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/export-snapshot-helpers.ts`
+    - 新增 `clonePetPalExportSnapshot`，统一承接按字段清单克隆快照对象的逻辑。
+    - 新增 `applyPetPalExportSnapshot`，统一承接按字段清单把快照写回目标对象的逻辑。
+- 三份导出状态模块改走共享 snapshot helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/owner-refund-export-state.ts`
+    - 退款导出状态已改成用字段清单驱动 clone/apply，不再手写九个字段的逐个拷贝。
+  - `apps/web-frontend/src/pages/frontend/petpal/owner-transaction-export-state.ts`
+    - 交易导出状态已改成用字段清单驱动 clone/apply，不再手写五个字段的逐个拷贝。
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-earnings-export-state.ts`
+    - 收益导出状态已改成用字段清单驱动 clone/apply，`datePreset` 和 `riskOnly` 仍保留在本页字段清单内。
+- 新增定向单测：
+  - `apps/web-frontend/test/petpal-export-snapshot-helpers.test.ts`
+    - 覆盖共享 snapshot helper 的克隆和写回行为。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-export-snapshot-helpers.test.ts ..\\web-frontend\\test\\owner-refund-export-state.test.ts ..\\web-frontend\\test\\owner-transaction-export-state.test.ts ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增导出字段、后端契约或页面交互，只继续收口 Web 前端导出状态层里重复的字段拷贝逻辑。
+- 已确认三份状态模块仍各自保留自己的空快照、筛选存在性判断和查询构建逻辑，因此不会因为共享 clone/apply helper 把不同导出业务错误耦合。
+- 已确认收益导出状态里的 `datePreset` 与 `riskOnly` 仍然受当前页面字段清单约束，不会被主人侧导出状态误带入。
+
+风险与缓解：
+
+- 风险：三份状态模块现在共享了字段拷贝 helper，但 `has*Filters` 和 `build*Query` 仍然是并行实现，后续如果继续新增导出页，仍要注意不要过度泛化不同业务语义。
+- 缓解：下一轮继续优先评估是否只抽关键词 `trim()` 和空值转 `undefined` 这类纯序列化规则，避免直接把不同导出查询强行合并。
+
+下一步（1-3）：
+
+1. 继续评估三份导出状态模块里可共享的纯序列化规则，例如关键词 `trim()` 和空值归一化，减少 query builder 里的机械重复。
+2. 继续评估是否把字段清单和空快照默认值再进一步靠拢，但保持收益页特有字段不被过度抽象。
+3. 在导出状态层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
 ### 14.172 2026-04-03（P3-M1 Slice 172）
 
 **概述**：延续退款原因关键词专项导出，本轮继续把照料者经营明细推进到“能按投诉摘要检索复盘”的层面，新增投诉摘要关键词筛选，让照料者可以快速定位服务争议、平台流程异常、处理结论等特定投诉上下文的完成订单。

@@ -11,6 +11,10 @@ import {
   parsePetPalExportDateRange,
   withPetPalExportDateRange,
 } from './export-date-range';
+import {
+  applyPetPalExportSnapshot,
+  clonePetPalExportSnapshot,
+} from './export-snapshot-helpers';
 
 export type EarningsExportDatePreset = '' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
 
@@ -34,6 +38,22 @@ export type CaregiverEarningsExportTemplate = CaregiverEarningsExportFilterSnaps
   name: string;
 };
 
+const caregiverEarningsExportSnapshotKeys = [
+  'startDate',
+  'endDate',
+  'serviceType',
+  'orderNoKeyword',
+  'refundType',
+  'refundStatus',
+  'refundReasonKeyword',
+  'complaintStatus',
+  'complaintType',
+  'complaintKeyword',
+  'complaintTargetRole',
+  'datePreset',
+  'riskOnly',
+] as const satisfies ReadonlyArray<keyof CaregiverEarningsExportFilterSnapshot>;
+
 export const createEmptyCaregiverEarningsExportFilterSnapshot =
 (): CaregiverEarningsExportFilterSnapshot => ({
   startDate: '',
@@ -53,41 +73,15 @@ export const createEmptyCaregiverEarningsExportFilterSnapshot =
 
 export const cloneCaregiverEarningsExportFilterSnapshot = (
   snapshot: CaregiverEarningsExportFilterSnapshot,
-): CaregiverEarningsExportFilterSnapshot => ({
-  startDate: snapshot.startDate,
-  endDate: snapshot.endDate,
-  serviceType: snapshot.serviceType,
-  orderNoKeyword: snapshot.orderNoKeyword,
-  refundType: snapshot.refundType,
-  refundStatus: snapshot.refundStatus,
-  refundReasonKeyword: snapshot.refundReasonKeyword,
-  complaintStatus: snapshot.complaintStatus,
-  complaintType: snapshot.complaintType,
-  complaintKeyword: snapshot.complaintKeyword,
-  complaintTargetRole: snapshot.complaintTargetRole,
-  datePreset: snapshot.datePreset,
-  riskOnly: snapshot.riskOnly,
-});
+): CaregiverEarningsExportFilterSnapshot => clonePetPalExportSnapshot(
+  snapshot,
+  caregiverEarningsExportSnapshotKeys,
+);
 
 export const applyCaregiverEarningsExportFilterSnapshot = (
   target: CaregiverEarningsExportFilterSnapshot,
   snapshot: CaregiverEarningsExportFilterSnapshot,
-) => {
-  target.startDate = snapshot.startDate;
-  target.endDate = snapshot.endDate;
-  target.serviceType = snapshot.serviceType;
-  target.orderNoKeyword = snapshot.orderNoKeyword;
-  target.refundType = snapshot.refundType;
-  target.refundStatus = snapshot.refundStatus;
-  target.refundReasonKeyword = snapshot.refundReasonKeyword;
-  target.complaintStatus = snapshot.complaintStatus;
-  target.complaintType = snapshot.complaintType;
-  target.complaintKeyword = snapshot.complaintKeyword;
-  target.complaintTargetRole = snapshot.complaintTargetRole;
-  target.datePreset = snapshot.datePreset;
-  target.riskOnly = snapshot.riskOnly;
-  return target;
-};
+) => applyPetPalExportSnapshot(target, snapshot, caregiverEarningsExportSnapshotKeys);
 
 export const parseCaregiverEarningsExportDateRange = (
   snapshot: CaregiverEarningsExportFilterSnapshot,
