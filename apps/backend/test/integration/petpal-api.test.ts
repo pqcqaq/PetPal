@@ -1760,6 +1760,277 @@ describe('PetPal API integration', () => {
     assert.equal(complaintFilteredRow.getCell(5).value, '杭州市滨江区导出-投诉待处理');
   });
 
+  it('filters caregiver earnings export by complaint type', async () => {
+    const { app, prisma } = context;
+    const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
+    const ownerSession = await loginAs(app, 'user', 'User123!');
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+
+    const caregiverProfileResponse = await request(app)
+      .get('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    await prisma.caregiverProfile.update({
+      where: {
+        id: caregiverProfileResponse.body.data.id,
+      },
+      data: {
+        auditStatus: 'APPROVED',
+      },
+    });
+
+    const ownerPet = await prisma.petProfile.findFirst({
+      where: {
+        ownerId: ownerSession.user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    assert.ok(ownerPet);
+
+    const suffix = Date.now().toString(36);
+    const feeComplaintRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-complaint-fee-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-07T09:00:00.000Z'),
+        endTime: new Date('2026-04-07T11:00:00.000Z'),
+        locationText: '杭州市滨江区导出-费用争议',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 188,
+        demandTags: ['export-complaint-fee'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const serviceComplaintRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-complaint-service-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-07T12:00:00.000Z'),
+        endTime: new Date('2026-04-07T14:00:00.000Z'),
+        locationText: '杭州市滨江区导出-服务质量',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 176,
+        demandTags: ['export-complaint-service'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const safeRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-complaint-type-safe-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-07T15:00:00.000Z'),
+        endTime: new Date('2026-04-07T17:00:00.000Z'),
+        locationText: '杭州市滨江区导出-无投诉类型',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 166,
+        demandTags: ['export-complaint-type-safe'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const existingForeignCaregiverProfile = await prisma.caregiverProfile.findFirst({
+      where: {
+        userId: adminSession.user.id,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const foreignCaregiverProfile =
+      existingForeignCaregiverProfile ??
+      (await prisma.caregiverProfile.create({
+        data: {
+          id: `caregiver-export-complaint-type-foreign-${suffix}`,
+          userId: adminSession.user.id,
+          experienceYears: 2,
+          serviceRadiusKm: 5,
+          serviceCity: '杭州',
+          auditStatus: 'APPROVED',
+        },
+        select: {
+          id: true,
+        },
+      }));
+
+    const foreignComplaintRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-complaint-type-foreign-${suffix}`,
+        ownerId: adminSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-07T10:00:00.000Z'),
+        endTime: new Date('2026-04-07T13:00:00.000Z'),
+        locationText: '杭州市滨江区导出-外部费用争议',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 199,
+        demandTags: ['export-complaint-type-foreign'],
+        status: 'MATCHED',
+        matchedCaregiverId: foreignCaregiverProfile.id,
+      },
+    });
+
+    const feeComplaintOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-complaint-fee-${suffix}`,
+        orderNo: `PP-EARN-COMPLAINT-FEE-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: feeComplaintRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: feeComplaintRequest.startTime,
+        appointmentEnd: feeComplaintRequest.endTime,
+        amountTotal: 188,
+        amountAdjusted: 0,
+        amountPaid: 188,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-07T11:15:00.000Z'),
+      },
+    });
+
+    const serviceComplaintOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-complaint-service-${suffix}`,
+        orderNo: `PP-EARN-COMPLAINT-SERVICE-${Date.now() + 1}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: serviceComplaintRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: serviceComplaintRequest.startTime,
+        appointmentEnd: serviceComplaintRequest.endTime,
+        amountTotal: 176,
+        amountAdjusted: 0,
+        amountPaid: 176,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-07T14:20:00.000Z'),
+      },
+    });
+
+    const safeOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-complaint-type-safe-${suffix}`,
+        orderNo: `PP-EARN-COMPLAINT-TYPE-SAFE-${Date.now() + 2}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: safeRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: safeRequest.startTime,
+        appointmentEnd: safeRequest.endTime,
+        amountTotal: 166,
+        amountAdjusted: 0,
+        amountPaid: 166,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-07T17:10:00.000Z'),
+      },
+    });
+
+    const foreignComplaintOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-complaint-type-foreign-${suffix}`,
+        orderNo: `PP-EARN-COMPLAINT-TYPE-FOREIGN-${Date.now() + 3}`,
+        ownerId: adminSession.user.id,
+        caregiverId: foreignCaregiverProfile.id,
+        serviceRequestId: foreignComplaintRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: foreignComplaintRequest.startTime,
+        appointmentEnd: foreignComplaintRequest.endTime,
+        amountTotal: 199,
+        amountAdjusted: 0,
+        amountPaid: 199,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-07T13:15:00.000Z'),
+      },
+    });
+
+    await prisma.complaint.create({
+      data: {
+        id: `complaint-export-fee-${suffix}`,
+        orderId: feeComplaintOrder.id,
+        complainantId: ownerSession.user.id,
+        targetRole: 'CAREGIVER',
+        complaintType: 'FEE',
+        description: '导出筛选需要命中费用争议订单',
+        status: 'OPEN',
+      },
+    });
+
+    await prisma.complaint.create({
+      data: {
+        id: `complaint-export-service-${suffix}`,
+        orderId: serviceComplaintOrder.id,
+        complainantId: ownerSession.user.id,
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: '导出筛选需要排除服务质量投诉订单',
+        status: 'OPEN',
+      },
+    });
+
+    await prisma.complaint.create({
+      data: {
+        id: `complaint-export-fee-foreign-${suffix}`,
+        orderId: foreignComplaintOrder.id,
+        complainantId: adminSession.user.id,
+        targetRole: 'CAREGIVER',
+        complaintType: 'FEE',
+        description: '导出筛选需要排除外部照料者费用争议订单',
+        status: 'OPEN',
+      },
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings/export')
+      .query({
+        startDate: '2026-04-07T00:00:00.000Z',
+        endDate: '2026-04-08T00:00:00.000Z',
+        serviceType: 'BOARDING',
+        complaintType: 'FEE',
+      })
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    const exportedOrderNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(exportedOrderNos, [feeComplaintOrder.orderNo]);
+    assert.ok(!exportedOrderNos.includes(serviceComplaintOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(safeOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(foreignComplaintOrder.orderNo));
+
+    const complaintTypeFilteredRow = worksheet.getRow(2);
+    assert.equal(complaintTypeFilteredRow.getCell(1).value, feeComplaintOrder.orderNo);
+    assert.equal(complaintTypeFilteredRow.getCell(5).value, '杭州市滨江区导出-费用争议');
+  });
+
   it('supports caregiver fulfillment actions and owner completion workflow', async () => {
     const { app, prisma, ownerSession, caregiverSession, caregiverProfile, order } =
       await createFulfillmentScenario();
