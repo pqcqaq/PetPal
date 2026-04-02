@@ -6966,6 +6966,69 @@ flowchart TD
 2. 继续补系统级主动提醒、跨页面主动引导和更细的结果回流。
 3. 在结果页链路基本稳定后，再集中补更多弱网态和最终验收收口。
 
+### 14.143 2026-04-02（P3-M1 Slice 143）
+
+**概述**：继续推进 Web 前台体验收口，本轮把结果页、提醒中心、订单队列、消息中心、售后中心、履约队列和订单详情之间的上下文回流统一起来，并补齐局部失败后的定向重试，避免用户被重新丢回无焦点页面。
+
+已完成：
+
+- 新增 Web 前台统一 notice 与 handoff 工具：
+  - `apps/web-frontend/src/pages/frontend/petpal/rebuild/petpal-desk-notice.vue`
+    - 新增紧凑 notice 组件，统一承接“从上一页回流而来”的提示和“当前分区尚未刷新完成”的状态说明。
+  - `apps/web-frontend/src/pages/frontend/petpal/rebuild/petpal-desk-page.vue`
+    - 已新增 `notice` 槽位，工作台页首屏现在可以稳定承接回流提示，不再只能依赖 toast。
+  - `apps/web-frontend/src/pages/frontend/petpal/recovery.ts`
+    - 已补齐 `notice / focusOrderId / focusRole / focusFilter / tab` 一组 handoff query 解析与构建工具。
+    - 继续复用 `runPetPalSectionRetry`，把“只重试当前分区”固定为统一模式。
+- 收口 Web 主工作台的焦点回流：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerOrdersView.vue`
+    - 订单队列已支持按 query 恢复筛选和焦点订单。
+    - 回流订单会带高亮，不再要求用户进来后重新找是哪一笔。
+    - 当订单队列刷新失败时，已支持只重试订单队列。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalMessagesView.vue`
+    - 已支持按 query 恢复主人 / 照料者视角和焦点会话。
+    - 主人侧和照料者侧会话现在可以分开重试，不再整页全刷。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalAftersalesView.vue`
+    - 已支持按 query 恢复焦点售后订单，并提示退款 / 投诉摘要是否有部分未刷新完成。
+    - 售后中心现在支持只重试当前售后摘要，不再整页退回空态。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverOrdersView.vue`
+    - 已支持按 query 恢复焦点履约订单，并把提醒或结果回流定位到正确订单。
+    - 履约队列刷新失败时，已支持只重试履约队列。
+- 收口订单详情的定向落点与局部恢复：
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+    - 已支持按 `tab=messages|service|aftersales` 直接滚动到沟通 / 履约 / 售后分区。
+    - 沟通区和售后区现在各自维护加载状态，可只重试沟通区或售后区，不再一处失败整页都失去上下文。
+- 接通结果页与提醒中心的上下文回流：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOrderResultWorkbench.vue`
+    - 支付 / 退款 / 投诉 / 评价结果页返回时，已改为带上下文跳回订单队列、售后中心、消息中心或订单详情。
+    - 结果页首屏“下一步”统计现在会根据当前模式和订单状态动态变化，不再统一写成泛化提示。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalRemindersView.vue`
+    - 待支付、售后中、未读消息、待履约等提醒现在会把用户直接带到正确工作台并锁定当前最该处理的一笔订单。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，所有回流、焦点恢复和局部重试都基于现有订单、消息、退款进度、投诉记录和履约列表接口完成。
+- 已确认“局部失败恢复态”没有回退为整页 toast 逻辑，而是落到对应工作台和对应分区，减少用户重新找上下文的成本。
+- 已确认结果页、提醒中心和订单详情之间已经形成一套统一的 handoff query 约定，后续页面可以继续沿用同一机制扩展。
+
+风险与缓解：
+
+- 风险：Web 端核心工作台虽然已经补齐上下文回流和局部重试，但主人 / 照料者总览及少量辅助页仍有残余说明式布局，系统级主动提醒也仍未真正落地。
+- 缓解：下一轮继续优先清理总览与辅助页里的残余说明块，并把更多主动引导从“静态入口”推进到“按当前焦点订单直接分发任务”。
+
+下一步（1-3）：
+
+1. 继续清理主人总览、照料者总览和其他辅助页里的残余说明式布局，把 notice / handoff / retry 机制继续推广到剩余高频页。
+2. 继续补更细的系统级主动提醒、跨角色动态引导和更多弱网恢复细节，避免当前只停留在页面内回流。
+3. 在 Web / App 主路径都稳定后，再集中补更多验收向测试、审计收口与最终交付材料。
+
 ### 14.135 2026-04-02（P1-M1 Slice 127）
 
 **概述**：继续推进 App 核心任务页重构，本轮沿订单详情页往下收口，把沟通 / 履约 / 售后三块旧式信息区改成更接近手机 App 的任务工作区。

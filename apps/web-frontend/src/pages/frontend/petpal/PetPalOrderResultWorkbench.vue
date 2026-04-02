@@ -221,12 +221,14 @@ import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import { buildPetPalDeskHandoffQuery, type PetPalDeskOrderFilter } from './recovery';
 import {
   formatPetPalMoney,
   formatPetPalRange,
   getPetPalComplaintStatusLabel,
   getPetPalComplaintTargetRoleLabel,
   getPetPalComplaintTypeLabel,
+  getPetPalConversationUnreadCount,
   getPetPalOrderStatusLabel,
   getPetPalRefundProgressStageLabel,
   getPetPalServiceTypeLabel,
@@ -288,9 +290,60 @@ const heroActions = computed(() => {
   if (!order.value) {
     return [{ label: '返回订单队列', to: { name: 'frontend-petpal-orders' }, tone: 'secondary' as const }];
   }
+  const activeOrder = order.value;
   return [
-    { label: '返回订单详情', to: { name: 'frontend-petpal-order-detail', params: { id: order.value.id } }, tone: 'secondary' as const },
-    { label: '返回订单队列', to: { name: 'frontend-petpal-orders' }, tone: 'secondary' as const },
+    {
+      label: props.mode === 'refund' || props.mode === 'complaint'
+        ? '回售后中心继续跟进'
+        : props.mode === 'review' && getPetPalConversationUnreadCount(activeOrder.conversation, 'owner')
+          ? '回消息中心看最新沟通'
+          : '回订单队列继续处理',
+      to: props.mode === 'refund' || props.mode === 'complaint'
+        ? {
+            name: 'frontend-petpal-aftersales',
+            query: buildPetPalDeskHandoffQuery({
+              notice: '这笔订单仍在售后链路中，可直接继续查看退款和投诉摘要。',
+              focusOrderId: activeOrder.id,
+            }),
+          }
+        : props.mode === 'review' && getPetPalConversationUnreadCount(activeOrder.conversation, 'owner')
+          ? {
+              name: 'frontend-petpal-messages',
+              query: buildPetPalDeskHandoffQuery({
+                notice: '评价已提交，如需继续沟通可直接回到这笔订单。',
+                focusOrderId: activeOrder.id,
+                focusRole: 'owner',
+              }),
+            }
+          : {
+              name: 'frontend-petpal-orders',
+              query: buildPetPalDeskHandoffQuery({
+                notice: props.mode === 'payment'
+                  ? '支付结果已更新，可继续跟进这笔订单。'
+                  : '这笔订单的处理结果已更新，可继续在订单队列里跟进。',
+                focusOrderId: activeOrder.id,
+                focusFilter: resolveOrderFilter(activeOrder),
+              }),
+            },
+      tone: 'secondary' as const,
+    },
+    {
+      label: '返回订单详情',
+      to: {
+        name: 'frontend-petpal-order-detail',
+        params: { id: activeOrder.id },
+        query: buildPetPalDeskHandoffQuery({
+          notice: props.mode === 'refund' || props.mode === 'complaint'
+            ? '当前结果对应售后分区，可直接继续查看订单内摘要。'
+            : props.mode === 'payment'
+              ? '支付结果已更新，可直接回订单概览继续跟单。'
+              : '评价结果已更新，可直接回订单概览继续查看状态。',
+          focusOrderId: activeOrder.id,
+          tab: props.mode === 'refund' || props.mode === 'complaint' ? 'aftersales' : 'summary',
+        }),
+      },
+      tone: 'secondary' as const,
+    },
   ];
 });
 
@@ -298,7 +351,7 @@ const heroStats = computed(() => [
   { label: '当前页面', value: pageTitle.value, hint: '动作已从订单详情拆开' },
   { label: '订单状态', value: order.value ? getPetPalOrderStatusLabel(order.value.orderStatus) : '--', hint: '先确认当前阶段' },
   { label: props.mode === 'complaint' ? '投诉数' : props.mode === 'refund' ? '退款数' : props.mode === 'review' ? '评价状态' : '待支付', value: modeMetric.value, hint: modeMetricHint.value },
-  { label: '下一步', value: '看摘要后处理', hint: '结果页不再混入其它流程' },
+  { label: '下一步', value: nextStepLabel.value, hint: '结果页只负责承接后续动作' },
 ]);
 
 const modeMetric = computed(() => {
@@ -329,6 +382,38 @@ const modeMetricHint = computed(() => {
   }
   return '根据支付状态决定是否继续付款';
 });
+
+const nextStepLabel = computed(() => {
+  if (!order.value) {
+    return '回订单队列';
+  }
+  if (props.mode === 'refund' || props.mode === 'complaint') {
+    return '回售后中心';
+  }
+  if (props.mode === 'review' && getPetPalConversationUnreadCount(order.value.conversation, 'owner')) {
+    return '回消息中心';
+  }
+  if (props.mode === 'payment' && isPetPalOutstandingOrder(order.value)) {
+    return '继续完成支付';
+  }
+  return '回订单继续跟进';
+});
+
+function resolveOrderFilter(record: OrderDetailRecord): PetPalDeskOrderFilter {
+  if (isPetPalOutstandingOrder(record)) {
+    return 'needs_payment';
+  }
+  if (['DISPUTED', 'PARTIAL_REFUNDED', 'REFUNDED'].includes(record.orderStatus)) {
+    return 'aftersales';
+  }
+  if (['PENDING_ACCEPT', 'ACCEPTED', 'SERVING'].includes(record.orderStatus)) {
+    return 'active';
+  }
+  if (record.orderStatus === 'COMPLETED') {
+    return 'done';
+  }
+  return 'all';
+}
 
 async function loadPage() {
   if (!orderId.value) {

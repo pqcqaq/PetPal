@@ -44,6 +44,10 @@
         </div>
       </div>
 
+      <div v-if="$slots.notice" class="petpal-desk-page__notice">
+        <slot name="notice" />
+      </div>
+
       <div v-if="stats.length" class="petpal-desk-page__stats">
         <div v-for="item in stats" :key="item.label" class="petpal-desk-page__stat">
           <span>{{ item.label }}</span>
@@ -193,6 +197,11 @@ withDefaults(defineProps<{
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.petpal-desk-page__notice {
+  display: grid;
+  gap: 12px;
 }
 
 .petpal-desk-page__stat {

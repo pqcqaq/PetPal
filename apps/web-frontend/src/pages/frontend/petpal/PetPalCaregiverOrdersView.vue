@@ -8,6 +8,21 @@
     :actions="[{ label: '返回照料者总览', to: { name: 'frontend-petpal-caregiver' }, tone: 'secondary' }]"
     :stats="heroStats"
   >
+    <template v-if="pageNotice" #notice>
+      <PetPalDeskNotice eyebrow="Handoff" :title="pageNotice.title" :description="pageNotice.description" :tone="pageNotice.tone">
+        <template #actions>
+          <el-button
+            v-if="loadState === 'error'"
+            :loading="sectionReloadingKey === 'orders'"
+            @click="retryOrders"
+          >
+            重试履约队列
+          </el-button>
+          <RouterLink v-else-if="activeOrder" :to="buildOrderDetailLink(activeOrder.id)">进入当前订单</RouterLink>
+        </template>
+      </PetPalDeskNotice>
+    </template>
+
     <div class="petpal-split-grid">
       <PetPalDeskSection class="petpal-span-5" eyebrow="Orders" title="履约订单" description="先选中一笔订单，再看右侧当前可执行动作。">
         <PetPalDeskEmpty
@@ -22,7 +37,7 @@
             :key="order.id"
             type="button"
             class="petpal-order-row"
-            :class="{ 'is-active': order.id === selectedOrderId }"
+            :class="{ 'is-active': order.id === selectedOrderId, 'is-focused': order.id === highlightedOrderId }"
             @click="selectedOrderId = order.id"
           >
             <div class="petpal-sheet-row__copy">
@@ -85,7 +100,7 @@
             >
               签退
             </el-button>
-            <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: activeOrder.id } }">查看完整订单详情</RouterLink>
+            <RouterLink :to="buildOrderDetailLink(activeOrder.id)">查看完整订单详情</RouterLink>
           </div>
 
           <div v-if="activeOrder.orderStatus === 'SERVING'" class="petpal-side-stack">
@@ -112,14 +127,22 @@
 
 <script setup lang="ts">
 import type { CaregiverOrderRecord } from '@rbac/api-common';
-import { computed, onMounted, reactive, ref } from 'vue';
-import { RouterLink } from 'vue-router';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { RouterLink, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
+import {
+  buildPetPalDeskHandoffQuery,
+  getPetPalQueryString,
+  mergePetPalPageNotice,
+  runPetPalSectionRetry,
+  type PetPalSectionLoadState,
+} from './recovery';
 import {
   formatPetPalRange,
   getPetPalOrderStatusLabel,
@@ -127,21 +150,39 @@ import {
   petPalServiceLogOptions,
 } from './shared';
 
+const route = useRoute();
 const orders = ref<CaregiverOrderRecord[]>([]);
 const selectedOrderId = ref('');
 const loadingKey = ref('');
+const loadState = ref<PetPalSectionLoadState>('idle');
+const sectionReloadingKey = ref<'' | 'orders'>('');
 const serviceLogForm = reactive({
   logType: 'NOTE' as typeof petPalServiceLogOptions[number]['value'],
   textNote: '',
 });
 
 const activeOrder = computed(() => orders.value.find((item) => item.id === selectedOrderId.value) ?? null);
+const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
 const heroStats = computed(() => [
   { label: '订单总数', value: String(orders.value.length), hint: '照料者全部履约订单' },
   { label: '待接单', value: String(orders.value.filter((item) => item.orderStatus === 'PENDING_ACCEPT').length), hint: '优先处理新订单' },
   { label: '服务中', value: String(orders.value.filter((item) => item.orderStatus === 'SERVING').length), hint: '签到后记得持续留痕' },
   { label: '已接单', value: String(orders.value.filter((item) => item.orderStatus === 'ACCEPTED').length), hint: '到达现场后再签到' },
 ]);
+const pageNotice = computed(() => {
+  const description = mergePetPalPageNotice([
+    getPetPalQueryString(route.query, 'notice'),
+    loadState.value === 'error' ? '履约订单刷新失败，可直接重试当前页' : '',
+  ]);
+  if (!description) {
+    return null;
+  }
+  return {
+    title: loadState.value === 'error' ? '履约队列暂未刷新完整' : '已回到履约队列',
+    description,
+    tone: loadState.value === 'error' ? 'warning' as const : 'accent' as const,
+  };
+});
 
 const statusTone = (status: CaregiverOrderRecord['orderStatus']) => {
   if (status === 'SERVING') return 'is-success';
@@ -149,16 +190,51 @@ const statusTone = (status: CaregiverOrderRecord['orderStatus']) => {
   return '';
 };
 
+function buildOrderDetailLink(orderId: string) {
+  return {
+    name: 'frontend-petpal-order-detail',
+    params: { id: orderId },
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这笔订单需要继续履约，可直接回履约留痕区处理。',
+      focusOrderId: orderId,
+      focusRole: 'caregiver',
+      tab: 'service',
+    }),
+  };
+}
+
+function applyRouteContext() {
+  if (highlightedOrderId.value && orders.value.some((item) => item.id === highlightedOrderId.value)) {
+    selectedOrderId.value = highlightedOrderId.value;
+    return;
+  }
+  if (!orders.value.some((item) => item.id === selectedOrderId.value)) {
+    selectedOrderId.value = orders.value[0]?.id || '';
+  }
+}
+
 async function loadPage() {
   try {
+    loadState.value = 'idle';
     const page = await api.petpal.caregiver.orders({ page: 1, pageSize: 50 });
     orders.value = page.items;
-    if (page.items.length && !selectedOrderId.value) {
-      selectedOrderId.value = page.items[0].id;
-    }
+    loadState.value = 'ready';
+    applyRouteContext();
   } catch (error: unknown) {
+    loadState.value = 'error';
     ElMessage.error(getErrorMessage(error, '加载履约订单失败'));
   }
+}
+
+async function retryOrders() {
+  await runPetPalSectionRetry({
+    key: 'orders',
+    sectionReloadingKey,
+    reload: loadPage,
+    getState: () => loadState.value,
+    successMessage: '履约队列已刷新',
+    swallowError: true,
+  });
 }
 
 async function acceptOrder(orderId: string) {
@@ -224,6 +300,14 @@ async function submitServiceLog(orderId: string) {
 onMounted(() => {
   void loadPage();
 });
+
+watch(
+  () => route.query.focusOrderId,
+  () => {
+    applyRouteContext();
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped lang="scss">
@@ -248,5 +332,11 @@ onMounted(() => {
 
 .petpal-order-row.is-active {
   color: #2563eb;
+}
+
+.petpal-order-row.is-focused {
+  margin-inline: -10px;
+  padding-inline: 16px;
+  background: rgba(244, 248, 255, 0.9);
 }
 </style>
