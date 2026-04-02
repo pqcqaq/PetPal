@@ -212,6 +212,7 @@ import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
   buildPetPalDeskHandoffQuery,
+  getPetPalDeskFocusRole,
   getPetPalDeskSectionTab,
   getPetPalQueryString,
   mergePetPalPageNotice,
@@ -251,17 +252,35 @@ const serviceSectionRef = ref<HTMLElement | null>(null);
 const aftersalesSectionRef = ref<HTMLElement | null>(null);
 
 const isOwnerView = computed(() => order.value?.ownerId === auth.user?.id);
-const navItems = computed(() => isOwnerView.value ? petPalOwnerWorkspaceNav : petPalCaregiverWorkspaceNav);
+const currentRole = computed<'owner' | 'caregiver'>(() => {
+  if (order.value) {
+    return isOwnerView.value ? 'owner' : 'caregiver';
+  }
+  return getPetPalDeskFocusRole(route.query) || 'owner';
+});
+const navItems = computed(() => currentRole.value === 'owner' ? petPalOwnerWorkspaceNav : petPalCaregiverWorkspaceNav);
 const heroActions = computed(() => {
   if (!order.value) {
     return [
-      { label: isOwnerView.value ? '返回订单队列' : '返回履约队列', to: isOwnerView.value ? { name: 'frontend-petpal-orders' } : { name: 'frontend-petpal-caregiver-orders' }, tone: 'secondary' as const },
-      { label: '消息中心', to: { name: 'frontend-petpal-messages' }, tone: 'secondary' as const },
+      {
+        label: currentRole.value === 'owner' ? '返回订单队列' : '返回履约队列',
+        to: buildFallbackQueueLink(
+          currentRole.value === 'owner'
+            ? '订单详情暂时不可用，已回到订单队列，可稍后重新进入当前订单。'
+            : '订单详情暂时不可用，已回到履约队列，可稍后重新进入当前订单。',
+        ),
+        tone: 'secondary' as const,
+      },
+      {
+        label: '消息中心',
+        to: buildMessagesLink('订单详情暂时不可用，可先回消息中心查看最近沟通。'),
+        tone: 'secondary' as const,
+      },
     ];
   }
   return [
     { label: isOwnerView.value ? '返回订单队列' : '返回履约队列', to: buildQueueLink(order.value), tone: 'secondary' as const },
-    { label: '消息中心', to: buildMessagesLink(order.value.id), tone: 'secondary' as const },
+    { label: '消息中心', to: buildMessagesLink('这里已经定位到这笔订单会话，可直接继续沟通。', order.value.id), tone: 'secondary' as const },
   ];
 });
 
@@ -305,7 +324,7 @@ function resolveOrderFilter(record: OrderDetailRecord) {
 }
 
 function buildQueueLink(record: OrderDetailRecord) {
-  if (isOwnerView.value) {
+  if (currentRole.value === 'owner') {
     return {
       name: 'frontend-petpal-orders',
       query: buildPetPalDeskHandoffQuery({
@@ -325,13 +344,29 @@ function buildQueueLink(record: OrderDetailRecord) {
   };
 }
 
-function buildMessagesLink(orderId: string) {
+function buildFallbackQueueLink(notice: string) {
+  if (currentRole.value === 'owner') {
+    return {
+      name: 'frontend-petpal-orders',
+      query: buildPetPalDeskHandoffQuery({ notice }),
+    };
+  }
+  return {
+    name: 'frontend-petpal-caregiver-orders',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      focusRole: 'caregiver',
+    }),
+  };
+}
+
+function buildMessagesLink(notice: string, orderId?: string) {
   return {
     name: 'frontend-petpal-messages',
     query: buildPetPalDeskHandoffQuery({
-      notice: '这里已经定位到这笔订单会话，可直接继续沟通。',
-      focusOrderId: orderId,
-      focusRole: isOwnerView.value ? 'owner' : 'caregiver',
+      notice,
+      ...(orderId ? { focusOrderId: orderId } : {}),
+      focusRole: currentRole.value,
     }),
   };
 }

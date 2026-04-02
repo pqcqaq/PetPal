@@ -292,6 +292,17 @@ function buildOwnerRequestCreateRoute(petId: string, notice: string) {
   };
 }
 
+function buildMessagesRoute(notice: string, orderId?: string) {
+  return {
+    name: 'frontend-petpal-messages',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(orderId ? { focusOrderId: orderId } : {}),
+      focusRole: 'owner',
+    }),
+  };
+}
+
 const heroStats = computed(() => [
   { label: '宠物档案', value: String(pets.value.length), hint: pets.value.length ? '资料可复用' : '先建第一只' },
   { label: '活跃需求', value: String(activeRequests.value.length), hint: activeRequests.value.length ? '继续匹配' : '可直接新建' },
@@ -324,15 +335,8 @@ const heroActions = computed(() => [
   {
     label: '消息中心',
     to: unreadOrder.value
-      ? {
-          name: 'frontend-petpal-messages',
-          query: buildPetPalDeskHandoffQuery({
-            notice: '这里已经定位到最近一笔有未读沟通的订单，可直接继续回复。',
-            focusOrderId: unreadOrder.value.id,
-            focusRole: 'owner',
-          }),
-        }
-      : { name: 'frontend-petpal-messages' },
+      ? buildMessagesRoute('这里已经定位到最近一笔有未读沟通的订单，可直接继续回复。', unreadOrder.value.id)
+      : buildMessagesRoute('这里已经回到主人消息中心，可继续查看跨订单沟通。'),
     tone: 'secondary' as const,
   },
   {

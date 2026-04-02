@@ -7202,6 +7202,51 @@ flowchart TD
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.150 2026-04-03（P3-M1 Slice 150）
+
+**概述**：继续推进 Web 前台收口，本轮把消息中心往返和订单详情缺失对象时的回流动作补成统一 handoff，避免“进入消息页有上下文、返回提醒或总览又裸跳”以及“订单详情对象不存在时直接回错角色队列”。
+
+已完成：
+
+- 收口消息中心往返链路：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalMessagesView.vue`
+    - 页头“提醒中心”动作现会按当前视角带回 `focusRole` 和 notice，不再从消息中心裸跳回提醒中心。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalRemindersView.vue`
+    - 页头“消息中心”动作现会根据当前聚焦角色和最近未读会话统一构造 handoff query。
+    - 主人 / 照料者待办里的“去消息中心”入口已复用同一 helper，不再手写分散 query。
+- 收口主人 / 照料者总览到消息中心的残余裸跳转：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverView.vue`
+    - 两侧总览页的“消息中心”动作即使没有未读订单，也会带着角色上下文和回流说明进入消息页。
+- 修正订单详情缺失对象时的回流：
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+    - 详情页现在会优先依据 handoff `focusRole` 维持主人 / 照料者角色上下文。
+    - 当订单对象暂不可用时，“返回队列 / 消息中心” 现已带 notice，并且不会再默认误回照料者履约队列。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮仅改动 Web 前台消息中心、提醒中心、主人 / 照料者总览和订单详情页的前端路由 handoff，没有新增接口、数据模型或状态结构变更。
+- 已确认消息中心与提醒中心之间、主人 / 照料者总览到消息中心之间，进入和返回动作现在都沿用统一 notice / focusRole 规则。
+- 已确认订单详情对象缺失时，导航和回流动作会延续既有角色上下文，避免 fallback 错误落到照料者队列。
+
+风险与缓解：
+
+- 风险：售后中心、结果页和少量辅助页仍有零散 fallback 动作在使用不带 notice 的默认返回。
+- 缓解：下一轮继续清理售后中心和结果页的残余默认回流，收掉最后一批辅助导航缺口。
+
+下一步（1-3）：
+
+1. 继续扫描售后中心、支付 / 退款 / 投诉 / 评价结果页的 fallback 动作，补齐剩余 notice / focus 规则。
+2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
+3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
+
 ### 14.149 2026-04-03（P3-M1 Slice 149）
 
 **概述**：继续推进 Web 前台收口，本轮把提醒中心和照料者服务管理链路里的残余裸跳转补齐，并让服务表单页真正承接 handoff notice，避免 caregiver 侧“入口有上下文、表单页无反馈”。

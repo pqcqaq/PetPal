@@ -277,6 +277,17 @@ function buildOrdersRoute(notice: string, orderId?: string) {
   };
 }
 
+function buildMessagesRoute(notice: string, orderId?: string) {
+  return {
+    name: 'frontend-petpal-messages',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(orderId ? { focusOrderId: orderId } : {}),
+      focusRole: 'caregiver',
+    }),
+  };
+}
+
 const primaryAction = computed(() => {
   if (!profile.value) {
     return {
@@ -308,15 +319,8 @@ const heroActions = computed(() => [
   {
     label: '消息中心',
     to: unreadOrder.value
-      ? {
-          name: 'frontend-petpal-messages',
-          query: buildPetPalDeskHandoffQuery({
-            notice: '这里已经定位到最近一笔需要回复的履约会话，可直接继续沟通。',
-            focusOrderId: unreadOrder.value.id,
-            focusRole: 'caregiver',
-          }),
-        }
-      : { name: 'frontend-petpal-messages' },
+      ? buildMessagesRoute('这里已经定位到最近一笔需要回复的履约会话，可直接继续沟通。', unreadOrder.value.id)
+      : buildMessagesRoute('这里已经回到照料者消息中心，可继续查看跨订单沟通。'),
     tone: 'secondary' as const,
   },
   {

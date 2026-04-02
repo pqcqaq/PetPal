@@ -5,7 +5,7 @@
     summary="消息中心只负责找出有未读或最近更新的会话，发送消息和完整上下文留在订单详情页。"
     :nav-items="petPalOwnerWorkspaceNav"
     active-name="frontend-petpal-messages"
-    :actions="[{ label: '提醒中心', to: { name: 'frontend-petpal-reminders' }, tone: 'secondary' }]"
+    :actions="pageActions"
     :stats="heroStats"
   >
     <template v-if="pageNotice" #notice>
@@ -171,6 +171,18 @@ const conversations = computed<ConversationItem[]>(() => {
 
 const activeConversation = computed(() => conversations.value.find((item) => item.id === selectedOrderId.value) ?? conversations.value[0] ?? null);
 const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
+const pageActions = computed(() => [
+  {
+    label: '提醒中心',
+    to: buildRemindersLink(
+      role.value === 'caregiver'
+        ? '这里已经回到照料者侧待办，可继续处理服务、履约或跨订单沟通。'
+        : '这里已经回到主人侧待办，可继续处理宠物、订单或跨订单沟通。',
+      role.value,
+    ),
+    tone: 'secondary' as const,
+  },
+]);
 const heroStats = computed(() => [
   { label: '主人会话', value: String(ownerOrders.value.length), hint: '按主人视角聚合' },
   { label: '照料者会话', value: String(caregiverOrders.value.length), hint: '按照料者视角聚合' },
@@ -195,6 +207,16 @@ const pageNotice = computed(() => {
 });
 
 const threadUnread = (item: ConversationItem) => getPetPalConversationUnreadCount(item.conversation, role.value);
+
+function buildRemindersLink(notice: string, focusRole: 'owner' | 'caregiver') {
+  return {
+    name: 'frontend-petpal-reminders',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      focusRole,
+    }),
+  };
+}
 
 function buildOrderDetailLink(orderId: string) {
   return {

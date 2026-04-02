@@ -5,7 +5,7 @@
     summary="提醒中心只回答现在先去哪里，不再在一个页面里同时展示大量业务明细。"
     :nav-items="petPalOwnerWorkspaceNav"
     active-name="frontend-petpal-reminders"
-    :actions="[{ label: '消息中心', to: { name: 'frontend-petpal-messages' }, tone: 'secondary' }]"
+    :actions="pageActions"
     :stats="heroStats"
   >
     <template v-if="pageNotice" #notice>
@@ -181,6 +181,15 @@ const focusedRole = computed(() => getPetPalDeskFocusRole(route.query));
 const firstActiveRequest = computed(() =>
   requests.value.find((item) => ['OPEN', 'MATCHED', 'MATCHING', 'CONFIRMED'].includes(item.status)) ?? null,
 );
+const firstUnreadOwnerOrder = computed(() =>
+  ownerOrders.value.find((item) => getPetPalConversationUnreadCount(item.conversation, 'owner') > 0) ?? null,
+);
+const firstUnreadCaregiverOrder = computed(() =>
+  caregiverOrders.value.find((item) => getPetPalConversationUnreadCount(item.conversation, 'caregiver') > 0) ?? null,
+);
+const messageActionRole = computed(() => (
+  focusedRole.value || (firstUnreadOwnerOrder.value ? 'owner' : firstUnreadCaregiverOrder.value ? 'caregiver' : 'owner')
+));
 const pageNotice = computed(() => {
   const description = mergePetPalPageNotice([
     getPetPalQueryString(route.query, 'notice'),
@@ -218,6 +227,23 @@ const pageNotice = computed(() => {
     tone: hasError ? 'warning' as const : 'accent' as const,
   };
 });
+const pageActions = computed(() => [
+  {
+    label: '消息中心',
+    to: buildMessagesRoute(
+      messageActionRole.value === 'caregiver'
+        ? firstUnreadCaregiverOrder.value
+          ? '这里已经定位到最近一笔需要回复的照料者会话，可直接继续沟通。'
+          : '这里已经回到照料者消息中心，可继续查看跨订单沟通。'
+        : firstUnreadOwnerOrder.value
+          ? '这里已经定位到最近一笔有未读消息的主人订单，可直接继续沟通。'
+          : '这里已经回到主人消息中心，可继续查看跨订单沟通。',
+      messageActionRole.value,
+      messageActionRole.value === 'caregiver' ? firstUnreadCaregiverOrder.value?.id : firstUnreadOwnerOrder.value?.id,
+    ),
+    tone: 'secondary' as const,
+  },
+]);
 
 const hasStatus = (error: unknown): error is { status: number } =>
   typeof error === 'object'
@@ -259,11 +285,21 @@ function buildCaregiverServiceCreateRoute(notice: string) {
   };
 }
 
+function buildMessagesRoute(notice: string, focusRole: 'owner' | 'caregiver', orderId?: string) {
+  return {
+    name: 'frontend-petpal-messages',
+    query: buildPetPalDeskHandoffQuery({
+      notice,
+      ...(orderId ? { focusOrderId: orderId } : {}),
+      focusRole,
+    }),
+  };
+}
+
 const ownerTasks = computed<ReminderTask[]>(() => {
   const tasks: ReminderTask[] = [];
   const firstOutstandingOrder = ownerOrders.value.find((item) => isPetPalOutstandingOrder(item));
   const firstAftersalesOrder = ownerOrders.value.find((item) => isPetPalAftersalesStatus(item.orderStatus));
-  const firstUnreadOwnerOrder = ownerOrders.value.find((item) => getPetPalConversationUnreadCount(item.conversation, 'owner') > 0);
   if (!pets.value.length) {
     tasks.push({
       title: '先建立第一只宠物档案',
@@ -319,19 +355,12 @@ const ownerTasks = computed<ReminderTask[]>(() => {
       priority: 90,
     });
   }
-  if (firstUnreadOwnerOrder) {
+  if (firstUnreadOwnerOrder.value) {
     tasks.push({
       title: '存在主人侧未读消息',
       description: '跨订单消息已经独立，不必逐个订单翻找。',
       actionLabel: '去消息中心',
-      to: {
-        name: 'frontend-petpal-messages',
-        query: buildPetPalDeskHandoffQuery({
-          notice: '这里已经定位到最近一笔有未读消息的订单，可直接继续沟通。',
-          focusOrderId: firstUnreadOwnerOrder.id,
-          focusRole: 'owner',
-        }),
-      },
+      to: buildMessagesRoute('这里已经定位到最近一笔有未读消息的订单，可直接继续沟通。', 'owner', firstUnreadOwnerOrder.value.id),
       priority: 70,
     });
   }
@@ -341,7 +370,6 @@ const ownerTasks = computed<ReminderTask[]>(() => {
 const caregiverTasks = computed<ReminderTask[]>(() => {
   const tasks: ReminderTask[] = [];
   const firstActiveCaregiverOrder = caregiverOrders.value.find((item) => ['PENDING_ACCEPT', 'ACCEPTED', 'SERVING'].includes(item.orderStatus));
-  const firstUnreadCaregiverOrder = caregiverOrders.value.find((item) => getPetPalConversationUnreadCount(item.conversation, 'caregiver') > 0);
   if (!caregiverProfile.value) {
     tasks.push({
       title: '先完成照料者入驻资料',
@@ -395,19 +423,12 @@ const caregiverTasks = computed<ReminderTask[]>(() => {
       priority: 96,
     });
   }
-  if (firstUnreadCaregiverOrder) {
+  if (firstUnreadCaregiverOrder.value) {
     tasks.push({
       title: '存在照料者侧未读消息',
       description: '建议先进入消息中心确认是否需要回复或回传履约说明。',
       actionLabel: '去消息中心',
-      to: {
-        name: 'frontend-petpal-messages',
-        query: buildPetPalDeskHandoffQuery({
-          notice: '这里已经定位到最近一笔需要回复的照料者会话，可直接继续沟通。',
-          focusOrderId: firstUnreadCaregiverOrder.id,
-          focusRole: 'caregiver',
-        }),
-      },
+      to: buildMessagesRoute('这里已经定位到最近一笔需要回复的照料者会话，可直接继续沟通。', 'caregiver', firstUnreadCaregiverOrder.value.id),
       priority: 72,
     });
   }
