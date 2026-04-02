@@ -103,7 +103,7 @@ onLoad((options) => {
 </script>
 
 <template>
-  <PetpalPage :title="pageTitle" subtitle="服务编辑只负责价格、范围和上架状态。" eyebrow="Service Form" back :back-url="PETPAL_CAREGIVER_SERVICES_PAGE">
+  <PetpalPage :title="pageTitle" subtitle="服务表单只维护价格、覆盖范围和上架状态。" eyebrow="Service Form" back :back-url="PETPAL_CAREGIVER_SERVICES_PAGE">
     <template v-if="!tokenStore.hasLogin">
       <PetpalSection title="需要登录">
         <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openLoginPage">去登录</button>
@@ -111,38 +111,36 @@ onLoad((options) => {
     </template>
 
     <template v-else>
-      <PetpalSection title="服务类型">
-        <view class="petpal-field">
-          <text class="petpal-field__label">服务类型</text>
-          <view class="petpal-chip-row">
-            <button
-              v-for="item in serviceTypeOptions"
-              :key="item.value"
-              :class="['petpal-chip', form.serviceType === item.value ? 'petpal-chip--active' : '']"
-              hover-class="none"
-              @click="form.serviceType = item.value"
-            >
-              {{ item.label }}
-            </button>
-          </view>
+      <PetpalSection tone="accent" title="先定义服务形态" subtitle="先确定服务类型和适用宠物，再填写报价与时段。">
+        <view class="petpal-choice-grid">
+          <button
+            v-for="item in serviceTypeOptions"
+            :key="item.value"
+            :class="['petpal-choice-tile', form.serviceType === item.value ? 'petpal-choice-tile--active' : '']"
+            hover-class="none"
+            @click="form.serviceType = item.value"
+          >
+            <text class="petpal-choice-tile__eyebrow">Service</text>
+            <text class="petpal-choice-tile__title">{{ item.label }}</text>
+            <text class="petpal-choice-tile__hint">{{ form.serviceType === item.value ? '当前服务类型' : '切换到该服务类型' }}</text>
+          </button>
         </view>
-        <view class="petpal-field">
-          <text class="petpal-field__label">适用宠物</text>
-          <view class="petpal-chip-row">
-            <button
-              v-for="item in speciesOptions"
-              :key="item.value"
-              :class="['petpal-chip', form.petSpecies === item.value ? 'petpal-chip--active' : '']"
-              hover-class="none"
-              @click="form.petSpecies = item.value"
-            >
-              {{ item.label }}
-            </button>
-          </view>
+        <view class="petpal-choice-grid petpal-choice-grid--two">
+          <button
+            v-for="item in speciesOptions"
+            :key="item.value"
+            :class="['petpal-choice-tile', form.petSpecies === item.value ? 'petpal-choice-tile--active' : '']"
+            hover-class="none"
+            @click="form.petSpecies = item.value"
+          >
+            <text class="petpal-choice-tile__eyebrow">Pet</text>
+            <text class="petpal-choice-tile__title">{{ item.label }}</text>
+            <text class="petpal-choice-tile__hint">{{ form.petSpecies === item.value ? '当前适用品类' : '切换到该宠物类型' }}</text>
+          </button>
         </view>
       </PetpalSection>
 
-      <PetpalSection title="价格和时效">
+      <PetpalSection title="填写报价与覆盖范围" subtitle="这里仅填写服务定价、覆盖城市和预约提前量。">
         <view class="petpal-grid--two">
           <view class="petpal-field">
             <text class="petpal-field__label">价格</text>
@@ -165,28 +163,28 @@ onLoad((options) => {
         </view>
       </PetpalSection>
 
-      <PetpalSection title="可接时段与状态">
+      <PetpalSection title="可接时段与上架状态" subtitle="上架与下架只在这里控制，不和列表页混用。">
         <view class="petpal-field">
           <text class="petpal-field__label">可接时段</text>
           <input v-model="form.availableSlotsText" class="petpal-input" placeholder="例如 工作日白天、周末全天、节假日可约" />
         </view>
-        <view class="petpal-field">
-          <text class="petpal-field__label">是否上架</text>
-          <view class="petpal-chip-row">
-            <button
-              v-for="item in yesNoOptions"
-              :key="item.value"
-              :class="['petpal-chip', form.isActive === item.value ? 'petpal-chip--active' : '']"
-              hover-class="none"
-              @click="form.isActive = item.value"
-            >
-              {{ item.label }}
-            </button>
-          </view>
+        <view class="petpal-choice-grid petpal-choice-grid--two">
+          <button
+            v-for="item in yesNoOptions"
+            :key="item.value"
+            :class="['petpal-choice-tile', form.isActive === item.value ? 'petpal-choice-tile--active' : '']"
+            hover-class="none"
+            @click="form.isActive = item.value"
+          >
+            <text class="petpal-choice-tile__eyebrow">Status</text>
+            <text class="petpal-choice-tile__title">{{ item.label }}</text>
+            <text class="petpal-choice-tile__hint">{{ item.value === 'YES' ? '主人端可以看到并匹配' : '仅保留草稿，不对外展示' }}</text>
+          </button>
         </view>
       </PetpalSection>
 
       <view class="petpal-bottom-bar">
+        <text class="petpal-note">保存后返回服务列表，列表页只展示状态，不再混编辑字段。</text>
         <view class="petpal-action-row">
           <button class="petpal-btn petpal-btn--primary" hover-class="none" :disabled="saving" @click="saveService">
             {{ saving ? '保存中...' : (serviceId ? '保存修改' : '创建服务') }}

@@ -17,6 +17,9 @@ const loading = ref(false)
 const filter = ref<FilterValue>('ALL')
 const orders = ref<OrderRecord[]>([])
 
+const refundCount = computed(() => orders.value.filter(item => (item.refunds?.length ?? 0) > 0 || Number(item.amountRefunded ?? 0) > 0).length)
+const disputeCount = computed(() => orders.value.filter(item => item.orderStatus === 'DISPUTED').length)
+
 const aftersalesOrders = computed(() => {
   const rows = orders.value.filter(item => (
     item.orderStatus === 'DISPUTED'
@@ -86,28 +89,36 @@ onPullDownRefresh(() => {
     </template>
 
     <template v-else>
-      <PetpalSection tone="danger" title="售后筛选" :subtitle="aftersalesOrders.length ? `当前有 ${aftersalesOrders.length} 笔售后相关订单` : '当前没有售后订单'">
+      <PetpalSection tone="danger" title="售后总览" :subtitle="aftersalesOrders.length ? `当前有 ${aftersalesOrders.length} 笔售后相关订单` : '当前没有售后订单'">
+        <view class="petpal-stat-row">
+          <view class="petpal-stat">
+            <text class="petpal-stat__label">退款相关</text>
+            <text class="petpal-stat__value">{{ refundCount }}</text>
+            <text class="petpal-stat__meta">含部分退款</text>
+          </view>
+          <view class="petpal-stat">
+            <text class="petpal-stat__label">争议中</text>
+            <text class="petpal-stat__value">{{ disputeCount }}</text>
+            <text class="petpal-stat__meta">需继续处理</text>
+          </view>
+        </view>
         <PetpalSegmented
           v-model="filter"
           :options="[
             { label: '全部', value: 'ALL', badge: orders.filter(item => item.orderStatus === 'DISPUTED' || item.orderStatus === 'PARTIAL_REFUNDED' || item.orderStatus === 'REFUNDED' || (item.refunds?.length ?? 0) > 0 || Number(item.amountRefunded ?? 0) > 0).length },
-            { label: '退款', value: 'REFUND', badge: orders.filter(item => (item.refunds?.length ?? 0) > 0 || Number(item.amountRefunded ?? 0) > 0).length },
-            { label: '争议', value: 'DISPUTE', badge: orders.filter(item => item.orderStatus === 'DISPUTED').length },
+            { label: '退款', value: 'REFUND', badge: refundCount },
+            { label: '争议', value: 'DISPUTE', badge: disputeCount },
           ]"
         />
       </PetpalSection>
 
       <PetpalSection title="售后订单列表" subtitle="每笔售后只给三个入口：看详情、看退款、看投诉。">
         <template v-if="aftersalesOrders.length">
-          <view v-for="item in aftersalesOrders" :key="item.id" class="petpal-stack">
-            <button class="petpal-row-btn" hover-class="none" @click="openOrderDetailPage(item.id, 'aftersales')">
-              <view class="petpal-row__copy">
-                <text class="petpal-row__title">{{ item.orderNo }}</text>
-                <text class="petpal-row__meta">{{ describeOrder(item) }}</text>
-                <text class="petpal-row__hint">已退款 {{ helpers.formatMoney(item.amountRefunded) }} · 退款记录 {{ item.refunds.length }}</text>
-              </view>
-              <text class="petpal-row__value">处理</text>
-            </button>
+          <view v-for="item in aftersalesOrders" :key="item.id" class="petpal-sheet">
+            <text class="petpal-banner__eyebrow">{{ item.orderStatus === 'DISPUTED' ? 'Dispute' : 'Refund' }}</text>
+            <text class="petpal-banner__title">{{ item.orderNo }}</text>
+            <text class="petpal-banner__meta">{{ describeOrder(item) }}</text>
+            <text class="petpal-note">已退款 {{ helpers.formatMoney(item.amountRefunded) }} · 退款记录 {{ item.refunds.length }}</text>
             <view class="petpal-action-row">
               <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(item.id, 'aftersales')">订单售后</button>
               <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="openRefund(item.id)">退款进度</button>

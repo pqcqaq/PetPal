@@ -54,6 +54,26 @@ const serviceLogNote = ref('')
 const isOwnerView = computed(() => Boolean(userInfo.value.id && order.value?.ownerId === userInfo.value.id))
 const roleLabel = computed(() => (isOwnerView.value ? '主人视角' : '照料者视角'))
 const conversationMessages = computed(() => conversation.value?.messages || [])
+const currentStatusLabel = computed(() => order.value ? helpers.getOrderStatusLabel(order.value.orderStatus) : '')
+const recentTimeline = computed(() => order.value?.timeline.slice().reverse().slice(0, 6) || [])
+const visibleServiceLogs = computed(() => order.value?.serviceLogs.slice().reverse() || [])
+const focusHint = computed(() => {
+  if (!order.value) {
+    return ''
+  }
+  if (isOwnerView.value) {
+    if (order.value.orderStatus === 'PENDING_ACCEPT') return '等待照料者接单，当前只需回看沟通和支付状态。'
+    if (order.value.orderStatus === 'SERVING') return '当前服务进行中，重点查看回传记录并在结束后确认完成。'
+    if (order.value.orderStatus === 'COMPLETED' && !order.value.review) return '订单已完成，下一步是评价或结束本次服务。'
+    if (['DISPUTED', 'PARTIAL_REFUNDED', 'REFUNDED'].includes(order.value.orderStatus)) return '当前订单已进入售后阶段，重点查看退款和投诉进展。'
+    return '当前订单没有额外阻塞动作，可按需查看沟通和服务记录。'
+  }
+
+  if (order.value.orderStatus === 'PENDING_ACCEPT') return '当前最重要的是接单，接单后再进入签到和服务回传。'
+  if (order.value.orderStatus === 'ACCEPTED') return '已接单，下一步是按约定时间签到。'
+  if (order.value.orderStatus === 'SERVING') return '服务中，持续补充服务记录并在结束时签退。'
+  return '当前订单以查看记录为主，详细动作按状态决定。'
+})
 
 const tabOptions = computed(() => [
   { label: '概览', value: 'overview' },
@@ -203,164 +223,167 @@ onPullDownRefresh(() => {
     </template>
 
     <template v-else-if="order">
-      <PetpalSection tone="accent" title="当前订单" :subtitle="`${roleLabel} · ${helpers.getOrderStatusLabel(order.orderStatus)}`">
-        <view class="petpal-grid--two">
+      <PetpalSection tone="accent" title="当前订单" :subtitle="`${roleLabel} · ${currentStatusLabel}`">
+        <view class="petpal-banner">
+          <text class="petpal-banner__eyebrow">Current Focus</text>
+          <text class="petpal-banner__title">{{ order.orderNo }}</text>
+          <text class="petpal-banner__meta">{{ helpers.serviceTypeLabels[order.serviceType] }} · {{ currentStatusLabel }}</text>
+          <text class="petpal-note">{{ focusHint }}</text>
+        </view>
+        <view class="petpal-stat-row">
           <view class="petpal-stat">
-            <text class="petpal-stat__label">订单号</text>
-            <text class="petpal-stat__value">{{ order.orderNo }}</text>
-            <text class="petpal-stat__meta">{{ helpers.serviceTypeLabels[order.serviceType] }}</text>
-          </view>
-          <view class="petpal-stat">
-            <text class="petpal-stat__label">金额</text>
+            <text class="petpal-stat__label">订单金额</text>
             <text class="petpal-stat__value">{{ helpers.formatMoney(order.amountTotal) }}</text>
             <text class="petpal-stat__meta">已支付 {{ helpers.formatMoney(order.amountPaid) }}</text>
           </view>
+          <view class="petpal-stat">
+            <text class="petpal-stat__label">预约时间</text>
+            <text class="petpal-stat__value">{{ helpers.formatDateTime(order.appointmentStart) }}</text>
+            <text class="petpal-stat__meta">{{ helpers.formatDateTime(order.appointmentEnd) }}</text>
+          </view>
         </view>
       </PetpalSection>
 
-      <PetpalSection title="切换内容">
+      <PetpalSection title="切换工作区" subtitle="同一订单的概览、沟通、履约、售后在这里独立切换。">
         <PetpalSegmented v-model="activeTab" :options="tabOptions" />
       </PetpalSection>
 
-      <PetpalSection v-if="activeTab === 'overview'" title="概览">
-        <button class="petpal-row-btn" hover-class="none">
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">预约时间</text>
-            <text class="petpal-row__meta">{{ helpers.formatRange(order.appointmentStart, order.appointmentEnd) }}</text>
+      <template v-if="activeTab === 'overview'">
+        <PetpalSection title="订单概览" subtitle="先看当前状态，再回看最近流转。">
+          <view class="petpal-sheet">
+            <text class="petpal-banner__eyebrow">Schedule</text>
+            <text class="petpal-banner__title">{{ helpers.formatRange(order.appointmentStart, order.appointmentEnd) }}</text>
+            <text class="petpal-banner__meta">{{ currentStatusLabel }}</text>
           </view>
-          <text class="petpal-row__value">{{ helpers.getOrderStatusLabel(order.orderStatus) }}</text>
-        </button>
-        <button
-          v-for="item in order.timeline.slice().reverse().slice(0, 6)"
-          :key="item.id"
-          class="petpal-row-btn"
-          hover-class="none"
-        >
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">{{ item.eventType }}</text>
-            <text class="petpal-row__hint">{{ helpers.formatDateTime(item.createdAt) }} · {{ item.operatorRole }}</text>
-          </view>
-        </button>
-        <view class="petpal-action-row">
-          <button
-            v-if="isOwnerView && order.orderStatus === 'SERVING'"
-            class="petpal-btn petpal-btn--primary"
-            hover-class="none"
-            @click="handleConfirmComplete"
-          >
-            确认完成
-          </button>
-          <button
-            v-if="isOwnerView && order.orderStatus === 'COMPLETED' && !order.review"
-            class="petpal-btn petpal-btn--secondary"
-            hover-class="none"
-            @click="openReview"
-          >
-            去评价
-          </button>
-          <button
-            v-if="isOwnerView && ['DISPUTED', 'PARTIAL_REFUNDED', 'REFUNDED'].includes(order.orderStatus)"
-            class="petpal-btn petpal-btn--danger"
-            hover-class="none"
-            @click="openComplaint"
-          >
-            继续售后
-          </button>
-        </view>
-      </PetpalSection>
+          <template v-if="recentTimeline.length">
+            <view v-for="item in recentTimeline" :key="item.id" class="petpal-sheet">
+              <text class="petpal-banner__title">{{ item.eventType }}</text>
+              <text class="petpal-note">{{ helpers.formatDateTime(item.createdAt) }} · {{ item.operatorRole }}</text>
+            </view>
+          </template>
+          <PetpalEmpty v-else title="还没有更多流转记录" description="订单状态变化后会在这里持续留痕。"/>
+        </PetpalSection>
 
-      <PetpalSection v-else-if="activeTab === 'chat'" title="订单沟通">
-        <template v-if="conversationMessages.length">
-          <view class="detail-chat">
-            <view
-              v-for="item in conversationMessages"
-              :key="item.id"
-              :class="[
-                'detail-chat__bubble',
-                item.senderUserId === userInfo.id ? 'detail-chat__bubble--own' : '',
-              ]"
+        <PetpalSection v-if="isOwnerView" title="当前能做的动作" subtitle="概览页只保留这一阶段最可能需要的操作。">
+          <view class="petpal-action-row">
+            <button
+              v-if="order.orderStatus === 'SERVING'"
+              class="petpal-btn petpal-btn--primary"
+              hover-class="none"
+              @click="handleConfirmComplete"
             >
-              <text class="detail-chat__meta">{{ item.senderRole }} · {{ helpers.formatDateTime(item.createdAt) }}</text>
-              <text class="detail-chat__content">{{ item.content || '发送了一条附件消息' }}</text>
-            </view>
+              确认完成
+            </button>
+            <button
+              v-if="order.orderStatus === 'COMPLETED' && !order.review"
+              class="petpal-btn petpal-btn--secondary"
+              hover-class="none"
+              @click="openReview"
+            >
+              去评价
+            </button>
+            <button
+              v-if="['DISPUTED', 'PARTIAL_REFUNDED', 'REFUNDED'].includes(order.orderStatus)"
+              class="petpal-btn petpal-btn--danger"
+              hover-class="none"
+              @click="openComplaint"
+            >
+              继续售后
+            </button>
           </view>
-        </template>
-        <PetpalEmpty v-else title="还没有沟通记录" description="发送第一条消息后，会在这里持续留痕。"/>
-        <view class="petpal-form">
-          <textarea v-model="messageText" class="petpal-textarea" :maxlength="280" placeholder="输入要沟通的内容" />
-          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="handleSendMessage">发送消息</button>
-        </view>
-      </PetpalSection>
+        </PetpalSection>
+      </template>
 
-      <PetpalSection v-else-if="activeTab === 'service'" title="服务记录">
-        <template v-if="order.serviceLogs.length">
-          <button
-            v-for="item in order.serviceLogs.slice().reverse()"
-            :key="item.id"
-            class="petpal-row-btn"
-            hover-class="none"
-          >
-            <view class="petpal-row__copy">
-              <text class="petpal-row__title">{{ helpers.getServiceLogTypeLabel(item.logType) }}</text>
-              <text class="petpal-row__meta">{{ item.textNote || '未填写文字说明' }}</text>
-              <text class="petpal-row__hint">{{ helpers.formatDateTime(item.happenedAt) }}</text>
-            </view>
-          </button>
-        </template>
-        <PetpalEmpty v-else title="还没有服务记录" description="签到、喂养、遛宠和备注都会记录在这里。"/>
-
-        <template v-if="!isOwnerView">
-          <view class="petpal-form">
-            <view class="petpal-chip-row">
-              <button
-                v-for="item in serviceLogOptions"
-                :key="item.value"
-                :class="['petpal-chip', serviceLogType === item.value ? 'petpal-chip--active' : '']"
-                hover-class="none"
-                @click="serviceLogType = item.value"
+      <template v-else-if="activeTab === 'chat'">
+        <PetpalSection title="订单沟通" subtitle="消息只保留在当前订单上下文里，不再散落到其他页面。">
+          <template v-if="conversationMessages.length">
+            <view class="detail-chat">
+              <view
+                v-for="item in conversationMessages"
+                :key="item.id"
+                :class="[
+                  'detail-chat__bubble',
+                  item.senderUserId === userInfo.id ? 'detail-chat__bubble--own' : '',
+                ]"
               >
-                {{ item.label }}
-              </button>
+                <text class="detail-chat__meta">{{ item.senderRole }} · {{ helpers.formatDateTime(item.createdAt) }}</text>
+                <text class="detail-chat__content">{{ item.content || '发送了一条附件消息' }}</text>
+              </view>
             </view>
-            <textarea v-model="serviceLogNote" class="petpal-textarea" :maxlength="220" placeholder="输入本次服务说明" />
+          </template>
+          <PetpalEmpty v-else title="还没有沟通记录" description="发送第一条消息后，会在这里持续留痕。"/>
+        </PetpalSection>
+
+        <PetpalSection title="发送消息" subtitle="消息发送动作单独放在这里，不和订单概览混在一起。">
+          <view class="petpal-form">
+            <textarea v-model="messageText" class="petpal-textarea" :maxlength="280" placeholder="输入要沟通的内容" />
+            <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="handleSendMessage">发送消息</button>
           </view>
+        </PetpalSection>
+      </template>
+
+      <template v-else-if="activeTab === 'service'">
+        <PetpalSection title="服务记录" subtitle="签到、喂养、遛宠和备注都只在这里留痕。">
+          <template v-if="visibleServiceLogs.length">
+            <view v-for="item in visibleServiceLogs" :key="item.id" class="petpal-sheet">
+              <text class="petpal-banner__eyebrow">{{ helpers.getServiceLogTypeLabel(item.logType) }}</text>
+              <text class="petpal-banner__title">{{ item.textNote || '未填写文字说明' }}</text>
+              <text class="petpal-note">{{ helpers.formatDateTime(item.happenedAt) }}</text>
+            </view>
+          </template>
+          <PetpalEmpty v-else title="还没有服务记录" description="签到、喂养、遛宠和备注都会记录在这里。"/>
+        </PetpalSection>
+
+        <PetpalSection v-if="!isOwnerView" tone="accent" title="继续履约" subtitle="照料者动作只放在这一块，避免和查看记录混在一起。">
+          <view class="petpal-choice-grid">
+            <button
+              v-for="item in serviceLogOptions"
+              :key="item.value"
+              :class="['petpal-choice-tile', serviceLogType === item.value ? 'petpal-choice-tile--active' : '']"
+              hover-class="none"
+              @click="serviceLogType = item.value"
+            >
+              <text class="petpal-choice-tile__eyebrow">Log Type</text>
+              <text class="petpal-choice-tile__title">{{ item.label }}</text>
+              <text class="petpal-choice-tile__hint">{{ item.note }}</text>
+            </button>
+          </view>
+          <textarea v-model="serviceLogNote" class="petpal-textarea" :maxlength="220" placeholder="输入本次服务说明" />
           <view class="petpal-action-row">
             <button v-if="order.orderStatus === 'PENDING_ACCEPT'" class="petpal-btn petpal-btn--primary" hover-class="none" @click="handleAccept">接单</button>
             <button v-if="order.orderStatus === 'ACCEPTED'" class="petpal-btn petpal-btn--primary" hover-class="none" @click="handleCheckIn">签到</button>
             <button v-if="order.orderStatus === 'SERVING'" class="petpal-btn petpal-btn--secondary" hover-class="none" @click="handleAddServiceLog">追加记录</button>
             <button v-if="order.orderStatus === 'SERVING'" class="petpal-btn petpal-btn--ghost" hover-class="none" @click="handleCheckOut">签退</button>
           </view>
-        </template>
-      </PetpalSection>
+        </PetpalSection>
+      </template>
 
-      <PetpalSection v-else title="售后信息">
-        <template v-if="refundProgress">
-          <view class="petpal-banner">
-            <text class="petpal-banner__title">{{ helpers.getRefundProgressStageLabel(refundProgress.stage) }}</text>
-            <text class="petpal-banner__meta">{{ helpers.getRefundProgressStageHint(refundProgress.stage) }}</text>
-          </view>
-        </template>
-        <template v-if="complaints.length">
-          <button
-            v-for="item in complaints"
-            :key="item.id"
-            class="petpal-row-btn"
-            hover-class="none"
-            @click="openComplaint"
-          >
-            <view class="petpal-row__copy">
-              <text class="petpal-row__title">{{ item.complaintType }}</text>
-              <text class="petpal-row__meta">{{ helpers.getComplaintStatusLabel(item.status) }}</text>
-              <text class="petpal-row__hint">{{ item.description }}</text>
+      <template v-else>
+        <PetpalSection title="售后进展" subtitle="退款阶段和投诉记录都拆到这里，不再混在订单概览里。">
+          <template v-if="refundProgress">
+            <view class="petpal-banner">
+              <text class="petpal-banner__eyebrow">Refund Progress</text>
+              <text class="petpal-banner__title">{{ helpers.getRefundProgressStageLabel(refundProgress.stage) }}</text>
+              <text class="petpal-banner__meta">{{ helpers.getRefundProgressStageHint(refundProgress.stage) }}</text>
             </view>
-          </button>
-        </template>
-        <PetpalEmpty v-else title="当前没有投诉记录" description="如果需要发起投诉或补充材料，请从这里进入投诉页。"/>
-        <view class="petpal-action-row">
-          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openComplaint">投诉处理</button>
-          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openOrderDetailPage(order.id)">回概览</button>
-        </view>
-      </PetpalSection>
+          </template>
+          <template v-if="complaints.length">
+            <view v-for="item in complaints" :key="item.id" class="petpal-sheet">
+              <text class="petpal-banner__title">{{ item.complaintType }}</text>
+              <text class="petpal-banner__meta">{{ helpers.getComplaintStatusLabel(item.status) }}</text>
+              <text class="petpal-note">{{ item.description }}</text>
+            </view>
+          </template>
+          <PetpalEmpty v-else title="当前没有投诉记录" description="如果需要发起投诉或补充材料，请从这里进入投诉页。"/>
+        </PetpalSection>
+
+        <PetpalSection title="售后动作" subtitle="售后只保留投诉入口和返回概览两个动作。">
+          <view class="petpal-action-row">
+            <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openComplaint">投诉处理</button>
+            <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openOrderDetailPage(order.id)">回概览</button>
+          </view>
+        </PetpalSection>
+      </template>
     </template>
 
     <template v-else-if="!loading">

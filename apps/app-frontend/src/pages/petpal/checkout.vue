@@ -143,7 +143,7 @@ onPullDownRefresh(() => {
 <template>
   <PetpalPage
     title="确认支付"
-    subtitle="这里只做结算，不混入需求编辑或订单售后。"
+    subtitle="结算页只确认当前需求、照料者和支付方式。"
     eyebrow="Checkout"
     back
     :back-url="currentRequestId ? `${PETPAL_REQUEST_DETAIL_PAGE}?requestId=${currentRequestId}` : PETPAL_REQUEST_DETAIL_PAGE"
@@ -163,47 +163,54 @@ onPullDownRefresh(() => {
     </template>
 
     <template v-else>
-      <PetpalSection tone="accent" title="本次服务" :subtitle="requestRecord ? helpers.serviceTypeLabels[requestRecord.serviceType] : '订单继续支付'">
-        <view class="petpal-grid--two">
+      <PetpalSection tone="accent" title="本次结算" :subtitle="requestRecord ? helpers.serviceTypeLabels[requestRecord.serviceType] : '订单继续支付'">
+        <view class="petpal-banner">
+          <text class="petpal-banner__eyebrow">Request Summary</text>
+          <text class="petpal-banner__title">{{ requestRecord?.pet?.name || '宠物待同步' }} · {{ requestRecord ? helpers.serviceTypeLabels[requestRecord.serviceType] : '订单续付' }}</text>
+          <text class="petpal-banner__meta">{{ requestRecord ? helpers.formatRange(requestRecord.startTime, requestRecord.endTime) : '订单时间同步中' }}</text>
+          <text class="petpal-note">{{ requestRecord?.locationText || '地点同步中' }}</text>
+        </view>
+        <view class="petpal-stat-row">
           <view class="petpal-stat">
-            <text class="petpal-stat__label">时间</text>
-            <text class="petpal-stat__value">{{ requestRecord ? helpers.formatDateTime(requestRecord.startTime) : '--' }}</text>
-            <text class="petpal-stat__meta">{{ requestRecord ? helpers.formatDateTime(requestRecord.endTime) : '订单时间同步中' }}</text>
+            <text class="petpal-stat__label">订单金额</text>
+            <text class="petpal-stat__value">{{ helpers.formatMoney(order?.amountTotal || requestRecord?.budgetAmount) }}</text>
+            <text class="petpal-stat__meta">{{ order ? order.orderNo : '支付时创建订单' }}</text>
           </view>
           <view class="petpal-stat">
-            <text class="petpal-stat__label">金额</text>
-            <text class="petpal-stat__value">{{ helpers.formatMoney(order?.amountTotal || requestRecord?.budgetAmount) }}</text>
-            <text class="petpal-stat__meta">{{ order ? order.orderNo : '将创建新订单' }}</text>
+            <text class="petpal-stat__label">支付状态</text>
+            <text class="petpal-stat__value">{{ order ? helpers.getOrderStatusLabel(order.orderStatus) : '待创建' }}</text>
+            <text class="petpal-stat__meta">{{ order ? `已支付 ${helpers.formatMoney(order.amountPaid)}` : '还未进入支付' }}</text>
           </view>
         </view>
-        <text class="petpal-note">{{ requestRecord?.locationText || '地点同步中' }}</text>
       </PetpalSection>
 
-      <PetpalSection v-if="caregiver" title="你选择的照料者" subtitle="这里只保留即将成交的这一位。">
-        <view class="petpal-banner">
+      <PetpalSection v-if="caregiver" title="成交对象" subtitle="这里只保留即将成交的这一位照料者。">
+        <view class="petpal-sheet">
+          <text class="petpal-banner__eyebrow">Selected Caregiver</text>
           <text class="petpal-banner__title">{{ caregiver.caregiverName }}</text>
           <text class="petpal-banner__meta">{{ describeCaregiverMatch(caregiver) }}</text>
           <text class="petpal-note">{{ describeCaregiverCapability(caregiver) }}</text>
         </view>
       </PetpalSection>
 
-      <PetpalSection title="支付方式" subtitle="支付行为单独处理，避免和其他逻辑混在一起。">
-        <button
-          v-for="item in payChannelOptions"
-          :key="item.value"
-          class="petpal-row-btn"
-          hover-class="none"
-          @click="payChannel = item.value"
-        >
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">{{ item.label }}</text>
-            <text class="petpal-row__hint">{{ item.note }}</text>
-          </view>
-          <text class="petpal-row__value">{{ payChannel === item.value ? '已选' : '选择' }}</text>
-        </button>
+      <PetpalSection title="支付方式" subtitle="选择一种支付方式后，底部主按钮才执行支付。">
+        <view class="petpal-choice-grid">
+          <button
+            v-for="item in payChannelOptions"
+            :key="item.value"
+            :class="['petpal-choice-tile', payChannel === item.value ? 'petpal-choice-tile--active' : '']"
+            hover-class="none"
+            @click="payChannel = item.value"
+          >
+            <text class="petpal-choice-tile__eyebrow">{{ payChannel === item.value ? 'Selected' : 'Pay Channel' }}</text>
+            <text class="petpal-choice-tile__title">{{ item.label }}</text>
+            <text class="petpal-choice-tile__hint">{{ item.note }}</text>
+          </button>
+        </view>
       </PetpalSection>
 
       <view class="petpal-bottom-bar">
+        <text class="petpal-note">支付完成后会进入独立结果页，不会在当前页混入订单详情和售后动作。</text>
         <view class="petpal-action-row">
           <button class="petpal-btn petpal-btn--primary" hover-class="none" :disabled="submitting" @click="submitPayment">
             {{ submitting ? '处理中...' : '确认支付' }}
