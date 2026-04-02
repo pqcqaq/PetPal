@@ -5,7 +5,7 @@
     summary="创建需求和支付已经分走，队列页只保留需求状态、匹配结果和建单动作。"
     :nav-items="petPalOwnerWorkspaceNav"
     active-name="frontend-petpal-requests"
-    :primary-action="{ label: '新建需求', to: { name: 'frontend-petpal-request-create' }, tone: 'primary' }"
+    :primary-action="primaryAction"
     :actions="[{ label: '返回主人总览', to: { name: 'frontend-petpal' }, tone: 'secondary' }]"
     :stats="heroStats"
   >
@@ -44,7 +44,7 @@
           description="先创建一条新需求，再回到这里查看匹配结果和下单入口。"
         >
           <template #actions>
-            <RouterLink class="frontend-page__button is-primary" :to="{ name: 'frontend-petpal-request-create' }">去新建需求</RouterLink>
+            <RouterLink class="frontend-page__button is-primary" :to="primaryAction.to">去新建需求</RouterLink>
           </template>
         </PetPalDeskEmpty>
 
@@ -149,6 +149,7 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalDeskHandoffQuery,
   getPetPalQueryString,
   mergePetPalPageNotice,
   runPetPalSectionRetry,
@@ -176,6 +177,16 @@ const sectionReloadingKey = ref<'' | 'requests' | 'matches'>('');
 
 const selectedRequest = computed(() => requests.value.find((item) => item.id === selectedRequestId.value) ?? null);
 const highlightedRequestId = computed(() => getPetPalQueryString(route.query, 'focusRequestId'));
+const primaryAction = computed(() => ({
+  label: '新建需求',
+  to: {
+    name: 'frontend-petpal-request-create',
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这里已经定位到新建需求页，可直接继续填写时间、地点和预算。',
+    }),
+  },
+  tone: 'primary' as const,
+}));
 const heroStats = computed(() => [
   { label: '需求总数', value: String(requests.value.length), hint: '只在这里看需求状态' },
   { label: '活跃需求', value: String(requests.value.filter((item) => ['OPEN', 'MATCHED', 'MATCHING', 'CONFIRMED'].includes(item.status)).length), hint: '建议优先处理活跃条目' },
@@ -312,7 +323,14 @@ async function createOrder(caregiverServiceId: string) {
       caregiverServiceId,
     });
     ElMessage.success('订单已创建，继续完成支付');
-    await router.push({ name: 'frontend-petpal-payment-result', params: { id: detail.id } });
+    await router.push({
+      name: 'frontend-petpal-payment-result',
+      params: { id: detail.id },
+      query: buildPetPalDeskHandoffQuery({
+        notice: '订单已创建，可直接继续支付并稍后回订单队列跟进。',
+        focusOrderId: detail.id,
+      }),
+    });
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '创建订单失败'));
   } finally {

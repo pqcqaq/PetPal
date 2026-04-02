@@ -5,7 +5,7 @@
     summary="退款进度、投诉状态和导出入口都收在这里，创建动作和完整上下文继续在结果页或订单详情处理。"
     :nav-items="petPalOwnerWorkspaceNav"
     active-name="frontend-petpal-aftersales"
-    :actions="[{ label: '订单队列', to: { name: 'frontend-petpal-orders' }, tone: 'secondary' }]"
+    :actions="pageActions"
     :stats="heroStats"
   >
     <template v-if="pageNotice" #notice>
@@ -108,8 +108,8 @@
 
           <div class="petpal-actions">
             <ListExportButton :request="() => api.petpal.orders.exportRefunds(activeOrder.id)" label="导出当前订单退款" pending-label="导出中" />
-            <RouterLink :to="{ name: 'frontend-petpal-refund-result', params: { id: activeOrder.id } }">查看退款结果页</RouterLink>
-            <RouterLink :to="{ name: 'frontend-petpal-complaint-result', params: { id: activeOrder.id } }">查看投诉结果页</RouterLink>
+            <RouterLink :to="buildRefundResultLink(activeOrder.id)">查看退款结果页</RouterLink>
+            <RouterLink :to="buildComplaintResultLink(activeOrder.id)">查看投诉结果页</RouterLink>
             <RouterLink :to="buildOrderDetailLink(activeOrder.id)">回订单详情</RouterLink>
           </div>
         </template>
@@ -167,6 +167,13 @@ const activeOrder = computed(() => aftersalesOrders.value.find((item) => item.id
 const complaints = computed(() => activeOrder.value ? complaintsByOrder.value[activeOrder.value.id] || [] : []);
 const refundProgress = computed(() => activeOrder.value ? refundProgressByOrder.value[activeOrder.value.id] || null : null);
 const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
+const pageActions = computed(() => [
+  {
+    label: '订单队列',
+    to: activeOrder.value ? buildOrderQueueLink(activeOrder.value.id) : { name: 'frontend-petpal-orders' },
+    tone: 'secondary' as const,
+  },
+]);
 
 const heroStats = computed(() => [
   { label: '售后订单', value: String(aftersalesOrders.value.length), hint: '退款或投诉中的订单' },
@@ -199,6 +206,39 @@ function buildOrderDetailLink(orderId: string) {
       notice: '这笔订单仍在售后链路中，可直接回售后摘要继续跟进。',
       focusOrderId: orderId,
       tab: 'aftersales',
+    }),
+  };
+}
+
+function buildOrderQueueLink(orderId: string) {
+  return {
+    name: 'frontend-petpal-orders',
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这里已经定位到这笔售后订单，可直接回订单队列继续跟进。',
+      focusOrderId: orderId,
+      focusFilter: 'aftersales',
+    }),
+  };
+}
+
+function buildRefundResultLink(orderId: string) {
+  return {
+    name: 'frontend-petpal-refund-result',
+    params: { id: orderId },
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这里已经定位到当前订单的退款结果页，可直接继续查看退款阶段。',
+      focusOrderId: orderId,
+    }),
+  };
+}
+
+function buildComplaintResultLink(orderId: string) {
+  return {
+    name: 'frontend-petpal-complaint-result',
+    params: { id: orderId },
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这里已经定位到当前订单的投诉结果页，可直接继续查看或补充投诉。',
+      focusOrderId: orderId,
     }),
   };
 }

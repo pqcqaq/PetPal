@@ -21,7 +21,7 @@
           </el-button>
           <RouterLink
             v-else-if="highlightedOrder"
-            :to="{ name: 'frontend-petpal-order-detail', params: { id: highlightedOrder.id } }"
+            :to="buildOrderDetailLink(highlightedOrder)"
           >
             直接看这笔订单
           </RouterLink>
@@ -61,10 +61,10 @@
             </div>
           </div>
           <div class="petpal-sheet-row__tail">
-            <RouterLink :to="{ name: 'frontend-petpal-order-detail', params: { id: order.id } }">查看详情</RouterLink>
+            <RouterLink :to="buildOrderDetailLink(order)">查看详情</RouterLink>
             <RouterLink
               v-if="isPetPalOutstandingOrder(order)"
-              :to="{ name: 'frontend-petpal-payment-result', params: { id: order.id } }"
+              :to="buildPaymentResultLink(order)"
             >
               继续支付
             </RouterLink>
@@ -88,6 +88,7 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalDeskHandoffQuery,
   getPetPalDeskOrderFilter,
   getPetPalQueryString,
   mergePetPalPageNotice,
@@ -168,6 +169,30 @@ const resolveOrderFilter = (order: OrderRecord): PetPalDeskOrderFilter => {
   }
   return 'all';
 };
+
+function buildOrderDetailLink(order: OrderRecord) {
+  return {
+    name: 'frontend-petpal-order-detail',
+    params: { id: order.id },
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这里已经定位到这笔订单，可直接继续查看状态、沟通或履约留痕。',
+      focusOrderId: order.id,
+      focusFilter: resolveOrderFilter(order),
+      tab: 'summary',
+    }),
+  };
+}
+
+function buildPaymentResultLink(order: OrderRecord) {
+  return {
+    name: 'frontend-petpal-payment-result',
+    params: { id: order.id },
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这里已经定位到这笔待支付订单的结果页，可直接继续付款。',
+      focusOrderId: order.id,
+    }),
+  };
+}
 
 function applyRouteContext() {
   const routeFilter = getPetPalDeskOrderFilter(route.query);

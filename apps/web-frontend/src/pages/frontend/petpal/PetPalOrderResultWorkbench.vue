@@ -8,6 +8,10 @@
     :actions="heroActions"
     :stats="heroStats"
   >
+    <template v-if="pageNotice" #notice>
+      <PetPalDeskNotice eyebrow="Handoff" :title="pageNotice.title" :description="pageNotice.description" :tone="pageNotice.tone" />
+    </template>
+
     <PetPalDeskSection eyebrow="Order" title="订单摘要" description="先确认订单和当前阶段，再决定是否继续操作。">
       <PetPalDeskEmpty
         v-if="!order"
@@ -219,9 +223,15 @@ import { api } from '@/api/client';
 import ListExportButton from '@/components/download/ListExportButton.vue';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
+import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
-import { buildPetPalDeskHandoffQuery, type PetPalDeskOrderFilter } from './recovery';
+import {
+  buildPetPalDeskHandoffQuery,
+  getPetPalQueryString,
+  mergePetPalPageNotice,
+  type PetPalDeskOrderFilter,
+} from './recovery';
 import {
   formatPetPalMoney,
   formatPetPalRange,
@@ -283,6 +293,24 @@ const pageSummary = computed(() => ({
   complaint: '投诉记录和新投诉提交都在这里处理。',
   review: '评价查看与提交都在这里单独完成。',
 }[props.mode]));
+const pageNotice = computed(() => {
+  const description = mergePetPalPageNotice([
+    getPetPalQueryString(route.query, 'notice'),
+  ]);
+  if (!description) {
+    return null;
+  }
+  return {
+    title: ({
+      payment: '已进入支付结果页',
+      refund: '已进入退款结果页',
+      complaint: '已进入投诉结果页',
+      review: '已进入评价结果页',
+    } satisfies Record<typeof props.mode, string>)[props.mode],
+    description,
+    tone: 'accent' as const,
+  };
+});
 
 const currentOrderId = computed(() => order.value?.id || orderId.value);
 

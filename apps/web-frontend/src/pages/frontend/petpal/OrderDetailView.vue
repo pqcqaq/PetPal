@@ -59,7 +59,7 @@
         <div class="petpal-actions">
           <RouterLink
             v-if="isPetPalOutstandingOrder(order)"
-            :to="{ name: 'frontend-petpal-payment-result', params: { id: order.id } }"
+            :to="buildResultLink('payment', order.id)"
           >
             去支付结果页
           </RouterLink>
@@ -72,19 +72,19 @@
           </el-button>
           <RouterLink
             v-if="isOwnerView"
-            :to="{ name: 'frontend-petpal-review-result', params: { id: order.id } }"
+            :to="buildResultLink('review', order.id)"
           >
             评价结果页
           </RouterLink>
           <RouterLink
             v-if="isOwnerView"
-            :to="{ name: 'frontend-petpal-complaint-result', params: { id: order.id } }"
+            :to="buildResultLink('complaint', order.id)"
           >
             投诉结果页
           </RouterLink>
           <RouterLink
             v-if="isOwnerView"
-            :to="{ name: 'frontend-petpal-refund-result', params: { id: order.id } }"
+            :to="buildResultLink('refund', order.id)"
           >
             退款结果页
           </RouterLink>
@@ -211,6 +211,7 @@ import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
 import {
+  buildPetPalDeskHandoffQuery,
   getPetPalDeskSectionTab,
   getPetPalQueryString,
   mergePetPalPageNotice,
@@ -251,10 +252,18 @@ const aftersalesSectionRef = ref<HTMLElement | null>(null);
 
 const isOwnerView = computed(() => order.value?.ownerId === auth.user?.id);
 const navItems = computed(() => isOwnerView.value ? petPalOwnerWorkspaceNav : petPalCaregiverWorkspaceNav);
-const heroActions = computed(() => [
-  { label: isOwnerView.value ? '返回订单队列' : '返回履约队列', to: isOwnerView.value ? { name: 'frontend-petpal-orders' } : { name: 'frontend-petpal-caregiver-orders' }, tone: 'secondary' as const },
-  { label: '消息中心', to: { name: 'frontend-petpal-messages' }, tone: 'secondary' as const },
-]);
+const heroActions = computed(() => {
+  if (!order.value) {
+    return [
+      { label: isOwnerView.value ? '返回订单队列' : '返回履约队列', to: isOwnerView.value ? { name: 'frontend-petpal-orders' } : { name: 'frontend-petpal-caregiver-orders' }, tone: 'secondary' as const },
+      { label: '消息中心', to: { name: 'frontend-petpal-messages' }, tone: 'secondary' as const },
+    ];
+  }
+  return [
+    { label: isOwnerView.value ? '返回订单队列' : '返回履约队列', to: buildQueueLink(order.value), tone: 'secondary' as const },
+    { label: '消息中心', to: buildMessagesLink(order.value.id), tone: 'secondary' as const },
+  ];
+});
 
 const heroStats = computed(() => [
   { label: '订单状态', value: order.value ? getPetPalOrderStatusLabel(order.value.orderStatus) : '--', hint: '先确认当前阶段' },
@@ -278,6 +287,70 @@ const pageNotice = computed(() => {
     tone: hasError ? 'warning' as const : 'accent' as const,
   };
 });
+
+function resolveOrderFilter(record: OrderDetailRecord) {
+  if (isPetPalOutstandingOrder(record)) {
+    return 'needs_payment' as const;
+  }
+  if (['DISPUTED', 'PARTIAL_REFUNDED', 'REFUNDED'].includes(record.orderStatus)) {
+    return 'aftersales' as const;
+  }
+  if (['PENDING_ACCEPT', 'ACCEPTED', 'SERVING'].includes(record.orderStatus)) {
+    return 'active' as const;
+  }
+  if (record.orderStatus === 'COMPLETED') {
+    return 'done' as const;
+  }
+  return 'all' as const;
+}
+
+function buildQueueLink(record: OrderDetailRecord) {
+  if (isOwnerView.value) {
+    return {
+      name: 'frontend-petpal-orders',
+      query: buildPetPalDeskHandoffQuery({
+        notice: '这里已经定位到这笔订单，可继续在队列里跟进当前阶段。',
+        focusOrderId: record.id,
+        focusFilter: resolveOrderFilter(record),
+      }),
+    };
+  }
+  return {
+    name: 'frontend-petpal-caregiver-orders',
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这里已经定位到这笔履约订单，可继续在履约队列里跟进。',
+      focusOrderId: record.id,
+      focusRole: 'caregiver',
+    }),
+  };
+}
+
+function buildMessagesLink(orderId: string) {
+  return {
+    name: 'frontend-petpal-messages',
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这里已经定位到这笔订单会话，可直接继续沟通。',
+      focusOrderId: orderId,
+      focusRole: isOwnerView.value ? 'owner' : 'caregiver',
+    }),
+  };
+}
+
+function buildResultLink(mode: 'payment' | 'review' | 'complaint' | 'refund', orderId: string) {
+  return {
+    name: `frontend-petpal-${mode}-result`,
+    params: { id: orderId },
+    query: buildPetPalDeskHandoffQuery({
+      notice: ({
+        payment: '这里已经定位到这笔待支付订单的结果页，可直接继续付款。',
+        review: '这里已经定位到这笔订单的评价结果页，可继续查看或提交评价。',
+        complaint: '这里已经定位到这笔订单的投诉结果页，可继续查看或补充投诉。',
+        refund: '这里已经定位到这笔订单的退款结果页，可继续查看退款阶段。',
+      } satisfies Record<'payment' | 'review' | 'complaint' | 'refund', string>)[mode],
+      focusOrderId: orderId,
+    }),
+  };
+}
 
 const conversationUnreadCount = computed(() => {
   if (!order.value) {

@@ -7157,6 +7157,51 @@ flowchart TD
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.148 2026-04-03（P3-M1 Slice 148）
+
+**概述**：继续推进 Web 前台收口，本轮把订单队列、订单详情、售后中心、需求队列和交易结果页之间的结果回流统一起来，让支付 / 退款 / 投诉 / 评价不再出现“入口带上下文、结果页不显示”或“结果页返回后丢焦点”的分叉。
+
+已完成：
+
+- 收口订单链路里的结果页入口：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerOrdersView.vue`
+    - 订单队列里的“直接看这笔订单 / 查看详情 / 继续支付” 已统一接入 handoff query，进入详情或支付结果页时都会带订单焦点与当前筛选上下文。
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+    - 订单详情里的“回订单队列 / 消息中心 / 去支付结果页 / 评价结果页 / 投诉结果页 / 退款结果页” 现已全部带 notice 和焦点订单，不再从详情页裸跳到下一层页面。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalAftersalesView.vue`
+    - 售后中心里的“订单队列 / 查看退款结果页 / 查看投诉结果页 / 回订单详情” 已统一按当前售后订单拼接 handoff，上下文不再丢失。
+- 让交易结果页真正承接 handoff：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOrderResultWorkbench.vue`
+    - 已新增 notice 区块，支付 / 退款 / 投诉 / 评价结果页现在会明确显示上一页带来的 handoff 说明，不再只是接收 query 但界面无反馈。
+- 补齐需求建单后的支付回流：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerRequestsView.vue`
+    - 需求队列创建订单后，现会带 notice 进入支付结果页。
+    - 需求队列里的“新建需求”主按钮与空态动作也已补齐 notice，保持 owner 侧入口规则一致。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮只改动 Web 前台交易结果回流、页面 notice 承接与 query 拼接，没有新增后端接口或数据模型变更。
+- 已确认订单队列、订单详情、售后中心、需求队列和结果页之间的高频结果入口已遵循同一套 handoff 规则，支付 / 退款 / 投诉 / 评价的跨页动作不再各自为政。
+- 已确认结果页现在会真实展示 handoff notice，避免之前“路由有上下文但页面看不出来”的体验断层。
+
+风险与缓解：
+
+- 风险：交易结果主链路已收口，但提醒中心、照料者服务管理和少量跨角色辅助入口仍可能残留零散裸跳转。
+- 缓解：下一轮继续扫描提醒中心与照料者侧剩余入口，清掉最后一批 notice / handoff 不一致点。
+
+下一步（1-3）：
+
+1. 继续扫描提醒中心、照料者服务管理和剩余辅助入口，收掉最后一批 handoff 不一致点。
+2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
+3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
+
 ### 14.146 2026-04-03（P3-M1 Slice 146）
 
 **概述**：继续推进 Web 前台收口，本轮把照料者侧残余的无上下文入口补齐，并让 `legacy` 兼容页也承接统一 notice，把旧链接稳定分发到带 handoff 的新页面。
