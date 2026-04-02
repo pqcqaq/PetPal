@@ -180,6 +180,19 @@
                 :value="item.value"
               />
             </el-select>
+            <el-select
+              v-model="exportComplaintTargetRole"
+              clearable
+              placeholder="导出全部责任角色"
+              class="petpal-export-toolbar__service"
+            >
+              <el-option
+                v-for="item in petPalComplaintTargetOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
             <el-checkbox v-model="exportRiskOnly">
               仅导出退款风险单
             </el-checkbox>
@@ -188,7 +201,7 @@
             </el-button>
           </div>
           <p class="petpal-export-toolbar__hint">
-            导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按退款风险单、投诉状态或投诉类型导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
+            导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按退款风险单、投诉状态、投诉类型或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
           </p>
         </div>
 
@@ -435,6 +448,7 @@
 
 <script setup lang="ts">
 import type {
+  ComplaintTargetRole,
   ComplaintType,
   PetServiceType,
   ComplaintStatus,
@@ -463,6 +477,7 @@ import {
   formatPetPalMoney,
   formatPetPalRange,
   getPetPalCaregiverAuditLabel,
+  petPalComplaintTargetOptions,
   getPetPalServiceTypeLabel,
   petPalComplaintStatusOptions,
   petPalComplaintTypeOptions,
@@ -482,6 +497,7 @@ type CaregiverEarningsExportFilterSnapshot = {
   serviceType: PetServiceType | '';
   complaintStatus: ComplaintStatus | '';
   complaintType: ComplaintType | '';
+  complaintTargetRole: ComplaintTargetRole | '';
   datePreset: EarningsExportDatePreset;
   riskOnly: boolean;
 };
@@ -509,6 +525,7 @@ const { state: exportPageState } = usePageState<CaregiverEarningsExportPageState
     serviceType: '',
     complaintStatus: '',
     complaintType: '',
+    complaintTargetRole: '',
     datePreset: '',
     riskOnly: false,
     templates: [],
@@ -579,6 +596,7 @@ const applyExportFilterSnapshot = (snapshot: CaregiverEarningsExportFilterSnapsh
   exportPageState.serviceType = snapshot.serviceType;
   exportPageState.complaintStatus = snapshot.complaintStatus;
   exportPageState.complaintType = snapshot.complaintType;
+  exportPageState.complaintTargetRole = snapshot.complaintTargetRole;
   exportPageState.datePreset = snapshot.datePreset;
   exportPageState.riskOnly = snapshot.riskOnly;
 };
@@ -588,6 +606,7 @@ const buildCurrentExportFilterSnapshot = (): CaregiverEarningsExportFilterSnapsh
   serviceType: exportPageState.serviceType,
   complaintStatus: exportPageState.complaintStatus,
   complaintType: exportPageState.complaintType,
+  complaintTargetRole: exportPageState.complaintTargetRole,
   datePreset: exportPageState.datePreset,
   riskOnly: exportPageState.riskOnly,
 });
@@ -598,6 +617,7 @@ const clearCurrentExportFilters = () => {
     serviceType: '',
     complaintStatus: '',
     complaintType: '',
+    complaintTargetRole: '',
     datePreset: '',
     riskOnly: false,
   });
@@ -667,6 +687,12 @@ const exportComplaintType = computed<ComplaintType | ''>({
     exportPageState.complaintType = value || '';
   },
 });
+const exportComplaintTargetRole = computed<ComplaintTargetRole | ''>({
+  get: () => exportPageState.complaintTargetRole,
+  set: (value) => {
+    exportPageState.complaintTargetRole = value || '';
+  },
+});
 const exportRiskOnly = computed<boolean>({
   get: () => exportPageState.riskOnly,
   set: (value) => {
@@ -716,6 +742,7 @@ const hasExportFilters = computed(() => Boolean(
   || exportServiceType.value
   || exportComplaintStatus.value
   || exportComplaintType.value
+  || exportComplaintTargetRole.value
   || exportRiskOnly.value,
 ));
 const revenueCards = computed(() => [
@@ -939,6 +966,7 @@ function buildEarningsExportRequest() {
     serviceType: exportServiceType.value || undefined,
     complaintStatus: exportComplaintStatus.value || undefined,
     complaintType: exportComplaintType.value || undefined,
+    complaintTargetRole: exportComplaintTargetRole.value || undefined,
     riskOnly: exportRiskOnly.value || undefined,
   });
 }

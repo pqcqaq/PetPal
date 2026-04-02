@@ -257,6 +257,7 @@ type CaregiverEarningsExportFilters = {
   riskOnly?: boolean;
   complaintStatus?: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
   complaintType?: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
+  complaintTargetRole?: 'CAREGIVER' | 'PLATFORM';
 };
 
 type ComplaintAdminScopeFilters = {
@@ -1975,7 +1976,9 @@ export const petpalService = {
               },
             }
           : {}),
-        ...(normalizedFilters.complaintStatus || normalizedFilters.complaintType
+        ...(normalizedFilters.complaintStatus
+          || normalizedFilters.complaintType
+          || normalizedFilters.complaintTargetRole
           ? {
               complaints: {
                 some: {
@@ -1988,6 +1991,11 @@ export const petpalService = {
                   ...(normalizedFilters.complaintType
                     ? {
                         complaintType: normalizedFilters.complaintType,
+                      }
+                    : {}),
+                  ...(normalizedFilters.complaintTargetRole
+                    ? {
+                        targetRole: normalizedFilters.complaintTargetRole,
                       }
                     : {}),
                 },

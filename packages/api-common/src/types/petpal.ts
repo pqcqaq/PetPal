@@ -559,6 +559,7 @@ export interface CaregiverEarningsExportQuery {
   riskOnly?: boolean;
   complaintStatus?: ComplaintStatus;
   complaintType?: ComplaintType;
+  complaintTargetRole?: ComplaintTargetRole;
 }
 
 export interface MatchCaregiverQuery {

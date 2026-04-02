@@ -197,6 +197,7 @@ const caregiverEarningsExportQuerySchema = z.object({
   riskOnly: optionalBooleanQuerySchema,
   complaintStatus: z.enum(['OPEN', 'PROCESSING', 'RESOLVED', 'REJECTED']).optional(),
   complaintType: z.enum(['SAFETY', 'FEE', 'SERVICE', 'FRAUD', 'OTHER']).optional(),
+  complaintTargetRole: z.enum(['CAREGIVER', 'PLATFORM']).optional(),
 });
 
 const adminComplaintQuerySchema = z.object({
