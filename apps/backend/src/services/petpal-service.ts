@@ -248,10 +248,123 @@ const OWNER_TRANSACTION_EXPORT_DEFAULT_DAYS = 365;
 const OWNER_TRANSACTION_EXPORT_MAX_DAYS = 366;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const HOUR_IN_MS = 60 * 60 * 1000;
+const CAREGIVER_EARNINGS_DAILY_BUCKET_COUNT = 7;
+const CAREGIVER_EARNINGS_WEEKLY_BUCKET_COUNT = 8;
+const CAREGIVER_EARNINGS_MONTHLY_BUCKET_COUNT = 6;
 const COMPLAINT_SLA_LIMIT_MS = env.PETPAL_COMPLAINT_SLA_LIMIT_HOURS * HOUR_IN_MS;
 const COMPLAINT_SLA_WARNING_MS = env.PETPAL_COMPLAINT_SLA_WARNING_HOURS * HOUR_IN_MS;
 const COMPLAINT_SLA_DUE_SOON_AGE_MS = COMPLAINT_SLA_LIMIT_MS - COMPLAINT_SLA_WARNING_MS;
 const ACTIVE_COMPLAINT_STATUSES = ['OPEN', 'PROCESSING'] as const;
+
+type CaregiverEarningsTrendBucketSeed = {
+  label: string;
+  rangeStart: Date;
+  rangeEnd: Date;
+  revenue: number;
+  completedOrderCount: number;
+};
+
+const startOfUtcDay = (value: Date) =>
+  new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+
+const addUtcDays = (value: Date, days: number) => new Date(value.getTime() + days * DAY_IN_MS);
+
+const startOfUtcWeek = (value: Date) => {
+  const dayStart = startOfUtcDay(value);
+  const weekday = dayStart.getUTCDay();
+  const offset = weekday === 0 ? -6 : 1 - weekday;
+  return addUtcDays(dayStart, offset);
+};
+
+const startOfUtcMonth = (value: Date) =>
+  new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1));
+
+const addUtcMonths = (value: Date, months: number) =>
+  new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth() + months, 1));
+
+const formatUtcMonthDay = (value: Date) =>
+  `${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`;
+
+const formatUtcYearMonth = (value: Date) =>
+  `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}`;
+
+const buildCaregiverEarningsTrendBuckets = (now = new Date()) => {
+  const currentDayStart = startOfUtcDay(now);
+  const currentWeekStart = startOfUtcWeek(now);
+  const currentMonthStart = startOfUtcMonth(now);
+
+  const daily = Array.from({ length: CAREGIVER_EARNINGS_DAILY_BUCKET_COUNT }, (_, index) => {
+    const rangeStart = addUtcDays(
+      currentDayStart,
+      index - (CAREGIVER_EARNINGS_DAILY_BUCKET_COUNT - 1),
+    );
+    return {
+      label: formatUtcMonthDay(rangeStart),
+      rangeStart,
+      rangeEnd: addUtcDays(rangeStart, 1),
+      revenue: 0,
+      completedOrderCount: 0,
+    };
+  });
+
+  const weekly = Array.from({ length: CAREGIVER_EARNINGS_WEEKLY_BUCKET_COUNT }, (_, index) => {
+    const rangeStart = addUtcDays(
+      currentWeekStart,
+      (index - (CAREGIVER_EARNINGS_WEEKLY_BUCKET_COUNT - 1)) * 7,
+    );
+    const rangeEnd = addUtcDays(rangeStart, 7);
+    return {
+      label: `${formatUtcMonthDay(rangeStart)} ~ ${formatUtcMonthDay(addUtcDays(rangeEnd, -1))}`,
+      rangeStart,
+      rangeEnd,
+      revenue: 0,
+      completedOrderCount: 0,
+    };
+  });
+
+  const monthly = Array.from({ length: CAREGIVER_EARNINGS_MONTHLY_BUCKET_COUNT }, (_, index) => {
+    const rangeStart = addUtcMonths(
+      currentMonthStart,
+      index - (CAREGIVER_EARNINGS_MONTHLY_BUCKET_COUNT - 1),
+    );
+    return {
+      label: formatUtcYearMonth(rangeStart),
+      rangeStart,
+      rangeEnd: addUtcMonths(rangeStart, 1),
+      revenue: 0,
+      completedOrderCount: 0,
+    };
+  });
+
+  return {
+    daily,
+    weekly,
+    monthly,
+  };
+};
+
+const appendCaregiverEarningsTrendValue = (
+  buckets: CaregiverEarningsTrendBucketSeed[],
+  appointmentEnd: Date,
+  revenue: number,
+) => {
+  for (const bucket of buckets) {
+    if (appointmentEnd >= bucket.rangeStart && appointmentEnd < bucket.rangeEnd) {
+      bucket.revenue += revenue;
+      bucket.completedOrderCount += 1;
+      break;
+    }
+  }
+};
+
+const toCaregiverEarningsTrendRecords = (buckets: CaregiverEarningsTrendBucketSeed[]) =>
+  buckets.map((bucket) => ({
+    label: bucket.label,
+    rangeStart: bucket.rangeStart,
+    rangeEnd: bucket.rangeEnd,
+    revenue: Number(bucket.revenue.toFixed(2)),
+    completedOrderCount: bucket.completedOrderCount,
+  }));
 
 const normalizeOwnerTransactionExportRange = (
   filters: OwnerTransactionExportFilters,
@@ -1525,6 +1638,7 @@ export const petpalService = {
       caregiverId: caregiverProfile.id,
       deleteAt: null,
     };
+    const trendBuckets = buildCaregiverEarningsTrendBuckets();
 
     const [totalServiceCount, activeServiceCount] = await Promise.all([
       prisma.caregiverService.count({ where: serviceWhere }),
@@ -1563,6 +1677,11 @@ export const petpalService = {
         latestActiveOrder: null,
         recentCompletedOrders: [],
         serviceRevenueMix: [],
+        trends: {
+          daily: toCaregiverEarningsTrendRecords(trendBuckets.daily),
+          weekly: toCaregiverEarningsTrendRecords(trendBuckets.weekly),
+          monthly: toCaregiverEarningsTrendRecords(trendBuckets.monthly),
+        },
       };
     }
 
@@ -1596,6 +1715,7 @@ export const petpalService = {
       serviceRevenueRows,
       latestActiveOrder,
       recentCompletedOrders,
+      completedTrendRows,
     ] = await Promise.all([
       prisma.orderMain.count({ where: completedWhere }),
       prisma.orderMain.aggregate({
@@ -1661,6 +1781,19 @@ export const petpalService = {
         ],
         take: 6,
       }),
+      prisma.orderMain.findMany({
+        where: {
+          ...completedWhere,
+          appointmentEnd: {
+            gte: trendBuckets.monthly[0]?.rangeStart,
+          },
+        },
+        select: {
+          appointmentEnd: true,
+          amountPaid: true,
+          amountRefunded: true,
+        },
+      }),
     ]);
 
     const totalIncome = calcNetIncome(
@@ -1682,6 +1815,13 @@ export const petpalService = {
       completedOrderCount + aftersalesOrderCount > 0
         ? Number((aftersalesOrderCount / (completedOrderCount + aftersalesOrderCount)).toFixed(4))
         : 0;
+
+    for (const row of completedTrendRows) {
+      const revenue = calcNetIncome(row.amountPaid, row.amountRefunded);
+      appendCaregiverEarningsTrendValue(trendBuckets.daily, row.appointmentEnd, revenue);
+      appendCaregiverEarningsTrendValue(trendBuckets.weekly, row.appointmentEnd, revenue);
+      appendCaregiverEarningsTrendValue(trendBuckets.monthly, row.appointmentEnd, revenue);
+    }
 
     return {
       profile,
@@ -1713,6 +1853,11 @@ export const petpalService = {
           };
         })
         .sort((left, right) => Number(right.revenue) - Number(left.revenue)),
+      trends: {
+        daily: toCaregiverEarningsTrendRecords(trendBuckets.daily),
+        weekly: toCaregiverEarningsTrendRecords(trendBuckets.weekly),
+        monthly: toCaregiverEarningsTrendRecords(trendBuckets.monthly),
+      },
     };
   },
 

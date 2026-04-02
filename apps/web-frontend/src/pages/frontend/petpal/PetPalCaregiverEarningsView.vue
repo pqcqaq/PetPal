@@ -209,6 +209,62 @@
     </div>
 
     <PetPalDeskSection
+      eyebrow="Trend"
+      title="日 / 周 / 月趋势"
+      description="按同一口径看最近 7 天、8 周和 6 个月的完成单收入变化。"
+    >
+      <template #actions>
+        <el-button
+          v-if="summaryState === 'error'"
+          :loading="sectionReloadingKey === 'summary'"
+          @click="retrySummary"
+        >
+          重试收益摘要
+        </el-button>
+      </template>
+
+      <PetPalDeskEmpty
+        v-if="summaryState === 'error'"
+        title="收益趋势暂未刷新完成"
+        description="可以先重试收益摘要，恢复后再继续查看日、周、月维度的经营变化。"
+      />
+
+      <PetPalDeskEmpty
+        v-else-if="!hasTrendData"
+        title="还没有可用的收益趋势"
+        description="完成订单后，这里会开始沉淀按天、按周、按月的收益变化。"
+      />
+
+      <div v-else class="petpal-trend-grid">
+        <article v-for="group in trendGroups" :key="group.key" class="petpal-trend-card">
+          <div class="petpal-trend-card__head">
+            <div>
+              <p>{{ group.label }}</p>
+              <strong>{{ formatPetPalMoney(group.totalRevenue) }}</strong>
+            </div>
+            <span>{{ group.totalOrders }} 笔完成单</span>
+          </div>
+          <div class="petpal-trend-list">
+            <div
+              v-for="item in group.items"
+              :key="`${group.key}-${item.label}`"
+              class="petpal-trend-row"
+            >
+              <div class="petpal-trend-row__copy">
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.completedOrderCount }} 笔</span>
+              </div>
+              <div class="petpal-trend-row__tail">
+                <span>{{ formatPetPalMoney(item.revenue) }}</span>
+                <i :style="{ width: getTrendBarWidth(item.revenue, group.maxRevenue) }" />
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </PetPalDeskSection>
+
+    <PetPalDeskSection
       eyebrow="Completed"
       title="最近完成的订单"
       description="履约已经结束的订单才会进入这里，方便复盘而不是再回履约动作。"
@@ -317,6 +373,13 @@ const formatPercent = (value: number) =>
 const getOrderNetIncome = (
   order: Pick<CaregiverEarningsOrderRecord, 'amountPaid' | 'amountRefunded'>,
 ) => Math.max(toAmount(order.amountPaid) - toAmount(order.amountRefunded), 0);
+const getTrendBarWidth = (value: number | string, maxRevenue: number) => {
+  const revenue = toAmount(value);
+  if (!maxRevenue || revenue <= 0) {
+    return '0%';
+  }
+  return `${Math.max((revenue / maxRevenue) * 100, 12)}%`;
+};
 
 const profile = computed(() => summary.value?.profile ?? null);
 const totals = computed(() => summary.value?.totals ?? emptyTotals);
@@ -343,6 +406,19 @@ const serviceRevenueMix = computed(
       shareLabel: formatPercent(item.shareRatio),
     })) ?? [],
 );
+const trendGroups = computed(() =>
+  [
+    { key: 'daily', label: '近 7 天', items: summary.value?.trends.daily ?? [] },
+    { key: 'weekly', label: '近 8 周', items: summary.value?.trends.weekly ?? [] },
+    { key: 'monthly', label: '近 6 个月', items: summary.value?.trends.monthly ?? [] },
+  ].map((group) => ({
+    ...group,
+    maxRevenue: group.items.reduce((max, item) => Math.max(max, toAmount(item.revenue)), 0),
+    totalRevenue: group.items.reduce((sum, item) => sum + toAmount(item.revenue), 0),
+    totalOrders: group.items.reduce((sum, item) => sum + item.completedOrderCount, 0),
+  })),
+);
+const hasTrendData = computed(() => totals.value.completedOrderCount > 0);
 const revenueCards = computed(() => [
   {
     label: '累计收入',
@@ -692,6 +768,94 @@ onMounted(() => {
   line-height: 1.08;
 }
 
+.petpal-trend-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.petpal-trend-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border-top: 1px solid rgba(39, 55, 42, 0.08);
+}
+
+.petpal-trend-card__head {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.petpal-trend-card__head p,
+.petpal-trend-card__head strong,
+.petpal-trend-card__head span {
+  margin: 0;
+}
+
+.petpal-trend-card__head p,
+.petpal-trend-card__head span,
+.petpal-trend-row__copy span,
+.petpal-trend-row__tail span {
+  color: #6b625a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.petpal-trend-card__head p {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.petpal-trend-card__head strong {
+  color: #241f1a;
+  font-size: 24px;
+  line-height: 1.08;
+}
+
+.petpal-trend-list {
+  display: grid;
+  gap: 10px;
+}
+
+.petpal-trend-row {
+  display: grid;
+  gap: 8px;
+}
+
+.petpal-trend-row__copy,
+.petpal-trend-row__tail {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.petpal-trend-row__copy strong,
+.petpal-trend-row__tail span {
+  color: #2b241f;
+  font-size: 13px;
+}
+
+.petpal-trend-row__tail {
+  position: relative;
+  min-height: 6px;
+  padding-bottom: 10px;
+}
+
+.petpal-trend-row__tail i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #dfa65b 0%, #8ab071 100%);
+}
+
 .petpal-sheet-row.is-focused {
   margin-inline: -10px;
   padding-inline: 16px;
@@ -701,6 +865,10 @@ onMounted(() => {
 @media (max-width: 1080px) {
   .petpal-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .petpal-trend-grid {
+    grid-template-columns: 1fr;
   }
 }
 

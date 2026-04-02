@@ -391,6 +391,14 @@ export interface CaregiverServiceRevenueMixRecord {
   shareRatio: number;
 }
 
+export interface CaregiverEarningsTrendBucketRecord {
+  label: string;
+  rangeStart: string;
+  rangeEnd: string;
+  revenue: AmountValue;
+  completedOrderCount: number;
+}
+
 export interface CaregiverEarningsSummaryRecord {
   profile: {
     auditStatus: CaregiverAuditStatus;
@@ -415,6 +423,11 @@ export interface CaregiverEarningsSummaryRecord {
   latestActiveOrder: CaregiverEarningsOrderRecord | null;
   recentCompletedOrders: CaregiverEarningsOrderRecord[];
   serviceRevenueMix: CaregiverServiceRevenueMixRecord[];
+  trends: {
+    daily: CaregiverEarningsTrendBucketRecord[];
+    weekly: CaregiverEarningsTrendBucketRecord[];
+    monthly: CaregiverEarningsTrendBucketRecord[];
+  };
 }
 
 export interface CreateServiceLogPayload {

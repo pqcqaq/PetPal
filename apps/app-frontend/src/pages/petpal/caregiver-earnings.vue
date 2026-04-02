@@ -42,6 +42,18 @@ const profile = computed(() => summary.value?.profile ?? null);
 const recentCompletedOrders = computed(() => summary.value?.recentCompletedOrders ?? []);
 const serviceRevenueMix = computed(() => summary.value?.serviceRevenueMix ?? []);
 const latestActiveOrder = computed(() => summary.value?.latestActiveOrder ?? null);
+const trendGroups = computed(() =>
+  [
+    { key: 'daily', label: '近 7 天', items: summary.value?.trends.daily ?? [] },
+    { key: 'weekly', label: '近 8 周', items: summary.value?.trends.weekly ?? [] },
+    { key: 'monthly', label: '近 6 个月', items: summary.value?.trends.monthly ?? [] },
+  ].map((group) => ({
+    ...group,
+    totalRevenue: group.items.reduce((sum, item) => sum + Number(item.revenue || 0), 0),
+    totalOrders: group.items.reduce((sum, item) => sum + item.completedOrderCount, 0),
+  })),
+);
+const hasTrendData = computed(() => totals.value.completedOrderCount > 0);
 
 function formatPercent(value: number | string | null | undefined) {
   const ratio = Number(value ?? 0);
@@ -187,6 +199,30 @@ onPullDownRefresh(() => {
           v-else
           title="还没有形成收入结构"
           description="完成第一笔订单后，这里会开始按服务类型归集收入。"
+        />
+      </PetpalSection>
+
+      <PetpalSection title="收益趋势" subtitle="按天 / 周 / 月看短期波动和中期稳定性。">
+        <template v-if="hasTrendData">
+          <view v-for="group in trendGroups" :key="group.key" class="petpal-sheet">
+            <text class="petpal-banner__eyebrow">{{ group.label }}</text>
+            <text class="petpal-banner__title">{{ helpers.formatMoney(group.totalRevenue) }}</text>
+            <text class="petpal-banner__meta"
+              >{{ group.totalOrders }} 笔完成单 · 同一口径收益趋势</text
+            >
+            <text
+              v-for="item in group.items"
+              :key="`${group.key}-${item.label}`"
+              class="petpal-note"
+              >{{ item.label }} · {{ item.completedOrderCount }} 笔 ·
+              {{ helpers.formatMoney(item.revenue) }}</text
+            >
+          </view>
+        </template>
+        <PetpalEmpty
+          v-else
+          title="还没有可用的收益趋势"
+          description="完成订单后，这里会开始沉淀按天、按周、按月的经营变化。"
         />
       </PetpalSection>
 

@@ -629,6 +629,15 @@ describe('PetPal API integration', () => {
     assert.equal(summaryResponse.body.data.latestActiveOrder, null);
     assert.deepEqual(summaryResponse.body.data.recentCompletedOrders, []);
     assert.deepEqual(summaryResponse.body.data.serviceRevenueMix, []);
+    assert.equal(summaryResponse.body.data.trends.daily.length, 7);
+    assert.equal(summaryResponse.body.data.trends.weekly.length, 8);
+    assert.equal(summaryResponse.body.data.trends.monthly.length, 6);
+    assert.ok(
+      summaryResponse.body.data.trends.daily.every(
+        (item: { revenue: number; completedOrderCount: number }) =>
+          Number(item.revenue) === 0 && item.completedOrderCount === 0,
+      ),
+    );
   });
 
   it('supports caregiver earnings summary aggregation', async () => {
@@ -835,6 +844,10 @@ describe('PetPal API integration', () => {
 
     const baselineTotals = baselineResponse.body.data.totals;
     const totals = summaryResponse.body.data.totals;
+    const sumTrendRevenue = (items: Array<{ revenue: number }>) =>
+      items.reduce((sum, item) => sum + Number(item.revenue), 0);
+    const sumTrendOrders = (items: Array<{ completedOrderCount: number }>) =>
+      items.reduce((sum, item) => sum + item.completedOrderCount, 0);
     const baselineMix = new Map<string, { revenue: number; orderCount: number }>(
       baselineResponse.body.data.serviceRevenueMix.map(
         (item: { serviceType: string; revenue: number; orderCount: number }) => [
@@ -894,6 +907,39 @@ describe('PetPal API integration', () => {
     assert.equal(
       (currentMix.get('FEEDING')?.orderCount ?? 0) - (baselineMix.get('FEEDING')?.orderCount ?? 0),
       1,
+    );
+    assert.equal(summaryResponse.body.data.trends.daily.length, 7);
+    assert.equal(summaryResponse.body.data.trends.weekly.length, 8);
+    assert.equal(summaryResponse.body.data.trends.monthly.length, 6);
+    assert.equal(
+      sumTrendRevenue(summaryResponse.body.data.trends.daily) -
+        sumTrendRevenue(baselineResponse.body.data.trends.daily),
+      100,
+    );
+    assert.equal(
+      sumTrendOrders(summaryResponse.body.data.trends.daily) -
+        sumTrendOrders(baselineResponse.body.data.trends.daily),
+      1,
+    );
+    assert.equal(
+      sumTrendRevenue(summaryResponse.body.data.trends.weekly) -
+        sumTrendRevenue(baselineResponse.body.data.trends.weekly),
+      180,
+    );
+    assert.equal(
+      sumTrendOrders(summaryResponse.body.data.trends.weekly) -
+        sumTrendOrders(baselineResponse.body.data.trends.weekly),
+      2,
+    );
+    assert.equal(
+      sumTrendRevenue(summaryResponse.body.data.trends.monthly) -
+        sumTrendRevenue(baselineResponse.body.data.trends.monthly),
+      180,
+    );
+    assert.equal(
+      sumTrendOrders(summaryResponse.body.data.trends.monthly) -
+        sumTrendOrders(baselineResponse.body.data.trends.monthly),
+      2,
     );
   });
 

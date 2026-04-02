@@ -7202,6 +7202,54 @@ flowchart TD
 2. 继续补更细的主动提醒、角色聚焦与弱网恢复说明，让回流后的下一步更明确。
 3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
 
+### 14.160 2026-04-03（P3-M1 Slice 160）
+
+**概述**：延续上一轮统一后的收益摘要，本轮继续补齐照料者收益的日 / 周 / 月趋势视角，让收益分析开始覆盖文档里明确要求的周期性报表维度。
+
+已完成：
+
+- 收益摘要补齐趋势维度：
+  - `packages/api-common/src/types/petpal.ts`
+  - `apps/backend/src/services/petpal-service.ts`
+    - `CaregiverEarningsSummaryRecord` 新增 `trends.daily / weekly / monthly`。
+    - 后端收益摘要现在会固定输出最近 7 天、8 周和 6 个月的完成单收入与订单量。
+    - 未审核照料者同样返回零值趋势桶，前端可以稳定渲染空态，不需要再额外猜测结构。
+- Web / App 收益页接入趋势：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+  - `apps/app-frontend/src/pages/petpal/caregiver-earnings.vue`
+    - Web 收益页新增“日 / 周 / 月趋势”分区，以统一收益口径展示近 7 天、8 周和 6 个月的变化。
+    - App 收益页新增收益趋势区块，开始补齐移动端对周期性收益分析的承接。
+- 定向测试补强：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 已继续校验空收益摘要的趋势桶长度与零值输出。
+    - 已继续校验收益聚合场景下日 / 周 / 月趋势收入与订单量的增量正确性。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `node --import tsx --test --test-concurrency=1 --test-name-pattern "caregiver earnings summary" test/integration/petpal-api.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 本轮没有新增新路由，继续复用上一轮的收益摘要接口，只扩展了统一契约和后端聚合逻辑。
+- 已确认日 / 周 / 月趋势与累计收入使用同一批已完成订单净收入口径，不会出现“总览一套算法、趋势另一套算法”的分叉。
+- 已确认未审核照料者与零单照料者都能拿到稳定趋势结构，双端页面不会因为趋势字段缺失而出现条件分支漂移。
+
+风险与缓解：
+
+- 风险：当前趋势能力仍聚焦固定时间窗的概览，不支持自定义筛选、对账导出或更深的经营归因。
+- 缓解：下一轮继续评估是否补经营导出、更多筛选维度或平台级运营看板，避免把“趋势已补齐”误判为收益分析已经整体收口。
+
+下一步（1-3）：
+
+1. 继续评估是否为照料者收益中心补经营导出或更多筛选维度。
+2. 继续补系统级主动提醒、保存后回流和更细的弱网恢复说明。
+3. 在 Web / App 高频链路继续稳定后，再集中补验收向测试、审计收口与最终交付材料。
+
 ### 14.159 2026-04-03（P3-M1 Slice 159）
 
 **概述**：延续上一轮照料者收益页，本轮把收益聚合从前端临时拼装收口到后端摘要接口，并同步切到 Web / App 两端的统一收益口径。
