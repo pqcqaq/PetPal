@@ -7491,6 +7491,50 @@ flowchart TD
 2. 继续评估是否把导出筛选快照和模板状态进一步抽成更高层的 composable，而不只是共享数组操作规则。
 3. 在导出链路共享层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.175 2026-04-03（P3-M1 Slice 175）
+
+**概述**：延续上一轮命名导出模板 helper 的共享化，本轮继续把“模板选中态 + 应用 / 保存 / 删除”这层 Vue 状态管理从照料者收益页内抽离成 composable，让页面只保留导出筛选快照本身，模板交互不再散落在单页里手写。
+
+已完成：
+
+- 提取 PetPal 命名导出模板 composable：
+  - `apps/web-frontend/src/composables/use-petpal-export-templates.ts`
+    - 新增 `usePetPalExportTemplates`，统一管理当前选中的模板名称、模板查找结果，以及模板应用 / 保存 / 删除动作。
+    - composable 底层继续复用上一轮的纯函数 helper，保持模板限额、更新前置和删除规则的一致性。
+- 照料者收益页接入 composable：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 页面改为把 `exportPageState.templates` 包装成可写 computed 后注入 composable。
+    - “应用模板 / 保存模板 / 删除模板”现在统一走 composable 返回的方法，页内不再重复处理模板查找、数组写回和选中项清理。
+- 定向测试补齐：
+  - `apps/web-frontend/test/use-petpal-export-templates.test.ts`
+    - 新增 composable 测试，覆盖模板选中与应用、模板新增 / 更新、模板删除与清空选中、超限时保持原状态不被污染。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\use-petpal-export-templates.test.ts` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-export-template-state.test.ts ..\\web-frontend\\test\\use-petpal-export-templates.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮仍未改动后端接口、数据库结构和导出契约，改动范围继续限定在 Web 前端的模板状态管理层。
+- 已确认照料者收益页现有模板交互行为保持不变，只是模板状态开始通过 composable 收口，后续迁移其它导出页时可以直接复用。
+- 已确认 composable 在模板超限时不会改写原模板列表，也不会错误清空当前选中项。
+
+风险与缓解：
+
+- 风险：目前 composable 的真实消费方仍只有照料者收益页，主人端和更多导出页还没有一起迁入，跨页面复用收益暂时还没完全兑现。
+- 缓解：下一轮继续优先寻找仍在线上的导出页，把模板状态管理一起迁到这套 composable，而不是继续在新页面复制模板交互。
+
+下一步（1-3）：
+
+1. 继续评估主人端导出页或后续新增导出页，优先把模板状态管理接到 `usePetPalExportTemplates`。
+2. 继续评估是否把导出筛选快照的读取 / 清空 / 预设应用也进一步收口成更完整的导出工具条基础设施。
+3. 在导出链路共享层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
 ### 14.172 2026-04-03（P3-M1 Slice 172）
 
 **概述**：延续退款原因关键词专项导出，本轮继续把照料者经营明细推进到“能按投诉摘要检索复盘”的层面，新增投诉摘要关键词筛选，让照料者可以快速定位服务争议、平台流程异常、处理结论等特定投诉上下文的完成订单。

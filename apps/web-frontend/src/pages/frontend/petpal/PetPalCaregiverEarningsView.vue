@@ -506,6 +506,7 @@ import { RouterLink, useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '@/api/client';
 import ListExportButton from '@/components/download/ListExportButton.vue';
+import { usePetPalExportTemplates } from '@/composables/use-petpal-export-templates';
 import { usePageState } from '@/composables/use-page-state';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
@@ -520,10 +521,7 @@ import {
   type PetPalSectionLoadState,
 } from './recovery';
 import {
-  findPetPalNamedExportTemplate,
   PETPAL_EXPORT_TEMPLATE_LIMIT,
-  removePetPalNamedExportTemplate,
-  upsertPetPalNamedExportTemplate,
   validatePetPalExportTemplateName,
 } from './export-template-state';
 import {
@@ -594,7 +592,19 @@ const { state: exportPageState } = usePageState<CaregiverEarningsExportPageState
     templates: [],
   },
 );
-const selectedExportTemplateName = ref('');
+const exportTemplateState = computed<CaregiverEarningsExportTemplate[]>({
+  get: () => exportPageState.templates,
+  set: (value) => {
+    exportPageState.templates = value;
+  },
+});
+const {
+  selectedTemplateName: selectedExportTemplateName,
+  selectedTemplate: selectedExportTemplate,
+  applySelectedTemplate: applyNamedExportTemplate,
+  saveTemplate: saveNamedExportTemplate,
+  removeSelectedTemplate: removeNamedExportTemplate,
+} = usePetPalExportTemplates(exportTemplateState);
 
 const emptyTotals: CaregiverEarningsSummaryRecord['totals'] = {
   totalIncome: 0,
@@ -808,9 +818,6 @@ const exportRiskOnly = computed<boolean>({
   },
 });
 const exportTemplates = computed(() => exportPageState.templates);
-const selectedExportTemplate = computed(
-  () => findPetPalNamedExportTemplate(exportTemplates.value, selectedExportTemplateName.value),
-);
 const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
 const latestActiveOrder = computed(() => summary.value?.latestActiveOrder ?? null);
 const recentCompletedOrders = computed(() => {
@@ -982,12 +989,14 @@ function clearExportFilters() {
 }
 
 function applySelectedExportTemplate() {
-  if (!selectedExportTemplate.value) {
+  const appliedTemplate = applyNamedExportTemplate((template) => {
+    applyExportFilterSnapshot(template);
+  });
+
+  if (!appliedTemplate) {
     return;
   }
-
-  applyExportFilterSnapshot(selectedExportTemplate.value);
-  ElMessage.success(`已应用模板「${selectedExportTemplate.value.name}」`);
+  ElMessage.success(`已应用模板「${appliedTemplate.name}」`);
 }
 
 async function saveCurrentExportTemplate() {
@@ -1013,15 +1022,13 @@ async function saveCurrentExportTemplate() {
       name,
       ...buildCurrentExportFilterSnapshot(),
     };
-    const result = upsertPetPalNamedExportTemplate(exportPageState.templates, nextTemplate);
+    const result = saveNamedExportTemplate(nextTemplate);
 
     if (result.status === 'limit_exceeded') {
       ElMessage.warning(`最多只能保存 ${PETPAL_EXPORT_TEMPLATE_LIMIT} 个导出模板`);
       return;
     }
 
-    exportPageState.templates = result.templates;
-    selectedExportTemplateName.value = name;
     ElMessage.success(result.status === 'updated' ? `模板「${name}」已更新` : `模板「${name}」已保存`);
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
@@ -1048,12 +1055,11 @@ async function deleteSelectedExportTemplate() {
       },
     );
 
-    exportPageState.templates = removePetPalNamedExportTemplate(
-      exportPageState.templates,
-      templateName,
-    );
-    selectedExportTemplateName.value = '';
-    ElMessage.success(`模板「${templateName}」已删除`);
+    const removedTemplateName = removeNamedExportTemplate();
+    if (!removedTemplateName) {
+      return;
+    }
+    ElMessage.success(`模板「${removedTemplateName}」已删除`);
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(getErrorMessage(error, '删除经营导出模板失败'));
