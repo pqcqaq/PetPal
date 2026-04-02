@@ -75,7 +75,7 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <PetpalPage title="照料者首页" subtitle="接单、履约、收益全部分开，不再堆成一个大工作台。" eyebrow="Caregiver">
+  <PetpalPage title="照料者首页" subtitle="接单、履约、收益分开处理，不再堆成一个大工作台。" eyebrow="Caregiver">
     <template #bar>
       <button
         v-if="tokenStore.hasLogin"
@@ -98,14 +98,21 @@ onPullDownRefresh(() => {
     <template v-else>
       <PetpalSection tone="accent">
         <view class="petpal-inline">
-          <view class="petpal-inline" style="justify-content: flex-start;">
+          <view class="petpal-inline petpal-inline--start">
             <view class="petpal-avatar-badge">{{ initials(displayName) }}</view>
-            <view class="petpal-stack" style="gap: 6rpx;">
+            <view class="petpal-stack petpal-stack--tight">
               <text class="petpal-banner__title">{{ displayName }}</text>
               <text class="petpal-note">{{ profile ? helpers.getCaregiverAuditLabel(profile.auditStatus) : '还未建立照料者档案' }}</text>
             </view>
           </view>
           <button class="petpal-icon-btn" hover-class="none" @click="openProfile">档案</button>
+        </view>
+        <view class="petpal-banner">
+          <text class="petpal-banner__eyebrow">Current Focus</text>
+          <text class="petpal-banner__title">
+            {{ pendingOrders.length ? `先处理 ${pendingOrders.length} 笔待接单订单` : servingOrders.length ? `有 ${servingOrders.length} 笔服务中的订单需要持续回传` : '当前没有阻塞中的订单' }}
+          </text>
+          <text class="petpal-banner__meta">接单、服务设置、收益查看分别进入独立页面，不再混成一个大面板。</text>
         </view>
         <view class="petpal-stat-row">
           <view class="petpal-stat">
@@ -116,33 +123,32 @@ onPullDownRefresh(() => {
           <view class="petpal-stat">
             <text class="petpal-stat__label">服务中</text>
             <text class="petpal-stat__value">{{ servingOrders.length }}</text>
-            <text class="petpal-stat__meta">需持续回传</text>
+            <text class="petpal-stat__meta">持续回传</text>
           </view>
         </view>
       </PetpalSection>
 
-      <PetpalSection title="先做哪件事">
-        <button class="petpal-row-btn" hover-class="none" @click="openOrders">
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">履约订单</text>
-            <text class="petpal-row__hint">处理接单、签到、签退和查看服务日志。</text>
-          </view>
-          <text class="petpal-row__value">{{ pendingOrders.length + servingOrders.length }}</text>
-        </button>
-        <button class="petpal-row-btn" hover-class="none" @click="openServices">
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">服务管理</text>
-            <text class="petpal-row__hint">维护价格、时效和上架状态。</text>
-          </view>
-          <text class="petpal-row__value">{{ services.length }}</text>
-        </button>
-        <button class="petpal-row-btn" hover-class="none" @click="openEarnings">
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">收益表现</text>
-            <text class="petpal-row__hint">看收入、完成单量和近期表现。</text>
-          </view>
-          <text class="petpal-row__value">查看</text>
-        </button>
+      <PetpalSection title="进入工作区" subtitle="每个入口只处理一类动作，避免在同一页里切来切去。">
+        <view class="petpal-choice-grid">
+          <button class="petpal-choice-tile" hover-class="none" @click="openOrders">
+            <text class="petpal-choice-tile__eyebrow">Orders</text>
+            <text class="petpal-choice-tile__title">履约订单</text>
+            <text class="petpal-choice-tile__meta">待接单 {{ pendingOrders.length }} / 服务中 {{ servingOrders.length }}</text>
+            <text class="petpal-choice-tile__hint">处理接单、签到、签退和服务日志。</text>
+          </button>
+          <button class="petpal-choice-tile" hover-class="none" @click="openServices">
+            <text class="petpal-choice-tile__eyebrow">Services</text>
+            <text class="petpal-choice-tile__title">服务管理</text>
+            <text class="petpal-choice-tile__meta">当前 {{ services.length }} 项服务</text>
+            <text class="petpal-choice-tile__hint">维护价格、通知时效和上架状态。</text>
+          </button>
+          <button class="petpal-choice-tile" hover-class="none" @click="openEarnings">
+            <text class="petpal-choice-tile__eyebrow">Earnings</text>
+            <text class="petpal-choice-tile__title">收益表现</text>
+            <text class="petpal-choice-tile__meta">查看收入、完成单量和近期表现</text>
+            <text class="petpal-choice-tile__hint">收益页只看经营结果，不再夹杂订单操作。</text>
+          </button>
+        </view>
       </PetpalSection>
 
       <PetpalSection title="最新待办订单" subtitle="这里只保留最关键的几笔。">

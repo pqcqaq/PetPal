@@ -104,8 +104,8 @@ onPullDownRefresh(() => {
 
 <template>
   <PetpalPage
-    title="选择你现在要做的事"
-    :subtitle="tokenStore.hasLogin ? '主人和照料者入口都保留，但每个入口只做一件事，避免混在同一页里。' : '先登录后再进入主人或照料者主流程。'"
+    title="现在先做哪件事"
+    :subtitle="tokenStore.hasLogin ? '这里只做分流，不堆介绍，不混流程。先选身份，再进入对应工作区。' : '先登录，再进入主人或照料者的独立流程。'"
     eyebrow="PetPal"
   >
     <template #bar>
@@ -120,8 +120,8 @@ onPullDownRefresh(() => {
     </template>
 
     <template v-if="!tokenStore.hasLogin">
-      <PetpalSection title="先登录" subtitle="登录后会自动恢复你上次的主人和照料者数据。">
-        <PetpalEmpty title="当前未登录" description="没有登录态时，不展示冗长介绍，只保留两个入口动作。">
+      <PetpalSection tone="accent" title="先恢复你的账号" subtitle="登录后自动恢复宠物、订单、服务和提醒。">
+        <PetpalEmpty title="当前未登录" description="没有登录态时，不展示冗长介绍，只保留进入系统需要的两个动作。">
           <view class="petpal-action-row">
             <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openLoginPage">去登录</button>
             <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="goToRegister">注册账号</button>
@@ -133,9 +133,9 @@ onPullDownRefresh(() => {
     <template v-else>
       <PetpalSection tone="accent">
         <view class="petpal-inline">
-          <view class="petpal-inline" style="justify-content: flex-start;">
+          <view class="petpal-inline petpal-inline--start">
             <view class="petpal-avatar-badge">{{ initials(displayName) }}</view>
-            <view class="petpal-stack" style="gap: 6rpx;">
+            <view class="petpal-stack petpal-stack--tight">
               <text class="petpal-banner__title">{{ displayName }}</text>
               <text class="petpal-note">{{ roleSummary(userInfo) }}</text>
             </view>
@@ -143,6 +143,13 @@ onPullDownRefresh(() => {
           <button class="petpal-icon-btn" hover-class="none" @click="openReminders">
             待办 {{ unreadHighPriorityCount }}
           </button>
+        </view>
+        <view class="petpal-banner">
+          <text class="petpal-banner__eyebrow">Current Focus</text>
+          <text class="petpal-banner__title">
+            {{ unreadHighPriorityCount ? `先处理 ${unreadHighPriorityCount} 条高优先待办` : '当前没有高优先阻塞事项' }}
+          </text>
+          <text class="petpal-banner__meta">你可以直接进入主人流程或照料者流程，每个流程都只保留一条主线。</text>
         </view>
         <view class="petpal-stat-row">
           <view class="petpal-stat">
@@ -158,51 +165,44 @@ onPullDownRefresh(() => {
         </view>
       </PetpalSection>
 
-      <PetpalSection title="主人入口" :subtitle="ownerNextAction">
-        <button class="petpal-row-btn" hover-class="none" @click="openRoleHome('owner')">
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">进入主人首页</text>
-            <text class="petpal-row__meta">宠物、需求、下单、消息、售后都从这里分流。</text>
-          </view>
-          <text class="petpal-row__value">打开</text>
-        </button>
-        <view class="petpal-tag-row">
-          <text class="petpal-pill petpal-pill--accent">宠物 {{ pets.length }}</text>
-          <text class="petpal-pill">需求 {{ requests.length }}</text>
-          <text class="petpal-pill">订单 {{ ownerOrders.length }}</text>
+      <PetpalSection title="进入工作流" subtitle="两个入口都保留，但只做各自该做的事。">
+        <view class="petpal-choice-grid">
+          <button class="petpal-choice-tile" hover-class="none" @click="openRoleHome('owner')">
+            <text class="petpal-choice-tile__eyebrow">Owner</text>
+            <text class="petpal-choice-tile__title">主人首页</text>
+            <text class="petpal-choice-tile__meta">{{ ownerNextAction }}</text>
+            <text class="petpal-choice-tile__hint">宠物、需求、下单、消息、售后从这里继续。</text>
+          </button>
+          <button class="petpal-choice-tile" hover-class="none" @click="openRoleHome('caregiver')">
+            <text class="petpal-choice-tile__eyebrow">Caregiver</text>
+            <text class="petpal-choice-tile__title">照料者首页</text>
+            <text class="petpal-choice-tile__meta">{{ caregiverNextAction }}</text>
+            <text class="petpal-choice-tile__hint">审核、服务、接单、履约、收益在独立页面处理。</text>
+          </button>
         </view>
-      </PetpalSection>
-
-      <PetpalSection title="照料者入口" :subtitle="caregiverNextAction">
-        <button class="petpal-row-btn" hover-class="none" @click="openRoleHome('caregiver')">
-          <view class="petpal-row__copy">
-            <text class="petpal-row__title">进入照料者首页</text>
-            <text class="petpal-row__meta">审核、服务、接单、履约、收益会拆成独立流转。</text>
-          </view>
-          <text class="petpal-row__value">打开</text>
-        </button>
         <view class="petpal-tag-row">
+          <text class="petpal-pill petpal-pill--accent">主人需求 {{ requests.length }}</text>
+          <text class="petpal-pill">主人订单 {{ ownerOrders.length }}</text>
           <text :class="['petpal-pill', caregiverProfile ? 'petpal-pill--success' : 'petpal-pill--warning']">
-            {{ caregiverProfile ? helpers.getCaregiverAuditLabel(caregiverProfile.auditStatus) : '未建档' }}
+            {{ caregiverProfile ? helpers.getCaregiverAuditLabel(caregiverProfile.auditStatus) : '照料者未建档' }}
           </text>
-          <text class="petpal-pill">服务 {{ caregiverServices.length }}</text>
-          <text class="petpal-pill">订单 {{ caregiverOrderCount }}</text>
-          <text v-if="isCaregiverEnabled(userInfo)" class="petpal-pill petpal-pill--accent">已开通照料者角色</text>
+          <text class="petpal-pill">照料服务 {{ caregiverServices.length }}</text>
+          <text v-if="isCaregiverEnabled(userInfo)" class="petpal-pill petpal-pill--accent">已开通照料者</text>
         </view>
       </PetpalSection>
 
-      <PetpalSection title="当前最急的事" subtitle="保持简洁，只放任务，不放说明文案。">
+      <PetpalSection title="统一收口" subtitle="提醒和通知是两个总入口，其余信息不再堆在这里。">
         <button class="petpal-row-btn" hover-class="none" @click="openReminders">
           <view class="petpal-row__copy">
             <text class="petpal-row__title">打开提醒中心</text>
-            <text class="petpal-row__hint">这里集中收口高优先通知和待处理订单。</text>
+            <text class="petpal-row__hint">集中处理高优先通知、未完成订单和需要你确认的事项。</text>
           </view>
           <text class="petpal-row__value">{{ unreadCount }} 条</text>
         </button>
         <button class="petpal-row-btn" hover-class="none" @click="openNotifications">
           <view class="petpal-row__copy">
             <text class="petpal-row__title">查看全部通知</text>
-            <text class="petpal-row__hint">包括资料、需求、未读沟通和售后提醒。</text>
+            <text class="petpal-row__hint">资料、需求、沟通、售后全部通知统一归档到这里。</text>
           </view>
           <text class="petpal-row__value">进入</text>
         </button>

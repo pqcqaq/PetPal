@@ -152,7 +152,7 @@ onLoad((options) => {
 <template>
   <PetpalPage
     :title="pageTitle"
-    subtitle="需求只做一件事：明确宠物、时间、地点和预算。匹配、下单、支付都去后续页面。"
+    subtitle="这里只明确宠物、时间、地点和预算。匹配、下单、支付都去后续页面。"
     eyebrow="Request"
     back
     :back-url="PETPAL_PETS_PAGE"
@@ -172,40 +172,42 @@ onLoad((options) => {
     </template>
 
     <template v-else>
-      <PetpalSection title="选择宠物和服务类型">
-        <view class="petpal-form">
-          <view class="petpal-field">
-            <text class="petpal-field__label">宠物</text>
-            <view class="petpal-chip-row">
-              <button
-                v-for="pet in pets"
-                :key="pet.id"
-                :class="['petpal-chip', form.petId === pet.id ? 'petpal-chip--active' : '']"
-                hover-class="none"
-                @click="form.petId = pet.id"
-              >
-                {{ pet.name }}
-              </button>
-            </view>
-          </view>
-          <view class="petpal-field">
-            <text class="petpal-field__label">服务类型</text>
-            <view class="petpal-chip-row">
-              <button
-                v-for="item in serviceTypeOptions"
-                :key="item.value"
-                :class="['petpal-chip', form.serviceType === item.value ? 'petpal-chip--active' : '']"
-                hover-class="none"
-                @click="form.serviceType = item.value"
-              >
-                {{ item.label }}
-              </button>
-            </view>
-          </view>
+      <PetpalSection tone="accent" title="1. 先确认这次照料对象" subtitle="宠物和服务类型先定下来，后面的时间与预算才有意义。">
+        <view class="petpal-choice-grid petpal-choice-grid--two">
+          <button
+            v-for="pet in pets"
+            :key="pet.id"
+            :class="['petpal-choice-tile', form.petId === pet.id ? 'petpal-choice-tile--active' : '']"
+            hover-class="none"
+            @click="form.petId = pet.id"
+          >
+            <text class="petpal-choice-tile__eyebrow">{{ helpers.speciesLabels[pet.species] }}</text>
+            <text class="petpal-choice-tile__title">{{ pet.name }}</text>
+            <text class="petpal-choice-tile__meta">{{ pet.breed || '未补品种' }}</text>
+            <text class="petpal-choice-tile__hint">{{ form.petId === pet.id ? '当前已选' : '切换到这只宠物' }}</text>
+          </button>
+        </view>
+        <view v-if="selectedPet" class="petpal-banner">
+          <text class="petpal-banner__eyebrow">Selected Pet</text>
+          <text class="petpal-banner__title">{{ selectedPet.name }}</text>
+          <text class="petpal-banner__meta">{{ helpers.speciesLabels[selectedPet.species] }} · {{ selectedPet.breed || '未补品种' }}</text>
+        </view>
+        <view class="petpal-choice-grid">
+          <button
+            v-for="item in serviceTypeOptions"
+            :key="item.value"
+            :class="['petpal-choice-tile', form.serviceType === item.value ? 'petpal-choice-tile--active' : '']"
+            hover-class="none"
+            @click="form.serviceType = item.value"
+          >
+            <text class="petpal-choice-tile__eyebrow">Service</text>
+            <text class="petpal-choice-tile__title">{{ item.label }}</text>
+            <text class="petpal-choice-tile__hint">{{ form.serviceType === item.value ? '当前服务类型' : '切换到这个服务类型' }}</text>
+          </button>
         </view>
       </PetpalSection>
 
-      <PetpalSection title="安排时间和地点">
+      <PetpalSection title="2. 安排时间与地点" subtitle="这里只填写履约范围，不在这里做比价和支付。">
         <view class="petpal-grid--two">
           <view class="petpal-field">
             <text class="petpal-field__label">开始时间</text>
@@ -222,11 +224,11 @@ onLoad((options) => {
         </view>
         <view class="petpal-field">
           <text class="petpal-field__label">预算</text>
-          <input v-model="form.budgetAmount" class="petpal-input" type="digit" placeholder="可留空，系统将按报价展示" />
+          <input v-model="form.budgetAmount" class="petpal-input" type="digit" placeholder="可留空，系统会按照照料者报价展示" />
         </view>
       </PetpalSection>
 
-      <PetpalSection title="照料要求" subtitle="常用标签直接勾选，额外要求再补充。">
+      <PetpalSection title="3. 说明照料要求" subtitle="常用要求直接点选，额外细节再补一段描述。">
         <view class="petpal-chip-row">
           <button
             v-for="item in requestTagOptions"
@@ -249,27 +251,23 @@ onLoad((options) => {
         </view>
       </PetpalSection>
 
-      <PetpalSection title="匹配预览" subtitle="这里只给你一个量感，真正比价和选择在需求详情页完成。">
+      <PetpalSection title="4. 先看匹配预览" subtitle="这里只看量感和价格区间，不会直接提交。">
         <template v-if="previewMatches.length">
-          <button
+          <view
             v-for="item in previewMatches"
             :key="item.serviceId"
-            class="petpal-row-btn"
-            hover-class="none"
-            @click="submitRequest"
+            class="petpal-sheet"
           >
-            <view class="petpal-row__copy">
-              <text class="petpal-row__title">{{ item.caregiverName }}</text>
-              <text class="petpal-row__meta">{{ describeCaregiverMatch(item) }}</text>
-              <text class="petpal-row__hint">{{ helpers.formatCaregiverRadius(item.serviceRadiusKm) }} · {{ helpers.formatCaregiverNoticeHours(item.minNoticeHours) }}</text>
-            </view>
-            <text class="petpal-row__value">{{ helpers.formatScore(item.ratingAvg) }}</text>
-          </button>
+            <text class="petpal-banner__title">{{ item.caregiverName }}</text>
+            <text class="petpal-banner__meta">{{ describeCaregiverMatch(item) }}</text>
+            <text class="petpal-note">{{ helpers.formatCaregiverRadius(item.serviceRadiusKm) }} · {{ helpers.formatCaregiverNoticeHours(item.minNoticeHours) }}</text>
+          </view>
         </template>
         <PetpalEmpty v-else title="还没有可展示的匹配预览" description="补齐宠物、服务、地点后会自动计算建议照料者。"/>
       </PetpalSection>
 
       <view class="petpal-bottom-bar">
+        <text class="petpal-note">提交后会进入需求详情页继续匹配与确认，不会在当前页直接支付。</text>
         <view class="petpal-action-row">
           <button class="petpal-btn petpal-btn--primary" hover-class="none" :disabled="saving" @click="submitRequest">
             {{ saving ? '创建中...' : '发布需求' }}

@@ -54,7 +54,7 @@ onPullDownRefresh(() => {
 <template>
   <PetpalPage
     title="宠物档案"
-    subtitle="查看和编辑单独拆开，需求创建也从这里单独进入。"
+    subtitle="档案维护和需求发起分开处理，每只宠物都是独立入口。"
     eyebrow="Pets"
     back
     :back-url="PETPAL_OWNER_HOME_PAGE"
@@ -68,21 +68,22 @@ onPullDownRefresh(() => {
     </template>
 
     <template v-else>
-      <PetpalSection title="全部宠物" :subtitle="pets.length ? `共 ${pets.length} 只` : '先建立第一只宠物档案'">
-        <template #trailing>
-          <button class="petpal-icon-btn" hover-class="none" @click="openCreate">新增</button>
-        </template>
+      <PetpalSection tone="accent" title="你的宠物档案库" :subtitle="pets.length ? `当前共 ${pets.length} 只` : '先建立第一只宠物档案'">
+        <view class="petpal-action-row">
+          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openCreate">新增宠物</button>
+          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openRequestFlow()">直接新建需求</button>
+        </view>
+      </PetpalSection>
+
+      <PetpalSection title="全部宠物" subtitle="每只宠物都单独维护资料，再单独发起需求。">
         <template v-if="pets.length">
-          <view v-for="pet in pets" :key="pet.id" class="petpal-stack" style="gap: 0;">
-            <button class="petpal-row-btn" hover-class="none" @click="openEdit(pet.id)">
-              <view class="petpal-row__copy">
-                <text class="petpal-row__title">{{ pet.name }}</text>
-                <text class="petpal-row__meta">{{ describePet(pet) }}</text>
-                <text class="petpal-row__hint">{{ describePetCare(pet) }}</text>
-              </view>
-              <text class="petpal-row__value">编辑</text>
-            </button>
-            <view class="petpal-action-row" style="padding-top: 12rpx;">
+          <view v-for="pet in pets" :key="pet.id" class="petpal-sheet">
+            <text class="petpal-banner__eyebrow">Pet Profile</text>
+            <text class="petpal-banner__title">{{ pet.name }}</text>
+            <text class="petpal-banner__meta">{{ describePet(pet) }}</text>
+            <text class="petpal-note">{{ describePetCare(pet) }}</text>
+            <view class="petpal-action-row">
+              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openEdit(pet.id)">编辑资料</button>
               <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="openRequestFlow(pet.id)">为它新建需求</button>
             </view>
           </view>

@@ -93,7 +93,7 @@ onPullDownRefresh(() => {
 <template>
   <PetpalPage
     title="需求详情"
-    subtitle="先看需求，再决定照料者，最后去支付。"
+    subtitle="先看这次需求，再选照料者，最后进入支付。"
     eyebrow="Request Detail"
     back
     :back-url="PETPAL_REQUEST_PAGE"
@@ -113,52 +113,43 @@ onPullDownRefresh(() => {
     </template>
 
     <template v-else-if="requestRecord">
-      <PetpalSection tone="accent" title="本次需求" :subtitle="helpers.getRequestStatusLabel(requestRecord.status)">
-        <view class="petpal-grid--two">
-          <view class="petpal-stat">
-            <text class="petpal-stat__label">服务</text>
-            <text class="petpal-stat__value">{{ helpers.serviceTypeLabels[requestRecord.serviceType] }}</text>
-            <text class="petpal-stat__meta">{{ requestRecord.pet?.name || '宠物待同步' }}</text>
-          </view>
-          <view class="petpal-stat">
-            <text class="petpal-stat__label">预算</text>
-            <text class="petpal-stat__value">{{ helpers.formatMoney(requestRecord.budgetAmount) }}</text>
-            <text class="petpal-stat__meta">{{ helpers.formatRange(requestRecord.startTime, requestRecord.endTime) }}</text>
-          </view>
+      <PetpalSection tone="accent" title="这次需求" :subtitle="helpers.getRequestStatusLabel(requestRecord.status)">
+        <view class="petpal-banner">
+          <text class="petpal-banner__eyebrow">Request</text>
+          <text class="petpal-banner__title">{{ requestRecord.pet?.name || '宠物待同步' }} · {{ helpers.serviceTypeLabels[requestRecord.serviceType] }}</text>
+          <text class="petpal-banner__meta">{{ helpers.formatRange(requestRecord.startTime, requestRecord.endTime) }}</text>
+          <text class="petpal-note">{{ requestRecord.locationText }} · 预算 {{ helpers.formatMoney(requestRecord.budgetAmount) }}</text>
         </view>
-        <text class="petpal-paragraph">{{ requestRecord.locationText }}</text>
         <view v-if="demandTags.length" class="petpal-tag-row">
           <text v-for="tag in demandTags" :key="tag" class="petpal-mini-tag">{{ tag }}</text>
         </view>
       </PetpalSection>
 
-      <PetpalSection title="可选照料者" :subtitle="matchRows.length ? `共匹配到 ${matchRows.length} 位` : '当前还没有可比对的照料者'">
+      <PetpalSection title="选择照料者" :subtitle="matchRows.length ? `共匹配到 ${matchRows.length} 位，当前只保留一个下单对象` : '当前还没有可比对的照料者'">
         <template v-if="matchRows.length">
-          <button
-            v-for="item in matchRows"
-            :key="item.serviceId"
-            class="petpal-row-btn"
-            hover-class="none"
-            @click="selectedServiceId = item.serviceId"
-          >
-            <view class="petpal-row__copy">
-              <text class="petpal-row__title">
-                {{ item.caregiverName }}
-                <text v-if="selectedServiceId === item.serviceId" class="petpal-note"> · 已选</text>
-              </text>
-              <text class="petpal-row__meta">{{ describeCaregiverMatch(item) }}</text>
-              <text class="petpal-row__hint">{{ describeCaregiverCapability(item) }}</text>
-            </view>
-            <text class="petpal-row__value">{{ helpers.formatScore(item.ratingAvg) }}</text>
-          </button>
+          <view class="petpal-choice-grid">
+            <button
+              v-for="item in matchRows"
+              :key="item.serviceId"
+              :class="['petpal-choice-tile', selectedServiceId === item.serviceId ? 'petpal-choice-tile--active' : '']"
+              hover-class="none"
+              @click="selectedServiceId = item.serviceId"
+            >
+              <text class="petpal-choice-tile__eyebrow">{{ selectedServiceId === item.serviceId ? 'Selected' : 'Candidate' }}</text>
+              <text class="petpal-choice-tile__title">{{ item.caregiverName }}</text>
+              <text class="petpal-choice-tile__meta">{{ describeCaregiverMatch(item) }}</text>
+              <text class="petpal-choice-tile__hint">{{ describeCaregiverCapability(item) }} · {{ helpers.formatScore(item.ratingAvg) }}</text>
+            </button>
+          </view>
         </template>
         <PetpalEmpty v-else title="还没有照料者可选" description="可以稍后重试，或回到需求页调整时间、预算和地点。">
           <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="rebuildRequest">调整需求</button>
         </PetpalEmpty>
       </PetpalSection>
 
-      <PetpalSection v-if="selectedCaregiver" title="当前准备下单的照料者" subtitle="这里只保留你即将下单的这一位。">
+      <PetpalSection v-if="selectedCaregiver" title="即将下单的照料者" subtitle="这里只保留你马上要确认的这一位。">
         <view class="petpal-banner">
+          <text class="petpal-banner__eyebrow">Checkout Target</text>
           <text class="petpal-banner__title">{{ selectedCaregiver.caregiverName }}</text>
           <text class="petpal-banner__meta">{{ describeCaregiverMatch(selectedCaregiver) }}</text>
           <text class="petpal-note">{{ selectedCaregiver.specialtyTags.join(' / ') || '暂无专长标签' }}</text>
@@ -166,6 +157,7 @@ onPullDownRefresh(() => {
       </PetpalSection>
 
       <view class="petpal-bottom-bar">
+        <text class="petpal-note">确认后会进入支付页，其他照料者仍然保留在当前选择页内。</text>
         <view class="petpal-action-row">
           <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openCheckout">确认并去支付</button>
           <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="rebuildRequest">调整需求</button>

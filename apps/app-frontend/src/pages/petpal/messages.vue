@@ -70,7 +70,7 @@ onPullDownRefresh(() => {
 <template>
   <PetpalPage
     title="消息"
-    subtitle="消息中心只保留会话摘要，真正聊天进入订单详情里的聊天页。"
+    subtitle="这里只看会话摘要，真正聊天进入订单详情里的聊天页。"
     eyebrow="Messages"
     :with-tabbar="true"
   >
@@ -96,6 +96,7 @@ onPullDownRefresh(() => {
     <template v-else>
       <PetpalSection v-if="priorityRow" tone="accent" title="先处理这条" :subtitle="priorityRow.summary.unread ? `${priorityRow.summary.unread} 条未读` : '最近一条会话'">
         <view class="petpal-banner">
+          <text class="petpal-banner__eyebrow">Priority Thread</text>
           <text class="petpal-banner__title">{{ priorityRow.order.orderNo }}</text>
           <text class="petpal-banner__meta">{{ priorityRow.summary.preview }}</text>
           <text class="petpal-note">{{ priorityRow.summary.meta }}</text>
@@ -106,7 +107,7 @@ onPullDownRefresh(() => {
         </view>
       </PetpalSection>
 
-      <PetpalSection title="会话列表">
+      <PetpalSection title="筛选会话" subtitle="只保留未读和全部两个视角。">
         <PetpalSegmented
           v-model="filter"
           :options="[
@@ -116,7 +117,7 @@ onPullDownRefresh(() => {
         />
       </PetpalSection>
 
-      <PetpalSection :title="filter === 'UNREAD' ? '未读会话' : '全部会话'" subtitle="这里不堆聊天气泡，只保留摘要和入口。">
+      <PetpalSection :title="filter === 'UNREAD' ? '未读会话' : '全部会话'" subtitle="不堆聊天气泡，只保留摘要、状态和入口。">
         <template v-if="visibleRows.length">
           <button
             v-for="item in visibleRows"
