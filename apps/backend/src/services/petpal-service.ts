@@ -260,6 +260,7 @@ type CaregiverEarningsExportFilters = {
   riskOnly?: boolean;
   complaintStatus?: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
   complaintType?: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
+  complaintKeyword?: string;
   complaintTargetRole?: 'CAREGIVER' | 'PLATFORM';
 };
 
@@ -443,6 +444,7 @@ const normalizeCaregiverEarningsExportFilters = (
   return {
     ...filters,
     refundReasonKeyword: filters.refundReasonKeyword?.trim() || undefined,
+    complaintKeyword: filters.complaintKeyword?.trim() || undefined,
     riskOnly: Boolean(filters.riskOnly),
   };
 };
@@ -2011,6 +2013,7 @@ export const petpalService = {
           : {}),
         ...(normalizedFilters.complaintStatus
           || normalizedFilters.complaintType
+          || normalizedFilters.complaintKeyword
           || normalizedFilters.complaintTargetRole
           ? {
               complaints: {
@@ -2024,6 +2027,24 @@ export const petpalService = {
                   ...(normalizedFilters.complaintType
                     ? {
                         complaintType: normalizedFilters.complaintType,
+                      }
+                    : {}),
+                  ...(normalizedFilters.complaintKeyword
+                    ? {
+                        OR: [
+                          {
+                            description: {
+                              contains: normalizedFilters.complaintKeyword,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                          {
+                            resultSummary: {
+                              contains: normalizedFilters.complaintKeyword,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                        ],
                       }
                     : {}),
                   ...(normalizedFilters.complaintTargetRole

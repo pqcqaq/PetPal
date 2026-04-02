@@ -212,6 +212,12 @@
                 :value="item.value"
               />
             </el-select>
+            <el-input
+              v-model="exportComplaintKeyword"
+              clearable
+              placeholder="投诉摘要关键词"
+              class="petpal-export-toolbar__service"
+            />
             <el-select
               v-model="exportComplaintTargetRole"
               clearable
@@ -233,7 +239,7 @@
             </el-button>
           </div>
           <p class="petpal-export-toolbar__hint">
-            导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按退款类型、退款状态、退款原因关键词、退款风险单、投诉状态、投诉类型或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
+            导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按退款类型、退款状态、退款原因关键词、退款风险单、投诉状态、投诉类型、投诉摘要关键词或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。
           </p>
         </div>
 
@@ -536,6 +542,7 @@ type CaregiverEarningsExportFilterSnapshot = {
   refundReasonKeyword: string;
   complaintStatus: ComplaintStatus | '';
   complaintType: ComplaintType | '';
+  complaintKeyword: string;
   complaintTargetRole: ComplaintTargetRole | '';
   datePreset: EarningsExportDatePreset;
   riskOnly: boolean;
@@ -567,6 +574,7 @@ const { state: exportPageState } = usePageState<CaregiverEarningsExportPageState
     refundReasonKeyword: '',
     complaintStatus: '',
     complaintType: '',
+    complaintKeyword: '',
     complaintTargetRole: '',
     datePreset: '',
     riskOnly: false,
@@ -641,7 +649,8 @@ const applyExportFilterSnapshot = (snapshot: CaregiverEarningsExportFilterSnapsh
   exportPageState.refundReasonKeyword = snapshot.refundReasonKeyword;
   exportPageState.complaintStatus = snapshot.complaintStatus;
   exportPageState.complaintType = snapshot.complaintType;
-  exportPageState.complaintTargetRole = snapshot.complaintTargetRole;
+  exportPageState.complaintKeyword = snapshot.complaintKeyword ?? '';
+  exportPageState.complaintTargetRole = snapshot.complaintTargetRole ?? '';
   exportPageState.datePreset = snapshot.datePreset;
   exportPageState.riskOnly = snapshot.riskOnly;
 };
@@ -654,6 +663,7 @@ const buildCurrentExportFilterSnapshot = (): CaregiverEarningsExportFilterSnapsh
   refundReasonKeyword: exportPageState.refundReasonKeyword,
   complaintStatus: exportPageState.complaintStatus,
   complaintType: exportPageState.complaintType,
+  complaintKeyword: exportPageState.complaintKeyword,
   complaintTargetRole: exportPageState.complaintTargetRole,
   datePreset: exportPageState.datePreset,
   riskOnly: exportPageState.riskOnly,
@@ -668,6 +678,7 @@ const clearCurrentExportFilters = () => {
     refundReasonKeyword: '',
     complaintStatus: '',
     complaintType: '',
+    complaintKeyword: '',
     complaintTargetRole: '',
     datePreset: '',
     riskOnly: false,
@@ -756,6 +767,12 @@ const exportComplaintType = computed<ComplaintType | ''>({
     exportPageState.complaintType = value || '';
   },
 });
+const exportComplaintKeyword = computed<string>({
+  get: () => exportPageState.complaintKeyword || '',
+  set: (value) => {
+    exportPageState.complaintKeyword = value.trimStart();
+  },
+});
 const exportComplaintTargetRole = computed<ComplaintTargetRole | ''>({
   get: () => exportPageState.complaintTargetRole,
   set: (value) => {
@@ -814,6 +831,7 @@ const hasExportFilters = computed(() => Boolean(
   || exportRefundReasonKeyword.value.trim()
   || exportComplaintStatus.value
   || exportComplaintType.value
+  || exportComplaintKeyword.value.trim()
   || exportComplaintTargetRole.value
   || exportRiskOnly.value,
 ));
@@ -1041,6 +1059,7 @@ function buildEarningsExportRequest() {
     refundReasonKeyword: exportRefundReasonKeyword.value.trim() || undefined,
     complaintStatus: exportComplaintStatus.value || undefined,
     complaintType: exportComplaintType.value || undefined,
+    complaintKeyword: exportComplaintKeyword.value.trim() || undefined,
     complaintTargetRole: exportComplaintTargetRole.value || undefined,
     riskOnly: exportRiskOnly.value || undefined,
   });

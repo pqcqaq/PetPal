@@ -562,6 +562,7 @@ export interface CaregiverEarningsExportQuery {
   riskOnly?: boolean;
   complaintStatus?: ComplaintStatus;
   complaintType?: ComplaintType;
+  complaintKeyword?: string;
   complaintTargetRole?: ComplaintTargetRole;
 }
 
