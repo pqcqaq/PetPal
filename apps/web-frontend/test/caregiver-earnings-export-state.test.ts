@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   applyCaregiverEarningsExportFilterSnapshot,
   buildCaregiverRiskOrderExportSnapshot,
+  buildCaregiverRiskQueueExportSnapshot,
   buildCaregiverEarningsExportQuery,
   cloneCaregiverEarningsExportFilterSnapshot,
   createEmptyCaregiverEarningsExportFilterSnapshot,
@@ -111,6 +112,48 @@ test('builds caregiver risk order export snapshots while preserving the current 
     complaintStatus: 'OPEN',
     complaintType: 'SERVICE',
     complaintTargetRole: 'CAREGIVER',
+    riskOnly: true,
+  });
+});
+
+test('builds caregiver risk queue export snapshots for common queue views', () => {
+  const currentSnapshot = {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days' as const,
+    serviceType: 'BOARDING' as const,
+    orderNoKeyword: ' old-order ',
+    refundReasonKeyword: ' old-reason ',
+    complaintKeyword: ' old-complaint ',
+    complaintType: 'SERVICE' as const,
+    complaintTargetRole: 'CAREGIVER' as const,
+  };
+
+  assert.deepEqual(buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'openComplaint'), {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days',
+    complaintStatus: 'OPEN',
+    riskOnly: true,
+  });
+
+  assert.deepEqual(buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'platformResponsibility'), {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days',
+    complaintTargetRole: 'PLATFORM',
+    riskOnly: true,
+  });
+
+  assert.deepEqual(buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'refundAwaitingSettlement'), {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days',
+    refundStatus: 'APPROVED',
     riskOnly: true,
   });
 });

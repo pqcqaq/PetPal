@@ -46,6 +46,11 @@ export type CaregiverEarningsExportTemplate = CaregiverEarningsExportFilterSnaps
   name: string;
 };
 
+export type CaregiverRiskQueueExportPreset =
+  | 'openComplaint'
+  | 'platformResponsibility'
+  | 'refundAwaitingSettlement';
+
 const caregiverEarningsExportSnapshot = definePetPalExportSnapshot<CaregiverEarningsExportFilterSnapshot>({
   startDate: '',
   endDate: '',
@@ -147,3 +152,34 @@ export const buildCaregiverRiskOrderExportSnapshot = (
   complaintTargetRole: order.primaryComplaintTargetRole ?? '',
   riskOnly: true,
 });
+
+export const buildCaregiverRiskQueueExportSnapshot = (
+  currentSnapshot: CaregiverEarningsExportFilterSnapshot,
+  preset: CaregiverRiskQueueExportPreset,
+): CaregiverEarningsExportFilterSnapshot => {
+  const baseSnapshot: CaregiverEarningsExportFilterSnapshot = {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: currentSnapshot.startDate,
+    endDate: currentSnapshot.endDate,
+    datePreset: currentSnapshot.datePreset,
+    riskOnly: true,
+  };
+
+  switch (preset) {
+    case 'openComplaint':
+      return {
+        ...baseSnapshot,
+        complaintStatus: 'OPEN',
+      };
+    case 'platformResponsibility':
+      return {
+        ...baseSnapshot,
+        complaintTargetRole: 'PLATFORM',
+      };
+    case 'refundAwaitingSettlement':
+      return {
+        ...baseSnapshot,
+        refundStatus: 'APPROVED',
+      };
+  }
+};

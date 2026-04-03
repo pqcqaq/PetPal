@@ -468,55 +468,72 @@
         description="当订单进入退款或争议链路后，这里会列出需要优先复盘的对象。"
       />
 
-      <div v-else class="petpal-sheet-list">
-        <div
-          v-for="order in recentAftersalesOrders"
-          :key="order.id"
-          class="petpal-sheet-row"
-          :class="{ 'is-focused': order.id === highlightedOrderId }"
-        >
-          <div class="petpal-sheet-row__copy">
-            <h3 class="petpal-sheet-row__title">{{ order.orderNo }}</h3>
-            <p class="petpal-sheet-row__desc">
-              {{ getPetPalOrderStatusLabel(order.orderStatus) }} ·
-              {{ getPetPalServiceTypeLabel(order.serviceType) }} · {{ order.ownerNickname }}
-            </p>
-            <p class="petpal-sheet-row__desc">
-              {{ getAftersalesRiskSummary(order) }}
-            </p>
-            <div
-              v-if="order.complaintCount || order.latestRefundStatus"
-              class="petpal-pill-row petpal-sheet-row__signals"
+      <div v-else>
+        <div v-if="riskQueueExportActions.length" class="petpal-note-row petpal-risk-shortcuts">
+          <span>快捷导出</span>
+          <div class="petpal-risk-shortcuts__actions">
+            <el-button
+              v-for="action in riskQueueExportActions"
+              :key="action.preset"
+              link
+              type="primary"
+              @click="applyRiskQueueExportPreset(action.preset)"
             >
-              <span
-                v-for="pill in getAftersalesRiskPills(order)"
-                :key="`${order.id}-${pill.label}`"
-                class="petpal-pill"
-                :class="pill.tone"
-              >
-                {{ pill.label }}
-              </span>
-            </div>
-            <p class="petpal-sheet-row__desc">
-              已退 {{ formatPetPalMoney(order.amountRefunded) }}
-              <template v-if="order.latestRefundAmount != null">
-                · 最近退款 {{ formatPetPalMoney(order.latestRefundAmount) }}
-              </template>
-              · 剩余净收入
-              {{ formatPetPalMoney(getOrderNetIncome(order)) }}
-            </p>
-            <p class="petpal-sheet-row__desc">
-              {{ formatPetPalRange(order.appointmentStart, order.appointmentEnd) }}
-            </p>
-          </div>
-          <div class="petpal-sheet-row__tail">
-            <span class="petpal-pill" :class="getAftersalesStatusPillTone(order.orderStatus)">
-              {{ getPetPalOrderStatusLabel(order.orderStatus) }}
-            </span>
-            <el-button link type="primary" @click="applyRiskOrderExportPreset(order)">
-              导出同类风险
+              {{ action.label }} {{ action.count }} 笔
             </el-button>
-            <RouterLink :to="buildAftersalesOrderDetailLink(order.id)">查看售后</RouterLink>
+          </div>
+        </div>
+
+        <div class="petpal-sheet-list">
+          <div
+            v-for="order in recentAftersalesOrders"
+            :key="order.id"
+            class="petpal-sheet-row"
+            :class="{ 'is-focused': order.id === highlightedOrderId }"
+          >
+            <div class="petpal-sheet-row__copy">
+              <h3 class="petpal-sheet-row__title">{{ order.orderNo }}</h3>
+              <p class="petpal-sheet-row__desc">
+                {{ getPetPalOrderStatusLabel(order.orderStatus) }} ·
+                {{ getPetPalServiceTypeLabel(order.serviceType) }} · {{ order.ownerNickname }}
+              </p>
+              <p class="petpal-sheet-row__desc">
+                {{ getAftersalesRiskSummary(order) }}
+              </p>
+              <div
+                v-if="order.complaintCount || order.latestRefundStatus"
+                class="petpal-pill-row petpal-sheet-row__signals"
+              >
+                <span
+                  v-for="pill in getAftersalesRiskPills(order)"
+                  :key="`${order.id}-${pill.label}`"
+                  class="petpal-pill"
+                  :class="pill.tone"
+                >
+                  {{ pill.label }}
+                </span>
+              </div>
+              <p class="petpal-sheet-row__desc">
+                已退 {{ formatPetPalMoney(order.amountRefunded) }}
+                <template v-if="order.latestRefundAmount != null">
+                  · 最近退款 {{ formatPetPalMoney(order.latestRefundAmount) }}
+                </template>
+                · 剩余净收入
+                {{ formatPetPalMoney(getOrderNetIncome(order)) }}
+              </p>
+              <p class="petpal-sheet-row__desc">
+                {{ formatPetPalRange(order.appointmentStart, order.appointmentEnd) }}
+              </p>
+            </div>
+            <div class="petpal-sheet-row__tail">
+              <span class="petpal-pill" :class="getAftersalesStatusPillTone(order.orderStatus)">
+                {{ getPetPalOrderStatusLabel(order.orderStatus) }}
+              </span>
+              <el-button link type="primary" @click="applyRiskOrderExportPreset(order)">
+                导出同类风险
+              </el-button>
+              <RouterLink :to="buildAftersalesOrderDetailLink(order.id)">查看售后</RouterLink>
+            </div>
           </div>
         </div>
       </div>
@@ -629,9 +646,11 @@ import {
 import {
   applyCaregiverEarningsExportFilterSnapshot,
   buildCaregiverRiskOrderExportSnapshot,
+  buildCaregiverRiskQueueExportSnapshot,
   buildCaregiverEarningsExportQuery,
   cloneCaregiverEarningsExportFilterSnapshot,
   createEmptyCaregiverEarningsExportFilterSnapshot,
+  type CaregiverRiskQueueExportPreset,
   type CaregiverEarningsExportFilterSnapshot,
   type CaregiverEarningsExportTemplate,
   type EarningsExportDatePreset,
@@ -967,6 +986,35 @@ const recentCompletedOrders = computed(() => {
   }
   return items;
 });
+const riskQueueExportActions = computed<
+  Array<{ preset: CaregiverRiskQueueExportPreset; label: string; count: number }>
+>(() => {
+  const counts = {
+    openComplaint: 0,
+    platformResponsibility: 0,
+    refundAwaitingSettlement: 0,
+  } satisfies Record<CaregiverRiskQueueExportPreset, number>;
+
+  for (const order of recentAftersalesOrders.value) {
+    if (order.primaryComplaintStatus === 'OPEN') {
+      counts.openComplaint += 1;
+    }
+    if (order.primaryComplaintTargetRole === 'PLATFORM') {
+      counts.platformResponsibility += 1;
+    }
+    if (order.latestRefundStatus === 'APPROVED') {
+      counts.refundAwaitingSettlement += 1;
+    }
+  }
+
+  const items: Array<{ preset: CaregiverRiskQueueExportPreset; label: string; count: number }> = [
+    { preset: 'openComplaint', label: '待受理投诉', count: counts.openComplaint },
+    { preset: 'platformResponsibility', label: '平台责任', count: counts.platformResponsibility },
+    { preset: 'refundAwaitingSettlement', label: '待退款', count: counts.refundAwaitingSettlement },
+  ];
+
+  return items.filter((item) => item.count > 0);
+});
 const serviceRevenueMix = computed(
   () =>
     summary.value?.serviceRevenueMix.map((item) => ({
@@ -1255,6 +1303,21 @@ function applyRiskOrderExportPreset(order: CaregiverAftersalesRiskOrderRecord) {
   ElMessage.success(
     `已切到${reasons.join(' / ') || '该风险订单'}导出条件，可直接导出同类风险明细。`,
   );
+}
+
+function applyRiskQueueExportPreset(preset: CaregiverRiskQueueExportPreset) {
+  applyCaregiverEarningsExportFilterSnapshot(
+    exportPageState,
+    buildCaregiverRiskQueueExportSnapshot(exportPageState, preset),
+  );
+
+  const label =
+    preset === 'openComplaint'
+      ? '待受理投诉'
+      : preset === 'platformResponsibility'
+        ? '平台责任'
+        : '待退款';
+  ElMessage.success(`已切到${label}导出条件，可直接导出当前队列里的同类风险明细。`);
 }
 
 const primaryAction = computed(() => {
@@ -1611,6 +1674,17 @@ onMounted(() => {
   margin-top: -2px;
 }
 
+.petpal-risk-shortcuts {
+  align-items: flex-start;
+}
+
+.petpal-risk-shortcuts__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .petpal-sheet-row.is-focused {
   margin-inline: -10px;
   padding-inline: 16px;
@@ -1649,6 +1723,10 @@ onMounted(() => {
   .petpal-mix-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .petpal-risk-shortcuts__actions {
+    justify-content: flex-start;
   }
 
   .petpal-note-row strong,
