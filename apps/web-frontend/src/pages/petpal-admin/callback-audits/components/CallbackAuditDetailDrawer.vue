@@ -112,6 +112,7 @@ import type { CallbackAuditRecord } from '@rbac/api-common';
 import {
   formatAuditTimestamp,
   resolveCallbackStatusLabel,
+  resolveCallbackStatusTagType,
   resolveCallbackTypeLabel,
   resolveSourceModeLabel,
 } from '../callback-audit-display';
@@ -166,15 +167,7 @@ const jsonTreeData = computed(() => {
   return buildTree(props.audit.verificationResult);
 });
 
-const getStatusTagType = (status: string): string => {
-  const typeMap: Record<string, string> = {
-    SUCCESS: 'success',
-    PENDING: 'warning',
-    FAILURE: 'danger',
-    ERROR: 'danger',
-  };
-  return typeMap[status] || 'success';
-};
+const getStatusTagType = resolveCallbackStatusTagType;
 
 const copyPayload = async () => {
   try {

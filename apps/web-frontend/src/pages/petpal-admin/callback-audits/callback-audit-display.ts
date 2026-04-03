@@ -2,10 +2,16 @@
  * PetPal callback audit display helpers and types.
  */
 
+import type {
+  CallbackSourceMode,
+  CallbackStatus,
+  CallbackType,
+} from '@rbac/api-common';
+
 export type CallbackAuditFilters = {
-  callbackType?: string;
-  callbackStatus?: string;
-  sourceMode?: string;
+  callbackType?: CallbackType;
+  callbackStatus?: CallbackStatus;
+  sourceMode?: CallbackSourceMode;
   requestId?: string;
   startDate?: string;
   endDate?: string;
@@ -18,42 +24,65 @@ export type AuditSignalItem = {
   tone?: 'danger' | 'warning' | 'accent' | 'neutral';
 };
 
-export const resolveCallbackTypeLabel = (type: string): string => {
-  const labels: Record<string, string> = {
-    PAYMENT_CALLBACK: '支付回调',
-    REFUND_CALLBACK: '退款回调',
-  };
-  return labels[type] || type;
+type CallbackAuditOption<T extends string> = {
+  label: string;
+  value: T;
 };
 
-export const resolveCallbackStatusLabel = (status: string): string => {
-  const labels: Record<string, string> = {
-    PENDING: '待处理',
-    SUCCESS: '成功',
-    FAILURE: '失败',
-    ERROR: '错误',
-  };
-  return labels[status] || status;
+type CallbackAuditStatusTone = 'warning' | 'accent' | 'danger' | 'neutral';
+type CallbackAuditStatusTagType = 'warning' | 'success' | 'danger' | 'info';
+
+export const callbackAuditTypeOptions: Array<CallbackAuditOption<CallbackType>> = [
+  { label: '支付回调', value: 'PAYMENT_CALLBACK' },
+  { label: '退款回调', value: 'REFUND_CALLBACK' },
+];
+
+export const callbackAuditStatusOptions: Array<CallbackAuditOption<CallbackStatus>> = [
+  { label: '待处理', value: 'PENDING' },
+  { label: '成功', value: 'SUCCESS' },
+  { label: '失败', value: 'FAILURE' },
+  { label: '错误', value: 'ERROR' },
+];
+
+export const callbackAuditSourceModeOptions: Array<CallbackAuditOption<CallbackSourceMode>> = [
+  { label: '令牌验证', value: 'TOKEN' },
+  { label: '微信支付 HMAC', value: 'WECHATPAY_HMAC' },
+  { label: '微信支付 SDK', value: 'WECHATPAY_SDK' },
+];
+
+const findCallbackAuditOptionLabel = <T extends string>(
+  options: Array<CallbackAuditOption<T>>,
+  value: T,
+) => options.find((item) => item.value === value)?.label ?? value;
+
+export const resolveCallbackTypeLabel = (type: CallbackType): string =>
+  findCallbackAuditOptionLabel(callbackAuditTypeOptions, type);
+
+export const resolveCallbackStatusLabel = (status: CallbackStatus): string =>
+  findCallbackAuditOptionLabel(callbackAuditStatusOptions, status);
+
+const callbackAuditStatusTones: Record<CallbackStatus, CallbackAuditStatusTone> = {
+  PENDING: 'warning',
+  SUCCESS: 'accent',
+  FAILURE: 'danger',
+  ERROR: 'danger',
 };
 
-export const resolveCallbackStatusTone = (status: string): string => {
-  const tones: Record<string, string> = {
-    PENDING: 'warning',
-    SUCCESS: 'accent',
-    FAILURE: 'danger',
-    ERROR: 'danger',
-  };
-  return tones[status] || 'neutral';
+const callbackAuditStatusTagTypes: Record<CallbackStatus, CallbackAuditStatusTagType> = {
+  PENDING: 'warning',
+  SUCCESS: 'success',
+  FAILURE: 'danger',
+  ERROR: 'danger',
 };
 
-export const resolveSourceModeLabel = (mode: string): string => {
-  const labels: Record<string, string> = {
-    TOKEN: '令牌验证',
-    WECHATPAY_HMAC: '微信支付 HMAC',
-    WECHATPAY_SDK: '微信支付 SDK',
-  };
-  return labels[mode] || mode;
-};
+export const resolveCallbackStatusTone = (status: CallbackStatus): CallbackAuditStatusTone =>
+  callbackAuditStatusTones[status] || 'neutral';
+
+export const resolveCallbackStatusTagType = (status: CallbackStatus): CallbackAuditStatusTagType =>
+  callbackAuditStatusTagTypes[status] || 'info';
+
+export const resolveSourceModeLabel = (mode: CallbackSourceMode): string =>
+  findCallbackAuditOptionLabel(callbackAuditSourceModeOptions, mode);
 
 export const formatAuditTimestamp = (iso: string): string => {
   try {

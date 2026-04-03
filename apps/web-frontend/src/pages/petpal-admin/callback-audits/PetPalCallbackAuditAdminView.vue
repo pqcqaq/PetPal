@@ -66,6 +66,9 @@ import type {
   CallbackAuditFilters,
 } from './callback-audit-display';
 import {
+  callbackAuditSourceModeOptions,
+  callbackAuditStatusOptions,
+  callbackAuditTypeOptions,
   compareCallbackAuditRecency,
   getActiveAuditFilterTokens,
 } from './callback-audit-display';
@@ -202,13 +205,17 @@ const hydrateStateFromRoute = () => {
 
   pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
   pageState.pageSize = [10, 20, 50, 100].includes(pageSize) ? pageSize : 10;
-  pageState.filters.callbackType = ['PAYMENT_CALLBACK', 'REFUND_CALLBACK'].includes(callbackType)
+  pageState.filters.callbackType = callbackAuditTypeOptions.some((item) => item.value === callbackType)
     ? callbackType as CallbackAuditFilters['callbackType']
     : undefined;
-  pageState.filters.callbackStatus = ['PENDING', 'SUCCESS', 'FAILURE', 'ERROR'].includes(callbackStatus)
+  pageState.filters.callbackStatus = callbackAuditStatusOptions.some(
+    (item) => item.value === callbackStatus,
+  )
     ? callbackStatus as CallbackAuditFilters['callbackStatus']
     : undefined;
-  pageState.filters.sourceMode = ['TOKEN', 'WECHATPAY_HMAC', 'WECHATPAY_SDK'].includes(sourceMode)
+  pageState.filters.sourceMode = callbackAuditSourceModeOptions.some(
+    (item) => item.value === sourceMode,
+  )
     ? sourceMode as CallbackAuditFilters['sourceMode']
     : undefined;
   pageState.filters.requestId = getSingleQueryValue(route.query.requestId) || undefined;
@@ -254,9 +261,9 @@ const pageSignals = computed<AuditSignalItem[]>(() => [
 ]);
 
 const buildFilterQuery = (): CallbackAuditQuery => ({
-  callbackType: pageState.filters.callbackType as any || undefined,
-  callbackStatus: pageState.filters.callbackStatus as any || undefined,
-  sourceMode: pageState.filters.sourceMode as any || undefined,
+  callbackType: pageState.filters.callbackType || undefined,
+  callbackStatus: pageState.filters.callbackStatus || undefined,
+  sourceMode: pageState.filters.sourceMode || undefined,
   requestId: pageState.filters.requestId || undefined,
   startDate: pageState.filters.startDate || undefined,
   endDate: pageState.filters.endDate || undefined,

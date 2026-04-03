@@ -7874,6 +7874,57 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.209 2026-04-03（P3-M1 Slice 209）
+
+**概述**：回调告警 outbox 页把状态和动作枚举收口后，回调审计页里同类问题也更明显了：toolbar 的类型 / 状态 / 来源筛选、详情区 / 表格 / 侧栏的状态显示和路由 query 的合法值判断，仍有多处并行常量。本轮继续按同一模式把 callback audit 的显示层枚举与标签规则收口到单一 helper，同时把 `el-tag` 需要的 tag type 与工作台信号卡使用的 tone 显式拆开，避免展示语义混用。
+
+已完成：
+
+- 回调审计页开始复用统一 display helper：
+  - `apps/web-frontend/src/pages/petpal-admin/callback-audits/callback-audit-display.ts`
+    - `CallbackAuditFilters` 已切到 `CallbackType / CallbackStatus / CallbackSourceMode` 强类型，不再维持字符串透传。
+    - 新增 callback type / status / source mode options，统一维护 toolbar 筛选项和 query 合法值集合。
+    - 新增 `resolveCallbackStatusTagType`，把 Element Plus `el-tag` 使用的 `success / warning / danger / info` 与信号卡 `tone` 的 `accent / neutral` 分离维护。
+    - 类型、状态、来源 label helper 与 active filter token 继续统一从同一组 option / 映射派生。
+  - `apps/web-frontend/src/pages/petpal-admin/callback-audits/components/CallbackAuditToolbar.vue`
+    - 类型 / 状态 / 来源三个下拉都改为消费共享 options，不再手写内联 `el-option`。
+  - `apps/web-frontend/src/pages/petpal-admin/callback-audits/PetPalCallbackAuditAdminView.vue`
+    - 路由 query 恢复里的 `callbackType / callbackStatus / sourceMode` 合法性判断改为基于共享 options。
+    - 过滤参数写回查询时不再依赖 `as any`。
+  - `apps/web-frontend/src/pages/petpal-admin/callback-audits/components/CallbackAuditTable.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/callback-audits/components/CallbackAuditDetailDrawer.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/callback-audits/components/CallbackAuditWorkbenchSidebar.vue`
+    - 三处状态 tag 统一改为复用共享 tag type helper，不再各自维护本地 `SUCCESS / PENDING / FAILURE / ERROR` 映射。
+- 定向测试继续兜底：
+  - `apps/web-frontend/test/callback-audit-display.test.ts`
+    - 新增 callback audit display helper 单测，锁定筛选项顺序、label、tone、tag type、filter token 截断规则和 recency / duration 辅助行为。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\callback-audit-display.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+  - 仍保留既有的大 chunk warning，本轮没有新增新的构建告警。
+
+代码审计结论：
+
+- 本轮没有改回调审计接口、统计口径或筛选字段语义，只把页面里分散的显示层枚举和状态映射收回到单一 helper。
+- 已确认 callback audit 的 toolbar、query 恢复和多处状态 tag 现在开始共用同一份 option / label 口径，不再出现局部枚举漂移。
+- 已修正本轮重构中潜在的展示风险：工作台信号卡继续使用 `tone`，而 Element Plus 标签重新使用合法的 tag type，避免把 `accent / neutral` 直接传给 `el-tag`。
+
+风险与缓解：
+
+- 风险：callback audit 页虽然已经收口枚举与状态展示，但统计卡片文案和更复杂的 filter/query 解析逻辑仍主要留在页面容器里。
+- 缓解：后续如继续治理后台 callback 模块，可优先评估统计卡与路由解析是否值得进一步抽出共享 helper，但先维持当前切片边界，避免把简单枚举收口过度扩散成大重构。
+
+下一步（1-3）：
+
+1. 继续盘点后台治理页剩余的统计卡片与页面内联文案，判断是否还有同构 helper 可继续抽离。
+2. 继续以定向单测方式锁定后台 callback / complaint / audit 模块的展示层规则，避免后续页面扩展时再回到内联常量。
+3. 在后台治理展示层进一步稳定后，再回到更高优先级的最终验收、补测与交付材料整理。
+
 ### 14.208 2026-04-03（P3-M1 Slice 208）
 
 **概述**：在投诉治理页和照料者审核页都开始收口业务枚举后，回调告警 outbox 页也暴露出同样的问题：状态筛选、状态 tag、重放动作筛选和重放记录动作文案仍直接散在页面里。本轮把这些值迁入独立 helper，让 outbox 页的状态与重放动作口径不再依赖模板内联文本。

@@ -100,6 +100,7 @@ import type { AuditSignalItem } from '../callback-audit-display';
 import {
   formatAuditTimestamp,
   resolveCallbackStatusLabel,
+  resolveCallbackStatusTagType,
   resolveCallbackTypeLabel,
   resolveSourceModeLabel,
 } from '../callback-audit-display';
@@ -109,15 +110,7 @@ defineProps<{
   pageSignals: AuditSignalItem[];
 }>();
 
-const getStatusTagType = (status: string): string => {
-  const typeMap: Record<string, string> = {
-    SUCCESS: 'success',
-    PENDING: 'warning',
-    FAILURE: 'danger',
-    ERROR: 'danger',
-  };
-  return typeMap[status] || 'success';
-};
+const getStatusTagType = resolveCallbackStatusTagType;
 </script>
 
 <style scoped>

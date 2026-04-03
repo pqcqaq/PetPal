@@ -8,8 +8,12 @@
             clearable
             placeholder="选择回调类型"
           >
-            <el-option label="支付回调" value="PAYMENT_CALLBACK" />
-            <el-option label="退款回调" value="REFUND_CALLBACK" />
+            <el-option
+              v-for="item in callbackAuditTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
           </el-select>
         </el-form-item>
       </el-col>
@@ -21,10 +25,12 @@
             clearable
             placeholder="选择回调状态"
           >
-            <el-option label="待处理" value="PENDING" />
-            <el-option label="成功" value="SUCCESS" />
-            <el-option label="失败" value="FAILURE" />
-            <el-option label="错误" value="ERROR" />
+            <el-option
+              v-for="item in callbackAuditStatusOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
           </el-select>
         </el-form-item>
       </el-col>
@@ -36,9 +42,12 @@
             clearable
             placeholder="选择验证来源"
           >
-            <el-option label="令牌验证" value="TOKEN" />
-            <el-option label="微信支付 HMAC" value="WECHATPAY_HMAC" />
-            <el-option label="微信支付 SDK" value="WECHATPAY_SDK" />
+            <el-option
+              v-for="item in callbackAuditSourceModeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
           </el-select>
         </el-form-item>
       </el-col>
@@ -92,7 +101,12 @@
 </template>
 
 <script setup lang="ts">
-import type { CallbackAuditFilters } from '../callback-audit-display';
+import {
+  callbackAuditSourceModeOptions,
+  callbackAuditStatusOptions,
+  callbackAuditTypeOptions,
+  type CallbackAuditFilters,
+} from '../callback-audit-display';
 
 defineProps<{
   filters: CallbackAuditFilters;
