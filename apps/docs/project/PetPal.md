@@ -7874,6 +7874,50 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.208 2026-04-03（P3-M1 Slice 208）
+
+**概述**：在投诉治理页和照料者审核页都开始收口业务枚举后，回调告警 outbox 页也暴露出同样的问题：状态筛选、状态 tag、重放动作筛选和重放记录动作文案仍直接散在页面里。本轮把这些值迁入独立 helper，让 outbox 页的状态与重放动作口径不再依赖模板内联文本。
+
+已完成：
+
+- 回调告警 outbox 页开始复用独立状态 / 动作 helper：
+  - `apps/web-frontend/src/pages/petpal-admin/callback-alert-outbox/callback-alert-outbox-options.ts`
+    - 新增 outbox 状态 options、状态 label / tag type helper。
+    - 新增重放动作 options 与 label helper，统一维护 `REQUEUE / REQUEUE_DEAD_BATCH` 的展示文本。
+  - `apps/web-frontend/src/pages/petpal-admin/callback-alert-outbox/PetPalCallbackAlertOutboxAdminView.vue`
+    - 工具条状态筛选改为消费共享 options。
+    - outbox 状态列不再直接输出枚举值，改为展示中文 label。
+    - 重放记录筛选、统计 tag 和日志表里的动作名称都改为复用同一套 replay action helper。
+    - 路由 query 恢复里的状态合法性判断也改为基于共享 options，而不是手写枚举列表。
+- 定向测试继续兜底：
+  - `apps/web-frontend/test/callback-alert-outbox-options.test.ts`
+    - 新增 outbox 状态与重放动作单测，锁定展示顺序、label 和 tag type。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\callback-alert-outbox-options.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+  - 保留既有的大 chunk warning，本轮没有新增新的构建告警。
+
+代码审计结论：
+
+- 本轮没有改回调告警 outbox 的接口、重试语义或权限判断，只把页面内联的状态/动作枚举迁入独立 helper。
+- 已确认 outbox 页现在与此前收口的后台治理页保持一致，筛选项、表格标签和动作日志开始共享同一套展示口径。
+
+风险与缓解：
+
+- 风险：回调审计页本身的筛选项目前主要分散在子组件和 display helper 中，还没有纳入同一轮枚举收口。
+- 缓解：先把 outbox 页单独收稳；下一轮如继续治理 callback 模块，可优先审查 callback audit toolbar 的筛选配置是否还存在平行常量。
+
+下一步（1-3）：
+
+1. 继续检查 callback audit toolbar / table 是否仍有内联业务枚举，按相同模式收口。
+2. 继续盘点 PetPal 后台治理页里剩余的统计卡片和 CTA 文案，评估是否要进一步抽离。
+3. 在后台治理枚举基本稳定后，再继续推进最终验收向测试、审计收口与交付材料整理。
+
 ### 14.207 2026-04-03（P3-M1 Slice 207）
 
 **概述**：投诉治理页的后台专用枚举已经开始收口后，同类问题在照料者审核页也很明显：审核状态下拉、状态 tag 和“通过 / 拒绝 / 重置”动作都还由页面自行维护，而且后台文案与前台共享文案同样存在有意差异。本轮把照料者审核页也切到后台专用 helper，继续复用共享状态值集合，但保留后台“已拒绝”的值班表达。

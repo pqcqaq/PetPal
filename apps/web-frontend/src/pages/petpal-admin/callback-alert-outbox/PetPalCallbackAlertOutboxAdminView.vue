@@ -38,7 +38,9 @@
       <el-table-column prop="eventType" label="事件类型" min-width="150" />
       <el-table-column label="状态" min-width="120">
         <template #default="{ row }">
-          <el-tag :type="statusTagType(row.status)">{{ row.status }}</el-tag>
+          <el-tag :type="statusTagType(row.status)">
+            {{ getCallbackAlertOutboxStatusLabel(row.status) }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column label="回调类型" min-width="140">
@@ -107,8 +109,12 @@
           clearable
           style="width: 180px"
         >
-          <el-option label="单条重放" value="REQUEUE" />
-          <el-option label="批量死信重放" value="REQUEUE_DEAD_BATCH" />
+          <el-option
+            v-for="item in callbackAlertReplayActionOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
         </el-select>
         <el-input
           v-model="replayFilter.actorId"
@@ -134,8 +140,12 @@
       </el-space>
       <el-space wrap style="margin-bottom: 12px">
         <el-tag type="info">总记录 {{ replayStats.total }}</el-tag>
-        <el-tag type="success">单条重放 {{ replayStats.byAction.REQUEUE }}</el-tag>
-        <el-tag type="warning">批量重放 {{ replayStats.byAction.REQUEUE_DEAD_BATCH }}</el-tag>
+        <el-tag type="success">
+          {{ getCallbackAlertReplayActionLabel('REQUEUE') }} {{ replayStats.byAction.REQUEUE }}
+        </el-tag>
+        <el-tag type="warning">
+          {{ getCallbackAlertReplayActionLabel('REQUEUE_DEAD_BATCH') }} {{ replayStats.byAction.REQUEUE_DEAD_BATCH }}
+        </el-tag>
         <el-tag>操作人数 {{ replayStats.uniqueActorCount }}</el-tag>
         <el-tag>批量占比 {{ Number((replayStats.batchReplayRatio * 100).toFixed(1)) }}%</el-tag>
         <el-tag>阈值 {{ Number((replayStats.dominanceThreshold * 100).toFixed(0)) }}% / {{ replayStats.dominanceMinSamples }} 条</el-tag>
@@ -147,7 +157,11 @@
       </el-space>
       <el-table v-loading="replayLoading" :data="replayLogs" border>
         <el-table-column prop="createdAt" label="时间" min-width="170" />
-        <el-table-column prop="actionType" label="动作" min-width="150" />
+        <el-table-column prop="actionType" label="动作" min-width="150">
+          <template #default="{ row }">
+            {{ getCallbackAlertReplayActionLabel(row.actionType) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="actorId" label="操作人" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">{{ row.actorId || '-' }}</template>
         </el-table-column>
@@ -188,6 +202,13 @@ import PageScaffold from '@/components/workbench/PageScaffold.vue';
 import { usePageState } from '@/composables/use-page-state';
 import { api } from '@/api/client';
 import { getErrorMessage } from '@/utils/errors';
+import {
+  callbackAlertOutboxStatusOptions,
+  callbackAlertReplayActionOptions,
+  getCallbackAlertOutboxStatusLabel,
+  getCallbackAlertOutboxStatusTagType,
+  getCallbackAlertReplayActionLabel,
+} from './callback-alert-outbox-options';
 
 defineOptions({ name: 'PetPalCallbackAlertOutboxAdminView' });
 
@@ -265,14 +286,6 @@ const { state: pageState } = usePageState<OutboxPageState>('page:petpal:callback
   },
 });
 
-const statusOptions: Array<{ label: string; value: CallbackAlertOutboxStatus }> = [
-  { label: '待处理', value: 'PENDING' },
-  { label: '处理中', value: 'PROCESSING' },
-  { label: '已发送', value: 'SENT' },
-  { label: '失败', value: 'FAILED' },
-  { label: '死信', value: 'DEAD' },
-];
-
 const stats = computed(() => [
   { label: '总量', value: statsData.value.total },
   { label: '待处理', value: statsData.value.byStatus.PENDING },
@@ -287,18 +300,8 @@ const stats = computed(() => [
   { label: '已发送', value: statsData.value.byStatus.SENT },
 ]);
 
-const statusTagType = (status: CallbackAlertOutboxStatus) => {
-  if (status === 'SENT') {
-    return 'success';
-  }
-  if (status === 'FAILED' || status === 'DEAD') {
-    return 'danger';
-  }
-  if (status === 'PROCESSING') {
-    return 'warning';
-  }
-  return 'info';
-};
+const statusOptions = callbackAlertOutboxStatusOptions;
+const statusTagType = getCallbackAlertOutboxStatusTagType;
 
 const routeFilterKeys = ['page', 'status'] as const;
 
@@ -338,7 +341,7 @@ const hydrateStateFromRoute = () => {
   const status = getSingleQueryValue(route.query.status);
 
   pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
-  pageState.filters.status = ['PENDING', 'PROCESSING', 'SENT', 'FAILED', 'DEAD'].includes(status)
+  pageState.filters.status = statusOptions.some((item) => item.value === status)
     ? status as CallbackAlertOutboxStatus
     : undefined;
 };
