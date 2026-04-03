@@ -44,10 +44,16 @@ import type {
   PenaltyAdminQuery,
   PenaltyAdminRecord,
   PenaltyAdminStats,
+  PenaltyTemplateAdminPage,
+  PenaltyTemplateAdminQuery,
+  PenaltyTemplateAdminStats,
+  PenaltyTemplateRecord,
   PlatformRuleAdminPage,
   PlatformRuleAdminQuery,
   PlatformRuleAdminStats,
   PlatformRuleRecord,
+  TogglePenaltyTemplatePayload,
+  UpsertPenaltyTemplatePayload,
   UpsertPlatformRulePayload,
   BatchCloseComplaintsPayload,
   BatchCloseComplaintsResult,
@@ -623,6 +629,34 @@ export const createApiFactory = (options: ClientOptions) => {
           client.request<PenaltyAdminStats>({
             url: '/petpal/admin/penalties/stats',
             params: query as unknown as QueryParams,
+          }),
+        penaltyTemplates: (query?: PenaltyTemplateAdminQuery) =>
+          client.request<PenaltyTemplateAdminPage>({
+            url: '/petpal/admin/penalty-templates',
+            params: query as unknown as QueryParams,
+          }),
+        penaltyTemplateStats: (query?: PenaltyTemplateAdminQuery) =>
+          client.request<PenaltyTemplateAdminStats>({
+            url: '/petpal/admin/penalty-templates/stats',
+            params: query as unknown as QueryParams,
+          }),
+        createPenaltyTemplate: (payload: UpsertPenaltyTemplatePayload) =>
+          client.request<PenaltyTemplateRecord>({
+            url: '/petpal/admin/penalty-templates',
+            method: 'POST',
+            data: payload,
+          }),
+        updatePenaltyTemplate: (templateId: string, payload: UpsertPenaltyTemplatePayload) =>
+          client.request<PenaltyTemplateRecord>({
+            url: `/petpal/admin/penalty-templates/${templateId}`,
+            method: 'PUT',
+            data: payload,
+          }),
+        togglePenaltyTemplate: (templateId: string, payload: TogglePenaltyTemplatePayload) =>
+          client.request<PenaltyTemplateRecord>({
+            url: `/petpal/admin/penalty-templates/${templateId}/status`,
+            method: 'POST',
+            data: payload,
           }),
         rectifyPenalty: (penaltyId: string, payload: RectifyPenaltyPayload) =>
           client.request<PenaltyAdminRecord>({

@@ -355,6 +355,35 @@ model PenaltyRecord {
   @@index([deleteAt])
 }
 
+model PenaltyTemplate {
+  id                String               @id
+  createId          String?
+  updateId          String?
+  templateCode      String               @unique
+  templateName      String
+  description       String?
+  targetRole        ComplaintTargetRole?
+  penaltyType       PenaltyType
+  severity          PenaltySeverity
+  defaultReason     String
+  actionSummary     String
+  defaultRectifyDays Int?
+  isActive          Boolean              @default(true)
+  usageCount        Int                  @default(0)
+  lastUsedAt        DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  deleteAt          DateTime?
+  creator           User?                @relation("PetPalPenaltyTemplateCreator", fields: [createId], references: [id], onDelete: SetNull)
+  updater           User?                @relation("PetPalPenaltyTemplateUpdater", fields: [updateId], references: [id], onDelete: SetNull)
+
+  @@index([targetRole, isActive])
+  @@index([penaltyType, severity])
+  @@index([isActive, updatedAt])
+  @@index([lastUsedAt])
+  @@index([deleteAt])
+}
+
 model PlatformRule {
   id          String             @id
   createId    String?

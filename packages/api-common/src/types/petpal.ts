@@ -358,6 +358,28 @@ export interface PenaltyAdminRecord {
   updatedAt: string;
 }
 
+export interface PenaltyTemplateRecord {
+  id: string;
+  templateCode: string;
+  templateName: string;
+  description: string | null;
+  targetRole: ComplaintTargetRole | null;
+  penaltyType: PenaltyType;
+  severity: PenaltySeverity;
+  defaultReason: string;
+  actionSummary: string;
+  defaultRectifyDays: number | null;
+  isActive: boolean;
+  usageCount: number;
+  lastUsedAt: string | null;
+  creatorId: string | null;
+  creatorNickname: string | null;
+  updaterId: string | null;
+  updaterNickname: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface OrderRecord {
   id: string;
   orderNo: string;
@@ -532,6 +554,7 @@ export interface ManageComplaintPayload {
   note?: string;
   resultStatus?: Extract<ComplaintStatus, 'RESOLVED' | 'REJECTED'>;
   resultSummary?: string;
+  penaltyTemplateId?: string;
   penaltyType?: PenaltyType;
   penaltySeverity?: PenaltySeverity;
   penaltyReason?: string;
@@ -628,6 +651,53 @@ export interface SubmitPenaltyAppealPayload {
 export interface ReviewPenaltyAppealPayload {
   decision: Extract<PenaltyAppealStatus, 'APPROVED' | 'REJECTED'>;
   reviewNote: string;
+}
+
+export interface PenaltyTemplateAdminQuery {
+  page?: number;
+  pageSize?: number;
+  targetRole?: ComplaintTargetRole;
+  penaltyType?: PenaltyType;
+  severity?: PenaltySeverity;
+  isActive?: boolean;
+  keyword?: string;
+}
+
+export interface UpsertPenaltyTemplatePayload {
+  templateCode: string;
+  templateName: string;
+  description?: string;
+  targetRole?: ComplaintTargetRole;
+  penaltyType: PenaltyType;
+  severity: PenaltySeverity;
+  defaultReason: string;
+  actionSummary: string;
+  defaultRectifyDays?: number;
+}
+
+export interface TogglePenaltyTemplatePayload {
+  isActive: boolean;
+}
+
+export interface PenaltyTemplateAdminStats {
+  total: number;
+  activeCount: number;
+  inactiveCount: number;
+  sharedCount: number;
+  caregiverCount: number;
+  platformCount: number;
+  totalUsageCount: number;
+  recentUsedCount: number;
+}
+
+export interface PenaltyTemplateAdminPage {
+  items: PenaltyTemplateRecord[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface PlatformRuleRecord {

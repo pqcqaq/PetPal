@@ -359,6 +359,36 @@
           </el-form-item>
 
           <template v-if="actionForm.actionType === 'PENALTY'">
+            <el-form-item label="处罚模板">
+              <el-select
+                v-model="actionForm.penaltyTemplateId"
+                clearable
+                filterable
+                :loading="penaltyTemplateLoading"
+                placeholder="可选：选择模板后自动带入默认字段"
+                style="width: 100%"
+                @change="handlePenaltyTemplateChange"
+              >
+                <el-option
+                  v-for="item in availablePenaltyTemplates"
+                  :key="item.id"
+                  :label="`${item.templateName}（${item.templateCode}）`"
+                  :value="item.id"
+                />
+              </el-select>
+              <div class="complaint-template-note">
+                <template v-if="selectedPenaltyTemplate">
+                  <strong>{{ selectedPenaltyTemplate.templateName }}</strong>
+                  <span>
+                    {{ selectedPenaltyTemplate.description || '未填写模板说明' }}
+                    · 默认整改
+                    {{ selectedPenaltyTemplate.defaultRectifyDays ? `${selectedPenaltyTemplate.defaultRectifyDays} 天` : '不预设' }}
+                    · 已使用 {{ selectedPenaltyTemplate.usageCount }} 次
+                  </span>
+                </template>
+                <span v-else>未选择模板时，继续按当前字段手动填写处罚内容。</span>
+              </div>
+            </el-form-item>
             <div class="complaint-action-grid">
               <el-form-item label="处罚类型">
                 <el-select v-model="actionForm.penaltyType" style="width: 100%">
@@ -469,6 +499,7 @@ import type {
   ComplaintType,
   ManageComplaintPayload,
   PenaltySeverity,
+  PenaltyTemplateRecord,
   PenaltyType,
   UserRecord,
 } from '@rbac/api-common';
@@ -541,6 +572,7 @@ type ActionForm = {
   note: string;
   resultStatus: 'RESOLVED' | 'REJECTED';
   resultSummary: string;
+  penaltyTemplateId: string;
   penaltyType?: PenaltyType;
   penaltySeverity?: PenaltySeverity;
   penaltyReason: string;
@@ -563,6 +595,8 @@ const actionSubmitting = ref(false);
 const quickAssigningId = ref('');
 const activeComplaint = ref<ComplaintAdminRecord | null>(null);
 const adminOptions = ref<UserRecord[]>([]);
+const penaltyTemplates = ref<PenaltyTemplateRecord[]>([]);
+const penaltyTemplateLoading = ref(false);
 const route = useRoute();
 const router = useRouter();
 const statsData = ref<ComplaintAdminStats>({
@@ -602,6 +636,7 @@ const createEmptyActionForm = (): ActionForm => ({
   note: '',
   resultStatus: 'RESOLVED',
   resultSummary: '',
+  penaltyTemplateId: '',
   penaltyType: 'WARNING',
   penaltySeverity: 'LOW',
   penaltyReason: '',
@@ -632,6 +667,24 @@ const isMineFilterActive = computed(() =>
   && !pageState.filters.unassignedOnly
   && pageState.filters.assignedAdminId === currentAdminId.value,
 );
+const availablePenaltyTemplates = computed(() => {
+  const targetRole = activeComplaint.value?.targetRole;
+  return penaltyTemplates.value
+    .filter(item => item.isActive && (!item.targetRole || item.targetRole === targetRole))
+    .sort((left, right) => {
+      if (right.usageCount !== left.usageCount) {
+        return right.usageCount - left.usageCount;
+      }
+      return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+    });
+});
+const selectedPenaltyTemplate = computed(() => {
+  const templateId = actionForm.penaltyTemplateId.trim();
+  if (!templateId) {
+    return null;
+  }
+  return availablePenaltyTemplates.value.find(item => item.id === templateId) ?? null;
+});
 const selectedActionableComplaints = computed(() =>
   selectedComplaints.value.filter(item => !isClosedComplaint(item)),
 );
@@ -819,6 +872,27 @@ const loadAdminOptions = async () => {
   }
 };
 
+const loadPenaltyTemplates = async () => {
+  if (!auth.permissions.includes('petpal.penalty.manage')) {
+    penaltyTemplates.value = [];
+    return;
+  }
+
+  try {
+    penaltyTemplateLoading.value = true;
+    const response = await api.petpal.admin.penaltyTemplates({
+      page: 1,
+      pageSize: 100,
+      isActive: true,
+    });
+    penaltyTemplates.value = response.items;
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '加载处罚模板失败'));
+  } finally {
+    penaltyTemplateLoading.value = false;
+  }
+};
+
 const loadRows = async () => {
   try {
     loading.value = true;
@@ -929,12 +1003,33 @@ const openBatchCloseDialog = () => {
   batchCloseDialogVisible.value = true;
 };
 
-const openActionDialog = (complaint: ComplaintAdminRecord) => {
+const applyPenaltyTemplate = (template: PenaltyTemplateRecord) => {
+  actionForm.penaltyType = template.penaltyType;
+  actionForm.penaltySeverity = template.severity;
+  actionForm.penaltyReason = template.defaultReason;
+  actionForm.penaltyActionSummary = template.actionSummary;
+  actionForm.rectifyDueAt = template.defaultRectifyDays
+    ? new Date(Date.now() + template.defaultRectifyDays * 24 * 60 * 60 * 1000)
+    : null;
+};
+
+const handlePenaltyTemplateChange = (value?: string) => {
+  const template = availablePenaltyTemplates.value.find(item => item.id === value);
+  if (!template) {
+    return;
+  }
+  applyPenaltyTemplate(template);
+};
+
+const openActionDialog = async (complaint: ComplaintAdminRecord) => {
   activeComplaint.value = complaint;
   Object.assign(actionForm, createEmptyActionForm(), {
     assigneeId: complaint.assignedAdminId ?? '',
     actionType: complaint.assignedAdminId ? 'INVESTIGATE' : 'ASSIGN',
   });
+  if (auth.permissions.includes('petpal.penalty.manage')) {
+    await loadPenaltyTemplates();
+  }
   actionDialogVisible.value = true;
 };
 
@@ -1041,26 +1136,27 @@ const submitAction = async () => {
   } else if (actionForm.actionType === 'PENALTY') {
     const penaltyReason = actionForm.penaltyReason.trim();
     const penaltyActionSummary = actionForm.penaltyActionSummary.trim();
-    if (!actionForm.penaltyType) {
+    if (!actionForm.penaltyTemplateId && !actionForm.penaltyType) {
       ElMessage.error('请选择处罚类型');
       return;
     }
-    if (!actionForm.penaltySeverity) {
+    if (!actionForm.penaltyTemplateId && !actionForm.penaltySeverity) {
       ElMessage.error('请选择严重等级');
       return;
     }
-    if (!penaltyActionSummary) {
+    if (!actionForm.penaltyTemplateId && !penaltyActionSummary) {
       ElMessage.error('请填写处罚措施');
       return;
     }
-    if (!penaltyReason) {
+    if (!actionForm.penaltyTemplateId && !penaltyReason) {
       ElMessage.error('请填写处罚原因');
       return;
     }
+    payload.penaltyTemplateId = actionForm.penaltyTemplateId.trim() || undefined;
     payload.penaltyType = actionForm.penaltyType;
     payload.penaltySeverity = actionForm.penaltySeverity;
-    payload.penaltyReason = penaltyReason;
-    payload.penaltyActionSummary = penaltyActionSummary;
+    payload.penaltyReason = penaltyReason || undefined;
+    payload.penaltyActionSummary = penaltyActionSummary || undefined;
     payload.rectifyDueAt = actionForm.rectifyDueAt?.toISOString();
   } else if (actionForm.actionType === 'CLOSE') {
     const resultSummary = actionForm.resultSummary.trim();
@@ -1094,6 +1190,9 @@ const submitAction = async () => {
 
 onMounted(async () => {
   await loadAdminOptions();
+  if (auth.permissions.includes('petpal.penalty.manage')) {
+    await loadPenaltyTemplates();
+  }
 });
 
 watch(
@@ -1219,6 +1318,16 @@ watch(
 .complaint-dialog__summary p {
   margin: 6px 0 0;
   color: #667085;
+}
+
+.complaint-template-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .complaint-action-grid {

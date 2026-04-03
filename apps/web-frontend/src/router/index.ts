@@ -231,6 +231,17 @@ const routes = [
         },
       },
       {
+        path: 'penalty-templates',
+        name: 'petpal-admin-penalty-templates',
+        component: () => import('@/pages/petpal-admin/PetPalPenaltyTemplateAdminRouteView.vue'),
+        meta: {
+          requiresAuth: true,
+          permissionAny: ['petpal.penalty.read', 'petpal.penalty.manage'],
+          title: '处罚模板',
+          description: '维护投诉处罚模板、适用对象和默认整改要求。',
+        },
+      },
+      {
         path: 'rules',
         name: 'petpal-admin-rules',
         component: () => import('@/pages/petpal-admin/PetPalPlatformRulesRouteView.vue'),

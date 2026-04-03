@@ -3,6 +3,7 @@ import type {
   CallbackAuditStats,
   ComplaintAdminStats,
   PenaltyAdminStats,
+  PenaltyTemplateAdminStats,
   PetPalAdminOperationsMetrics,
   PetPalAdminOverviewScope,
   PlatformRuleAdminStats,
@@ -328,6 +329,19 @@ type PenaltyRectifyStatusCounter = Record<'PENDING' | 'COMPLETED' | 'WAIVED', nu
 type PenaltySeverityCounter = Record<'LOW' | 'MEDIUM' | 'HIGH', number>;
 type PenaltyAppealStatusCounter = Record<'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED', number>;
 
+type PenaltyTemplateScopeFilters = {
+  targetRole?: 'CAREGIVER' | 'PLATFORM';
+  penaltyType?: 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
+  severity?: 'LOW' | 'MEDIUM' | 'HIGH';
+  isActive?: boolean;
+  keyword?: string;
+};
+
+type PenaltyTemplateFilters = PenaltyTemplateScopeFilters & {
+  page: number;
+  pageSize: number;
+};
+
 type PlatformRuleScopeFilters = {
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   keyword?: string;
@@ -377,6 +391,8 @@ const createPenaltyAppealStatusCounter = (): PenaltyAppealStatusCounter => ({
   APPROVED: 0,
   REJECTED: 0,
 });
+
+const RECENT_PENALTY_TEMPLATE_USAGE_WINDOW_MS = 30 * DAY_IN_MS;
 
 type CaregiverEarningsTrendBucketSeed = {
   label: string;
@@ -1288,12 +1304,17 @@ const appendComplaintProcessLog = async (
   });
 
 const buildPenaltyProcessLogNote = (payload: {
+  templateCode?: string | null;
+  templateName?: string | null;
   penaltyType: 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
   severity: 'LOW' | 'MEDIUM' | 'HIGH';
   reason: string;
   actionSummary: string;
   rectifyDueAt?: Date;
 }) => [
+  payload.templateCode || payload.templateName
+    ? `处罚模板：${payload.templateName || payload.templateCode}${payload.templateCode ? `（${payload.templateCode}）` : ''}`
+    : null,
   `处罚类型：${payload.penaltyType}`,
   `严重等级：${payload.severity}`,
   `处罚措施：${payload.actionSummary}`,
@@ -1678,6 +1699,47 @@ const toComplaintAdminRecord = (complaint: ComplaintAdminEntity) => ({
   penalties: complaint.penalties.map(toPenaltyAdminRecord),
 });
 
+const penaltyTemplateAdminInclude = {
+  creator: {
+    select: {
+      id: true,
+      nickname: true,
+    },
+  },
+  updater: {
+    select: {
+      id: true,
+      nickname: true,
+    },
+  },
+} satisfies Prisma.PenaltyTemplateInclude;
+
+type PenaltyTemplateAdminEntity = Prisma.PenaltyTemplateGetPayload<{
+  include: typeof penaltyTemplateAdminInclude;
+}>;
+
+const toPenaltyTemplateRecord = (template: PenaltyTemplateAdminEntity) => ({
+  id: template.id,
+  templateCode: template.templateCode,
+  templateName: template.templateName,
+  description: template.description,
+  targetRole: template.targetRole,
+  penaltyType: template.penaltyType,
+  severity: template.severity,
+  defaultReason: template.defaultReason,
+  actionSummary: template.actionSummary,
+  defaultRectifyDays: template.defaultRectifyDays,
+  isActive: template.isActive,
+  usageCount: template.usageCount,
+  lastUsedAt: template.lastUsedAt,
+  creatorId: template.createId ?? null,
+  creatorNickname: template.creator?.nickname ?? null,
+  updaterId: template.updateId ?? null,
+  updaterNickname: template.updater?.nickname ?? null,
+  createdAt: template.createdAt,
+  updatedAt: template.updatedAt,
+});
+
 const platformRuleAdminInclude = {
   creator: {
     select: {
@@ -1713,7 +1775,72 @@ const toPlatformRuleRecord = (rule: PlatformRuleAdminEntity) => ({
   updatedAt: rule.updatedAt,
 });
 
+const normalizePenaltyTemplateCode = (value: string) => value.trim().toUpperCase();
 const normalizePlatformRuleCode = (value: string) => value.trim().toUpperCase();
+
+const buildPenaltyTemplateWhere = (
+  filters: PenaltyTemplateScopeFilters,
+): Prisma.PenaltyTemplateWhereInput => {
+  const keyword = filters.keyword?.trim();
+
+  return {
+    deleteAt: null,
+    targetRole: filters.targetRole,
+    penaltyType: filters.penaltyType,
+    severity: filters.severity,
+    isActive: filters.isActive,
+    OR: keyword
+      ? [
+          {
+            templateCode: {
+              contains: keyword,
+              mode: 'insensitive',
+            },
+          },
+          {
+            templateName: {
+              contains: keyword,
+              mode: 'insensitive',
+            },
+          },
+          {
+            description: {
+              contains: keyword,
+              mode: 'insensitive',
+            },
+          },
+          {
+            defaultReason: {
+              contains: keyword,
+              mode: 'insensitive',
+            },
+          },
+          {
+            actionSummary: {
+              contains: keyword,
+              mode: 'insensitive',
+            },
+          },
+          {
+            creator: {
+              nickname: {
+                contains: keyword,
+                mode: 'insensitive',
+              },
+            },
+          },
+          {
+            updater: {
+              nickname: {
+                contains: keyword,
+                mode: 'insensitive',
+              },
+            },
+          },
+        ]
+      : undefined,
+  };
+};
 
 const buildPlatformRuleWhere = (
   filters: PlatformRuleScopeFilters,
@@ -2007,6 +2134,16 @@ const toPenaltyAdminStatsBaseFilters = (
   keyword: filters.keyword,
 });
 
+const toPenaltyTemplateStatsBaseFilters = (
+  filters: PenaltyTemplateScopeFilters,
+): PenaltyTemplateScopeFilters => ({
+  targetRole: filters.targetRole,
+  penaltyType: filters.penaltyType,
+  severity: filters.severity,
+  isActive: filters.isActive,
+  keyword: filters.keyword,
+});
+
 const loadAdminComplaintById = async (
   client: Prisma.TransactionClient | PrismaClient,
   complaintId: string,
@@ -2030,6 +2167,43 @@ const loadAdminPenaltyById = async (
     },
     include: penaltyAdminInclude,
   });
+
+const loadAdminPenaltyTemplateById = async (
+  client: Prisma.TransactionClient | PrismaClient,
+  templateId: string,
+) =>
+  client.penaltyTemplate.findFirst({
+    where: {
+      id: templateId,
+      deleteAt: null,
+    },
+    include: penaltyTemplateAdminInclude,
+  });
+
+const resolveComplaintPenaltyTemplate = async (
+  client: Prisma.TransactionClient | PrismaClient,
+  templateId: string | undefined,
+  targetRole: 'CAREGIVER' | 'PLATFORM',
+) => {
+  if (!templateId?.trim()) {
+    return null;
+  }
+
+  const template = await loadAdminPenaltyTemplateById(client, templateId.trim());
+  if (!template) {
+    throw notFound('Penalty template not found');
+  }
+
+  if (!template.isActive) {
+    throw badRequest('Inactive penalty template cannot be applied');
+  }
+
+  if (template.targetRole && template.targetRole !== targetRole) {
+    throw badRequest('Penalty template target role does not match complaint');
+  }
+
+  return template;
+};
 
 const loadComplaintAdminAssignee = async (
   client: Prisma.TransactionClient | PrismaClient,
@@ -4546,6 +4720,309 @@ export const petpalService = {
     };
   },
 
+  async queryAdminPenaltyTemplates(filters: PenaltyTemplateFilters) {
+    const where = buildPenaltyTemplateWhere(filters);
+    const [total, templates] = await Promise.all([
+      prisma.penaltyTemplate.count({ where }),
+      prisma.penaltyTemplate.findMany({
+        where,
+        include: penaltyTemplateAdminInclude,
+        orderBy: [
+          {
+            isActive: 'desc',
+          },
+          {
+            usageCount: 'desc',
+          },
+          {
+            updatedAt: 'desc',
+          },
+        ],
+        skip: (filters.page - 1) * filters.pageSize,
+        take: filters.pageSize,
+      }),
+    ]);
+
+    return {
+      items: templates.map(toPenaltyTemplateRecord),
+      pagination: {
+        page: filters.page,
+        pageSize: filters.pageSize,
+        total,
+        totalPages: Math.ceil(total / filters.pageSize),
+      },
+    };
+  },
+
+  async queryAdminPenaltyTemplateStats(
+    filters: PenaltyTemplateScopeFilters = {},
+  ): Promise<PenaltyTemplateAdminStats> {
+    const baseFilters = toPenaltyTemplateStatsBaseFilters(filters);
+    const where = buildPenaltyTemplateWhere(baseFilters);
+    const recentBoundary = new Date(Date.now() - RECENT_PENALTY_TEMPLATE_USAGE_WINDOW_MS);
+    const [total, activeCount, inactiveCount, sharedCount, caregiverCount, platformCount, usageAggregate, recentUsedCount] =
+      await Promise.all([
+        prisma.penaltyTemplate.count({ where }),
+        prisma.penaltyTemplate.count({
+          where: {
+            AND: [
+              where,
+              {
+                isActive: true,
+              },
+            ],
+          },
+        }),
+        prisma.penaltyTemplate.count({
+          where: {
+            AND: [
+              where,
+              {
+                isActive: false,
+              },
+            ],
+          },
+        }),
+        prisma.penaltyTemplate.count({
+          where: {
+            AND: [
+              where,
+              {
+                targetRole: null,
+              },
+            ],
+          },
+        }),
+        prisma.penaltyTemplate.count({
+          where: {
+            AND: [
+              where,
+              {
+                targetRole: 'CAREGIVER',
+              },
+            ],
+          },
+        }),
+        prisma.penaltyTemplate.count({
+          where: {
+            AND: [
+              where,
+              {
+                targetRole: 'PLATFORM',
+              },
+            ],
+          },
+        }),
+        prisma.penaltyTemplate.aggregate({
+          where,
+          _sum: {
+            usageCount: true,
+          },
+        }),
+        prisma.penaltyTemplate.count({
+          where: {
+            AND: [
+              where,
+              {
+                lastUsedAt: {
+                  gte: recentBoundary,
+                },
+              },
+            ],
+          },
+        }),
+      ]);
+
+    return {
+      total,
+      activeCount,
+      inactiveCount,
+      sharedCount,
+      caregiverCount,
+      platformCount,
+      totalUsageCount: usageAggregate._sum.usageCount ?? 0,
+      recentUsedCount,
+    };
+  },
+
+  async createAdminPenaltyTemplate(
+    actorId: string,
+    payload: {
+      templateCode: string;
+      templateName: string;
+      description?: string;
+      targetRole?: 'CAREGIVER' | 'PLATFORM';
+      penaltyType: 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
+      severity: 'LOW' | 'MEDIUM' | 'HIGH';
+      defaultReason: string;
+      actionSummary: string;
+      defaultRectifyDays?: number;
+    },
+  ) {
+    const templateCode = normalizePenaltyTemplateCode(payload.templateCode);
+    const templateName = payload.templateName.trim();
+    const description = payload.description?.trim() || null;
+    const defaultReason = payload.defaultReason.trim();
+    const actionSummary = payload.actionSummary.trim();
+
+    if (!templateName) {
+      throw badRequest('Penalty template name is required');
+    }
+
+    if (!defaultReason) {
+      throw badRequest('Penalty template default reason is required');
+    }
+
+    if (!actionSummary) {
+      throw badRequest('Penalty template action summary is required');
+    }
+
+    const duplicated = await prisma.penaltyTemplate.findFirst({
+      where: {
+        templateCode,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (duplicated) {
+      throw badRequest('Penalty template code already exists');
+    }
+
+    const created = await prisma.penaltyTemplate.create({
+      data: withSnowflakeId({
+        createId: actorId,
+        updateId: actorId,
+        templateCode,
+        templateName,
+        description,
+        targetRole: payload.targetRole ?? null,
+        penaltyType: payload.penaltyType,
+        severity: payload.severity,
+        defaultReason,
+        actionSummary,
+        defaultRectifyDays: payload.defaultRectifyDays ?? null,
+        isActive: true,
+      }),
+      include: penaltyTemplateAdminInclude,
+    });
+
+    return toPenaltyTemplateRecord(created);
+  },
+
+  async updateAdminPenaltyTemplate(
+    templateId: string,
+    actorId: string,
+    payload: {
+      templateCode: string;
+      templateName: string;
+      description?: string;
+      targetRole?: 'CAREGIVER' | 'PLATFORM';
+      penaltyType: 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
+      severity: 'LOW' | 'MEDIUM' | 'HIGH';
+      defaultReason: string;
+      actionSummary: string;
+      defaultRectifyDays?: number;
+    },
+  ) {
+    const existing = await prisma.penaltyTemplate.findFirst({
+      where: {
+        id: templateId,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!existing) {
+      throw notFound('Penalty template not found');
+    }
+
+    const templateCode = normalizePenaltyTemplateCode(payload.templateCode);
+    const templateName = payload.templateName.trim();
+    const description = payload.description?.trim() || null;
+    const defaultReason = payload.defaultReason.trim();
+    const actionSummary = payload.actionSummary.trim();
+
+    if (!templateName) {
+      throw badRequest('Penalty template name is required');
+    }
+
+    if (!defaultReason) {
+      throw badRequest('Penalty template default reason is required');
+    }
+
+    if (!actionSummary) {
+      throw badRequest('Penalty template action summary is required');
+    }
+
+    const duplicated = await prisma.penaltyTemplate.findFirst({
+      where: {
+        id: {
+          not: templateId,
+        },
+        templateCode,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (duplicated) {
+      throw badRequest('Penalty template code already exists');
+    }
+
+    const updated = await prisma.penaltyTemplate.update({
+      where: {
+        id: templateId,
+      },
+      data: {
+        updateId: actorId,
+        templateCode,
+        templateName,
+        description,
+        targetRole: payload.targetRole ?? null,
+        penaltyType: payload.penaltyType,
+        severity: payload.severity,
+        defaultReason,
+        actionSummary,
+        defaultRectifyDays: payload.defaultRectifyDays ?? null,
+      },
+      include: penaltyTemplateAdminInclude,
+    });
+
+    return toPenaltyTemplateRecord(updated);
+  },
+
+  async setAdminPenaltyTemplateStatus(templateId: string, actorId: string, isActive: boolean) {
+    const existing = await loadAdminPenaltyTemplateById(prisma, templateId);
+
+    if (!existing) {
+      throw notFound('Penalty template not found');
+    }
+
+    if (existing.isActive === isActive) {
+      return toPenaltyTemplateRecord(existing);
+    }
+
+    const updated = await prisma.penaltyTemplate.update({
+      where: {
+        id: templateId,
+      },
+      data: {
+        updateId: actorId,
+        isActive,
+      },
+      include: penaltyTemplateAdminInclude,
+    });
+
+    return toPenaltyTemplateRecord(updated);
+  },
+
   async queryAdminPlatformRules(filters: PlatformRuleFilters) {
     const where = buildPlatformRuleWhere(filters);
     const [total, rules] = await Promise.all([
@@ -5346,6 +5823,7 @@ export const petpalService = {
       note?: string;
       resultStatus?: 'RESOLVED' | 'REJECTED';
       resultSummary?: string;
+      penaltyTemplateId?: string;
       penaltyType?: 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
       penaltySeverity?: 'LOW' | 'MEDIUM' | 'HIGH';
       penaltyReason?: string;
@@ -5416,10 +5894,21 @@ export const petpalService = {
           resultSummary,
         });
       } else if (payload.actionType === 'PENALTY') {
-        const penaltyType = payload.penaltyType;
-        const penaltySeverity = payload.penaltySeverity;
-        const penaltyReason = payload.penaltyReason?.trim();
-        const penaltyActionSummary = payload.penaltyActionSummary?.trim();
+        const penaltyTemplate = await resolveComplaintPenaltyTemplate(
+          tx,
+          payload.penaltyTemplateId,
+          complaint.targetRole,
+        );
+        const penaltyType = payload.penaltyType ?? penaltyTemplate?.penaltyType;
+        const penaltySeverity = payload.penaltySeverity ?? penaltyTemplate?.severity;
+        const penaltyReason = payload.penaltyReason?.trim() || penaltyTemplate?.defaultReason;
+        const penaltyActionSummary = payload.penaltyActionSummary?.trim() || penaltyTemplate?.actionSummary;
+        const rectifyDueAt = payload.rectifyDueAt
+          ?? (
+            penaltyTemplate?.defaultRectifyDays
+              ? new Date(Date.now() + penaltyTemplate.defaultRectifyDays * DAY_IN_MS)
+              : undefined
+          );
 
         if (!penaltyType) {
           throw badRequest('Penalty type is required');
@@ -5460,14 +5949,31 @@ export const petpalService = {
           severity: penaltySeverity,
           reason: penaltyReason,
           actionSummary: penaltyActionSummary,
-          rectifyDueAt: payload.rectifyDueAt,
+          rectifyDueAt,
         });
+
+        if (penaltyTemplate) {
+          await tx.penaltyTemplate.update({
+            where: {
+              id: penaltyTemplate.id,
+            },
+            data: {
+              updateId: actorId,
+              usageCount: {
+                increment: 1,
+              },
+              lastUsedAt: new Date(),
+            },
+          });
+        }
 
         await appendComplaintProcessLog(tx, {
           complaintId: complaint.id,
           actionType: 'PENALTY',
           operatorId: actorId,
           note: buildPenaltyProcessLogNote({
+            templateCode: penaltyTemplate?.templateCode ?? null,
+            templateName: penaltyTemplate?.templateName ?? null,
             penaltyType: penalty.penaltyType,
             severity: penalty.severity,
             reason: penalty.reason,

@@ -244,6 +244,7 @@ const adminComplaintActionSchema = z.object({
   note: z.string().trim().max(1000).optional(),
   resultStatus: z.enum(['RESOLVED', 'REJECTED']).optional(),
   resultSummary: z.string().trim().max(1000).optional(),
+  penaltyTemplateId: z.string().trim().min(1).max(64).optional(),
   penaltyType: z.enum(['WARNING', 'SERVICE_RESTRICTION', 'ACCOUNT_SUSPENSION', 'OTHER']).optional(),
   penaltySeverity: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
   penaltyReason: z.string().trim().max(1000).optional(),
@@ -297,6 +298,37 @@ const adminPenaltyAppealSchema = z.object({
 const adminPenaltyAppealReviewSchema = z.object({
   decision: z.enum(['APPROVED', 'REJECTED']),
   reviewNote: z.string().trim().min(1).max(1000),
+});
+
+const penaltyTemplateQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(100).optional(),
+  targetRole: z.enum(['CAREGIVER', 'PLATFORM']).optional(),
+  penaltyType: penaltyTypeEnum.optional(),
+  severity: penaltySeverityEnum.optional(),
+  isActive: optionalBooleanQuerySchema,
+  keyword: z.string().trim().max(100).optional(),
+});
+
+const penaltyTemplateStatsQuerySchema = penaltyTemplateQuerySchema.omit({
+  page: true,
+  pageSize: true,
+});
+
+const penaltyTemplatePayloadSchema = z.object({
+  templateCode: z.string().trim().min(2).max(50).regex(/^[A-Za-z0-9_-]+$/),
+  templateName: z.string().trim().min(1).max(100),
+  description: z.string().trim().max(1000).optional(),
+  targetRole: z.enum(['CAREGIVER', 'PLATFORM']).optional(),
+  penaltyType: penaltyTypeEnum,
+  severity: penaltySeverityEnum,
+  defaultReason: z.string().trim().min(1).max(1000),
+  actionSummary: z.string().trim().min(1).max(1000),
+  defaultRectifyDays: z.coerce.number().int().min(1).max(365).optional(),
+});
+
+const penaltyTemplateStatusSchema = z.object({
+  isActive: z.boolean(),
 });
 
 const platformRuleStatusEnum = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
@@ -1168,6 +1200,87 @@ petpalRouter.post(
     const payload = adminComplaintBatchCloseSchema.parse(req.body ?? {});
     const result = await petpalService.batchCloseAdminComplaints(auth.id, payload);
     return ok(res, result, 'Complaints batch closed');
+  }),
+);
+
+petpalRouter.get(
+  '/admin/penalty-templates',
+  requireAnyPermission('petpal.penalty.read', 'petpal.penalty.manage'),
+  asyncHandler(async (req, res) => {
+    const { page, pageSize } = parsePagination(req.query);
+    const query = penaltyTemplateQuerySchema.parse({
+      ...req.query,
+      page,
+      pageSize,
+    });
+
+    const result = await petpalService.queryAdminPenaltyTemplates({
+      page: query.page ?? page,
+      pageSize: query.pageSize ?? pageSize,
+      targetRole: query.targetRole,
+      penaltyType: query.penaltyType,
+      severity: query.severity,
+      isActive: query.isActive,
+      keyword: query.keyword,
+    });
+    return ok(res, result, 'Penalty template list');
+  }),
+);
+
+petpalRouter.get(
+  '/admin/penalty-templates/stats',
+  requireAnyPermission('petpal.penalty.read', 'petpal.penalty.manage'),
+  asyncHandler(async (req, res) => {
+    const query = penaltyTemplateStatsQuerySchema.parse(req.query ?? {});
+    const result = await petpalService.queryAdminPenaltyTemplateStats({
+      targetRole: query.targetRole,
+      penaltyType: query.penaltyType,
+      severity: query.severity,
+      isActive: query.isActive,
+      keyword: query.keyword,
+    });
+    return ok(res, result, 'Penalty template stats');
+  }),
+);
+
+petpalRouter.post(
+  '/admin/penalty-templates',
+  requirePermission('petpal.penalty.manage'),
+  asyncHandler(async (req, res) => {
+    const auth = req.auth!;
+    const payload = penaltyTemplatePayloadSchema.parse(req.body ?? {});
+    const template = await petpalService.createAdminPenaltyTemplate(auth.id, payload);
+    return ok(res, template, 'Penalty template created');
+  }),
+);
+
+petpalRouter.put(
+  '/admin/penalty-templates/:id',
+  requirePermission('petpal.penalty.manage'),
+  asyncHandler(async (req, res) => {
+    const auth = req.auth!;
+    const payload = penaltyTemplatePayloadSchema.parse(req.body ?? {});
+    const template = await petpalService.updateAdminPenaltyTemplate(
+      String(req.params.id),
+      auth.id,
+      payload,
+    );
+    return ok(res, template, 'Penalty template updated');
+  }),
+);
+
+petpalRouter.post(
+  '/admin/penalty-templates/:id/status',
+  requirePermission('petpal.penalty.manage'),
+  asyncHandler(async (req, res) => {
+    const auth = req.auth!;
+    const payload = penaltyTemplateStatusSchema.parse(req.body ?? {});
+    const template = await petpalService.setAdminPenaltyTemplateStatus(
+      String(req.params.id),
+      auth.id,
+      payload.isActive,
+    );
+    return ok(res, template, 'Penalty template status updated');
   }),
 );
 

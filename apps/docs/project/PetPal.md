@@ -1077,7 +1077,7 @@ flowchart TB
 | 消息与回传   | 订单会话、图文消息、过程媒体、未读数                                               | 基本完成，跨订单聚合、提醒中心和通知中心已完成，仍缺系统主动通知 | P2         |
 | 支付与退款   | 多次支付、补差价、部分退款、回调审计、对账                                         | 核心已完成                                                       | P4         |
 | 评价与投诉   | 评价、标签、投诉、处理日志、仲裁结论                                               | 基本完成，售后中心、帮助体系和通知收口已落地，仍缺更主动触达     | P2         |
-| 管理治理     | 审核台、纠纷处理、违规处罚、规则发布、指标看板                                     | 规则发布、违规处罚、整改跟踪与单次申诉审核基础闭环已完成，深度看板与用户侧 / 多次申诉链路仍待补齐 | P4         |
+| 管理治理     | 审核台、纠纷处理、违规处罚、规则发布、指标看板                                     | 规则发布、违规处罚、处罚模板、整改跟踪与单次申诉审核基础闭环已完成，深度看板与用户侧 / 多次申诉链路仍待补齐 | P4         |
 | 可观测与审计 | request_id 串联、关键动作审计、导出留痕                                            | 部分完成                                                         | P5         |
 
 ### 13.5 P1-M2：接单履约闭环
@@ -1444,7 +1444,7 @@ flowchart TD
 | 履约链路       | 基本完成 | 接单、签到、服务日志、签退、确认完成已落地到后端、Web 和 App；超时治理与收益联动仍未补齐                                           |
 | 支付与退款     | 基本完成 | 支付/退款记录、回调审计、退款进度、导出能力已具备                                                                                  |
 | 评价与投诉     | 基本完成 | Web 端已支持评价、投诉、售后时间线；App 端也已具备订单详情提交、独立售后中心、帮助体系、提醒与通知收口能力，但仍缺更主动的系统触达 |
-| 管理后台       | 基本完成 | 根级 `/petpal-admin/*` 已承载投诉、违规处罚、单次处罚申诉审核、照料者审核、回调审计、告警队列、规则治理；更深运营看板与用户侧 / 多次申诉仍未补齐 |
+| 管理后台       | 基本完成 | 根级 `/petpal-admin/*` 已承载投诉、违规处罚、处罚模板、单次处罚申诉审核、照料者审核、回调审计、告警队列、规则治理；更深运营看板与用户侧 / 多次申诉仍未补齐 |
 | 消息与在线沟通 | 基本完成 | 订单详情会话、附件回传、跨订单消息中心、未读态、提醒中心、通知中心和 Web/App 摘要已落地；仍缺系统级主动提醒、推送与后台触达        |
 | 收益与数据分析 | 部分完成 | App 已补收益与表现页，可基于订单聚合看净收入、评分和售后风险；后端专门统计接口与平台运营指标仍未完整实现                           |
 | 文档与答辩材料 | 部分完成 | 计划、进度日志和实现历史持续更新中，但完整验收脚本、截图、演示素材尚未收齐                                                         |
@@ -1461,7 +1461,7 @@ flowchart TD
 1. `app-frontend` 已形成真实可用的 PetPal 主应用骨架，帮助中心、账户支持、提醒中心、通知中心、起步向导和应用内主动催办信号已落地，但系统级主动触达与更深的动态引导仍未收口。
 2. Web 前台仍存在超级页面承载过多逻辑的问题，主人 / 照料者前台尚未按路由充分拆分。
 3. 提醒中心与通知中心已落地，但真正的系统主动提醒、推送和更强的售后/消息到达能力仍未完成。
-4. 健康记录、资质材料、收益分析纵深、用户侧 / 多次处罚申诉链路和更深的运营看板仍缺完整前后端闭环；规则发布、处罚整改与单次申诉审核已补齐基础闭环。
+4. 健康记录、资质材料、收益分析纵深、用户侧 / 多次处罚申诉链路、整改材料回传和更深的运营看板仍缺完整前后端闭环；规则发布、处罚模板、处罚整改与单次申诉审核已补齐基础闭环。
 5. 统一验收层尚未收口，前端定向验证、人工验收脚本、论文素材还不够完整。
 
 当前工作区进行中但尚未完成交付的内容：
@@ -1495,7 +1495,7 @@ flowchart TD
    - 图文过程沟通
    - 未读数与消息提醒
 2. 补齐健康记录、资质材料、收益分析和平台运营指标。
-3. 继续补齐后台“用户侧 / 多次处罚申诉、模板化治理 / 运营看板深化”能力，并在已落地的规则治理、处罚整改与单次申诉审核基础上完成从工单治理到平台治理的升级。
+3. 继续补齐后台“用户侧 / 多次处罚申诉、整改材料回传 / 运营看板深化”能力，并在已落地的规则治理、处罚模板、处罚整改与单次申诉审核基础上完成从工单治理到平台治理的升级。
 
 #### 第三优先级：验收收口
 
@@ -7880,6 +7880,91 @@ flowchart TD
 1. 继续评估主人交易导出、主人退款导出和照料者收益导出之间可共享的快照基础 helper，减少三个状态模块的平行实现。
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
+### 14.218 2026-04-03（P3-M1 Slice 218）
+
+**概述**：上一轮已经把单次处罚申诉闭环补到根级后台，但处罚动作仍然依赖管理员每次手填类型、等级、原因和措施，缺少可复用的处罚策略来源。本轮继续沿根级 `/petpal-admin` 治理工作区补齐处罚模板治理，把“规则发布 + 处罚执行 + 申诉复核”继续推进到“可维护模板、可在投诉处理中一键套用”的更稳定执行链路。
+
+已完成：
+
+- 处罚模板数据模型与共享契约落地：
+  - `apps/backend/prisma/models/petpal.prisma`
+    - 新增 `PenaltyTemplate`，包含模板编码、模板名称、适用对象、处罚类型、严重等级、默认处罚原因、默认处罚措施、默认整改天数、启停状态、使用次数和最近使用时间。
+  - `apps/backend/prisma/models/auth.prisma`
+    - 为处罚模板创建人、更新人补上 `User` 反向关联。
+  - `apps/backend/prisma/migrations/20260404001000_add_petpal_penalty_templates/migration.sql`
+    - 新增处罚模板表、索引和创建人 / 更新人外键迁移。
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增处罚模板列表记录、分页 / 统计查询、创建 / 更新载荷与启停载荷类型，并把投诉处罚动作载荷补上 `penaltyTemplateId`。
+  - `packages/api-common/src/api/factory.ts`
+    - 新增：
+      - `api.petpal.admin.penaltyTemplates()`
+      - `api.petpal.admin.penaltyTemplateStats()`
+      - `api.petpal.admin.createPenaltyTemplate()`
+      - `api.petpal.admin.updatePenaltyTemplate()`
+      - `api.petpal.admin.togglePenaltyTemplate()`
+- 后端处罚模板治理与投诉套用逻辑落地：
+  - `apps/backend/src/services/petpal-service.ts`
+    - 新增处罚模板列表、统计、创建、编辑、启停服务。
+    - 新增模板套用约束：模板必须处于启用状态，且适用对象必须与当前投诉对象匹配或为通用模板。
+    - 投诉处罚动作现在支持仅传 `penaltyTemplateId`，由后端自动回填处罚字段、默认整改截止时间，并在模板被使用时递增 `usageCount`、更新 `lastUsedAt`。
+    - 处罚流程日志会额外写入本次使用的模板编码 / 名称，保证模板化治理仍可审计。
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增：
+      - `GET /api/petpal/admin/penalty-templates`
+      - `GET /api/petpal/admin/penalty-templates/stats`
+      - `POST /api/petpal/admin/penalty-templates`
+      - `PUT /api/petpal/admin/penalty-templates/:id`
+      - `POST /api/petpal/admin/penalty-templates/:id/status`
+    - 投诉处罚动作 schema 已支持 `penaltyTemplateId`。
+    - 继续复用 `petpal.penalty.read` / `petpal.penalty.manage`，不额外新增模板权限码。
+- 根级后台模板页与投诉处罚弹窗落地：
+  - `apps/web-frontend/src/router/index.ts`
+  - `apps/web-frontend/src/pages/petpal-admin/navigation.ts`
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalPenaltyTemplateAdminRouteView.vue`
+    - 根级后台新增 `/petpal-admin/penalty-templates` 页面入口。
+  - `apps/web-frontend/src/pages/petpal-admin/penalty-templates/PetPalPenaltyTemplateAdminView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/penalty-templates/penalty-template-options.ts`
+    - 新增处罚模板治理页，支持筛选、统计、展开详情、新建 / 编辑和启停管理。
+  - `apps/web-frontend/src/pages/petpal-admin/complaints/PetPalComplaintAdminView.vue`
+    - 处罚动作弹窗新增模板选择区，选择模板后会自动带入处罚类型、严重等级、原因、措施和默认整改时间，同时仍允许管理员按当前工单场景微调字段。
+- 定向测试与文档同步：
+  - `apps/backend/test/integration/petpal-penalty-template-admin.test.ts`
+    - 新增处罚模板定向集成测试，覆盖模板创建 / 列表 / 统计、投诉处罚套用、使用次数递增，以及对象不匹配 / 已停用模板的非法套用。
+  - 文档已同步：
+    - `README.md`
+    - `docs/project-memory.md`
+    - `docs/implementation-history.md`
+    - `apps/docs/project/PetPal.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/backend exec -- prisma migrate deploy` 通过。
+- `pnpm --filter @rbac/backend exec -- prisma generate` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test test/integration/petpal-penalty-template-admin.test.ts` 通过。
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮把处罚治理从“管理员重复手填处罚字段”推进到“模板可维护 + 投诉可套用”的复用形态，处罚执行开始具备更稳定的制度落地来源。
+- 已确认模板治理继续刻意收口在后台侧，不扩散到自动规则命中、用户侧模板推荐或独立处罚立案。
+- 已确认模板套用仍允许人工微调，既保证后台值班效率，也避免模板字段把真实工单场景锁死。
+
+风险与缓解：
+
+- 风险：当前模板仍是静态人工维护，尚未直接绑定平台规则版本、规则差异对比或自动触发条件。
+- 缓解：后续如继续深化，可在现有模板主数据基础上再补规则关联、触发来源和版本差异审计，而不必推翻本轮模型。
+
+- 风险：当前处罚对象完成整改时，整改材料仍未形成独立回传链路，模板也还无法约束材料清单。
+- 缓解：下一轮优先评估整改材料回传与模板字段之间的最小关联，避免处罚模板继续停留在纯文本默认值层。
+
+下一步（1-3）：
+
+1. 继续补整改材料回传、材料审核和模板约束，让处罚治理从“文本模板”推进到“有证据回传”的执行闭环。
+2. 继续补用户侧 / 多次申诉、规则版本关联和更细的触发来源，让处罚治理从后台值班工具升级到更完整的平台仲裁链路。
+3. 继续按切片节奏做定向测试、局部构建验证、本地提交和文档更新，不回退到无边界全量验证。
 
 ### 14.217 2026-04-03（P3-M1 Slice 217）
 

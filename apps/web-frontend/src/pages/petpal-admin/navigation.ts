@@ -41,6 +41,14 @@ export const petpalAdminNavItems: PetPalAdminNavItem[] = [
     permissionsAny: ['petpal.penalty.read', 'petpal.penalty.manage'],
   },
   {
+    title: '处罚模板',
+    caption: 'Templates',
+    description: '维护常用处罚模板，支撑投诉处理时的一键套用。',
+    to: '/petpal-admin/penalty-templates',
+    icon: 'i-carbon-catalog',
+    permissionsAny: ['petpal.penalty.read', 'petpal.penalty.manage'],
+  },
+  {
     title: '照料者审核',
     caption: 'Caregiver Audit',
     description: '审核照料者资质、查看审核状态与处理进度。',
