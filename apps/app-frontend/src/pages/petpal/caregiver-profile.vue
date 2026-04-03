@@ -55,9 +55,37 @@ async function loadPage() {
   }
 }
 
+async function resolveCurrentCaregiverProfileId() {
+  if (profile.value?.id) {
+    return profile.value.id
+  }
+
+  try {
+    const next = await getCaregiverProfile()
+    if (next?.id) {
+      profile.value = next
+      return next.id
+    }
+  }
+  catch {
+    return null
+  }
+
+  return null
+}
+
 async function uploadMaterials() {
   try {
-    const files = await upload.selectAndUploadAttachments({ tag1: 'petpal', tag2: 'qualification' })
+    const caregiverProfileId = await resolveCurrentCaregiverProfileId()
+    if (!caregiverProfileId) {
+      toast('请先保存照料者档案，再上传资质材料')
+      return
+    }
+
+    const files = await upload.selectAndUploadAttachments({
+      tag1: 'petpal-caregiver-qualification',
+      tag2: caregiverProfileId,
+    })
     form.qualificationMaterials = [...form.qualificationMaterials, ...files].slice(0, 12)
     toast('材料已添加', 'success')
   }

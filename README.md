@@ -18,7 +18,7 @@ QC-RBAC 是一个围绕认证、授权、多端接入组织的 Monorepo。仓库
 - OAuth / OIDC：既能作为 Provider 对外提供授权服务，也能作为 Client 接入第三方登录，支持 PKCE、`userinfo`、`introspect`、`revoke`。
 - Web 控制台：动态菜单路由、分页列表、统一导出、工作台偏好同步到当前用户。
 - PetPal 治理工作区：根级 `/petpal-admin` 已覆盖总览、投诉、违规处罚、整改附件直传与复核、处罚模板、处罚申诉审核、照料者审核、回调治理与平台规则管理，附件中心也已补上 PetPal 业务引用展示、删除保护和临时业务附件回收。
-- Uni 移动端：自定义 Header、Tabbar、安全区适配，不依赖第三方 UI 组件库。
+- Uni 移动端：自定义 Header、Tabbar、安全区适配，不依赖第三方 UI 组件库，照料者资质材料上传已对齐后台附件治理标签。
 - 共享协议层：`packages/api-common` 统一客户端枚举、权限常量、请求适配器和 API 工厂。
 - 测试：后端测试按 `framework` 与 `integration` 拆分，覆盖删除保护、导出抽象、认证、OAuth、RBAC、附件、PetPal JSON 引用删除保护、客户端等主链路。
 

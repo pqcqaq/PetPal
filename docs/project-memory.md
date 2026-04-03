@@ -192,6 +192,7 @@ Last updated: 2026-04-04
 - 保持 unibest 项目组织方式
 - 复用 `api-common`
 - 已包含登录 / 注册 / 首页 / 我的 / 权限相关接入位点
+- PetPal 照料者资质材料上传已对齐后端受管附件口径，当前会使用 `petpal-caregiver-qualification + caregiverProfile.id` 作为上传标签
 
 ## 5. 关键架构原则
 
