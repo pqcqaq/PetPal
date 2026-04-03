@@ -217,6 +217,10 @@ Last updated: 2026-04-04
   - Web 端 `PetPalOrderResultWorkbench.vue` 里的投诉表单已从手填证据 URL 改成订单范围受管上传，上传结果会先保留为带 `fileId`、`url`、文件名和大小的本地附件快照，再在提交时映射回既有 `evidenceUrls`。
   - App 端 `pages/order-complaint/index.vue` 已把本地投诉证据状态从 URL 数组升级为受管附件快照列表，查看 / 移除都改按 `fileId` 和附件元数据处理。
   - 本轮没有改后端投诉协议，Web / App 仍继续向当前投诉接口提交 `evidenceUrls`，只是在前端把上传和本地管理统一到受管附件模式。
+- 2026-04-04 已继续收口投诉附件共享约定：
+  - `packages/api-common` 已新增通用受管附件快照类型，并把投诉附件标签、最大数量和大小限制提升为共享常量。
+  - Web / App 投诉页现在都直接消费这组共享常量和类型，不再各自手写 `petpal-order-complaint`、3 张和 8 MB 约束。
+  - `apps/web-frontend/test/petpal-shared.test.ts` 已补投诉附件治理常量稳定性断言，继续兜底双端共享配置不会漂移。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

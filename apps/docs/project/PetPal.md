@@ -7882,6 +7882,58 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.244 2026-04-04（P3-M1 Slice 244）
+
+**概述**：上一轮已经把 Web / App 投诉证据形态对齐到受管附件快照，但附件结构、投诉标签和上传限额仍散在各端页面里重复声明。这样后续一旦继续扩展投诉附件规则，Web / App 很容易再次漂移。本轮继续做一刀更小的共享约定收口，把投诉附件的公共类型和配置提升到 `api-common`。
+
+已完成：
+
+- `packages/api-common` 已补通用受管附件快照与投诉附件配置常量：
+  - `packages/api-common/src/types/files.ts`
+    - 新增 `ManagedAttachmentRecord`，统一定义 `fileId / url / name / mimeType / size / uploadedAt` 这组受管附件快照字段。
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增 `PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG`、`PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT`、`PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB` 和字节级常量。
+    - PetPal 既有资质材料 / 整改材料记录结构已改为复用同一受管附件快照类型，不再继续平铺重复字段。
+- Web / App 投诉页已切到共享约定：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOrderResultWorkbench.vue`
+    - 投诉截图上传不再手写 `petpal-order-complaint` 标签和 3 张 / 8 MB 约束，统一改读 `api-common` 常量。
+    - 本地投诉附件列表也已改用共享 `ManagedAttachmentRecord` 类型。
+  - `apps/app-frontend/src/pages/order-complaint/index.vue`
+    - 投诉页的上传实例、剩余槽位计算和订单范围标签也都改走共享投诉附件常量。
+    - 本地证据状态改直接复用共享 `ManagedAttachmentRecord` 类型。
+  - `apps/app-frontend/src/composables/useManagedAttachmentUpload.ts`
+    - 受管上传返回值类型也已改为复用共享附件快照结构，避免页面侧和上传器各自维护一份相同字段。
+- Web 定向单测已补共享常量稳定性覆盖：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 新增投诉附件标签、最大数量和大小限制的稳定性断言，继续兜底 Web / App 共享配置不会无意漂移。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-shared.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 已确认本轮只收口前端共享约定和类型导出，没有改变投诉接口 payload、后端上传白名单或订单投诉业务流程。
+- 已确认 Web / App 投诉页现在使用同一套投诉附件标签和限额配置，后续如果调整 3 张 / 8 MB 规则，不再需要双端分别修改。
+- 已确认 App 端受管上传器与 PetPal 资质材料 / 整改材料记录结构都能直接消费共享受管附件快照类型，没有引入新的业务字段。
+
+风险与缓解：
+
+- 风险：当前共享常量只覆盖投诉附件，订单消息附件和资质材料标签仍未完全统一提升到同一套共享配置。
+- 缓解：本轮先只收口投诉附件，保持切片足够小；后续如继续扩展消息或资质材料上传规则，再按同样方式逐步提升到共享层。
+
+- 风险：`ManagedAttachmentRecord` 目前还是结构型复用，没有进一步区分“业务返回记录”和“前端本地上传快照”语义。
+- 缓解：现阶段这两类对象字段完全一致，先统一结构减少重复；如果后续语义继续分化，再考虑拆更细的别名或包装类型。
+
+下一步（1-3）：
+
+1. 继续评估是否把订单消息附件和照料者资质材料标签也一起提升到共享附件配置层。
+2. 继续评估投诉接口是否要从 `evidenceUrls` 进一步升级为 `fileId` 快照协议。
+3. 继续按切片节奏推进局部改动、定向验证、本地提交和文档同步，不回到无边界大改。
+
 ### 14.243 2026-04-04（P3-M1 Slice 243）
 
 **概述**：上一轮已经把 App 投诉证据上传切到订单范围受管附件，但 Web 投诉结果工作台里仍保留手填 URL 的旧表单，双端投诉证据形态没有完全对齐。本轮继续沿“前端先管理受管附件快照、提交边界仍兼容既有投诉协议”的方向收口，把 Web / App 两端的投诉证据状态统一提升到带 `fileId` 的本地附件记录。

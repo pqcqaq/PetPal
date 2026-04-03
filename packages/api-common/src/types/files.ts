@@ -39,6 +39,15 @@ export interface UploadCallbackResult {
   url: string;
 }
 
+export interface ManagedAttachmentRecord {
+  fileId: string;
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+}
+
 export interface MediaAssetOwnerSummary {
   id: string;
   username: string;

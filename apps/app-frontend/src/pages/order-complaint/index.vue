@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import type { ComplaintTargetRole, ComplaintType, OrderDetailRecord } from '@rbac/api-common'
+import {
+  PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT,
+  PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB,
+  PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
+  type ComplaintTargetRole,
+  type ComplaintType,
+  type ManagedAttachmentRecord,
+  type OrderDetailRecord,
+} from '@rbac/api-common'
 import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { createOrderComplaint, getOrderDetail } from '@/api/petpal'
@@ -14,26 +22,20 @@ const orderId = ref('')
 const loading = ref(false)
 const submitting = ref(false)
 const order = ref<OrderDetailRecord | null>(null)
-const upload = useManagedAttachmentUpload({ maxCount: 3, maxSizeMb: 8 })
-
-type ComplaintEvidenceAttachment = {
-  fileId: string
-  url: string
-  name: string
-  mimeType: string
-  size: number
-  uploadedAt: string
-}
+const upload = useManagedAttachmentUpload({
+  maxCount: PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT,
+  maxSizeMb: PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB,
+})
 
 const form = reactive({
   targetRole: 'CAREGIVER' as ComplaintTargetRole,
   complaintType: 'SERVICE' as ComplaintType,
   description: '',
-  evidenceAttachments: [] as ComplaintEvidenceAttachment[],
+  evidenceAttachments: [] as ManagedAttachmentRecord[],
 })
 
 const pageSubtitle = computed(() => order.value ? `${order.value.orderNo} · 投诉会进入独立结果页` : '提交投诉后将进入投诉结果页。')
-const evidenceSlotsLeft = computed(() => Math.max(0, 3 - form.evidenceAttachments.length))
+const evidenceSlotsLeft = computed(() => Math.max(0, PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT - form.evidenceAttachments.length))
 
 async function loadPage() {
   if (!tokenStore.hasLogin || loading.value || !orderId.value) {
@@ -59,7 +61,7 @@ async function uploadEvidence() {
 
   try {
     const files = await upload.selectAndUploadAttachments({
-      tag1: 'petpal-order-complaint',
+      tag1: PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
       tag2: orderId.value,
       maxCount: evidenceSlotsLeft.value,
     })

@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT,
+  PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB,
+  PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
+} from '@rbac/api-common';
+import {
   getPetPalCaregiverAuditLabel,
   getPetPalComplaintSlaStatusLabel,
   petPalCaregiverAuditOptions,
@@ -28,4 +33,10 @@ test('exposes caregiver audit options in a stable order for shared admin and fro
 
   assert.equal(getPetPalCaregiverAuditLabel('APPROVED'), '已通过');
   assert.equal(getPetPalCaregiverAuditLabel('REJECTED'), '已驳回');
+});
+
+test('exposes stable complaint attachment governance constants for web and app uploads', () => {
+  assert.equal(PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG, 'petpal-order-complaint');
+  assert.equal(PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT, 3);
+  assert.equal(PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB, 8);
 });

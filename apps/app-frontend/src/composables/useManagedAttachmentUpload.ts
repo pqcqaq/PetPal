@@ -1,3 +1,4 @@
+import type { ManagedAttachmentRecord } from '@rbac/api-common'
 import { ref } from 'vue'
 import { appApi } from '@/api/client'
 import { getErrorMessage } from '@/utils/error'
@@ -9,14 +10,7 @@ type SelectedFile = {
   contentType: string
 }
 
-type UploadResult = {
-  fileId: string
-  url: string
-  name: string
-  mimeType: string
-  size: number
-  uploadedAt: string
-}
+type UploadResult = ManagedAttachmentRecord
 
 const imageExtToMimeTypeMap: Record<string, string> = {
   '.png': 'image/png',

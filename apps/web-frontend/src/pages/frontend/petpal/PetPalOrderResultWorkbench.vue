@@ -261,7 +261,16 @@
 </template>
 
 <script setup lang="ts">
-import type { ComplaintRecord, OrderDetailRecord, OrderRefundProgressRecord, OwnerPayChannel } from '@rbac/api-common';
+import {
+  PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT,
+  PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_BYTES,
+  PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
+  type ComplaintRecord,
+  type ManagedAttachmentRecord,
+  type OrderDetailRecord,
+  type OrderRefundProgressRecord,
+  type OwnerPayChannel,
+} from '@rbac/api-common';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
@@ -314,24 +323,12 @@ const uploadingComplaintEvidence = ref(false);
 const payChannel = ref<OwnerPayChannel>('WECHAT_PAY');
 const complaintEvidenceInputRef = ref<HTMLInputElement | null>(null);
 
-type ComplaintEvidenceAttachment = {
-  fileId: string;
-  url: string;
-  name: string;
-  mimeType: string;
-  size: number;
-  uploadedAt: string;
-};
-
-const MAX_COMPLAINT_ATTACHMENTS = 3;
-const MAX_COMPLAINT_ATTACHMENT_SIZE = 8 * 1024 * 1024;
-
 const complaintForm = reactive({
   targetRole: 'CAREGIVER' as typeof petPalComplaintTargetOptions[number]['value'],
   complaintType: 'SERVICE' as typeof petPalComplaintTypeOptions[number]['value'],
   description: '',
 });
-const complaintEvidenceAttachments = ref<ComplaintEvidenceAttachment[]>([]);
+const complaintEvidenceAttachments = ref<ManagedAttachmentRecord[]>([]);
 
 const reviewForm = reactive({
   rating: 5,
@@ -371,7 +368,7 @@ const pageNotice = computed(() => buildPetPalPageNotice({
 
 const currentOrderId = computed(() => order.value?.id || orderId.value);
 const complaintEvidenceSlotsLeft = computed(() =>
-  Math.max(0, MAX_COMPLAINT_ATTACHMENTS - complaintEvidenceAttachments.value.length));
+  Math.max(0, PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT - complaintEvidenceAttachments.value.length));
 
 const heroActions = computed(() => {
   if (!order.value) {
@@ -666,7 +663,7 @@ async function handleComplaintEvidenceChange(event: Event) {
   }
 
   const validFiles = limitedFiles.filter((file) =>
-    (!file.type || file.type.startsWith('image/')) && file.size <= MAX_COMPLAINT_ATTACHMENT_SIZE);
+    (!file.type || file.type.startsWith('image/')) && file.size <= PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_BYTES);
   if (validFiles.length < limitedFiles.length) {
     ElMessage.warning('仅支持上传不超过 8 MB 的图片文件');
   }
@@ -679,7 +676,7 @@ async function handleComplaintEvidenceChange(event: Event) {
   try {
     for (const file of validFiles) {
       const uploaded = await uploadAttachmentFile(file, {
-        tag1: 'petpal-order-complaint',
+        tag1: PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
         tag2: order.value.id,
       });
 

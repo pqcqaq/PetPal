@@ -1,3 +1,4 @@
+import type { ManagedAttachmentRecord } from './files';
 import type { PaginatedResult } from './common';
 
 export type PetSpecies = 'DOG' | 'CAT' | 'OTHER';
@@ -58,6 +59,10 @@ export type ServiceLogType =
 export type ComplaintTargetRole = 'CAREGIVER' | 'PLATFORM';
 export type ComplaintType = 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
 export type ComplaintStatus = 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
+export const PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG = 'petpal-order-complaint';
+export const PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT = 3;
+export const PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB = 8;
+export const PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_BYTES = PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB * 1024 * 1024;
 export type ComplaintActionType =
   | 'OPEN'
   | 'ASSIGN'
@@ -649,14 +654,7 @@ export interface PenaltyAdminPage {
   };
 }
 
-export interface PenaltyRectifyMaterialRecord {
-  fileId: string;
-  url: string;
-  name: string;
-  mimeType: string;
-  size: number;
-  uploadedAt: string;
-}
+export interface PenaltyRectifyMaterialRecord extends ManagedAttachmentRecord {}
 
 export interface RectifyPenaltyPayload {
   rectifyStatus: Exclude<PenaltyRectifyStatus, 'PENDING'>;
@@ -850,14 +848,7 @@ export interface MatchedCaregiverRecord {
 
 export type MatchedCaregiverPage = PaginatedResult<MatchedCaregiverRecord>;
 
-export interface CaregiverQualificationMaterialRecord {
-  fileId: string;
-  url: string;
-  name: string;
-  mimeType: string;
-  size: number;
-  uploadedAt: string;
-}
+export interface CaregiverQualificationMaterialRecord extends ManagedAttachmentRecord {}
 
 export interface CaregiverProfileRecord {
   id: string;
