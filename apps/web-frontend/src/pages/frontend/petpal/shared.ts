@@ -84,6 +84,15 @@ export const petPalComplaintStatusOptions: Array<{ label: string; value: Complai
   { label: '已驳回', value: 'REJECTED' },
 ];
 
+export const petPalComplaintSlaStatusOptions: Array<{
+  label: string;
+  value: ComplaintAdminSlaStatus;
+}> = [
+  { label: 'SLA正常', value: 'NORMAL' },
+  { label: '即将超时', value: 'DUE_SOON' },
+  { label: '投诉已超时', value: 'OVERDUE' },
+];
+
 export const petPalRefundTypeOptions: Array<{ label: string; value: RefundType }> = [
   { label: '全额退款', value: 'FULL' },
   { label: '部分退款', value: 'PARTIAL' },

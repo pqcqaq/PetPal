@@ -7874,6 +7874,51 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.203 2026-04-03（P3-M1 Slice 203）
+
+**概述**：上一轮已经把投诉 SLA 接进收益摘要、风险队列和经营导出 query，但导出表单仍只能依赖快捷预设或“导出同类风险”隐式带入条件。本轮把这个缺口补齐，让照料者可以在收益页直接手动选择投诉 SLA 口径，避免为了一次简单筛选还要先切风险视角。
+
+已完成：
+
+- 收益导出表单补齐投诉 SLA 手动筛选：
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - 新增 `petPalComplaintSlaStatusOptions`，统一维护 `NORMAL / DUE_SOON / OVERDUE` 的表单选项顺序和文案。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 经营导出工具条新增“投诉 SLA”下拉，可直接筛选 `SLA正常 / 即将超时 / 投诉已超时`。
+    - 表单提示文案同步补充投诉 SLA 口径，避免用户误以为该维度只能走风险快捷导出。
+    - 页面状态新增 `exportComplaintSlaStatus` 绑定，继续复用已有 snapshot / query / summary 链路，不引入额外局部状态。
+- 定向测试继续兜底：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 新增共享选项单测，锁定投诉 SLA 选项的顺序与标签，并校验与摘要标签 helper 一致。
+  - `apps/web-frontend/test/caregiver-earnings-export-state.test.ts`
+  - `apps/web-frontend/test/petpal-export-filter-summary.test.ts`
+    - 继续验证投诉 SLA 字段在导出 query 和摘要清理中的行为没有回退。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts ..\\web-frontend\\test\\petpal-export-filter-summary.test.ts ..\\web-frontend\\test\\petpal-shared.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+  - 保留既有的大 chunk warning，本轮未额外扩大构建风险。
+
+代码审计结论：
+
+- 本轮只是把既有 `complaintSlaStatus` 状态链路公开到表单层，没有新增第二套筛选状态，因此模板、最近一次筛选、命名模板和当前条件摘要仍然保持同一口径。
+- 已确认这次变更仍然只落在 Web 收益导出表单，不涉及后端接口、导出字段或主人侧导出页面。
+
+风险与缓解：
+
+- 风险：当前快捷风险预设仍只开放“已超时投诉”，没有补“即将超时投诉”，因此 SLA 手动筛选与快捷视角的覆盖面还不完全对齐。
+- 缓解：下一轮优先评估是否补 `dueSoonComplaint` 预设，并决定是否把其插入到当前风险动作区顺序中。
+
+下一步（1-3）：
+
+1. 继续评估是否追加“即将超时投诉”风险预设，让手动筛选与快捷导出覆盖面保持一致。
+2. 继续评估是否把投诉 SLA 选项定义进一步复用到后台投诉页，减少前后台各自手写选项文案。
+3. 在收益导出入口基本稳定后，再继续推进剩余验收向测试、审计收口与最终交付材料。
+
 ### 14.202 2026-04-03（P3-M1 Slice 202）
 
 **概述**：延续上一轮把风险预设说明文案收口到配置源后的状态，本轮继续补上真正缺失的 SLA 业务语义：照料者收益摘要里的风险订单现在会直接回传主投诉的 SLA 状态和截止时间，经营明细导出 query 也同步支持投诉 SLA 筛选，收益页因此可以新增“已超时投诉”风险视角，并在风险队列里直接高亮超时 / 即将超时信号，不再只靠投诉状态和投诉条数近似表达时效风险。

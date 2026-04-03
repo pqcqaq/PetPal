@@ -92,7 +92,7 @@
       <template v-else>
         <PetPalExportToolbar
           class="petpal-export-toolbar"
-          hint="导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按订单号关键词、退款金额门槛、最少投诉数、退款类型、退款状态、退款原因关键词、退款风险单、投诉状态、投诉类型、投诉摘要关键词或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。"
+          hint="导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按订单号关键词、退款金额门槛、最少投诉数、退款类型、退款状态、退款原因关键词、退款风险单、投诉状态、投诉SLA、投诉类型、投诉摘要关键词或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。"
         >
           <template #presets>
             <div class="petpal-export-toolbar__presets">
@@ -215,6 +215,19 @@
             >
               <el-option
                 v-for="item in petPalComplaintStatusOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+            <el-select
+              v-model="exportComplaintSlaStatus"
+              clearable
+              placeholder="导出全部投诉SLA"
+              class="petpal-export-toolbar__service"
+            >
+              <el-option
+                v-for="item in petPalComplaintSlaStatusOptions"
                 :key="item.value"
                 :label="item.label"
                 :value="item.value"
@@ -736,6 +749,7 @@ import {
   getPetPalOrderStatusLabel,
   getPetPalRefundStatusLabel,
   getPetPalRefundStatusType,
+  petPalComplaintSlaStatusOptions,
   petPalComplaintTargetOptions,
   getPetPalServiceTypeLabel,
   petPalComplaintStatusOptions,
@@ -1041,6 +1055,12 @@ const exportComplaintStatus = createPetPalClearableFieldBinding<ComplaintStatus 
   get: () => exportPageState.complaintStatus,
   set: (value) => {
     exportPageState.complaintStatus = value;
+  },
+});
+const exportComplaintSlaStatus = createPetPalClearableFieldBinding<ComplaintAdminSlaStatus | ''>({
+  get: () => exportPageState.complaintSlaStatus,
+  set: (value) => {
+    exportPageState.complaintSlaStatus = value;
   },
 });
 const exportComplaintType = createPetPalClearableFieldBinding<ComplaintType | ''>({
