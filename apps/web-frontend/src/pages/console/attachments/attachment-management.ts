@@ -1,5 +1,6 @@
 import type {
   MediaAssetRecord,
+  MediaAssetReferenceRecord,
   MediaAssetUpdatePayload,
   MediaAssetUploadStatus,
 } from '@rbac/api-common';
@@ -126,6 +127,27 @@ export const formatAttachmentSize = (value: number) => {
 
 export const formatAttachmentTagSummary = (record: MediaAssetRecord) =>
   [record.tag1, record.tag2].filter(Boolean).join(' / ') || '未设置';
+
+export const resolveAttachmentReferenceKindLabel = (kind: MediaAssetReferenceRecord['kind']) => {
+  if (kind === 'PETPAL_CAREGIVER_QUALIFICATION') {
+    return '照料者资质';
+  }
+
+  if (kind === 'PETPAL_PENALTY_RECTIFY') {
+    return '处罚整改';
+  }
+
+  return kind;
+};
+
+export const formatAttachmentReferenceSummary = (record: MediaAssetRecord) => {
+  if (record.referenceCount === 0) {
+    return '未引用';
+  }
+
+  const labels = [...new Set(record.references.map((reference) => resolveAttachmentReferenceKindLabel(reference.kind)))];
+  return `${record.referenceCount} 条引用 · ${labels.join(' / ')}`;
+};
 
 export const buildAttachmentFilterParams = (filters: AttachmentFilters) => ({
   q: filters.q || undefined,

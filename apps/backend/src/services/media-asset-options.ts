@@ -1,8 +1,13 @@
-import type { MediaAssetRecord, PaginatedMediaAssets } from '@rbac/api-common';
+import type {
+  MediaAssetRecord,
+  MediaAssetReferenceRecord,
+  PaginatedMediaAssets,
+} from '@rbac/api-common';
 import type { Request } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import type { Prisma } from '../lib/prisma-generated';
+import { resolveMediaAssetReferenceMap } from './media-asset-references';
 import { mediaAssetWithOwnerInclude, toMediaAssetRecord } from '../utils/file-records';
 import { parsePaginationInput } from '../utils/http';
 
@@ -22,6 +27,10 @@ export type MediaAssetSearchFilters = {
 type MediaAssetSearchOverrides = {
   defaults?: Partial<MediaAssetSearchFilters>;
   fixed?: Partial<MediaAssetSearchFilters>;
+};
+
+type MediaAssetListOptions = {
+  includeReferences?: boolean;
 };
 
 const trimText = (value: string | undefined) => value?.trim() ?? '';
@@ -188,7 +197,7 @@ export const listMediaAssets = async ({
   pageSize,
   skip,
   ...filters
-}: ReturnType<typeof parseMediaAssetSearchPayload>): Promise<PaginatedMediaAssets> => {
+}: ReturnType<typeof parseMediaAssetSearchPayload>, options?: MediaAssetListOptions): Promise<PaginatedMediaAssets> => {
   const where = buildMediaAssetWhere(filters);
   const total = await prisma.mediaAsset.count({ where });
   const assets = await prisma.mediaAsset.findMany({
@@ -198,9 +207,17 @@ export const listMediaAssets = async ({
     include: mediaAssetWithOwnerInclude,
     orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
   });
+  const includeReferences = options?.includeReferences ?? true;
+  const referenceMap: Map<string, MediaAssetReferenceRecord[]> = includeReferences
+    ? await resolveMediaAssetReferenceMap(assets.map((asset) => asset.id))
+    : new Map();
 
   return {
-    items: assets.map(toMediaAssetRecord),
+    items: assets.map((asset) =>
+      toMediaAssetRecord(asset, {
+        references: referenceMap.get(asset.id) ?? [],
+      }),
+    ),
     meta: { page, pageSize, total },
   };
 };
@@ -230,5 +247,5 @@ export const resolveMediaAssetsByIds = async (
     include: mediaAssetWithOwnerInclude,
   });
 
-  return orderResolvedItems(normalizedIds, assets).map(toMediaAssetRecord);
+  return orderResolvedItems(normalizedIds, assets).map((asset) => toMediaAssetRecord(asset));
 };

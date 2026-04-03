@@ -7882,6 +7882,70 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.222 2026-04-04（P3-M1 Slice 222）
+
+**概述**：上一轮已经把处罚整改材料切到真实附件实体，但附件中心仍不知道这些 JSON 快照里的 `fileId` 正在被业务使用，后台依然可能误删照料者资质材料或整改凭证。本轮继续沿现有附件治理链路补“业务引用感知”，让附件中心从“只能挡数据库外键”升级到“也能挡 PetPal JSON 业务引用”的更稳闭环。
+
+已完成：
+
+- 共享附件契约补齐业务引用元数据：
+  - `packages/api-common/src/types/files.ts`
+    - 新增 `MediaAssetReferenceKind`、`MediaAssetReferenceRecord`。
+    - `MediaAssetRecord` 新增 `referenceCount` 和 `references`，统一承载业务引用摘要。
+- 后端附件业务引用扫描与删除保护落地：
+  - `apps/backend/src/services/media-asset-references.ts`
+    - 新增 PetPal 附件引用扫描服务，当前覆盖：
+      - `CaregiverProfile.qualificationMaterials`
+      - `PenaltyRecord.rectifyEvidenceMaterials`
+    - 会回填引用类型、实体 ID、标题和说明，供附件中心直接消费。
+  - `apps/backend/src/services/media-asset-options.ts`
+    - 附件列表查询已补引用汇总回填。
+  - `apps/backend/src/routes/attachments.ts`
+    - 附件详情 / 更新响应已补引用元数据。
+    - 删除前会先检查业务引用；若仍被 PetPal 业务记录引用，则直接拒绝删除。
+  - `apps/backend/src/utils/file-records.ts`
+    - 附件序列化已统一输出引用计数与引用列表。
+- 定向集成测试补齐：
+  - `apps/backend/test/integration/attachments.test.ts`
+    - 新增“照料者资质材料 + 处罚整改材料”双引用场景。
+    - 已覆盖附件列表 / 详情返回引用元数据，以及删除时的 400 拦截。
+- 控制台附件管理页已开始消费业务引用：
+  - `apps/web-frontend/src/pages/console/attachments/attachment-management.ts`
+    - 新增引用类型文案与摘要格式化 helper。
+  - `apps/web-frontend/src/pages/console/attachments/components/AttachmentsTable.vue`
+    - 列表新增引用列，显示引用计数与摘要。
+    - 已被引用附件在列表操作中直接禁删。
+  - `apps/web-frontend/src/pages/console/attachments/AttachmentsView.vue`
+    - 详情页新增“业务引用”区块，展示引用类型、实体 ID、标题和说明。
+    - 详情页删除动作和右键菜单删除动作已同步禁删并提示原因。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test test/integration/attachments.test.ts` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认附件中心现在不只依赖外键级删除保护，也能识别 PetPal JSON 快照里的 `fileId` 业务引用。
+- 已确认照料者资质材料与处罚整改材料两条链路都会把引用摘要透出到附件列表和详情，后台值班可以先看“谁在引用”，再决定是否处理业务记录。
+- 已确认未被引用的附件能力没有被回退，现有附件 CRUD、头像外键保护和图片选项接口继续可用。
+
+风险与缓解：
+
+- 风险：当前业务引用仍来自 JSON 快照扫描，不是数据库显式关系；随着引用来源继续增加，扫描规则需要同步维护。
+- 缓解：本轮先把引用扫描集中到单一服务里，后续新增 PetPal 附件引用点时只需要继续扩展该服务，不必把逻辑散在多个路由里。
+
+- 风险：当前仅拦截“已引用附件”的误删，尚未处理“已上传但最终没有被任何业务记录引用”的孤儿附件。
+- 缓解：后续可在现有附件清理链路上继续补“按上传时间窗口清理未引用附件”的回收策略，本轮先优先保证已引用材料不会被误删。
+
+下一步（1-3）：
+
+1. 继续补未引用整改附件和未引用资质材料的回收策略，避免后台试传后长期沉淀孤儿文件。
+2. 继续评估是否把高价值附件关系从 JSON 快照升级为显式关系表，减少后续引用扫描维护成本。
+3. 继续按切片节奏补更多附件业务引用来源，并保持定向测试、局部构建验证、本地提交和文档同步。
+
 ### 14.221 2026-04-04（P3-M1 Slice 221）
 
 **概述**：上一轮已经把整改材料复核补到根级后台，但整改材料本体仍然只是 URL 文本，后台无法确认链接是否对应真实附件，也无法直接展示文件元数据。本轮继续沿根级 `/petpal-admin` 治理工作区把处罚整改材料升级为附件化提交，让处罚治理从“材料可复核”推进到“材料来自真实上传实体、可直接展示附件元数据”的更稳闭环。

@@ -8,6 +8,10 @@ import { authMiddleware } from '../middlewares/auth';
 import { requirePermission } from '../middlewares/require-permission';
 import { normalizeMediaAssetTag } from '../services/file-upload';
 import {
+  formatMediaAssetReferenceBlockMessage,
+  listMediaAssetReferences,
+} from '../services/media-asset-references';
+import {
   buildMediaAssetWhere,
   listMediaAssets,
   parseMediaAssetSearchFilters,
@@ -40,6 +44,11 @@ const normalizeOriginalName = (value: string) => {
 
   return nextValue;
 };
+
+const toMediaAssetRecordWithReferences = async (asset: MediaAssetWithOwnerRecord) =>
+  toMediaAssetRecord(asset, {
+    references: await listMediaAssetReferences(asset.id),
+  });
 
 attachmentsRouter.use(authMiddleware);
 
@@ -92,6 +101,9 @@ const handleImageOptions = asyncHandler(async (req, res) => {
         mimePrefix: 'image/',
       },
     }),
+    {
+      includeReferences: false,
+    },
   );
 
   return ok(res, result, 'Attachment image options');
@@ -135,7 +147,7 @@ attachmentsRouter.get(
       throw notFound('Attachment not found');
     }
 
-    return ok(res, toMediaAssetRecord(asset), 'Attachment detail');
+    return ok(res, await toMediaAssetRecordWithReferences(asset), 'Attachment detail');
   }),
 );
 
@@ -167,7 +179,7 @@ attachmentsRouter.put(
       include: mediaAssetWithOwnerInclude,
     }) as MediaAssetWithOwnerRecord;
 
-    return ok(res, toMediaAssetRecord(asset), 'Attachment updated');
+    return ok(res, await toMediaAssetRecordWithReferences(asset), 'Attachment updated');
   }),
 );
 
@@ -183,6 +195,11 @@ attachmentsRouter.delete(
 
     if (!asset) {
       throw notFound('Attachment not found');
+    }
+
+    const references = await listMediaAssetReferences(asset.id);
+    if (references.length > 0) {
+      throw badRequest(formatMediaAssetReferenceBlockMessage(references));
     }
 
     await assertPrismaDeleteAllowed('MediaAsset', 'delete', {

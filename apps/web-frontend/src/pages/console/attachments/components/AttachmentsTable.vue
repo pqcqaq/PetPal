@@ -52,6 +52,16 @@
               </el-tag>
             </template>
           </el-table-column>
+          <el-table-column label="引用" min-width="180">
+            <template #default="{ row }">
+              <div class="attachment-reference-stack">
+                <el-tag :type="row.referenceCount > 0 ? 'danger' : 'success'" effect="light" round>
+                  {{ row.referenceCount > 0 ? `${row.referenceCount} 条引用` : '未引用' }}
+                </el-tag>
+                <span>{{ formatAttachmentReferenceSummary(row) }}</span>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column label="大小" width="120">
             <template #default="{ row }">
               {{ formatAttachmentSize(row.size) }}
@@ -72,6 +82,7 @@
                   v-permission="'file.delete'"
                   link
                   type="danger"
+                  :disabled="row.referenceCount > 0"
                   @click="emit('delete', row)"
                 >
                   删除
@@ -101,6 +112,7 @@ import ContextMenuHost from '@/components/common/ContextMenuHost.vue';
 import type { ContextMenuItem } from '@/components/common/context-menu';
 import {
   formatAttachmentSize,
+  formatAttachmentReferenceSummary,
   resolveAttachmentKindLabel,
   resolveAttachmentStatusLabel,
   resolveAttachmentStatusType,
@@ -148,5 +160,16 @@ const contextMenuSourceItems = computed(() => props.contextMenuItems as unknown 
 .attachment-owner span {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+.attachment-reference-stack {
+  display: grid;
+  gap: 6px;
+}
+
+.attachment-reference-stack span {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.4;
 }
 </style>

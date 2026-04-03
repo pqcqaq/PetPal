@@ -45,6 +45,17 @@ export interface MediaAssetOwnerSummary {
   nickname: string;
 }
 
+export type MediaAssetReferenceKind =
+  | 'PETPAL_CAREGIVER_QUALIFICATION'
+  | 'PETPAL_PENALTY_RECTIFY';
+
+export interface MediaAssetReferenceRecord {
+  kind: MediaAssetReferenceKind;
+  entityId: string;
+  title: string;
+  note: string;
+}
+
 export interface MediaAssetRecord {
   id: string;
   userId: string;
@@ -65,6 +76,8 @@ export interface MediaAssetRecord {
   createdAt: string;
   updatedAt: string;
   owner: MediaAssetOwnerSummary;
+  referenceCount: number;
+  references: MediaAssetReferenceRecord[];
 }
 
 export interface MediaAssetUpdatePayload {

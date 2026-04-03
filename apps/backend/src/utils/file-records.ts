@@ -1,4 +1,4 @@
-import type { MediaAssetRecord } from '@rbac/api-common';
+import type { MediaAssetRecord, MediaAssetReferenceRecord } from '@rbac/api-common';
 import type { MediaAsset, Prisma, User } from '../lib/prisma-generated';
 
 export const mediaAssetWithOwnerInclude = {
@@ -21,28 +21,41 @@ export type MediaAssetWithOwnerRecord = MediaAsset & {
   user: MediaAssetOwnerSummary;
 };
 
-export const toMediaAssetRecord = (asset: MediaAssetWithOwner | MediaAssetWithOwnerRecord): MediaAssetRecord => ({
-  id: asset.id,
-  userId: asset.userId,
-  kind: asset.kind,
-  originalName: asset.originalName,
-  mimeType: asset.mimeType,
-  size: Number(asset.size),
-  storageProvider: asset.storageProvider === 'S3' ? 's3' : 'local',
-  storageBucket: asset.storageBucket,
-  objectKey: asset.objectKey,
-  uploadStatus: asset.uploadStatus,
-  uploadStrategy: asset.uploadStrategy === 'CHUNKED' ? 'chunked' : 'single',
-  tag1: asset.tag1,
-  tag2: asset.tag2,
-  etag: asset.etag,
-  url: asset.url,
-  completedAt: asset.completedAt?.toISOString() ?? null,
-  createdAt: asset.createdAt.toISOString(),
-  updatedAt: asset.updatedAt.toISOString(),
-  owner: {
-    id: asset.user.id,
-    username: asset.user.username,
-    nickname: asset.user.nickname,
-  },
-});
+type MediaAssetRecordOptions = {
+  references?: MediaAssetReferenceRecord[];
+};
+
+export const toMediaAssetRecord = (
+  asset: MediaAssetWithOwner | MediaAssetWithOwnerRecord,
+  options?: MediaAssetRecordOptions,
+): MediaAssetRecord => {
+  const references = options?.references ?? [];
+
+  return {
+    id: asset.id,
+    userId: asset.userId,
+    kind: asset.kind,
+    originalName: asset.originalName,
+    mimeType: asset.mimeType,
+    size: Number(asset.size),
+    storageProvider: asset.storageProvider === 'S3' ? 's3' : 'local',
+    storageBucket: asset.storageBucket,
+    objectKey: asset.objectKey,
+    uploadStatus: asset.uploadStatus,
+    uploadStrategy: asset.uploadStrategy === 'CHUNKED' ? 'chunked' : 'single',
+    tag1: asset.tag1,
+    tag2: asset.tag2,
+    etag: asset.etag,
+    url: asset.url,
+    completedAt: asset.completedAt?.toISOString() ?? null,
+    createdAt: asset.createdAt.toISOString(),
+    updatedAt: asset.updatedAt.toISOString(),
+    owner: {
+      id: asset.user.id,
+      username: asset.user.username,
+      nickname: asset.user.nickname,
+    },
+    referenceCount: references.length,
+    references,
+  };
+};

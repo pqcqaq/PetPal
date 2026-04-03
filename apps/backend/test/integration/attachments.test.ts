@@ -20,6 +20,148 @@ let context: BackendTestContext;
 
 const resolveUploadPath = (objectKey: string) => path.resolve(process.cwd(), 'uploads', objectKey);
 
+const loadManagedAttachmentMaterial = async (fileId: string) => {
+  const asset = await context.prismaRaw.mediaAsset.findUnique({
+    where: { id: fileId },
+    select: {
+      id: true,
+      originalName: true,
+      mimeType: true,
+      size: true,
+      url: true,
+      createdAt: true,
+    },
+  });
+
+  assert.ok(asset);
+  assert.ok(asset.url);
+
+  return {
+    fileId: asset.id,
+    url: asset.url,
+    name: asset.originalName,
+    mimeType: asset.mimeType,
+    size: Number(asset.size),
+    uploadedAt: asset.createdAt.toISOString(),
+  };
+};
+
+const createPenaltyReferenceScenario = async (input: {
+  targetUserId: string;
+  rectifyMaterial: {
+    fileId: string;
+    url: string;
+    name: string;
+    mimeType: string;
+    size: number;
+    uploadedAt: string;
+  };
+}) => {
+  const { app, prisma } = context;
+  const ownerSession = await loginAs(app, 'user', 'User123!');
+  const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
+  const pet = await prisma.petProfile.findFirst({
+    where: {
+      ownerId: ownerSession.user.id,
+    },
+    select: {
+      id: true,
+    },
+  });
+  const caregiverProfile = await prisma.caregiverProfile.findFirst({
+    where: {
+      userId: caregiverSession.user.id,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  assert.ok(pet);
+  assert.ok(caregiverProfile);
+
+  const suffix = Date.now().toString(36);
+  const requestRecord = await prisma.serviceRequest.create({
+    data: {
+      id: `req-attachment-reference-${suffix}`,
+      ownerId: ownerSession.user.id,
+      petId: pet.id,
+      serviceType: 'WALKING',
+      startTime: new Date('2026-04-03T09:00:00.000Z'),
+      endTime: new Date('2026-04-03T10:00:00.000Z'),
+      locationText: `杭州市滨江区附件治理测试-${suffix}`,
+      budgetAmount: 88,
+      demandTags: ['attachment-governance', suffix],
+      status: 'MATCHED',
+      matchedCaregiverId: caregiverProfile.id,
+    },
+  });
+
+  const order = await prisma.orderMain.create({
+    data: {
+      id: `order-attachment-reference-${suffix}`,
+      orderNo: `PP-ATTACH-${Date.now()}`,
+      ownerId: ownerSession.user.id,
+      caregiverId: caregiverProfile.id,
+      serviceRequestId: requestRecord.id,
+      serviceType: 'WALKING',
+      appointmentStart: new Date('2026-04-03T09:00:00.000Z'),
+      appointmentEnd: new Date('2026-04-03T10:00:00.000Z'),
+      amountTotal: 88,
+      amountAdjusted: 0,
+      amountPaid: 88,
+      amountRefunded: 0,
+      orderStatus: 'SERVING',
+    },
+  });
+
+  const complaint = await prisma.complaint.create({
+    data: {
+      id: `complaint-attachment-reference-${suffix}`,
+      orderId: order.id,
+      complainantId: ownerSession.user.id,
+      targetRole: 'CAREGIVER',
+      complaintType: 'SERVICE',
+      description: `处罚整改附件引用治理测试 ${suffix}`,
+      evidenceUrls: ['https://example.com/evidence/attachment-reference'],
+      status: 'PROCESSING',
+    },
+  });
+
+  const penalty = await prisma.penaltyRecord.create({
+    data: {
+      id: `penalty-attachment-reference-${suffix}`,
+      complaintId: complaint.id,
+      orderId: order.id,
+      targetRole: 'CAREGIVER',
+      targetUserId: input.targetUserId,
+      penaltyType: 'SERVICE_RESTRICTION',
+      severity: 'HIGH',
+      reason: `处罚整改附件引用治理测试 ${suffix}`,
+      actionSummary: '限制接单并要求补交整改材料',
+      rectifyStatus: 'COMPLETED',
+      rectifyNote: '已补交整改材料',
+      rectifiedAt: new Date('2026-04-04T08:30:00.000Z'),
+      rectifyEvidenceUrls: [input.rectifyMaterial.url],
+      rectifyEvidenceMaterials: [input.rectifyMaterial],
+      rectifyReviewStatus: 'PENDING',
+    },
+    select: {
+      id: true,
+      order: {
+        select: {
+          orderNo: true,
+        },
+      },
+    },
+  });
+
+  return {
+    penaltyId: penalty.id,
+    orderNo: penalty.order.orderNo,
+  };
+};
+
 const waitForFileRemoval = async (filePath: string) => {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
@@ -261,6 +403,134 @@ describe('Attachment integration', () => {
       resolved.body.data.map((item: { id: string }) => item.id),
       [avatarUpload.fileId, imageUpload.fileId],
     );
+  });
+
+  it('surfaces PetPal business references and blocks deleting referenced attachments', async () => {
+    const { app } = context;
+    const adminSession = await loginAs(app, 'admin@example.com', 'Admin123!');
+    const managerSession = await loginAs(app, 'manager', 'Manager123!');
+    const managerUser = await context.prismaRaw.user.findUnique({
+      where: { id: managerSession.user.id },
+      select: {
+        nickname: true,
+        username: true,
+      },
+    });
+
+    assert.ok(managerUser);
+
+    const tag1 = `slice-222-${Date.now().toString(36)}`;
+    const qualificationUpload = await uploadManagedFileForTest(app, {
+      accessToken: adminSession.tokens.accessToken,
+      fileName: 'caregiver-qualification.jpg',
+      contentType: 'image/jpeg',
+      content: 'caregiver-qualification-content',
+      kind: 'attachment',
+      tag1,
+      tag2: 'caregiver-qualification',
+    });
+    const penaltyUpload = await uploadManagedFileForTest(app, {
+      accessToken: adminSession.tokens.accessToken,
+      fileName: 'penalty-rectify.jpg',
+      contentType: 'image/jpeg',
+      content: 'penalty-rectify-content',
+      kind: 'attachment',
+      tag1,
+      tag2: 'penalty-rectify',
+    });
+    const freeUpload = await uploadManagedFileForTest(app, {
+      accessToken: adminSession.tokens.accessToken,
+      fileName: 'free-attachment.txt',
+      contentType: 'text/plain',
+      content: 'free-attachment-content',
+      kind: 'attachment',
+      tag1,
+      tag2: 'free',
+    });
+
+    const qualificationMaterial = await loadManagedAttachmentMaterial(qualificationUpload.fileId);
+    const rectifyMaterial = await loadManagedAttachmentMaterial(penaltyUpload.fileId);
+
+    const caregiverProfile = await context.prismaRaw.caregiverProfile.update({
+      where: {
+        userId: managerSession.user.id,
+      },
+      data: {
+        qualificationMaterials: [qualificationMaterial],
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const penaltyReference = await createPenaltyReferenceScenario({
+      targetUserId: managerSession.user.id,
+      rectifyMaterial,
+    });
+
+    const listResponse = await request(app)
+      .get('/api/attachments')
+      .query({
+        page: 1,
+        pageSize: 10,
+        tag1,
+      })
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(listResponse.body.data.meta.total, 3);
+
+    const qualificationItem = listResponse.body.data.items.find(
+      (item: { id: string }) => item.id === qualificationUpload.fileId,
+    );
+    const penaltyItem = listResponse.body.data.items.find(
+      (item: { id: string }) => item.id === penaltyUpload.fileId,
+    );
+    const freeItem = listResponse.body.data.items.find(
+      (item: { id: string }) => item.id === freeUpload.fileId,
+    );
+
+    assert.ok(qualificationItem);
+    assert.ok(penaltyItem);
+    assert.ok(freeItem);
+    assert.equal(qualificationItem.referenceCount, 1);
+    assert.equal(qualificationItem.references[0].kind, 'PETPAL_CAREGIVER_QUALIFICATION');
+    assert.equal(qualificationItem.references[0].entityId, caregiverProfile.id);
+    assert.match(qualificationItem.references[0].note, /照料者资质材料/);
+    assert.match(qualificationItem.references[0].note, new RegExp(managerUser.username));
+    assert.equal(penaltyItem.referenceCount, 1);
+    assert.equal(penaltyItem.references[0].kind, 'PETPAL_PENALTY_RECTIFY');
+    assert.equal(penaltyItem.references[0].entityId, penaltyReference.penaltyId);
+    assert.match(penaltyItem.references[0].note, /处罚整改凭证/);
+    assert.match(penaltyItem.references[0].title, new RegExp(penaltyReference.orderNo));
+    assert.equal(freeItem.referenceCount, 0);
+    assert.deepEqual(freeItem.references, []);
+
+    const detailResponse = await request(app)
+      .get(`/api/attachments/${qualificationUpload.fileId}`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(detailResponse.body.data.referenceCount, 1);
+    assert.equal(detailResponse.body.data.references[0].kind, 'PETPAL_CAREGIVER_QUALIFICATION');
+    assert.equal(detailResponse.body.data.references[0].entityId, caregiverProfile.id);
+    assert.match(detailResponse.body.data.references[0].title, new RegExp(managerUser.nickname));
+
+    const blockedQualificationDelete = await request(app)
+      .delete(`/api/attachments/${qualificationUpload.fileId}`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(400);
+
+    assert.match(blockedQualificationDelete.body.message, /Attachment is still referenced by business records/);
+    assert.match(blockedQualificationDelete.body.message, /照料者资质材料/);
+
+    const blockedPenaltyDelete = await request(app)
+      .delete(`/api/attachments/${penaltyUpload.fileId}`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(400);
+
+    assert.match(blockedPenaltyDelete.body.message, /Attachment is still referenced by business records/);
+    assert.match(blockedPenaltyDelete.body.message, new RegExp(penaltyReference.orderNo));
   });
 
   it('blocks deleting avatar images that are still referenced by users', async () => {

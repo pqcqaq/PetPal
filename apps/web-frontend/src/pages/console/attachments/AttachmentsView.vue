@@ -102,7 +102,7 @@
       v-else-if="isDetailMode"
       caption="附件详情"
       title="文件属性与访问地址"
-      description="详情页只展示文件本身、标签和访问地址，不再用抽屉堆叠信息。"
+      description="详情页展示文件属性、业务引用和访问地址，删除风险在这里一次说清。"
     >
       <div v-loading="panelLoading" class="detail-stack">
         <template v-if="selectedAttachment">
@@ -123,7 +123,15 @@
                 <el-button v-if="selectedAttachment.url" link @click="openAttachmentLink(selectedAttachment)">打开附件</el-button>
                 <el-button v-if="selectedAttachment.url" link @click="copyAttachmentLink(selectedAttachment)">复制链接</el-button>
                 <el-button v-if="canEdit" link @click="openEditById">编辑标签</el-button>
-                <el-button v-if="canDelete" link type="danger" @click="removeAttachment(selectedAttachment)">删除</el-button>
+                <el-button
+                  v-if="canDelete"
+                  link
+                  type="danger"
+                  :disabled="selectedAttachment.referenceCount > 0"
+                  @click="removeAttachment(selectedAttachment)"
+                >
+                  删除
+                </el-button>
               </el-space>
             </div>
 
@@ -169,6 +177,32 @@
                 <strong>{{ selectedAttachment.objectKey }}</strong>
               </div>
             </div>
+          </section>
+
+          <section class="detail-section">
+            <div class="detail-section__header">
+              <div>
+                <p class="panel-caption">References</p>
+                <h3 class="panel-heading panel-heading--md">业务引用</h3>
+              </div>
+            </div>
+            <div v-if="selectedAttachment.references.length" class="detail-reference-list">
+              <article
+                v-for="reference in selectedAttachment.references"
+                :key="`${reference.kind}-${reference.entityId}`"
+                class="detail-reference-card"
+              >
+                <div class="detail-reference-card__meta">
+                  <el-tag type="danger" effect="light" round>
+                    {{ resolveAttachmentReferenceKindLabel(reference.kind) }}
+                  </el-tag>
+                  <span>{{ reference.entityId }}</span>
+                </div>
+                <strong>{{ reference.title }}</strong>
+                <p>{{ reference.note }}</p>
+              </article>
+            </div>
+            <el-empty v-else description="当前附件暂无业务引用，可按规则删除。" />
           </section>
 
           <section class="detail-section">
@@ -232,8 +266,10 @@ import {
   createEmptyAttachmentEditorForm,
   createEmptyAttachmentUploadForm,
   formatAttachmentSize,
+  formatAttachmentReferenceSummary,
   formatAttachmentTagSummary,
   resolveAttachmentKindLabel,
+  resolveAttachmentReferenceKindLabel,
   resolveAttachmentStatusLabel,
   resolveAttachmentStatusType,
   validateAttachmentEditorForm,
@@ -308,12 +344,14 @@ const pageStats = computed(() => {
   const attachmentCount = attachments.value.filter((item) => item.kind === 'attachment').length;
   const avatarCount = attachments.value.filter((item) => item.kind === 'avatar').length;
   const taggedCount = attachments.value.filter((item) => item.tag1 || item.tag2).length;
+  const referencedCount = attachments.value.filter((item) => item.referenceCount > 0).length;
 
   return [
     { label: '附件总数', value: total.value },
     { label: '当前页附件', value: attachmentCount },
     { label: '当前页头像', value: avatarCount },
     { label: '已标记', value: taggedCount },
+    { label: '存在引用', value: referencedCount },
   ];
 });
 
@@ -334,10 +372,11 @@ const screenHeader = computed(() => {
     return {
       caption: 'Attachment Detail',
       title: selectedAttachment.value.originalName,
-      description: '详情页只展示文件属性、标签和访问地址。',
+      description: '详情页展示文件属性、业务引用和访问地址。',
       meta: [
         { label: '文件状态', value: resolveAttachmentStatusLabel(selectedAttachment.value.uploadStatus) },
         { label: '标签摘要', value: formatAttachmentTagSummary(selectedAttachment.value) },
+        { label: '业务引用', value: formatAttachmentReferenceSummary(selectedAttachment.value) },
       ],
     };
   }
@@ -585,6 +624,11 @@ const copyAttachmentLink = async (row: MediaAssetRecord) => {
 };
 
 const removeAttachment = async (row: MediaAssetRecord) => {
+  if (row.referenceCount > 0) {
+    ElMessage.warning(`该附件仍被 ${row.referenceCount} 条业务记录引用，暂不能删除`);
+    return;
+  }
+
   try {
     await ElMessageBox.confirm(
       `确定删除附件“${row.originalName}”吗？`,
@@ -645,6 +689,7 @@ const attachmentContextMenuItems = [
     key: 'delete',
     label: '删除附件',
     hidden: () => !canDelete.value,
+    disabled: (row) => row.referenceCount > 0,
     danger: true,
     onSelect: (row) => removeAttachment(row),
   },
@@ -652,7 +697,9 @@ const attachmentContextMenuItems = [
     key: 'summary',
     label: '查看摘要',
     onSelect: (row) => {
-      ElMessage.info(`${resolveAttachmentKindLabel(row.kind)} · ${resolveAttachmentStatusLabel(row.uploadStatus)} · ${formatAttachmentTagSummary(row)}`);
+      ElMessage.info(
+        `${resolveAttachmentKindLabel(row.kind)} · ${resolveAttachmentStatusLabel(row.uploadStatus)} · ${formatAttachmentTagSummary(row)} · ${formatAttachmentReferenceSummary(row)}`,
+      );
     },
   },
 ] satisfies ContextMenuItem<MediaAssetRecord>[];
@@ -757,5 +804,42 @@ onMounted(async () => {
   background: var(--surface-1);
   word-break: break-all;
   color: var(--ink-2);
+}
+
+.detail-reference-list {
+  display: grid;
+  gap: 12px;
+}
+
+.detail-reference-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  background: var(--surface-1);
+}
+
+.detail-reference-card strong {
+  color: var(--ink-1);
+}
+
+.detail-reference-card p {
+  margin: 0;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+.detail-reference-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.detail-reference-card__meta span {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
 }
 </style>
