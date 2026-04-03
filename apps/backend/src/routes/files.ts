@@ -4,6 +4,7 @@ import {
   PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
   PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
   PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
+  PETPAL_SERVICE_LOG_ATTACHMENT_TAG,
 } from '@rbac/api-common';
 import { getRootPrismaRawClient, prisma } from '../lib/prisma';
 import { authMiddleware } from '../middlewares/auth';
@@ -44,7 +45,7 @@ const isPetpalServiceLogUpload = (input: {
   tag1?: string | null;
   tag2?: string | null;
 }) => input.kind === 'attachment'
-  && input.tag1 === 'petpal-service-log'
+  && input.tag1 === PETPAL_SERVICE_LOG_ATTACHMENT_TAG
   && Boolean(input.tag2?.trim());
 
 const isPetpalCaregiverQualificationUpload = (input: {

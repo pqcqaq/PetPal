@@ -2,6 +2,8 @@ import {
   PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
   PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
   PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
+  PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE,
+  PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG,
 } from '@rbac/api-common';
 import { env } from '../../config/env';
 import { prisma } from '../../lib/prisma';
@@ -51,8 +53,8 @@ const listCleanupTargets = async (cutoff: Date, batchSize: number) =>
               tag1: PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
             },
             {
-              tag1: 'petpal-penalty',
-              tag2: 'rectify',
+              tag1: PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG,
+              tag2: PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE,
             },
           ],
         },

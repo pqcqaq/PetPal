@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it } from 'node:test';
+import {
+  PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE,
+  PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG,
+} from '@rbac/api-common';
 import request from 'supertest';
 import {
   bootstrapBackendTestContext,
@@ -184,8 +188,8 @@ const uploadRectifyEvidenceFiles = async (
         contentType: file.contentType,
         content: file.content,
         kind: 'attachment',
-        tag1: 'petpal-penalty',
-        tag2: 'rectify',
+        tag1: PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG,
+        tag2: PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE,
       }),
     );
   }

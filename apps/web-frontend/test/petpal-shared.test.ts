@@ -11,6 +11,10 @@ import {
   PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_MB,
   PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
   PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
+  PETPAL_PENALTY_RECTIFY_ATTACHMENT_MAX_COUNT,
+  PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE,
+  PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG,
+  PETPAL_SERVICE_LOG_ATTACHMENT_TAG,
 } from '@rbac/api-common';
 import {
   getPetPalCaregiverAuditLabel,
@@ -57,4 +61,11 @@ test('exposes stable message and caregiver attachment governance constants for s
   assert.equal(PETPAL_CAREGIVER_QUALIFICATION_UPLOAD_MAX_COUNT, 3);
   assert.equal(PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT, 12);
   assert.equal(PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_MB, 8);
+});
+
+test('exposes stable service log and penalty attachment governance constants for shared uploads', () => {
+  assert.equal(PETPAL_SERVICE_LOG_ATTACHMENT_TAG, 'petpal-service-log');
+  assert.equal(PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG, 'petpal-penalty');
+  assert.equal(PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE, 'rectify');
+  assert.equal(PETPAL_PENALTY_RECTIFY_ATTACHMENT_MAX_COUNT, 10);
 });

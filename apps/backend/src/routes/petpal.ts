@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { PETPAL_PENALTY_RECTIFY_ATTACHMENT_MAX_COUNT } from '@rbac/api-common';
 import { authMiddleware } from '../middlewares/auth';
 import { requireAnyPermission, requirePermission } from '../middlewares/require-permission';
 import { asyncHandler, ok, parsePagination } from '../utils/http';
@@ -291,7 +292,8 @@ const adminPenaltyStatsQuerySchema = adminPenaltyQuerySchema.omit({
 const adminPenaltyRectifySchema = z.object({
   rectifyStatus: z.enum(['COMPLETED', 'WAIVED']),
   rectifyNote: z.string().trim().min(1).max(1000),
-  rectifyEvidenceFileIds: z.array(z.string().trim().min(1).max(64)).max(10).optional(),
+  rectifyEvidenceFileIds:
+    z.array(z.string().trim().min(1).max(64)).max(PETPAL_PENALTY_RECTIFY_ATTACHMENT_MAX_COUNT).optional(),
 });
 
 const adminPenaltyAppealSchema = z.object({

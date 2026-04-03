@@ -7,6 +7,8 @@ import {
   PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
   PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
   PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
+  PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE,
+  PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG,
 } from '@rbac/api-common';
 import request from 'supertest';
 import {
@@ -806,8 +808,8 @@ describe('Attachment integration', () => {
       contentType: 'image/jpeg',
       content: 'stale-penalty-rectify-content',
       kind: 'attachment',
-      tag1: 'petpal-penalty',
-      tag2: 'rectify',
+      tag1: PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG,
+      tag2: PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE,
     });
     const referencedPenaltyUpload = await uploadManagedFileForTest(app, {
       accessToken: adminSession.tokens.accessToken,
@@ -815,8 +817,8 @@ describe('Attachment integration', () => {
       contentType: 'image/jpeg',
       content: 'referenced-penalty-rectify-content',
       kind: 'attachment',
-      tag1: 'petpal-penalty',
-      tag2: 'rectify',
+      tag1: PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG,
+      tag2: PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE,
     });
     const orphanComplaintUpload = await uploadManagedFileForTest(app, {
       accessToken: ownerSession.tokens.accessToken,

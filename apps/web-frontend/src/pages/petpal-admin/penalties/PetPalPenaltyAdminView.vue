@@ -559,6 +559,11 @@ import type {
 import { ElMessage } from 'element-plus';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import {
+  PETPAL_PENALTY_RECTIFY_ATTACHMENT_MAX_COUNT,
+  PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE,
+  PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG,
+} from '@rbac/api-common';
 import { api } from '@/api/client';
 import { usePageState } from '@/composables/use-page-state';
 import { uploadAttachmentFile } from '@/utils/direct-upload';
@@ -853,7 +858,7 @@ const getRectifyReviewHint = (record: PenaltyAdminRecord) => {
   return '当前整改无需复核。';
 };
 
-const RECTIFY_MATERIAL_LIMIT = 10;
+const RECTIFY_MATERIAL_LIMIT = PETPAL_PENALTY_RECTIFY_ATTACHMENT_MAX_COUNT;
 
 const toRectifyMaterialRecord = (detail: MediaAssetRecord): PenaltyRectifyMaterialRecord => {
   if (!detail.url) {
@@ -911,8 +916,8 @@ const uploadRectifyFiles = async (files: File[]) => {
       const uploaded = await uploadAttachmentFile(
         file,
         {
-          tag1: 'petpal-penalty',
-          tag2: 'rectify',
+          tag1: PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG,
+          tag2: PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE,
         },
       );
       const detail = await api.attachments.detail(uploaded.fileId);

@@ -4,6 +4,7 @@ import {
   PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
   PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
   PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
+  PETPAL_SERVICE_LOG_ATTACHMENT_TAG,
 } from '@rbac/api-common';
 import request from 'supertest';
 import {
@@ -151,7 +152,7 @@ describe('File upload integration', () => {
         fileName: 'wrong-order.jpg',
         contentType: 'image/jpeg',
         size: 128,
-        tag1: 'petpal-service-log',
+        tag1: PETPAL_SERVICE_LOG_ATTACHMENT_TAG,
         tag2: 'order-not-owned',
       })
       .expect(403);
@@ -166,7 +167,7 @@ describe('File upload integration', () => {
         fileName: 'petpal-service.jpg',
         contentType: 'image/jpeg',
         size: Buffer.byteLength('petpal-service-binary'),
-        tag1: 'petpal-service-log',
+        tag1: PETPAL_SERVICE_LOG_ATTACHMENT_TAG,
         tag2: order.id,
       })
       .expect(200);
@@ -227,7 +228,7 @@ describe('File upload integration', () => {
     assert.ok(asset);
     assert.equal(asset.userId, memberSession.user.id);
     assert.equal(asset.kind, 'attachment');
-    assert.equal(asset.tag1, 'petpal-service-log');
+    assert.equal(asset.tag1, PETPAL_SERVICE_LOG_ATTACHMENT_TAG);
     assert.equal(asset.tag2, order.id);
     assert.equal(asset.uploadStatus, 'COMPLETED');
     assert.equal(asset.url, uploaded.url);

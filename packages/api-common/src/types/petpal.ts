@@ -56,6 +56,7 @@ export type ServiceLogType =
   | 'HEALTH'
   | 'CHECK_OUT'
   | 'NOTE';
+export const PETPAL_SERVICE_LOG_ATTACHMENT_TAG = 'petpal-service-log';
 export type ComplaintTargetRole = 'CAREGIVER' | 'PLATFORM';
 export type ComplaintType = 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
 export type ComplaintStatus = 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
@@ -73,6 +74,9 @@ export const PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG = 'petpal-order-complaint';
 export const PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT = 3;
 export const PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB = 8;
 export const PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_BYTES = PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB * 1024 * 1024;
+export const PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG = 'petpal-penalty';
+export const PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE = 'rectify';
+export const PETPAL_PENALTY_RECTIFY_ATTACHMENT_MAX_COUNT = 10;
 export type ComplaintActionType =
   | 'OPEN'
   | 'ASSIGN'
