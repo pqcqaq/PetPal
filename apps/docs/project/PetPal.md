@@ -7874,6 +7874,51 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.211 2026-04-03（P3-M1 Slice 211）
+
+**概述**：route query 基础桥接层共享之后，后台治理页里还保留着另一组同构重复：`hydrateStateFromRoute()` 在四个页面里分别用 `includes()` 或 `options.some()` 校验 query 值是否合法，再配合类型断言写回筛选状态。这种逻辑小而散，继续复制只会放大维护噪音。本轮把这组“option value 合法性判断”提炼成共享 type guard，让后台页的 query 恢复直接基于选项源完成类型收窄。
+
+已完成：
+
+- 后台治理页开始复用共享 option-value helper：
+  - `apps/web-frontend/src/pages/petpal-admin/shared/option-value.ts`
+    - 新增 `hasSelectOptionValue`，统一基于 options 数组判断 query 值是否合法，同时把字符串值收窄为对应联合类型。
+  - `apps/web-frontend/src/pages/petpal-admin/callback-audits/PetPalCallbackAuditAdminView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/callback-alert-outbox/PetPalCallbackAlertOutboxAdminView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/caregiver-audits/PetPalCaregiverAuditAdminView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/complaints/PetPalComplaintAdminView.vue`
+    - 四页的 route query 恢复现在都直接复用共享 type guard，不再分别写 `some(...)`、`includes(...)` 和 `as ...` 断言。
+    - 投诉治理页的状态 / 类型 / 对象 / SLA 校验也已改成直接消费现有 admin option 源，不再重复手写原始枚举列表。
+- 定向测试继续兜底：
+  - `apps/web-frontend/test/petpal-admin-option-value.test.ts`
+    - 新增后台 option-value helper 单测，锁定 callback outbox、callback audit、caregiver audit、complaint admin 四类 options 对合法值 / 非法值的判定行为。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-admin-option-value.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+  - 仍保留既有的大 chunk warning，本轮没有新增新的构建告警。
+
+代码审计结论：
+
+- 本轮没有新增后台筛选字段、路由参数或接口契约，变化只在于后台治理页 route query 恢复的类型安全和共享化。
+- 已确认投诉治理页不再单独维护一份状态 / 类型 / 对象 / SLA 原始枚举列表，query 恢复直接与当前 admin option 源保持一致。
+- 已确认 callback audit、callback outbox 和 caregiver audit 三页现在也不需要再通过显式类型断言把 query 值塞回页面状态。
+
+风险与缓解：
+
+- 风险：当前共享的是 option value 判定层，而不是 label / tone / route 构建的完整统一模型；如果继续过度抽象，页面可读性会下降。
+- 缓解：保持 helper 只负责最稳定的基础 type guard，页面仍保留各自的业务筛选语义与 query 组织方式。
+
+下一步（1-3）：
+
+1. 继续盘点后台治理页剩余的轻量重复逻辑，只抽跨页稳定且不牺牲可读性的基础 helper。
+2. 继续保持“小 helper + 单测 + 单 slice 提交”的节奏，把治理页收口做成可持续演进的基础层。
+3. 在后台治理基础层再稳一轮后，优先回到更高价值的验收补测、演示链路和最终交付材料整理。
+
 ### 14.210 2026-04-03（P3-M1 Slice 210）
 
 **概述**：后台投诉治理、照料者审核、回调审计和回调告警 outbox 页在枚举收口之外，还一直各自复制着同一套 route query 处理代码：单值取出、字符串裁剪、query 归一化、快照比较。逻辑虽然简单，但分散在四页里会持续抬高维护成本。本轮把这组路由桥接工具抽成共享 helper，并用独立单测固定下来。

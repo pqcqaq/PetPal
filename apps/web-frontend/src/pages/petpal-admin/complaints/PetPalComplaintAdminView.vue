@@ -416,6 +416,7 @@ import {
   getSingleRouteQueryValue,
   normalizeStringRouteQuery,
 } from '../shared/route-query';
+import { hasSelectOptionValue } from '../shared/option-value';
 
 defineOptions({ name: 'PetPalComplaintAdminView' });
 
@@ -635,17 +636,26 @@ const hydrateStateFromRoute = () => {
   const unassignedOnly = getSingleRouteQueryValue(route.query.unassignedOnly);
 
   pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
-  pageState.filters.status = ['OPEN', 'PROCESSING', 'RESOLVED', 'REJECTED'].includes(status)
-    ? status as ComplaintStatus
+  pageState.filters.status = hasSelectOptionValue(complaintAdminStatusOptions, status)
+    ? status
     : undefined;
-  pageState.filters.complaintType = ['SAFETY', 'FEE', 'SERVICE', 'FRAUD', 'OTHER'].includes(complaintType)
-    ? complaintType as ComplaintType
+  pageState.filters.complaintType = hasSelectOptionValue(
+    complaintAdminTypeOptions,
+    complaintType,
+  )
+    ? complaintType
     : undefined;
-  pageState.filters.targetRole = ['CAREGIVER', 'PLATFORM'].includes(targetRole)
-    ? targetRole as ComplaintTargetRole
+  pageState.filters.targetRole = hasSelectOptionValue(
+    complaintAdminTargetRoleOptions,
+    targetRole,
+  )
+    ? targetRole
     : undefined;
-  pageState.filters.slaStatus = ['NORMAL', 'DUE_SOON', 'OVERDUE'].includes(slaStatus)
-    ? slaStatus as ComplaintAdminSlaStatus
+  pageState.filters.slaStatus = hasSelectOptionValue(
+    complaintAdminSlaStatusOptions,
+    slaStatus,
+  )
+    ? slaStatus
     : undefined;
   pageState.filters.unassignedOnly = unassignedOnly === 'true';
   pageState.filters.assignedAdminId = pageState.filters.unassignedOnly ? undefined : assignedAdminId || undefined;

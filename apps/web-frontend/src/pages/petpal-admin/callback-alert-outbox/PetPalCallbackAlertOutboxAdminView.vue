@@ -214,6 +214,7 @@ import {
   getSingleRouteQueryValue,
   normalizeStringRouteQuery,
 } from '../shared/route-query';
+import { hasSelectOptionValue } from '../shared/option-value';
 
 defineOptions({ name: 'PetPalCallbackAlertOutboxAdminView' });
 
@@ -331,8 +332,8 @@ const hydrateStateFromRoute = () => {
   const status = getSingleRouteQueryValue(route.query.status);
 
   pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
-  pageState.filters.status = statusOptions.some((item) => item.value === status)
-    ? status as CallbackAlertOutboxStatus
+  pageState.filters.status = hasSelectOptionValue(statusOptions, status)
+    ? status
     : undefined;
 };
 

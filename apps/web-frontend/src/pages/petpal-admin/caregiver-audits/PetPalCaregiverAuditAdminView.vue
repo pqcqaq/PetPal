@@ -141,6 +141,7 @@ import {
   getSingleRouteQueryValue,
   normalizeStringRouteQuery,
 } from '../shared/route-query';
+import { hasSelectOptionValue } from '../shared/option-value';
 
 defineOptions({ name: 'PetPalCaregiverAuditAdminView' });
 
@@ -235,10 +236,11 @@ const hydrateStateFromRoute = () => {
   const page = Number.parseInt(getSingleRouteQueryValue(route.query.page), 10);
 
   pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
-  pageState.filters.auditStatus = caregiverAuditAdminStatusOptions.some(
-    (item) => item.value === auditStatus,
+  pageState.filters.auditStatus = hasSelectOptionValue(
+    caregiverAuditAdminStatusOptions,
+    auditStatus,
   )
-    ? auditStatus as CaregiverAuditStatus
+    ? auditStatus
     : undefined;
   pageState.filters.city = getSingleRouteQueryValue(route.query.city) || undefined;
   pageState.filters.keyword = getSingleRouteQueryValue(route.query.keyword) || undefined;

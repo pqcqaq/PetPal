@@ -77,6 +77,7 @@ import {
   getSingleRouteQueryValue,
   normalizeStringRouteQuery,
 } from '../shared/route-query';
+import { hasSelectOptionValue } from '../shared/option-value';
 import CallbackAuditDetailDrawer from './components/CallbackAuditDetailDrawer.vue';
 import CallbackAuditTable from './components/CallbackAuditTable.vue';
 import CallbackAuditToolbar from './components/CallbackAuditToolbar.vue';
@@ -195,18 +196,20 @@ const hydrateStateFromRoute = () => {
 
   pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
   pageState.pageSize = [10, 20, 50, 100].includes(pageSize) ? pageSize : 10;
-  pageState.filters.callbackType = callbackAuditTypeOptions.some((item) => item.value === callbackType)
-    ? callbackType as CallbackAuditFilters['callbackType']
+  pageState.filters.callbackType = hasSelectOptionValue(callbackAuditTypeOptions, callbackType)
+    ? callbackType
     : undefined;
-  pageState.filters.callbackStatus = callbackAuditStatusOptions.some(
-    (item) => item.value === callbackStatus,
+  pageState.filters.callbackStatus = hasSelectOptionValue(
+    callbackAuditStatusOptions,
+    callbackStatus,
   )
-    ? callbackStatus as CallbackAuditFilters['callbackStatus']
+    ? callbackStatus
     : undefined;
-  pageState.filters.sourceMode = callbackAuditSourceModeOptions.some(
-    (item) => item.value === sourceMode,
+  pageState.filters.sourceMode = hasSelectOptionValue(
+    callbackAuditSourceModeOptions,
+    sourceMode,
   )
-    ? sourceMode as CallbackAuditFilters['sourceMode']
+    ? sourceMode
     : undefined;
   pageState.filters.requestId = getSingleRouteQueryValue(route.query.requestId) || undefined;
   pageState.filters.startDate = getSingleRouteQueryValue(route.query.startDate) || undefined;
