@@ -209,6 +209,11 @@ import {
   getCallbackAlertOutboxStatusTagType,
   getCallbackAlertReplayActionLabel,
 } from './callback-alert-outbox-options';
+import {
+  buildRouteQuerySnapshot,
+  getSingleRouteQueryValue,
+  normalizeStringRouteQuery,
+} from '../shared/route-query';
 
 defineOptions({ name: 'PetPalCallbackAlertOutboxAdminView' });
 
@@ -305,21 +310,6 @@ const statusTagType = getCallbackAlertOutboxStatusTagType;
 
 const routeFilterKeys = ['page', 'status'] as const;
 
-const getSingleQueryValue = (value: unknown) => {
-  if (typeof value === 'string') {
-    return value.trim();
-  }
-  return '';
-};
-
-const normalizeRouteQuery = (query: Record<string, unknown>) => Object.entries(query)
-  .reduce<Record<string, string>>((acc, [key, value]) => {
-    if (typeof value === 'string' && value.trim()) {
-      acc[key] = value.trim();
-    }
-    return acc;
-  }, {});
-
 const buildRouteQuery = () => {
   const query: Record<string, string> = {};
   if (pageState.page > 1) {
@@ -337,8 +327,8 @@ const hydrateStateFromRoute = () => {
     return;
   }
 
-  const page = Number.parseInt(getSingleQueryValue(route.query.page), 10);
-  const status = getSingleQueryValue(route.query.status);
+  const page = Number.parseInt(getSingleRouteQueryValue(route.query.page), 10);
+  const status = getSingleRouteQueryValue(route.query.status);
 
   pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
   pageState.filters.status = statusOptions.some((item) => item.value === status)
@@ -376,13 +366,9 @@ const loadOutbox = async () => {
 
 const syncRouteAndLoad = async () => {
   const nextQuery = buildRouteQuery();
-  const currentQuery = normalizeRouteQuery(route.query as Record<string, unknown>);
-  const nextSnapshot = JSON.stringify(
-    Object.entries(nextQuery).sort(([left], [right]) => left.localeCompare(right)),
-  );
-  const currentSnapshot = JSON.stringify(
-    Object.entries(currentQuery).sort(([left], [right]) => left.localeCompare(right)),
-  );
+  const currentQuery = normalizeStringRouteQuery(route.query as Record<string, unknown>);
+  const nextSnapshot = buildRouteQuerySnapshot(nextQuery);
+  const currentSnapshot = buildRouteQuerySnapshot(currentQuery);
 
   if (nextSnapshot === currentSnapshot) {
     await loadOutbox();

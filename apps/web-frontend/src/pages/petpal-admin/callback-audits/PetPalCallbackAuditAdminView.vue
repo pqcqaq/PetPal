@@ -72,6 +72,11 @@ import {
   compareCallbackAuditRecency,
   getActiveAuditFilterTokens,
 } from './callback-audit-display';
+import {
+  buildRouteQuerySnapshot,
+  getSingleRouteQueryValue,
+  normalizeStringRouteQuery,
+} from '../shared/route-query';
 import CallbackAuditDetailDrawer from './components/CallbackAuditDetailDrawer.vue';
 import CallbackAuditTable from './components/CallbackAuditTable.vue';
 import CallbackAuditToolbar from './components/CallbackAuditToolbar.vue';
@@ -147,21 +152,6 @@ const routeFilterKeys = [
   'endDate',
 ] as const;
 
-const getSingleQueryValue = (value: unknown) => {
-  if (typeof value === 'string') {
-    return value.trim();
-  }
-  return '';
-};
-
-const normalizeRouteQuery = (query: Record<string, unknown>) => Object.entries(query)
-  .reduce<Record<string, string>>((acc, [key, value]) => {
-    if (typeof value === 'string' && value.trim()) {
-      acc[key] = value.trim();
-    }
-    return acc;
-  }, {});
-
 const buildRouteQuery = () => {
   const query: Record<string, string> = {};
   if (pageState.page > 1) {
@@ -197,11 +187,11 @@ const hydrateStateFromRoute = () => {
     return;
   }
 
-  const page = Number.parseInt(getSingleQueryValue(route.query.page), 10);
-  const pageSize = Number.parseInt(getSingleQueryValue(route.query.pageSize), 10);
-  const callbackType = getSingleQueryValue(route.query.callbackType);
-  const callbackStatus = getSingleQueryValue(route.query.callbackStatus);
-  const sourceMode = getSingleQueryValue(route.query.sourceMode);
+  const page = Number.parseInt(getSingleRouteQueryValue(route.query.page), 10);
+  const pageSize = Number.parseInt(getSingleRouteQueryValue(route.query.pageSize), 10);
+  const callbackType = getSingleRouteQueryValue(route.query.callbackType);
+  const callbackStatus = getSingleRouteQueryValue(route.query.callbackStatus);
+  const sourceMode = getSingleRouteQueryValue(route.query.sourceMode);
 
   pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
   pageState.pageSize = [10, 20, 50, 100].includes(pageSize) ? pageSize : 10;
@@ -218,9 +208,9 @@ const hydrateStateFromRoute = () => {
   )
     ? sourceMode as CallbackAuditFilters['sourceMode']
     : undefined;
-  pageState.filters.requestId = getSingleQueryValue(route.query.requestId) || undefined;
-  pageState.filters.startDate = getSingleQueryValue(route.query.startDate) || undefined;
-  pageState.filters.endDate = getSingleQueryValue(route.query.endDate) || undefined;
+  pageState.filters.requestId = getSingleRouteQueryValue(route.query.requestId) || undefined;
+  pageState.filters.startDate = getSingleRouteQueryValue(route.query.startDate) || undefined;
+  pageState.filters.endDate = getSingleRouteQueryValue(route.query.endDate) || undefined;
 };
 
 const failureCount = computed(() => statsData.value.byStatus.FAILURE + statsData.value.byStatus.ERROR);
@@ -312,13 +302,9 @@ const loadLogs = async () => {
 
 const syncRouteAndLoad = async () => {
   const nextQuery = buildRouteQuery();
-  const currentQuery = normalizeRouteQuery(route.query as Record<string, unknown>);
-  const nextSnapshot = JSON.stringify(
-    Object.entries(nextQuery).sort(([left], [right]) => left.localeCompare(right)),
-  );
-  const currentSnapshot = JSON.stringify(
-    Object.entries(currentQuery).sort(([left], [right]) => left.localeCompare(right)),
-  );
+  const currentQuery = normalizeStringRouteQuery(route.query as Record<string, unknown>);
+  const nextSnapshot = buildRouteQuerySnapshot(nextQuery);
+  const currentSnapshot = buildRouteQuerySnapshot(currentQuery);
 
   if (nextSnapshot === currentSnapshot) {
     await loadLogs();

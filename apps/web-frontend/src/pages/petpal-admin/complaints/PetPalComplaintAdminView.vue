@@ -411,6 +411,11 @@ import {
   getComplaintAdminTargetRoleLabel,
   getComplaintAdminTypeLabel,
 } from './complaint-admin-options';
+import {
+  buildRouteQuerySnapshot,
+  getSingleRouteQueryValue,
+  normalizeStringRouteQuery,
+} from '../shared/route-query';
 
 defineOptions({ name: 'PetPalComplaintAdminView' });
 
@@ -586,21 +591,6 @@ const canQuickAssignToMe = (complaint: ComplaintAdminRecord) => {
 
 const routeFilterKeys = ['page', 'status', 'complaintType', 'targetRole', 'slaStatus', 'assignedAdminId', 'unassignedOnly', 'keyword'] as const;
 
-const getSingleQueryValue = (value: unknown) => {
-  if (typeof value === 'string') {
-    return value.trim();
-  }
-  return '';
-};
-
-const normalizeRouteQuery = (query: Record<string, unknown>) => Object.entries(query)
-  .reduce<Record<string, string>>((acc, [key, value]) => {
-    if (typeof value === 'string' && value.trim()) {
-      acc[key] = value.trim();
-    }
-    return acc;
-  }, {});
-
 const buildRouteQuery = () => {
   const query: Record<string, string> = {};
   if (pageState.page > 1) {
@@ -636,13 +626,13 @@ const hydrateStateFromRoute = () => {
     return;
   }
 
-  const page = Number.parseInt(getSingleQueryValue(route.query.page), 10);
-  const status = getSingleQueryValue(route.query.status);
-  const complaintType = getSingleQueryValue(route.query.complaintType);
-  const targetRole = getSingleQueryValue(route.query.targetRole);
-  const slaStatus = getSingleQueryValue(route.query.slaStatus);
-  const assignedAdminId = getSingleQueryValue(route.query.assignedAdminId);
-  const unassignedOnly = getSingleQueryValue(route.query.unassignedOnly);
+  const page = Number.parseInt(getSingleRouteQueryValue(route.query.page), 10);
+  const status = getSingleRouteQueryValue(route.query.status);
+  const complaintType = getSingleRouteQueryValue(route.query.complaintType);
+  const targetRole = getSingleRouteQueryValue(route.query.targetRole);
+  const slaStatus = getSingleRouteQueryValue(route.query.slaStatus);
+  const assignedAdminId = getSingleRouteQueryValue(route.query.assignedAdminId);
+  const unassignedOnly = getSingleRouteQueryValue(route.query.unassignedOnly);
 
   pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
   pageState.filters.status = ['OPEN', 'PROCESSING', 'RESOLVED', 'REJECTED'].includes(status)
@@ -659,7 +649,7 @@ const hydrateStateFromRoute = () => {
     : undefined;
   pageState.filters.unassignedOnly = unassignedOnly === 'true';
   pageState.filters.assignedAdminId = pageState.filters.unassignedOnly ? undefined : assignedAdminId || undefined;
-  pageState.filters.keyword = getSingleQueryValue(route.query.keyword) || undefined;
+  pageState.filters.keyword = getSingleRouteQueryValue(route.query.keyword) || undefined;
 };
 
 const buildQuery = (): ComplaintAdminQuery => ({
@@ -720,9 +710,9 @@ const loadRows = async () => {
 
 const syncRouteAndLoad = async () => {
   const nextQuery = buildRouteQuery();
-  const currentQuery = normalizeRouteQuery(route.query as Record<string, unknown>);
-  const nextSnapshot = JSON.stringify(Object.entries(nextQuery).sort(([left], [right]) => left.localeCompare(right)));
-  const currentSnapshot = JSON.stringify(Object.entries(currentQuery).sort(([left], [right]) => left.localeCompare(right)));
+  const currentQuery = normalizeStringRouteQuery(route.query as Record<string, unknown>);
+  const nextSnapshot = buildRouteQuerySnapshot(nextQuery);
+  const currentSnapshot = buildRouteQuerySnapshot(currentQuery);
 
   if (nextSnapshot === currentSnapshot) {
     await loadRows();

@@ -7874,6 +7874,51 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.210 2026-04-03（P3-M1 Slice 210）
+
+**概述**：后台投诉治理、照料者审核、回调审计和回调告警 outbox 页在枚举收口之外，还一直各自复制着同一套 route query 处理代码：单值取出、字符串裁剪、query 归一化、快照比较。逻辑虽然简单，但分散在四页里会持续抬高维护成本。本轮把这组路由桥接工具抽成共享 helper，并用独立单测固定下来。
+
+已完成：
+
+- 后台治理页开始复用共享 route query helper：
+  - `apps/web-frontend/src/pages/petpal-admin/shared/route-query.ts`
+    - 新增 `getSingleRouteQueryValue`，统一处理 route query 单值读取与 `trim()`。
+    - 新增 `normalizeStringRouteQuery`，统一把 query 归一化成只包含非空字符串的对象。
+    - 新增 `buildRouteQuerySnapshot`，统一对 query 做稳定排序快照比较，避免每页手写 `Object.entries(...).sort(...)`。
+  - `apps/web-frontend/src/pages/petpal-admin/callback-audits/PetPalCallbackAuditAdminView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/callback-alert-outbox/PetPalCallbackAlertOutboxAdminView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/caregiver-audits/PetPalCaregiverAuditAdminView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/complaints/PetPalComplaintAdminView.vue`
+    - 四页的 query 单值读取、归一化和快照比较已全部切到共享 helper，不再平行维护同构函数。
+- 定向测试继续兜底：
+  - `apps/web-frontend/test/petpal-admin-route-query.test.ts`
+    - 新增共享 route query helper 单测，锁定 `trim`、仅保留字符串 query、以及 key 顺序无关的稳定快照行为。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-admin-route-query.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+  - 仍保留既有的大 chunk warning，本轮没有新增新的构建告警。
+
+代码审计结论：
+
+- 本轮没有新增路由参数、筛选字段或接口语义，变化只在于后台治理页的 route query 桥接逻辑共享化。
+- 已确认四个 PetPal admin 页现在对 query 的 `trim()`、空值过滤和快照比较规则一致，后续继续扩展筛选项时不需要再复制同一组辅助函数。
+
+风险与缓解：
+
+- 风险：当前共享的仍只是 query 基础桥接层，各页面自己的 `buildRouteQuery` 和 enum 合法值判定逻辑还保留在页面内，后续如果进一步抽离过度，反而会让页面语义变绕。
+- 缓解：先把基础字符串 query 处理统一，保持页面级过滤语义仍留在各自容器；只有在后续出现明确同构逻辑时再继续抽离。
+
+下一步（1-3）：
+
+1. 继续盘点 PetPal admin 页里剩余的轻量重复逻辑，只抽真正跨页稳定复用的基础层 helper。
+2. 继续以定向测试兜底后台治理展示层和路由桥接层，避免为共享化引入隐性回归。
+3. 在这批后台治理页基础层稳定后，再回到更高优先级的验收补测、演示路径和交付材料整理。
+
 ### 14.209 2026-04-03（P3-M1 Slice 209）
 
 **概述**：回调告警 outbox 页把状态和动作枚举收口后，回调审计页里同类问题也更明显了：toolbar 的类型 / 状态 / 来源筛选、详情区 / 表格 / 侧栏的状态显示和路由 query 的合法值判断，仍有多处并行常量。本轮继续按同一模式把 callback audit 的显示层枚举与标签规则收口到单一 helper，同时把 `el-tag` 需要的 tag type 与工作台信号卡使用的 tone 显式拆开，避免展示语义混用。
