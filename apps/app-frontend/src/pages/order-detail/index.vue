@@ -36,10 +36,12 @@ import {
 import {
   clearPetPalMessageDraft,
   clearPetPalMessageRecovery,
+  getPetPalMessageComposerScope,
   getPetPalMessageRecovery,
   persistPetPalMessageDraft,
   restorePetPalMessageDraft,
   setPetPalMessageRecovery,
+  type PetPalMessageComposerScope,
   type PetPalMessageDraftAttachment,
 } from '../petpal/message-composer-state'
 
@@ -61,6 +63,7 @@ const complaints = ref<ComplaintRecord[]>([])
 const conversation = ref<OrderConversationDetailRecord | null>(null)
 const messageText = ref('')
 const messageAttachments = ref<UploadedMessageAttachment[]>([])
+const messageComposerScope = ref<PetPalMessageComposerScope>('shared')
 const serviceLogType = ref<ServiceLogType>('NOTE')
 const serviceLogNote = ref('')
 
@@ -124,6 +127,7 @@ async function loadPage() {
       getOrderMessages(orderId.value).catch(() => null),
     ])
     order.value = detailResult
+    messageComposerScope.value = detailResult.ownerId === userInfo.value.id ? 'owner' : 'caregiver'
     refundProgress.value = refundResult
     complaints.value = complaintsResult
     conversation.value = messagesResult
@@ -205,7 +209,7 @@ async function uploadMessageMaterials() {
   }
   catch (error: unknown) {
     const message = `${getErrorMessage(error, '上传失败')}，已完成的图片仍会保留在当前草稿中。`
-    setPetPalMessageRecovery(orderId.value, 'upload', message)
+    setPetPalMessageRecovery(orderId.value, 'upload', message, messageComposerScope.value)
     toast(message)
   }
 }
@@ -239,7 +243,7 @@ async function handleSendMessage() {
   }
   catch (error: unknown) {
     const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`
-    setPetPalMessageRecovery(order.value.id, 'send', message)
+    setPetPalMessageRecovery(order.value.id, 'send', message, messageComposerScope.value)
     toast(message)
   }
   finally {
@@ -311,13 +315,23 @@ watch(activeTab, async (value) => {
 
 watch(messageText, () => {
   if (orderId.value) {
-    persistPetPalMessageDraft(orderId.value, messageText.value, messageAttachments.value)
+    persistPetPalMessageDraft(
+      orderId.value,
+      messageText.value,
+      messageAttachments.value,
+      messageComposerScope.value,
+    )
   }
 })
 
 watch(messageAttachments, () => {
   if (orderId.value) {
-    persistPetPalMessageDraft(orderId.value, messageText.value, messageAttachments.value)
+    persistPetPalMessageDraft(
+      orderId.value,
+      messageText.value,
+      messageAttachments.value,
+      messageComposerScope.value,
+    )
   }
 }, { deep: true })
 
@@ -326,12 +340,19 @@ watch(orderId, (value, previousValue) => {
     return
   }
   if (previousValue) {
-    persistPetPalMessageDraft(previousValue, messageText.value, messageAttachments.value)
+    persistPetPalMessageDraft(
+      previousValue,
+      messageText.value,
+      messageAttachments.value,
+      messageComposerScope.value,
+    )
   }
   if (!value) {
+    messageComposerScope.value = 'shared'
     resetComposer()
     return
   }
+  messageComposerScope.value = getPetPalMessageComposerScope(value) ?? 'shared'
   restoreComposerState(value)
 }, { immediate: true })
 

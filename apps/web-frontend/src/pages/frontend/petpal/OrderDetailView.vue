@@ -289,10 +289,12 @@ import { getErrorMessage, isDialogCancellation } from '@/utils/errors';
 import {
   clearPetPalMessageDraft,
   clearPetPalMessageRecovery,
+  getPetPalMessageComposerScope,
   getPetPalMessageRecovery,
   persistPetPalMessageDraft,
   restorePetPalMessageDraft,
   setPetPalMessageRecovery,
+  type PetPalMessageComposerScope,
   type PetPalMessageDraftAttachment,
 } from './message-composer-state';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
@@ -357,6 +359,7 @@ const currentRole = computed<'owner' | 'caregiver'>(() => {
   }
   return getPetPalDeskFocusRole(route.query) || 'owner';
 });
+const messageComposerScope = ref<PetPalMessageComposerScope>(currentRole.value);
 const navItems = computed(() => currentRole.value === 'owner' ? petPalOwnerWorkspaceNav : petPalCaregiverWorkspaceNav);
 const heroActions = computed(() => {
   if (!order.value) {
@@ -579,6 +582,7 @@ async function loadPage() {
   }
   try {
     order.value = await api.petpal.orders.detail(orderId.value);
+    messageComposerScope.value = order.value.ownerId === auth.user?.id ? 'owner' : 'caregiver';
     await loadConversationSection(orderId.value);
     if (order.value.ownerId === auth.user?.id) {
       await loadAftersalesSection(orderId.value);
@@ -737,7 +741,7 @@ async function handleMessageAttachmentChange(event: Event) {
     clearPetPalMessageRecovery(order.value.id);
   } catch (error: unknown) {
     const message = `${getErrorMessage(error, '上传消息图片失败')}，已完成的图片仍会保留在当前草稿中。`;
-    setPetPalMessageRecovery(order.value.id, 'upload', message);
+    setPetPalMessageRecovery(order.value.id, 'upload', message, messageComposerScope.value);
     ElMessage.error(message);
   } finally {
     uploadingMessageAttachments.value = false;
@@ -781,7 +785,7 @@ async function submitMessage() {
     ElMessage.success('消息已发送');
   } catch (error: unknown) {
     const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`;
-    setPetPalMessageRecovery(order.value.id, 'send', message);
+    setPetPalMessageRecovery(order.value.id, 'send', message, messageComposerScope.value);
     ElMessage.error(message);
   } finally {
     sendingMessage.value = false;
@@ -832,7 +836,12 @@ watch(
   messageContent,
   () => {
     if (orderId.value) {
-      persistPetPalMessageDraft(orderId.value, messageContent.value, messageAttachments.value);
+      persistPetPalMessageDraft(
+        orderId.value,
+        messageContent.value,
+        messageAttachments.value,
+        messageComposerScope.value,
+      );
     }
   },
 );
@@ -841,7 +850,12 @@ watch(
   messageAttachments,
   () => {
     if (orderId.value) {
-      persistPetPalMessageDraft(orderId.value, messageContent.value, messageAttachments.value);
+      persistPetPalMessageDraft(
+        orderId.value,
+        messageContent.value,
+        messageAttachments.value,
+        messageComposerScope.value,
+      );
     }
   },
   { deep: true },
@@ -854,12 +868,21 @@ watch(
       return;
     }
     if (previousValue) {
-      persistPetPalMessageDraft(previousValue, messageContent.value, messageAttachments.value);
+      persistPetPalMessageDraft(
+        previousValue,
+        messageContent.value,
+        messageAttachments.value,
+        messageComposerScope.value,
+      );
     }
     if (!value) {
+      messageComposerScope.value = 'shared';
       resetComposer();
       return;
     }
+    const routeScope = getPetPalDeskFocusRole(route.query);
+    messageComposerScope.value = getPetPalMessageComposerScope(value)
+      ?? (routeScope ? routeScope : 'shared');
     restoreComposerState(value);
   },
   { immediate: true },

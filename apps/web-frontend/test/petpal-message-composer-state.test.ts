@@ -201,3 +201,43 @@ test('keeps only the newest persisted petpal message composer threads', () => {
     'order-14',
   ]);
 });
+
+test('keeps persisted petpal message composer threads independently per scope', () => {
+  const drafts = Object.fromEntries([
+    ...Array.from({ length: 14 }, (_, index) => [
+      `owner-order-${index + 1}`,
+      {
+        content: `owner-draft-${index + 1}`,
+        attachments: [],
+        updatedAt: `2026-04-08T${String(index).padStart(2, '0')}:00:00.000Z`,
+        scope: 'owner',
+      },
+    ]),
+    ...Array.from({ length: 14 }, (_, index) => [
+      `caregiver-order-${index + 1}`,
+      {
+        content: `caregiver-draft-${index + 1}`,
+        attachments: [],
+        updatedAt: `2026-04-09T${String(index).padStart(2, '0')}:00:00.000Z`,
+        scope: 'caregiver',
+      },
+    ]),
+  ]);
+
+  const snapshot = parsePersistedPetPalMessageComposerSnapshot({
+    drafts,
+    recoveries: {},
+  }, {
+    now: Date.parse('2026-04-09T14:30:00.000Z'),
+  });
+
+  assert.equal(Object.keys(snapshot.drafts).length, 24);
+  assert.equal(snapshot.drafts['owner-order-1'], undefined);
+  assert.equal(snapshot.drafts['owner-order-2'], undefined);
+  assert.equal(snapshot.drafts['caregiver-order-1'], undefined);
+  assert.equal(snapshot.drafts['caregiver-order-2'], undefined);
+  assert.equal(snapshot.drafts['owner-order-3']?.content, 'owner-draft-3');
+  assert.equal(snapshot.drafts['owner-order-14']?.content, 'owner-draft-14');
+  assert.equal(snapshot.drafts['caregiver-order-3']?.content, 'caregiver-draft-3');
+  assert.equal(snapshot.drafts['caregiver-order-14']?.content, 'caregiver-draft-14');
+});

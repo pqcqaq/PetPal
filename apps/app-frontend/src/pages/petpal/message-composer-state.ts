@@ -21,6 +21,8 @@ export type PetPalMessageRecoveryState = {
   message: string
 }
 
+export type PetPalMessageComposerScope = 'owner' | 'caregiver' | 'shared'
+
 export type PersistedPetPalMessageComposerSnapshot = {
   drafts: Record<string, PetPalMessageDraftState>
   recoveries: Record<string, PetPalMessageRecoveryState>
@@ -28,10 +30,12 @@ export type PersistedPetPalMessageComposerSnapshot = {
 
 type PersistedPetPalMessageDraftRecord = PetPalMessageDraftState & {
   updatedAt: string
+  scope: PetPalMessageComposerScope
 }
 
 type PersistedPetPalMessageRecoveryRecord = PetPalMessageRecoveryState & {
   updatedAt: string
+  scope: PetPalMessageComposerScope
 }
 
 type PersistedPetPalMessageComposerRecords = {
@@ -50,6 +54,9 @@ const createEmptyPersistedSnapshot = (): PersistedPetPalMessageComposerRecords =
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+const normalizeMessageComposerScope = (value: unknown): PetPalMessageComposerScope =>
+  value === 'owner' || value === 'caregiver' ? value : 'shared'
 
 const cloneMessageDraftAttachments = (attachments: PetPalMessageDraftAttachment[]) =>
   attachments.map(item => ({
@@ -159,6 +166,7 @@ const toDraftRecord = (
   return {
     ...cloneMessageDraftState(draft),
     updatedAt,
+    scope: normalizeMessageComposerScope(rawValue.scope),
   }
 }
 
@@ -199,6 +207,7 @@ const toRecoveryRecord = (
     stage: recovery.stage,
     message: recovery.message,
     updatedAt,
+    scope: normalizeMessageComposerScope(rawValue.scope),
   }
 }
 
@@ -206,55 +215,68 @@ const compactPersistedPetPalMessageComposerRecords = (
   snapshot: PersistedPetPalMessageComposerRecords,
   now = Date.now(),
 ): PersistedPetPalMessageComposerRecords => {
-  const orderTimestamps = new Map<string, number>()
-  const collectTimestamp = (orderId: string, updatedAt: string) => {
+  const orderTimestampsByScope = new Map<PetPalMessageComposerScope, Map<string, number>>()
+  const collectTimestamp = (
+    orderId: string,
+    updatedAt: string,
+    scope: PetPalMessageComposerScope,
+  ) => {
     const timestamp = toTimestamp(updatedAt)
     if (timestamp === null) {
       return
     }
 
-    const previousTimestamp = orderTimestamps.get(orderId)
+    const scopedTimestamps = orderTimestampsByScope.get(scope) ?? new Map<string, number>()
+    const previousTimestamp = scopedTimestamps.get(orderId)
     if (previousTimestamp === undefined || timestamp > previousTimestamp) {
-      orderTimestamps.set(orderId, timestamp)
+      scopedTimestamps.set(orderId, timestamp)
+      orderTimestampsByScope.set(scope, scopedTimestamps)
     }
   }
 
   Object.entries(snapshot.drafts).forEach(([orderId, draft]) => {
-    collectTimestamp(orderId, draft.updatedAt)
+    collectTimestamp(orderId, draft.updatedAt, draft.scope)
   })
   Object.entries(snapshot.recoveries).forEach(([orderId, recovery]) => {
-    collectTimestamp(orderId, recovery.updatedAt)
+    collectTimestamp(orderId, recovery.updatedAt, recovery.scope)
   })
 
-  const retainedOrderIds = new Set(
-    Array.from(orderTimestamps.entries())
-      .filter(([, timestamp]) => now - timestamp <= MAX_PERSISTED_AGE_MS)
-      .sort((left, right) => right[1] - left[1])
-      .slice(0, MAX_PERSISTED_THREADS)
-      .map(([orderId]) => orderId),
+  const retainedOrderIdsByScope = new Map(
+    Array.from(orderTimestampsByScope.entries()).map(([scope, orderTimestamps]) => [
+      scope,
+      new Set(
+        Array.from(orderTimestamps.entries())
+          .filter(([, timestamp]) => now - timestamp <= MAX_PERSISTED_AGE_MS)
+          .sort((left, right) => right[1] - left[1])
+          .slice(0, MAX_PERSISTED_THREADS)
+          .map(([orderId]) => orderId),
+      ),
+    ] as const),
   )
 
   return {
     drafts: Object.fromEntries(
       Object.entries(snapshot.drafts)
-        .filter(([orderId]) => retainedOrderIds.has(orderId))
+        .filter(([orderId, draft]) => retainedOrderIdsByScope.get(draft.scope)?.has(orderId))
         .map(([orderId, draft]) => [
           orderId,
           {
             ...cloneMessageDraftState(draft),
             updatedAt: draft.updatedAt,
+            scope: draft.scope,
           } satisfies PersistedPetPalMessageDraftRecord,
         ]),
     ),
     recoveries: Object.fromEntries(
       Object.entries(snapshot.recoveries)
-        .filter(([orderId]) => retainedOrderIds.has(orderId))
+        .filter(([orderId, recovery]) => retainedOrderIdsByScope.get(recovery.scope)?.has(orderId))
         .map(([orderId, recovery]) => [
           orderId,
           {
             stage: recovery.stage,
             message: recovery.message,
             updatedAt: recovery.updatedAt,
+            scope: recovery.scope,
           } satisfies PersistedPetPalMessageRecoveryRecord,
         ]),
     ),
@@ -410,10 +432,17 @@ export function clearPetPalMessageDraft(orderId: string) {
   syncPersistedPetPalMessageComposerSnapshot()
 }
 
+export function getPetPalMessageComposerScope(orderId: string): PetPalMessageComposerScope | null {
+  return messageDrafts.value[orderId]?.scope
+    ?? messageRecoveries.value[orderId]?.scope
+    ?? null
+}
+
 export function persistPetPalMessageDraft(
   orderId: string,
   content: string,
   attachments: PetPalMessageDraftAttachment[],
+  scope?: PetPalMessageComposerScope,
 ) {
   if (!orderId) {
     return
@@ -432,6 +461,7 @@ export function persistPetPalMessageDraft(
       content,
       attachments: nextAttachments,
       updatedAt: new Date().toISOString(),
+      scope: scope ?? getPetPalMessageComposerScope(orderId) ?? 'shared',
     },
   }
   syncPersistedPetPalMessageComposerSnapshot()
@@ -468,6 +498,7 @@ export function setPetPalMessageRecovery(
   orderId: string,
   stage: PetPalMessageRecoveryStage,
   message: string,
+  scope?: PetPalMessageComposerScope,
 ) {
   if (!orderId) {
     return
@@ -479,6 +510,7 @@ export function setPetPalMessageRecovery(
       stage,
       message,
       updatedAt: new Date().toISOString(),
+      scope: scope ?? getPetPalMessageComposerScope(orderId) ?? 'shared',
     },
   }
   syncPersistedPetPalMessageComposerSnapshot()

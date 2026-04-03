@@ -189,6 +189,10 @@ Last updated: 2026-04-04
 - 2026-04-04 已继续补消息沟通缓存淘汰策略：
   - Web / App 两端的 `message-composer-state.ts` 现在都会对本地消息草稿 / 恢复态做自动裁剪，只保留最近更新的有限线程，并淘汰超过 7 天的旧缓存。
   - `apps/web-frontend/test/petpal-message-composer-state.test.ts` 已继续补 stale entry 和最大线程数裁剪的单测，避免后续改动把淘汰规则放松。
+- 2026-04-04 已继续补消息缓存作用域隔离：
+  - Web / App 两端的 `message-composer-state.ts` 现在都会为本地草稿 / 恢复态记录 `owner` / `caregiver` / `shared` 作用域，并按作用域分别执行缓存容量裁剪。
+  - 消息中心与订单详情页现在会把当前角色作用域透传到草稿与恢复态写入链路，双身份账号在主人侧和照料者侧切换时不再互相挤占缓存名额。
+  - `apps/web-frontend/test/petpal-message-composer-state.test.ts` 已补按作用域独立保留线程的定向单测，继续兜底后续裁剪规则演进。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

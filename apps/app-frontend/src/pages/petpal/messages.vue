@@ -15,6 +15,7 @@ import {
   persistPetPalMessageDraft,
   restorePetPalMessageDraft,
   setPetPalMessageRecovery,
+  type PetPalMessageComposerScope,
   type PetPalMessageDraftAttachment,
 } from './message-composer-state'
 import PetpalEmpty from './rebuild/petpal-empty.vue'
@@ -53,6 +54,7 @@ const filter = ref<FilterValue>('UNREAD')
 const ownerOrders = ref<OrderRecord[]>([])
 const caregiverOrders = ref<CaregiverOrderRecord[]>([])
 const selectedOrderId = ref('')
+const selectedThreadScope = ref<PetPalMessageComposerScope>(role.value)
 const conversation = ref<OrderConversationDetailRecord | null>(null)
 const messageText = ref('')
 const messageAttachments = ref<UploadedMessageAttachment[]>([])
@@ -146,8 +148,11 @@ function clearThreadRecovery(orderId: string) {
   clearPetPalMessageRecovery(orderId)
 }
 
-function persistThreadDraft(orderId: string) {
-  persistPetPalMessageDraft(orderId, messageText.value, messageAttachments.value)
+function persistThreadDraft(
+  orderId: string,
+  scope: PetPalMessageComposerScope = selectedThreadScope.value,
+) {
+  persistPetPalMessageDraft(orderId, messageText.value, messageAttachments.value, scope)
 }
 
 function restoreThreadDraft(orderId: string) {
@@ -336,7 +341,7 @@ async function uploadMessageMaterials() {
   }
   catch (error: unknown) {
     const message = `${getErrorMessage(error, '上传失败')}，已完成的图片仍会保留在当前草稿中。`
-    setPetPalMessageRecovery(orderId, 'upload', message)
+    setPetPalMessageRecovery(orderId, 'upload', message, selectedThreadScope.value)
     toast(message)
   }
 }
@@ -373,7 +378,7 @@ async function handleSendMessage() {
   }
   catch (error: unknown) {
     const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`
-    setPetPalMessageRecovery(orderId, 'send', message)
+    setPetPalMessageRecovery(orderId, 'send', message, selectedThreadScope.value)
     toast(message)
   }
   finally {
@@ -427,15 +432,18 @@ watch(selectedOrderId, (value, previousValue) => {
     return
   }
 
+  const previousScope = selectedThreadScope.value
   if (previousValue) {
-    persistThreadDraft(previousValue)
+    persistThreadDraft(previousValue, previousScope)
   }
 
   if (!value) {
+    selectedThreadScope.value = role.value
     clearThreadState()
     return
   }
 
+  selectedThreadScope.value = role.value
   restoreThreadDraft(value)
   void loadThread(value)
 })

@@ -275,6 +275,7 @@ import {
   persistPetPalMessageDraft,
   restorePetPalMessageDraft,
   setPetPalMessageRecovery,
+  type PetPalMessageComposerScope,
   type PetPalMessageDraftAttachment,
 } from './message-composer-state';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
@@ -325,6 +326,7 @@ const ownerOrders = ref<OrderRecord[]>([]);
 const caregiverOrders = ref<CaregiverOrderRecord[]>([]);
 const role = ref<'owner' | 'caregiver'>('owner');
 const selectedOrderId = ref('');
+const selectedThreadScope = ref<PetPalMessageComposerScope>(role.value);
 const activeThread = ref<OrderConversationDetailRecord | null>(null);
 const activeThreadState = ref<PetPalSectionLoadState>('idle');
 const messageContent = ref('');
@@ -460,8 +462,11 @@ function clearThreadRecovery(orderId: string) {
   clearPetPalMessageRecovery(orderId);
 }
 
-function persistThreadDraft(orderId: string) {
-  persistPetPalMessageDraft(orderId, messageContent.value, messageAttachments.value);
+function persistThreadDraft(
+  orderId: string,
+  scope: PetPalMessageComposerScope = selectedThreadScope.value,
+) {
+  persistPetPalMessageDraft(orderId, messageContent.value, messageAttachments.value, scope);
 }
 
 function restoreThreadDraft(orderId: string) {
@@ -743,7 +748,7 @@ async function handleMessageAttachmentChange(event: Event) {
     clearThreadRecovery(currentOrderId);
   } catch (error: unknown) {
     const message = `${getErrorMessage(error, '上传消息图片失败')}，已完成的图片仍会保留在当前草稿中。`;
-    setPetPalMessageRecovery(currentOrderId, 'upload', message);
+    setPetPalMessageRecovery(currentOrderId, 'upload', message, selectedThreadScope.value);
     ElMessage.error(message);
   } finally {
     uploadingMessageAttachments.value = false;
@@ -779,7 +784,7 @@ async function submitMessage() {
     ElMessage.success('消息已发送');
   } catch (error: unknown) {
     const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`;
-    setPetPalMessageRecovery(orderId, 'send', message);
+    setPetPalMessageRecovery(orderId, 'send', message, selectedThreadScope.value);
     ElMessage.error(message);
   } finally {
     sendingMessage.value = false;
@@ -823,16 +828,19 @@ watch(
     if (orderId === previousOrderId) {
       return;
     }
+    const previousScope = selectedThreadScope.value;
     if (previousOrderId) {
-      persistThreadDraft(previousOrderId);
+      persistThreadDraft(previousOrderId, previousScope);
     }
     if (!orderId) {
+      selectedThreadScope.value = role.value;
       activeThreadRequestVersion += 1;
       activeThread.value = null;
       activeThreadState.value = 'idle';
       resetComposer();
       return;
     }
+    selectedThreadScope.value = role.value;
     restoreThreadDraft(orderId);
     void loadActiveThread(orderId);
   },
