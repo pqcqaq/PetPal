@@ -19,6 +19,7 @@ import {
 import {
   formatPetPalDate,
   formatPetPalMoney,
+  getPetPalComplaintSlaStatusLabel,
   getPetPalComplaintStatusLabel,
   getPetPalComplaintTargetRoleLabel,
   getPetPalComplaintTypeLabel,
@@ -60,6 +61,7 @@ export type CaregiverEarningsExportSummaryItemKey =
   | 'refundStatus'
   | 'refundReasonKeyword'
   | 'complaintStatus'
+  | 'complaintSlaStatus'
   | 'complaintType'
   | 'complaintKeyword'
   | 'complaintTargetRole'
@@ -327,6 +329,13 @@ export const buildCaregiverEarningsExportSummaryItems = (
       value: getPetPalComplaintStatusLabel(snapshot.complaintStatus),
     });
   }
+  if (snapshot.complaintSlaStatus) {
+    items.push({
+      key: 'complaintSlaStatus',
+      label: '投诉SLA',
+      value: getPetPalComplaintSlaStatusLabel(snapshot.complaintSlaStatus),
+    });
+  }
   if (snapshot.complaintType) {
     items.push({
       key: 'complaintType',
@@ -394,6 +403,9 @@ export const clearCaregiverEarningsExportSummaryItem = (
       break;
     case 'complaintStatus':
       nextSnapshot.complaintStatus = '';
+      break;
+    case 'complaintSlaStatus':
+      nextSnapshot.complaintSlaStatus = '';
       break;
     case 'complaintType':
       nextSnapshot.complaintType = '';

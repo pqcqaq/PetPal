@@ -652,6 +652,7 @@
 
 <script setup lang="ts">
 import type {
+  ComplaintAdminSlaStatus,
   ComplaintTargetRole,
   ComplaintType,
   PetServiceType,
@@ -727,6 +728,8 @@ import {
   formatPetPalMoney,
   formatPetPalRange,
   getPetPalCaregiverAuditLabel,
+  getPetPalComplaintSlaStatusLabel,
+  getPetPalComplaintSlaStatusType,
   getPetPalComplaintStatusLabel,
   getPetPalComplaintTargetRoleLabel,
   getPetPalComplaintTypeLabel,
@@ -874,6 +877,12 @@ const getAftersalesRiskPills = (order: CaregiverAftersalesRiskOrderRecord) => {
       tone: order.complaintCount > 1 ? 'is-warning' : '',
     });
   }
+  if (order.primaryComplaintSlaStatus && order.primaryComplaintSlaStatus !== 'NORMAL') {
+    pills.push({
+      label: getPetPalComplaintSlaStatusLabel(order.primaryComplaintSlaStatus),
+      tone: mapComplaintSlaStatusToPillTone(order.primaryComplaintSlaStatus),
+    });
+  }
   if (order.latestRefundStatus) {
     pills.push({
       label: getPetPalRefundStatusLabel(order.latestRefundStatus),
@@ -888,6 +897,9 @@ const getAftersalesRiskSummary = (order: CaregiverAftersalesRiskOrderRecord) => 
 
   if (order.primaryComplaintStatus) {
     parts.push(`主要投诉：${getPetPalComplaintStatusLabel(order.primaryComplaintStatus)}`);
+  }
+  if (order.primaryComplaintSlaStatus && order.primaryComplaintSlaStatus !== 'NORMAL') {
+    parts.push(`投诉SLA：${getPetPalComplaintSlaStatusLabel(order.primaryComplaintSlaStatus)}`);
   }
   if (order.primaryComplaintType) {
     parts.push(getPetPalComplaintTypeLabel(order.primaryComplaintType));
@@ -905,6 +917,9 @@ const getAftersalesRiskSummary = (order: CaregiverAftersalesRiskOrderRecord) => 
 
   return parts.join(' · ') || '订单已进入售后链路，建议尽快复盘退款和投诉进度。';
 };
+const mapComplaintSlaStatusToPillTone = (
+  status: ComplaintAdminSlaStatus,
+): PetPalSignalPillTone => mapSignalTypeToPillTone(getPetPalComplaintSlaStatusType(status));
 const getTrendBarWidth = (value: number | string, maxRevenue: number) => {
   const revenue = toAmount(value);
   if (!maxRevenue || revenue <= 0) {

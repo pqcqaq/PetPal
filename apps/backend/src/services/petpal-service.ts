@@ -273,6 +273,7 @@ type CaregiverEarningsExportFilters = {
   refundReasonKeyword?: string;
   riskOnly?: boolean;
   complaintStatus?: 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED';
+  complaintSlaStatus?: 'NORMAL' | 'DUE_SOON' | 'OVERDUE';
   complaintType?: 'SAFETY' | 'FEE' | 'SERVICE' | 'FRAUD' | 'OTHER';
   complaintKeyword?: string;
   complaintTargetRole?: 'CAREGIVER' | 'PLATFORM';
@@ -987,6 +988,7 @@ const compareCaregiverAftersalesRiskOrder = (
 const toCaregiverAftersalesRiskOrderRecord = (order: CaregiverAftersalesRiskOrderEntity) => {
   const primaryComplaint = getPrimaryCaregiverAftersalesComplaint(order.complaints);
   const latestRefund = order.refunds[0] ?? null;
+  const primaryComplaintSlaMeta = primaryComplaint ? getComplaintAdminSlaMeta(primaryComplaint) : null;
 
   return {
     ...toCaregiverEarningsOrderRecord(order),
@@ -994,6 +996,8 @@ const toCaregiverAftersalesRiskOrderRecord = (order: CaregiverAftersalesRiskOrde
     latestRefundAmount: latestRefund ? toNumber(latestRefund.refundAmount) : null,
     complaintCount: order.complaints.length,
     primaryComplaintStatus: primaryComplaint?.status ?? null,
+    primaryComplaintSlaStatus: primaryComplaintSlaMeta?.slaStatus ?? null,
+    primaryComplaintSlaDeadlineAt: primaryComplaintSlaMeta?.slaDeadlineAt ?? null,
     primaryComplaintTargetRole: primaryComplaint?.targetRole ?? null,
     primaryComplaintType: primaryComplaint?.complaintType ?? null,
   };
@@ -2247,6 +2251,7 @@ export const petpalService = {
             }
           : {}),
         ...(normalizedFilters.complaintStatus
+          || normalizedFilters.complaintSlaStatus
           || normalizedFilters.complaintType
           || normalizedFilters.complaintKeyword
           || normalizedFilters.complaintTargetRole
@@ -2257,6 +2262,11 @@ export const petpalService = {
                   ...(normalizedFilters.complaintStatus
                     ? {
                         status: normalizedFilters.complaintStatus,
+                      }
+                    : {}),
+                  ...(normalizedFilters.complaintSlaStatus
+                    ? {
+                        AND: [buildComplaintAdminSlaWhere(normalizedFilters.complaintSlaStatus)!],
                       }
                     : {}),
                   ...(normalizedFilters.complaintType

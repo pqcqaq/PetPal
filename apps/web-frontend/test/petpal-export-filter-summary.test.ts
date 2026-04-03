@@ -78,6 +78,7 @@ test('builds and clears caregiver earnings export summary items', () => {
   snapshot.refundStatus = 'SUCCESS';
   snapshot.refundReasonKeyword = ' 提前结束 ';
   snapshot.complaintStatus = 'OPEN';
+  snapshot.complaintSlaStatus = 'OVERDUE';
   snapshot.complaintType = 'FRAUD';
   snapshot.complaintKeyword = ' 迟到 ';
   snapshot.complaintTargetRole = 'CAREGIVER';
@@ -91,6 +92,7 @@ test('builds and clears caregiver earnings export summary items', () => {
     { key: 'refundStatus', label: '退款状态', value: '退款成功' },
     { key: 'refundReasonKeyword', label: '退款原因', value: '提前结束' },
     { key: 'complaintStatus', label: '投诉状态', value: '待受理' },
+    { key: 'complaintSlaStatus', label: '投诉SLA', value: '投诉已超时' },
     { key: 'complaintType', label: '投诉类型', value: '欺诈风险' },
     { key: 'complaintKeyword', label: '投诉摘要', value: '迟到' },
     { key: 'complaintTargetRole', label: '责任角色', value: '照料者' },
@@ -99,12 +101,14 @@ test('builds and clears caregiver earnings export summary items', () => {
 
   clearCaregiverEarningsExportSummaryItem(snapshot, 'dateRange');
   clearCaregiverEarningsExportSummaryItem(snapshot, 'riskOnly');
+  clearCaregiverEarningsExportSummaryItem(snapshot, 'complaintSlaStatus');
   clearCaregiverEarningsExportSummaryItem(snapshot, 'refundReasonKeyword');
 
   assert.equal(snapshot.startDate, '');
   assert.equal(snapshot.endDate, '');
   assert.equal(snapshot.datePreset, '');
   assert.equal(snapshot.riskOnly, false);
+  assert.equal(snapshot.complaintSlaStatus, '');
   assert.equal(snapshot.refundReasonKeyword, '');
   assert.equal(snapshot.complaintType, 'FRAUD');
 });

@@ -7874,6 +7874,68 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.202 2026-04-03（P3-M1 Slice 202）
+
+**概述**：延续上一轮把风险预设说明文案收口到配置源后的状态，本轮继续补上真正缺失的 SLA 业务语义：照料者收益摘要里的风险订单现在会直接回传主投诉的 SLA 状态和截止时间，经营明细导出 query 也同步支持投诉 SLA 筛选，收益页因此可以新增“已超时投诉”风险视角，并在风险队列里直接高亮超时 / 即将超时信号，不再只靠投诉状态和投诉条数近似表达时效风险。
+
+已完成：
+
+- 后端收益摘要与导出契约补齐投诉 SLA：
+  - `packages/api-common/src/types/petpal.ts`
+    - `CaregiverAftersalesRiskOrderRecord` 新增 `primaryComplaintSlaStatus` 和 `primaryComplaintSlaDeadlineAt`。
+    - `CaregiverEarningsExportQuery` 新增 `complaintSlaStatus`。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 收益摘要里的 `recentAftersalesOrders` 现在会复用后台投诉工单已有的 SLA 计算规则，回传主投诉的 SLA 状态与截止时间。
+    - 经营明细导出筛选新增投诉 SLA 口径，支持按 `NORMAL / DUE_SOON / OVERDUE` 过滤。
+  - `apps/backend/src/routes/petpal.ts`
+    - 照料者经营导出 query schema 新增 `complaintSlaStatus` 校验。
+- 收益导出状态补齐 SLA 快照字段：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-earnings-export-state.ts`
+    - 导出 snapshot / query / risk-order preset 生成规则新增 `complaintSlaStatus`。
+    - “导出同类风险”现在会把当前风险单的投诉 SLA 一并带入导出条件，避免只按投诉状态近似匹配。
+  - `apps/web-frontend/src/pages/frontend/petpal/export-filter-summary.ts`
+    - 当前已生效导出条件摘要新增“投诉 SLA”条目，并支持逐项清除。
+- 风险预设补上超时视角：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-risk-queue-preset-config.ts`
+    - 新增 `overdueComplaint` 预设，统一维护标签、说明、快照 patch 和计数规则。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 风险队列 pill 与摘要文案新增投诉 SLA 信号，超时和即将超时不再埋在后台概念里。
+    - 快捷导出区现在会直接出现“已超时投诉”视角。
+- 定向测试继续兜底：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 收益摘要聚合用例新增主投诉 SLA 返回断言。
+    - 新增经营导出按投诉 SLA 筛选用例，覆盖 `OVERDUE` 和 `DUE_SOON`。
+  - `apps/web-frontend/test/caregiver-earnings-export-state.test.ts`
+  - `apps/web-frontend/test/caregiver-risk-queue-export.test.ts`
+  - `apps/web-frontend/test/petpal-export-filter-summary.test.ts`
+    - 覆盖 SLA 快照、预设识别、动作计数和摘要清理。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts ..\\web-frontend\\test\\caregiver-risk-queue-export.test.ts ..\\web-frontend\\test\\petpal-export-filter-summary.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 --test-name-pattern "supports caregiver earnings summary aggregation|filters caregiver earnings export by complaint SLA status" test/integration/petpal-api.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮新增了真实可导出的投诉 SLA 业务语义，而不是只在前端做静态标签。
+- 已确认收益摘要风险订单、风险快捷导出和当前导出条件摘要都使用同一套投诉 SLA 口径，不会出现“列表上看见超时、导出时却丢掉 SLA 条件”的语义漂移。
+- 已确认这次变更仍然限定在照料者收益 / 风险复盘链路，没有扩散到主人退款导出或后台投诉筛选之外的页面。
+
+风险与缓解：
+
+- 风险：当前经营导出虽然已经支持投诉 SLA 筛选，但表单区还没有开放手动选择 SLA 的筛选控件，当前入口主要依赖风险快捷导出和“导出同类风险”。
+- 缓解：下一轮如继续深化，可优先评估是否把 `complaintSlaStatus` 补成表单级可选筛选项，并决定是否追加“即将超时投诉”预设，而不是继续只走隐式 preset。
+
+下一步（1-3）：
+
+1. 继续评估是否为收益导出表单补“投诉 SLA”手动筛选项，让超时视角不只依赖快捷预设。
+2. 继续评估是否追加“即将超时投诉”风险预设，并结合当前风险队列顺序决定是否需要把 SLA 风险进一步前置。
+3. 在风险复盘入口基本稳定后，再继续补剩余验收向测试、审计收口与最终交付材料。
+
 ### 14.201 2026-04-03（P3-M1 Slice 201）
 
 **概述**：延续上一轮把风险预设计数收口成共享 counter 后的状态，本轮继续把收益页里仍散落在页面层的“当前风险视角说明文案”也并回预设配置源。这样每个风险视角的标签、说明、快照 patch、匹配规则和计数口径都统一挂在同一份 preset definition 上，页面不再用通用模板字符串兜底说明。

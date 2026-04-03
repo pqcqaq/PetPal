@@ -29,6 +29,8 @@ const createRiskOrder = (
   latestRefundAmount: null,
   complaintCount: 0,
   primaryComplaintStatus: null,
+  primaryComplaintSlaStatus: null,
+  primaryComplaintSlaDeadlineAt: null,
   primaryComplaintTargetRole: null,
   primaryComplaintType: null,
   ...overrides,
@@ -39,6 +41,7 @@ const riskQueueOrders = [
     id: 'risk-order-open-repeat-caregiver',
     complaintCount: 3,
     primaryComplaintStatus: 'OPEN',
+    primaryComplaintSlaStatus: 'OVERDUE',
     primaryComplaintTargetRole: 'CAREGIVER',
     amountRefunded: 120,
     latestRefundStatus: 'APPROVED',
@@ -62,6 +65,7 @@ test('counts caregiver risk queue presets with a shared preset map', () => {
   assert.deepEqual(createCaregiverRiskQueueExportPresetCountMap(), {
     openComplaint: 0,
     openRepeatedComplaint: 0,
+    overdueComplaint: 0,
     processingComplaint: 0,
     caregiverResponsibility: 0,
     platformResponsibility: 0,
@@ -74,6 +78,7 @@ test('counts caregiver risk queue presets with a shared preset map', () => {
   assert.deepEqual(countCaregiverRiskQueueExportPresets(riskQueueOrders), {
     openComplaint: 1,
     openRepeatedComplaint: 1,
+    overdueComplaint: 1,
     processingComplaint: 1,
     caregiverResponsibility: 2,
     platformResponsibility: 1,
@@ -90,6 +95,7 @@ test('builds caregiver risk queue export actions in stable preset order', () => 
   assert.deepEqual(actions, [
     { preset: 'openComplaint', label: '待受理投诉', count: 1 },
     { preset: 'openRepeatedComplaint', label: '待受理重复投诉', count: 1 },
+    { preset: 'overdueComplaint', label: '已超时投诉', count: 1 },
     { preset: 'processingComplaint', label: '处理中投诉', count: 1 },
     { preset: 'caregiverResponsibility', label: '照料者责任', count: 2 },
     { preset: 'platformResponsibility', label: '平台责任', count: 1 },
@@ -103,6 +109,7 @@ test('builds caregiver risk queue export actions in stable preset order', () => 
 test('returns caregiver risk queue preset labels for composite views', () => {
   assert.equal(getCaregiverRiskQueueExportPresetLabel('openComplaint'), '待受理投诉');
   assert.equal(getCaregiverRiskQueueExportPresetLabel('openRepeatedComplaint'), '待受理重复投诉');
+  assert.equal(getCaregiverRiskQueueExportPresetLabel('overdueComplaint'), '已超时投诉');
   assert.equal(
     getCaregiverRiskQueueExportPresetLabel('repeatCaregiverComplaint'),
     '照料者重复投诉',
@@ -114,6 +121,10 @@ test('returns caregiver risk queue preset descriptions for active queue views', 
   assert.equal(
     getCaregiverRiskQueueExportPresetDescription('openRepeatedComplaint'),
     '当前经营导出已聚焦待受理且已重复出现的投诉，可优先处理高复发风险订单。',
+  );
+  assert.equal(
+    getCaregiverRiskQueueExportPresetDescription('overdueComplaint'),
+    '当前经营导出已聚焦投诉 SLA 已超时的风险单，可优先补救长期未结案争议。',
   );
   assert.equal(
     getCaregiverRiskQueueExportPresetDescription('repeatCaregiverComplaint'),

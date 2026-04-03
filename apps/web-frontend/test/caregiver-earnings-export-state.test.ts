@@ -68,6 +68,7 @@ test('builds caregiver earnings export query payloads without leaking empty valu
     refundStatus: 'SUCCESS' as const,
     refundReasonKeyword: '  late arrival  ',
     complaintStatus: 'PROCESSING' as const,
+    complaintSlaStatus: 'OVERDUE' as const,
     complaintKeyword: '  follow up  ',
     complaintTargetRole: 'CAREGIVER' as const,
     riskOnly: true,
@@ -84,6 +85,7 @@ test('builds caregiver earnings export query payloads without leaking empty valu
     refundStatus: 'SUCCESS',
     refundReasonKeyword: 'late arrival',
     complaintStatus: 'PROCESSING',
+    complaintSlaStatus: 'OVERDUE',
     complaintType: undefined,
     complaintKeyword: 'follow up',
     complaintTargetRole: 'CAREGIVER',
@@ -107,6 +109,7 @@ test('builds caregiver risk order export snapshots while preserving the current 
     serviceType: 'BOARDING',
     latestRefundStatus: 'APPROVED',
     primaryComplaintStatus: 'OPEN',
+    primaryComplaintSlaStatus: 'OVERDUE',
     primaryComplaintType: 'SERVICE',
     primaryComplaintTargetRole: 'CAREGIVER',
   });
@@ -119,6 +122,7 @@ test('builds caregiver risk order export snapshots while preserving the current 
     serviceType: 'BOARDING',
     refundStatus: 'APPROVED',
     complaintStatus: 'OPEN',
+    complaintSlaStatus: 'OVERDUE',
     complaintType: 'SERVICE',
     complaintTargetRole: 'CAREGIVER',
     riskOnly: true,
@@ -157,6 +161,15 @@ test('builds caregiver risk queue export snapshots for common queue views', () =
     datePreset: 'last7days',
     complaintStatus: 'OPEN',
     minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
+    riskOnly: true,
+  });
+
+  assert.deepEqual(buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'overdueComplaint'), {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days',
+    complaintSlaStatus: 'OVERDUE',
     riskOnly: true,
   });
 
@@ -262,6 +275,15 @@ test('detects current caregiver risk queue export views without confusing other 
   assert.equal(
     resolveCaregiverRiskQueueExportPreset(openRepeatedComplaintSnapshot),
     'openRepeatedComplaint',
+  );
+
+  const overdueComplaintSnapshot = buildCaregiverRiskQueueExportSnapshot(
+    currentSnapshot,
+    'overdueComplaint',
+  );
+  assert.equal(
+    resolveCaregiverRiskQueueExportPreset(overdueComplaintSnapshot),
+    'overdueComplaint',
   );
 
   const processingComplaintSnapshot = buildCaregiverRiskQueueExportSnapshot(

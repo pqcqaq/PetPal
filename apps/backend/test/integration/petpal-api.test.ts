@@ -924,6 +924,7 @@ describe('PetPal API integration', () => {
         complaintType: 'SERVICE',
         description: '服务过程与约定不一致，需要优先核查',
         status: 'OPEN',
+        createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000),
       },
     });
 
@@ -981,6 +982,8 @@ describe('PetPal API integration', () => {
       priorityAftersalesOrder.id,
     );
     assert.equal(summaryResponse.body.data.recentAftersalesOrders[0].primaryComplaintStatus, 'OPEN');
+    assert.equal(summaryResponse.body.data.recentAftersalesOrders[0].primaryComplaintSlaStatus, 'OVERDUE');
+    assert.ok(summaryResponse.body.data.recentAftersalesOrders[0].primaryComplaintSlaDeadlineAt);
     assert.equal(
       summaryResponse.body.data.recentAftersalesOrders[0].primaryComplaintTargetRole,
       'CAREGIVER',
@@ -998,6 +1001,8 @@ describe('PetPal API integration', () => {
     assert.equal(refundRiskOrder.latestRefundStatus, 'SUCCESS');
     assert.equal(Number(refundRiskOrder.latestRefundAmount), 40);
     assert.equal(refundRiskOrder.primaryComplaintStatus, 'RESOLVED');
+    assert.equal(refundRiskOrder.primaryComplaintSlaStatus, null);
+    assert.equal(refundRiskOrder.primaryComplaintSlaDeadlineAt, null);
     assert.equal(refundRiskOrder.primaryComplaintTargetRole, 'PLATFORM');
     assert.equal(refundRiskOrder.primaryComplaintType, 'FEE');
     assert.ok(
@@ -4315,6 +4320,164 @@ describe('PetPal API integration', () => {
     const complaintKeywordFilteredRow = comboWorksheet.getRow(2);
     assert.equal(complaintKeywordFilteredRow.getCell(1).value, matchedOrder.orderNo);
     assert.equal(complaintKeywordFilteredRow.getCell(5).value, '杭州市滨江区导出-投诉摘要命中');
+  });
+
+  it('filters caregiver earnings export by complaint SLA status', async () => {
+    const { app, prisma } = context;
+    const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
+    const ownerSession = await loginAs(app, 'user', 'User123!');
+
+    const caregiverProfileResponse = await request(app)
+      .get('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    await prisma.caregiverProfile.update({
+      where: {
+        id: caregiverProfileResponse.body.data.id,
+      },
+      data: {
+        auditStatus: 'APPROVED',
+      },
+    });
+
+    const ownerPet = await prisma.petProfile.findFirst({
+      where: {
+        ownerId: ownerSession.user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    assert.ok(ownerPet);
+
+    const suffix = Date.now().toString(36);
+    const createRequest = async (key: string, locationText: string) =>
+      prisma.serviceRequest.create({
+        data: {
+          id: `req-earn-export-complaint-sla-${key}-${suffix}`,
+          ownerId: ownerSession.user.id,
+          petId: ownerPet.id,
+          serviceType: 'BOARDING',
+          startTime: new Date('2026-04-10T09:00:00.000Z'),
+          endTime: new Date('2026-04-10T18:00:00.000Z'),
+          locationText,
+          locationLat: 30.206,
+          locationLng: 120.211,
+          budgetAmount: 208,
+          demandTags: [key],
+          status: 'MATCHED',
+          matchedCaregiverId: caregiverProfileResponse.body.data.id,
+        },
+      });
+
+    const overdueRequest = await createRequest('overdue', '杭州市滨江区导出-投诉已超时');
+    const dueSoonRequest = await createRequest('due-soon', '杭州市滨江区导出-投诉即将超时');
+
+    const overdueOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-complaint-sla-overdue-${suffix}`,
+        orderNo: `PP-EARN-SLA-O-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: overdueRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: overdueRequest.startTime,
+        appointmentEnd: overdueRequest.endTime,
+        amountTotal: 208,
+        amountAdjusted: 0,
+        amountPaid: 208,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-10T18:30:00.000Z'),
+      },
+    });
+
+    const dueSoonOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-complaint-sla-due-soon-${suffix}`,
+        orderNo: `PP-EARN-SLA-D-${Date.now() + 1}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: dueSoonRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: dueSoonRequest.startTime,
+        appointmentEnd: dueSoonRequest.endTime,
+        amountTotal: 188,
+        amountAdjusted: 0,
+        amountPaid: 188,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-10T18:45:00.000Z'),
+      },
+    });
+
+    await prisma.complaint.create({
+      data: {
+        id: `complaint-export-sla-overdue-${suffix}`,
+        orderId: overdueOrder.id,
+        complainantId: ownerSession.user.id,
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: '已超过 SLA 的投诉',
+        status: 'OPEN',
+        createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000),
+      },
+    });
+
+    await prisma.complaint.create({
+      data: {
+        id: `complaint-export-sla-due-soon-${suffix}`,
+        orderId: dueSoonOrder.id,
+        complainantId: ownerSession.user.id,
+        targetRole: 'PLATFORM',
+        complaintType: 'FEE',
+        description: '即将超过 SLA 的投诉',
+        status: 'OPEN',
+        createdAt: new Date(Date.now() - 21 * 60 * 60 * 1000),
+      },
+    });
+
+    const overdueResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings/export')
+      .query({
+        serviceType: 'BOARDING',
+        complaintSlaStatus: 'OVERDUE',
+      })
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const overdueWorksheet = await loadWorksheet(overdueResponse.body as Buffer);
+    const overdueExportedOrderNos = Array.from(
+      { length: Math.max(0, overdueWorksheet.rowCount - 1) },
+      (_, index) => String(overdueWorksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(overdueExportedOrderNos, [overdueOrder.orderNo]);
+    assert.ok(!overdueExportedOrderNos.includes(dueSoonOrder.orderNo));
+
+    const dueSoonResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings/export')
+      .query({
+        serviceType: 'BOARDING',
+        complaintSlaStatus: 'DUE_SOON',
+      })
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const dueSoonWorksheet = await loadWorksheet(dueSoonResponse.body as Buffer);
+    const dueSoonExportedOrderNos = Array.from(
+      { length: Math.max(0, dueSoonWorksheet.rowCount - 1) },
+      (_, index) => String(dueSoonWorksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(dueSoonExportedOrderNos, [dueSoonOrder.orderNo]);
+    assert.ok(!dueSoonExportedOrderNos.includes(overdueOrder.orderNo));
   });
 
   it('filters caregiver earnings export by order number keyword', async () => {

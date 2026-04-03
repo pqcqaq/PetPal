@@ -1,5 +1,6 @@
 import type {
   CaregiverAftersalesRiskOrderRecord,
+  ComplaintAdminSlaStatus,
   ComplaintStatus,
   ComplaintTargetRole,
   RefundStatus,
@@ -10,6 +11,7 @@ export const CAREGIVER_REPEAT_COMPLAINT_COUNT = 2;
 
 type CaregiverRiskQueueExportPresetPatch = {
   complaintStatus?: ComplaintStatus;
+  complaintSlaStatus?: ComplaintAdminSlaStatus;
   complaintTargetRole?: ComplaintTargetRole;
   refundStatus?: RefundStatus;
   minRefundAmount?: number;
@@ -54,6 +56,15 @@ export const caregiverRiskQueueExportPresetDefinitions = [
     matchesOrder: (order) =>
       order.primaryComplaintStatus === 'OPEN'
       && order.complaintCount >= CAREGIVER_REPEAT_COMPLAINT_COUNT,
+  },
+  {
+    preset: 'overdueComplaint',
+    label: '已超时投诉',
+    description: '当前经营导出已聚焦投诉 SLA 已超时的风险单，可优先补救长期未结案争议。',
+    patch: {
+      complaintSlaStatus: 'OVERDUE',
+    },
+    matchesOrder: (order) => order.primaryComplaintSlaStatus === 'OVERDUE',
   },
   {
     preset: 'processingComplaint',

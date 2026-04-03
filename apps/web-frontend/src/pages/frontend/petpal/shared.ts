@@ -1,5 +1,6 @@
 import type {
   CaregiverAuditStatus,
+  ComplaintAdminSlaStatus,
   ComplaintStatus,
   ComplaintTargetRole,
   ComplaintType,
@@ -265,6 +266,23 @@ export const getPetPalComplaintStatusLabel = (status: ComplaintStatus) => ({
   RESOLVED: '已解决',
   REJECTED: '已驳回',
 }[status] ?? status);
+
+export const getPetPalComplaintSlaStatusLabel = (status: ComplaintAdminSlaStatus) => ({
+  NORMAL: 'SLA正常',
+  DUE_SOON: '即将超时',
+  OVERDUE: '投诉已超时',
+}[status] ?? status);
+
+export const getPetPalComplaintSlaStatusType = (
+  status: ComplaintAdminSlaStatus,
+): 'success' | 'warning' | 'danger' => {
+  const map: Record<ComplaintAdminSlaStatus, 'success' | 'warning' | 'danger'> = {
+    NORMAL: 'success',
+    DUE_SOON: 'warning',
+    OVERDUE: 'danger',
+  };
+  return map[status];
+};
 
 export const getPetPalComplaintStatusType = (
   status: ComplaintStatus,

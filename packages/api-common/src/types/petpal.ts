@@ -388,6 +388,8 @@ export interface CaregiverAftersalesRiskOrderRecord extends CaregiverEarningsOrd
   latestRefundAmount: AmountValue | null;
   complaintCount: number;
   primaryComplaintStatus: ComplaintStatus | null;
+  primaryComplaintSlaStatus: ComplaintAdminSlaStatus | null;
+  primaryComplaintSlaDeadlineAt: string | null;
   primaryComplaintTargetRole: ComplaintTargetRole | null;
   primaryComplaintType: ComplaintType | null;
 }
@@ -577,6 +579,7 @@ export interface CaregiverEarningsExportQuery {
   refundReasonKeyword?: string;
   riskOnly?: boolean;
   complaintStatus?: ComplaintStatus;
+  complaintSlaStatus?: ComplaintAdminSlaStatus;
   complaintType?: ComplaintType;
   complaintKeyword?: string;
   complaintTargetRole?: ComplaintTargetRole;

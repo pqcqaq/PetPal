@@ -1,6 +1,7 @@
 import type {
   CaregiverAftersalesRiskOrderRecord,
   CaregiverEarningsExportQuery,
+  ComplaintAdminSlaStatus,
   ComplaintStatus,
   ComplaintTargetRole,
   ComplaintType,
@@ -49,6 +50,7 @@ export type CaregiverEarningsExportFilterSnapshot = {
   refundStatus: RefundStatus | '';
   refundReasonKeyword: string;
   complaintStatus: ComplaintStatus | '';
+  complaintSlaStatus: ComplaintAdminSlaStatus | '';
   complaintType: ComplaintType | '';
   complaintKeyword: string;
   complaintTargetRole: ComplaintTargetRole | '';
@@ -71,6 +73,7 @@ const caregiverEarningsExportSnapshot = definePetPalExportSnapshot<CaregiverEarn
   refundStatus: '',
   refundReasonKeyword: '',
   complaintStatus: '',
+  complaintSlaStatus: '',
   complaintType: '',
   complaintKeyword: '',
   complaintTargetRole: '',
@@ -120,6 +123,7 @@ export const hasCaregiverEarningsExportFilters = (
   snapshot.refundStatus,
   snapshot.refundReasonKeyword,
   snapshot.complaintStatus,
+  snapshot.complaintSlaStatus,
   snapshot.complaintType,
   snapshot.complaintKeyword,
   snapshot.complaintTargetRole,
@@ -139,6 +143,7 @@ export const buildCaregiverEarningsExportQuery = (
   refundStatus: toPetPalOptionalQueryValue(snapshot.refundStatus),
   refundReasonKeyword: toPetPalOptionalTrimmedQueryText(snapshot.refundReasonKeyword),
   complaintStatus: toPetPalOptionalQueryValue(snapshot.complaintStatus),
+  complaintSlaStatus: toPetPalOptionalQueryValue(snapshot.complaintSlaStatus),
   complaintType: toPetPalOptionalQueryValue(snapshot.complaintType),
   complaintKeyword: toPetPalOptionalTrimmedQueryText(snapshot.complaintKeyword),
   complaintTargetRole: toPetPalOptionalQueryValue(snapshot.complaintTargetRole),
@@ -152,6 +157,7 @@ export const buildCaregiverRiskOrderExportSnapshot = (
     | 'serviceType'
     | 'latestRefundStatus'
     | 'primaryComplaintStatus'
+    | 'primaryComplaintSlaStatus'
     | 'primaryComplaintType'
     | 'primaryComplaintTargetRole'
   >,
@@ -163,6 +169,7 @@ export const buildCaregiverRiskOrderExportSnapshot = (
   serviceType: order.serviceType,
   refundStatus: order.latestRefundStatus ?? '',
   complaintStatus: order.primaryComplaintStatus ?? '',
+  complaintSlaStatus: order.primaryComplaintSlaStatus ?? '',
   complaintType: order.primaryComplaintType ?? '',
   complaintTargetRole: order.primaryComplaintTargetRole ?? '',
   riskOnly: true,

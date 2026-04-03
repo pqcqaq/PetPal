@@ -214,6 +214,7 @@ const caregiverEarningsExportQuerySchema = z.object({
   refundReasonKeyword: z.string().trim().min(1).max(100).optional(),
   riskOnly: optionalBooleanQuerySchema,
   complaintStatus: z.enum(['OPEN', 'PROCESSING', 'RESOLVED', 'REJECTED']).optional(),
+  complaintSlaStatus: z.enum(['NORMAL', 'DUE_SOON', 'OVERDUE']).optional(),
   complaintType: z.enum(['SAFETY', 'FEE', 'SERVICE', 'FRAUD', 'OTHER']).optional(),
   complaintKeyword: z.string().trim().min(1).max(100).optional(),
   complaintTargetRole: z.enum(['CAREGIVER', 'PLATFORM']).optional(),
