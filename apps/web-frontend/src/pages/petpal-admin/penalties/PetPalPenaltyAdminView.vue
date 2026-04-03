@@ -81,6 +81,14 @@
               <span class="penalty-expand__label">整改说明</span>
               <p>{{ scope.row.rectifyNote }}</p>
             </div>
+            <div v-if="scope.row.rectifyEvidenceUrls.length" class="penalty-expand__section">
+              <span class="penalty-expand__label">整改材料</span>
+              <ul class="penalty-expand__links">
+                <li v-for="url in scope.row.rectifyEvidenceUrls" :key="url">
+                  <a :href="url" target="_blank" rel="noreferrer">{{ url }}</a>
+                </li>
+              </ul>
+            </div>
             <div v-if="scope.row.appealStatus !== 'NONE'" class="penalty-expand__section">
               <span class="penalty-expand__label">申诉原因</span>
               <p>{{ scope.row.appealReason || '-' }}</p>
@@ -247,6 +255,19 @@
               placeholder="说明整改证据、复核结果或豁免原因"
             />
           </el-form-item>
+          <el-form-item label="整改材料链接">
+            <el-input
+              v-model="rectifyForm.rectifyEvidenceInput"
+              type="textarea"
+              :rows="4"
+              maxlength="4000"
+              show-word-limit
+              placeholder="每行一个材料链接；完成整改时至少填写 1 个"
+            />
+            <p class="penalty-dialog__helper">
+              支持填写视频、图片、复盘文档等 URL，提交后将按行去重保存，最多 10 条。
+            </p>
+          </el-form-item>
         </el-form>
       </template>
 
@@ -403,6 +424,7 @@ type State = {
 type RectifyFormState = {
   rectifyStatus: Extract<PenaltyRectifyStatus, 'COMPLETED' | 'WAIVED'>;
   rectifyNote: string;
+  rectifyEvidenceInput: string;
 };
 
 type AppealFormState = {
@@ -455,6 +477,7 @@ const { state: pageState, reset: resetPageState } = usePageState<State>('page:pe
 const createEmptyRectifyForm = (): RectifyFormState => ({
   rectifyStatus: 'COMPLETED',
   rectifyNote: '',
+  rectifyEvidenceInput: '',
 });
 
 const createEmptyAppealForm = (): AppealFormState => ({
@@ -539,6 +562,16 @@ const getAppealHint = (record: PenaltyAdminRecord) => {
     ? `审核于 ${formatDateTime(record.appealReviewedAt)}`
     : '已完成审核';
 };
+
+const parseEvidenceUrls = (input: string) =>
+  Array.from(
+    new Set(
+      input
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
 
 const buildRouteQuery = () => {
   const query: Record<string, string> = {};
@@ -724,12 +757,18 @@ const submitRectify = async () => {
     ElMessage.error('请填写整改说明');
     return;
   }
+  const rectifyEvidenceUrls = parseEvidenceUrls(rectifyForm.rectifyEvidenceInput);
+  if (rectifyForm.rectifyStatus === 'COMPLETED' && rectifyEvidenceUrls.length === 0) {
+    ElMessage.error('完成整改时至少需要填写 1 个整改材料链接');
+    return;
+  }
 
   try {
     rectifySubmitting.value = true;
     await api.petpal.admin.rectifyPenalty(activePenalty.value.id, {
       rectifyStatus: rectifyForm.rectifyStatus,
       rectifyNote,
+      rectifyEvidenceUrls,
     });
     rectifyDialogVisible.value = false;
     ElMessage.success('处罚整改状态已更新');
@@ -854,6 +893,16 @@ watch(
   color: var(--el-text-color-secondary);
 }
 
+.penalty-expand__links {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.penalty-expand__links a {
+  color: var(--el-color-primary);
+  word-break: break-all;
+}
+
 .penalty-dialog__summary {
   margin-bottom: 16px;
   padding: 12px 14px;
@@ -868,6 +917,13 @@ watch(
 
 .penalty-dialog__summary p {
   margin-top: 6px;
+  color: var(--el-text-color-secondary);
+}
+
+.penalty-dialog__helper {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--el-text-color-secondary);
 }
 </style>

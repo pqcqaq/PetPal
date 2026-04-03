@@ -1670,6 +1670,7 @@ const toPenaltyAdminRecord = (penalty: PenaltyAdminEntity) => ({
   rectifyDueAt: penalty.rectifyDueAt,
   rectifiedAt: penalty.rectifiedAt,
   rectifyNote: penalty.rectifyNote,
+  rectifyEvidenceUrls: toStringArray(penalty.rectifyEvidenceUrls),
   appealStatus: penalty.appealStatus,
   appealReason: penalty.appealReason,
   appealSubmittedAt: penalty.appealSubmittedAt,
@@ -5496,6 +5497,7 @@ export const petpalService = {
     payload: {
       rectifyStatus: 'COMPLETED' | 'WAIVED';
       rectifyNote: string;
+      rectifyEvidenceUrls?: string[];
     },
   ) {
     const existing = await prisma.penaltyRecord.findFirst({
@@ -5526,6 +5528,10 @@ export const petpalService = {
     if (!rectifyNote) {
       throw badRequest('Penalty rectify note is required');
     }
+    const rectifyEvidenceUrls = normalizeEvidenceUrls(payload.rectifyEvidenceUrls);
+    if (payload.rectifyStatus === 'COMPLETED' && rectifyEvidenceUrls.length === 0) {
+      throw badRequest('Completed penalty rectification requires at least one evidence url');
+    }
 
     const updated = await prisma.penaltyRecord.update({
       where: {
@@ -5535,6 +5541,10 @@ export const petpalService = {
         updateId: actorId,
         rectifyStatus: payload.rectifyStatus,
         rectifyNote,
+        rectifyEvidenceUrls:
+          rectifyEvidenceUrls.length > 0
+            ? (rectifyEvidenceUrls as Prisma.InputJsonValue)
+            : Prisma.DbNull,
         rectifiedAt: new Date(),
       },
       include: penaltyAdminInclude,

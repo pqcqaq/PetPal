@@ -341,6 +341,7 @@ export interface PenaltyAdminRecord {
   rectifyDueAt: string | null;
   rectifiedAt: string | null;
   rectifyNote: string | null;
+  rectifyEvidenceUrls: string[];
   appealStatus: PenaltyAppealStatus;
   appealReason: string | null;
   appealSubmittedAt: string | null;
@@ -642,6 +643,7 @@ export interface PenaltyAdminPage {
 export interface RectifyPenaltyPayload {
   rectifyStatus: Exclude<PenaltyRectifyStatus, 'PENDING'>;
   rectifyNote: string;
+  rectifyEvidenceUrls?: string[];
 }
 
 export interface SubmitPenaltyAppealPayload {
