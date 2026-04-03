@@ -337,6 +337,9 @@ const finishRouteProgress = () => {
   endRouteProgress();
 };
 
+const isPetPalFrontendTarget = (path: string) =>
+  path === '/petpal' || path.startsWith('/petpal/');
+
 export const router = createRouter({
   history: createWebHistory(),
   routes,
@@ -344,6 +347,12 @@ export const router = createRouter({
 
 router.beforeEach(async (to) => {
   startRouteProgress();
+
+  if (isPetPalFrontendTarget(to.path)) {
+    const { ensurePetPalStartup } = await import('@/petpal/startup');
+    ensurePetPalStartup();
+  }
+
   const auth = useAuthStore(pinia);
   const menus = useMenuStore(pinia);
   const isConsoleTarget = to.path === CONSOLE_NAMESPACE || to.path.startsWith(`${CONSOLE_NAMESPACE}/`);

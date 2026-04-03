@@ -209,6 +209,10 @@ Last updated: 2026-04-04
   - Web / App 两端的 `message-composer-state.ts` 现在都已导出显式 `warmup` 入口，启动时会先重读本地存储并立即压缩回写旧匿名消息缓存，不再要求用户先进入消息页或订单详情页才触发清理。
   - `apps/web-frontend/src/main.ts` 与 `apps/app-frontend/src/main.ts` 已分别接入 PetPal 启动文件，让这次性清理更早发生在前台工作区启动阶段。
   - `apps/web-frontend/test/petpal-message-composer-state.test.ts` 已补“仅靠 warmup 就会改写存储”的定向单测，继续兜底启动期缓存收口链路。
+- 2026-04-04 已继续补 PetPal 首次访问懒 warmup：
+  - Web 端已把消息缓存 warmup 从全局 `main.ts` 挪到 `/petpal*` 路由首次命中时的懒加载启动 helper，避免非 PetPal 场景也提前拉起消息状态模块。
+  - App 端已把同一逻辑挪到 `PetpalPage` 公共页面壳首次渲染时触发，PetPal 页面之外不再无差别执行消息缓存 warmup。
+  - `apps/web-frontend/test/petpal-startup.test.ts` 已补“startup helper 只触发一次直到显式 reset”的定向单测，继续兜底懒 warmup 入口。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

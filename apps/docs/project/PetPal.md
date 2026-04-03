@@ -7882,6 +7882,60 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.242 2026-04-04（P3-M1 Slice 242）
+
+**概述**：上一轮已经把消息缓存 warmup 提前到启动阶段，但接线仍挂在双端 `main.ts`。这会让非 PetPal 场景也提前 import 消息状态模块，和“只在真实业务场景里启动业务状态”的收口方向不完全一致。本轮继续沿同一条缓存收口链路，把 warmup 从全局主入口收紧到“首次进入 PetPal 场景时才触发”。
+
+已完成：
+
+- Web 端已补按路由懒触发的 PetPal warmup：
+  - `apps/web-frontend/src/petpal/startup.ts`
+    - 启动文件不再在模块顶层直接执行 warmup，改为导出 `ensurePetPalStartup(...)` 并加上单次触发保护。
+    - 新增 `resetPetPalStartupForTest()`，用于稳定验证“只在首次进入 PetPal 场景时触发一次”的边界。
+  - `apps/web-frontend/src/router/index.ts`
+    - 现在只会在首次命中 `/petpal` 或 `/petpal/*` 路由时懒加载 `startup` 模块并执行一次 warmup。
+    - `/petpal-admin/*`、`/console/*`、首页和其他前台页面不再提前拉起消息缓存状态模块。
+  - `apps/web-frontend/src/main.ts`
+    - 已移除全局 `startup` 引入，PetPal 消息缓存不再跟着全站入口一起初始化。
+- App 端已补按页面壳懒触发的 PetPal warmup：
+  - `apps/app-frontend/src/petpal/startup.ts`
+    - 同样改为显式 `ensurePetPalStartup(...)`，并加上一次性保护与测试 reset 入口。
+  - `apps/app-frontend/src/pages/petpal/rebuild/petpal-page.vue`
+    - PetPal 公共页面壳现在会在首次渲染时触发 warmup，后续 PetPal 页面复用同一个 once guard。
+  - `apps/app-frontend/src/main.ts`
+    - 已移除全局 `startup` 引入，非 PetPal 页面不再无差别执行消息缓存 warmup。
+- Web 定向单测已补懒启动 helper 覆盖：
+  - `apps/web-frontend/test/petpal-startup.test.ts`
+    - 新增“startup helper 在 reset 前只 warmup 一次”用例，兜底懒启动入口不会重复执行。
+  - `apps/web-frontend/test/petpal-message-composer-state.test.ts`
+    - 既有 warmup 压缩存储用例继续保留，用来保证懒触发后执行的仍是同一套缓存裁剪逻辑。
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-message-composer-state.test.ts ..\\web-frontend\\test\\petpal-startup.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有改变消息缓存的 identity、匿名迁移、24 小时清理窗口或运行时草稿读写口径，变化只在 warmup 的触发边界和启动 helper 结构。
+- 已确认 Web 端 warmup 现在只会在 PetPal 前台路由首次命中时发生，避免首页、控制台和后台治理页面继续为 PetPal 消息状态付出无关初始化成本。
+- 已确认 App 端 warmup 现在绑定到 PetPal 页面壳首次渲染，PetPal 页面内部仍能保持一次性清理，而全局 `main.ts` 已回到更纯粹的应用壳职责。
+
+风险与缓解：
+
+- 风险：Web 端首次进入 PetPal 路由时现在会多一次动态导入 `startup` chunk。
+- 缓解：这部分体积很小，只承载一次性 warmup 入口，而且比全站主入口长期携带 PetPal 消息状态更符合实际使用路径。
+
+- 风险：App 端 warmup 目前依赖 `PetpalPage` 公共页面壳；如果后续新增 PetPal 页面未复用这个壳，就可能漏掉首次触发。
+- 缓解：当前主要 PetPal 页面和订单详情辅助页都已复用该壳；后续新增页面时继续保持这一约束，必要时再补更显式的页面级入口检查。
+
+下一步（1-3）：
+
+1. 继续评估 App 端是否还需要对少量不走 `PetpalPage` 的未来页面补显式 warmup 约束，避免后续扩展时漏接一次性初始化。
+2. 继续评估订单消息与投诉证据是否要统一升级为带 `fileId` 的受控附件快照，进一步提升附件引用追踪可靠性。
+3. 继续按切片节奏推进局部改动、定向验证、本地提交和文档同步，不回到无边界大改。
+
 ### 14.241 2026-04-04（P3-M1 Slice 241）
 
 **概述**：上一轮已经把长期未命中的匿名旧消息缓存缩短到 24 小时，但真正的压缩回写仍依赖消息状态模块被加载。也就是说，用户如果一直没有进入消息页或订单详情页，启动时并不会主动把这些旧匿名残留收掉。本轮继续沿同一条缓存收口链路，把这次性清理显式接到双端启动阶段，让 PetPal 工作区一启动就先 warmup 本地消息缓存。

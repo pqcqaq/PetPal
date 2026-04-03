@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { ensurePetPalStartup } from '@/petpal/startup'
+
+ensurePetPalStartup()
+
 const props = withDefaults(defineProps<{
   title: string
   subtitle?: string
