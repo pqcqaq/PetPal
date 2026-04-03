@@ -50,6 +50,7 @@ const envSchema = z.object({
   UPLOAD_RECONCILE_RUN_ON_START: booleanFromEnv(true),
   UPLOAD_RECONCILE_INTERVAL_MINUTES: z.coerce.number().int().positive().default(60),
   UPLOAD_PENDING_TIMEOUT_MINUTES: z.coerce.number().int().positive().default(60),
+  UPLOAD_ORPHAN_GRACE_PERIOD_MINUTES: z.coerce.number().int().positive().default(1440),
   UPLOAD_RECONCILE_BATCH_SIZE: z.coerce.number().int().positive().default(100),
   PETPAL_CALLBACK_AUTH_MODE: z.enum(['TOKEN', 'WECHATPAY']).default('TOKEN'),
   PETPAL_CALLBACK_TOKEN: z.string().default('petpal-dev-callback-token'),

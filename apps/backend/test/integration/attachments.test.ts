@@ -15,10 +15,23 @@ import {
   uploadManagedFileForTest,
   withClientAuth,
 } from '../support/backend-testkit';
+import { cleanupOrphanManagedAttachments } from '../../src/timers/upload-reconcile/cleanup-orphan-managed-attachments';
 
 let context: BackendTestContext;
 
 const resolveUploadPath = (objectKey: string) => path.resolve(process.cwd(), 'uploads', objectKey);
+
+const resolveManagedUploadPath = async (fileId: string) => {
+  const asset = await context.prismaRaw.mediaAsset.findUnique({
+    where: { id: fileId },
+    select: {
+      objectKey: true,
+    },
+  });
+
+  assert.ok(asset);
+  return resolveUploadPath(asset.objectKey);
+};
 
 const loadManagedAttachmentMaterial = async (fileId: string) => {
   const asset = await context.prismaRaw.mediaAsset.findUnique({
@@ -531,6 +544,163 @@ describe('Attachment integration', () => {
 
     assert.match(blockedPenaltyDelete.body.message, /Attachment is still referenced by business records/);
     assert.match(blockedPenaltyDelete.body.message, new RegExp(penaltyReference.orderNo));
+  });
+
+  it('cleans up stale unreferenced PetPal managed attachments without touching referenced or generic files', async () => {
+    const { app } = context;
+    const adminSession = await loginAs(app, 'admin@example.com', 'Admin123!');
+    const managerSession = await loginAs(app, 'manager', 'Manager123!');
+    const caregiverProfile = await context.prismaRaw.caregiverProfile.findUnique({
+      where: {
+        userId: managerSession.user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    assert.ok(caregiverProfile);
+
+    const orphanQualificationUpload = await uploadManagedFileForTest(app, {
+      accessToken: managerSession.tokens.accessToken,
+      fileName: 'stale-caregiver-qualification.jpg',
+      contentType: 'image/jpeg',
+      content: 'stale-caregiver-qualification-content',
+      kind: 'attachment',
+      tag1: 'petpal-caregiver-qualification',
+      tag2: caregiverProfile.id,
+    });
+    const referencedQualificationUpload = await uploadManagedFileForTest(app, {
+      accessToken: managerSession.tokens.accessToken,
+      fileName: 'referenced-caregiver-qualification.jpg',
+      contentType: 'image/jpeg',
+      content: 'referenced-caregiver-qualification-content',
+      kind: 'attachment',
+      tag1: 'petpal-caregiver-qualification',
+      tag2: caregiverProfile.id,
+    });
+    const orphanPenaltyUpload = await uploadManagedFileForTest(app, {
+      accessToken: adminSession.tokens.accessToken,
+      fileName: 'stale-penalty-rectify.jpg',
+      contentType: 'image/jpeg',
+      content: 'stale-penalty-rectify-content',
+      kind: 'attachment',
+      tag1: 'petpal-penalty',
+      tag2: 'rectify',
+    });
+    const referencedPenaltyUpload = await uploadManagedFileForTest(app, {
+      accessToken: adminSession.tokens.accessToken,
+      fileName: 'referenced-penalty-rectify.jpg',
+      contentType: 'image/jpeg',
+      content: 'referenced-penalty-rectify-content',
+      kind: 'attachment',
+      tag1: 'petpal-penalty',
+      tag2: 'rectify',
+    });
+    const genericAttachmentUpload = await uploadManagedFileForTest(app, {
+      accessToken: adminSession.tokens.accessToken,
+      fileName: 'generic-attachment.txt',
+      contentType: 'text/plain',
+      content: 'generic-attachment-content',
+      kind: 'attachment',
+      tag1: 'generic',
+      tag2: 'archive',
+    });
+
+    const staleAt = new Date('2026-04-01T08:00:00.000Z');
+    await context.prismaRaw.mediaAsset.updateMany({
+      where: {
+        id: {
+          in: [
+            orphanQualificationUpload.fileId,
+            referencedQualificationUpload.fileId,
+            orphanPenaltyUpload.fileId,
+            referencedPenaltyUpload.fileId,
+            genericAttachmentUpload.fileId,
+          ],
+        },
+      },
+      data: {
+        completedAt: staleAt,
+      },
+    });
+
+    const referencedQualificationMaterial = await loadManagedAttachmentMaterial(referencedQualificationUpload.fileId);
+    const referencedPenaltyMaterial = await loadManagedAttachmentMaterial(referencedPenaltyUpload.fileId);
+    await context.prismaRaw.caregiverProfile.update({
+      where: {
+        id: caregiverProfile.id,
+      },
+      data: {
+        qualificationMaterials: [referencedQualificationMaterial],
+      },
+    });
+
+    await createPenaltyReferenceScenario({
+      targetUserId: managerSession.user.id,
+      rectifyMaterial: referencedPenaltyMaterial,
+    });
+
+    const orphanQualificationPath = await resolveManagedUploadPath(orphanQualificationUpload.fileId);
+    const orphanPenaltyPath = await resolveManagedUploadPath(orphanPenaltyUpload.fileId);
+    const genericAttachmentPath = await resolveManagedUploadPath(genericAttachmentUpload.fileId);
+
+    const cleanupResult = await cleanupOrphanManagedAttachments({
+      now: new Date('2026-04-04T12:00:00.000Z'),
+      graceMinutes: 60,
+      batchSize: 20,
+    });
+
+    assert.deepEqual(cleanupResult, {
+      checked: 4,
+      deleted: 2,
+      keptReferenced: 2,
+      blocked: 0,
+    });
+
+    const deletedAssets = await context.prismaRaw.mediaAsset.findMany({
+      where: {
+        id: {
+          in: [orphanQualificationUpload.fileId, orphanPenaltyUpload.fileId],
+        },
+      },
+      select: {
+        id: true,
+        deleteAt: true,
+      },
+    });
+
+    assert.equal(deletedAssets.length, 2);
+    assert.ok(deletedAssets.every((item) => item.deleteAt !== null));
+    await waitForFileRemoval(orphanQualificationPath);
+    await waitForFileRemoval(orphanPenaltyPath);
+
+    const referencedQualificationDetail = await request(app)
+      .get(`/api/attachments/${referencedQualificationUpload.fileId}`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(referencedQualificationDetail.body.data.referenceCount, 1);
+
+    const referencedPenaltyDetail = await request(app)
+      .get(`/api/attachments/${referencedPenaltyUpload.fileId}`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(referencedPenaltyDetail.body.data.referenceCount, 1);
+
+    const genericAttachment = await context.prismaRaw.mediaAsset.findUnique({
+      where: {
+        id: genericAttachmentUpload.fileId,
+      },
+      select: {
+        deleteAt: true,
+      },
+    });
+
+    assert.ok(genericAttachment);
+    assert.equal(genericAttachment.deleteAt, null);
+    await fs.access(genericAttachmentPath);
   });
 
   it('blocks deleting avatar images that are still referenced by users', async () => {
