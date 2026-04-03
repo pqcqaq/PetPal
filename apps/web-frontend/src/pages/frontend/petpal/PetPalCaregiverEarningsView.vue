@@ -1075,6 +1075,7 @@ const riskQueueExportActions = computed<
 >(() => {
   const counts = {
     openComplaint: 0,
+    openRepeatedComplaint: 0,
     processingComplaint: 0,
     caregiverResponsibility: 0,
     platformResponsibility: 0,
@@ -1087,6 +1088,9 @@ const riskQueueExportActions = computed<
   for (const order of recentAftersalesOrders.value) {
     if (order.primaryComplaintStatus === 'OPEN') {
       counts.openComplaint += 1;
+      if (order.complaintCount >= CAREGIVER_REPEAT_COMPLAINT_COUNT) {
+        counts.openRepeatedComplaint += 1;
+      }
     }
     if (order.primaryComplaintStatus === 'PROCESSING') {
       counts.processingComplaint += 1;
@@ -1113,6 +1117,11 @@ const riskQueueExportActions = computed<
 
   const items: Array<{ preset: CaregiverRiskQueueExportPreset; label: string; count: number }> = [
     { preset: 'openComplaint', label: getRiskQueueExportPresetLabel('openComplaint'), count: counts.openComplaint },
+    {
+      preset: 'openRepeatedComplaint',
+      label: getRiskQueueExportPresetLabel('openRepeatedComplaint'),
+      count: counts.openRepeatedComplaint,
+    },
     {
       preset: 'processingComplaint',
       label: getRiskQueueExportPresetLabel('processingComplaint'),
@@ -1492,6 +1501,9 @@ function applyAllRiskQueueExportPreset() {
 function getRiskQueueExportPresetLabel(preset: CaregiverRiskQueueExportPreset) {
   if (preset === 'openComplaint') {
     return '待受理投诉';
+  }
+  if (preset === 'openRepeatedComplaint') {
+    return '待受理重复投诉';
   }
   if (preset === 'processingComplaint') {
     return '处理中投诉';

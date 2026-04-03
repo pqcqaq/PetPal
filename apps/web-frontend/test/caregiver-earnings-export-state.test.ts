@@ -150,6 +150,16 @@ test('builds caregiver risk queue export snapshots for common queue views', () =
     riskOnly: true,
   });
 
+  assert.deepEqual(buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'openRepeatedComplaint'), {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days',
+    complaintStatus: 'OPEN',
+    minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
+    riskOnly: true,
+  });
+
   assert.deepEqual(buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'processingComplaint'), {
     ...createEmptyCaregiverEarningsExportFilterSnapshot(),
     startDate: '2026-04-01T00:00:00.000Z',
@@ -244,6 +254,15 @@ test('detects current caregiver risk queue export views without confusing other 
   const openComplaintSnapshot = buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'openComplaint');
   assert.equal(resolveCaregiverRiskQueueExportPreset(openComplaintSnapshot), 'openComplaint');
   assert.equal(isCaregiverAllRiskExportSnapshot(openComplaintSnapshot), false);
+
+  const openRepeatedComplaintSnapshot = buildCaregiverRiskQueueExportSnapshot(
+    currentSnapshot,
+    'openRepeatedComplaint',
+  );
+  assert.equal(
+    resolveCaregiverRiskQueueExportPreset(openRepeatedComplaintSnapshot),
+    'openRepeatedComplaint',
+  );
 
   const processingComplaintSnapshot = buildCaregiverRiskQueueExportSnapshot(
     currentSnapshot,

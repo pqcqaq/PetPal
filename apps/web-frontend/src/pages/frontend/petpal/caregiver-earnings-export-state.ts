@@ -52,6 +52,7 @@ export type CaregiverEarningsExportTemplate = CaregiverEarningsExportFilterSnaps
 
 export type CaregiverRiskQueueExportPreset =
   | 'openComplaint'
+  | 'openRepeatedComplaint'
   | 'processingComplaint'
   | 'caregiverResponsibility'
   | 'platformResponsibility'
@@ -62,6 +63,7 @@ export type CaregiverRiskQueueExportPreset =
 
 const caregiverRiskQueueExportPresets = [
   'openComplaint',
+  'openRepeatedComplaint',
   'processingComplaint',
   'caregiverResponsibility',
   'platformResponsibility',
@@ -212,6 +214,12 @@ export const buildCaregiverRiskQueueExportSnapshot = (
       return {
         ...baseSnapshot,
         complaintStatus: 'OPEN',
+      };
+    case 'openRepeatedComplaint':
+      return {
+        ...baseSnapshot,
+        complaintStatus: 'OPEN',
+        minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
       };
     case 'processingComplaint':
       return {
