@@ -7874,6 +7874,51 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.201 2026-04-03（P3-M1 Slice 201）
+
+**概述**：延续上一轮把风险预设计数收口成共享 counter 后的状态，本轮继续把收益页里仍散落在页面层的“当前风险视角说明文案”也并回预设配置源。这样每个风险视角的标签、说明、快照 patch、匹配规则和计数口径都统一挂在同一份 preset definition 上，页面不再用通用模板字符串兜底说明。
+
+已完成：
+
+- 风险预设配置源补齐说明文案：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-risk-queue-preset-config.ts`
+    - 每个风险预设新增 `description` 字段，分别说明待受理投诉、待退款、高退款暴露、照料者重复投诉等视角的导出语义。
+    - 新增共享 definition map，`label` / `description` / `patch` 的读取不再重复 `find`。
+- 风险导出 helper 转导出说明 getter：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-risk-queue-export.ts`
+    - 新增 `getCaregiverRiskQueueExportPresetDescription`，让页面继续只依赖风险导出 helper 读取当前视角说明。
+- 收益页改为消费共享说明：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 当前风险视角提示区改为直接读取预设配置中的 description，不再根据 label 拼接通用文案。
+- 定向测试继续兜底：
+  - `apps/web-frontend/test/caregiver-risk-queue-export.test.ts`
+    - 新增风险视角说明 getter 断言，确认复合风险视角和待退款视角都返回稳定文案。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts ..\\web-frontend\\test\\caregiver-risk-queue-export.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增后端字段，也没有改动风险导出筛选口径，变更继续限定在 Web 风险预设配置与收益页展示层。
+- 已确认当前风险视角说明不再由页面自行拼装，新增或调整风险视角时只需要维护同一份配置源。
+- 已确认风险动作顺序、风险计数和快照映射单测仍全部通过，没有因为补说明文案带来行为漂移。
+
+风险与缓解：
+
+- 风险：当前风险视角说明已经收口，但如果后续真的引入“超时未结案”这类需要时间语义的新视角，现有前端配置仍然需要后端先补契约字段。
+- 缓解：下一轮如继续补新风险视角，应优先先切后端契约 slice，把投诉时间 / SLA 语义补到 `recentAftersalesOrders`，再在配置源里加新 preset，避免前端猜测时效状态。
+
+下一步（1-3）：
+
+1. 继续评估是否为 `recentAftersalesOrders` 补投诉时间或 SLA 字段，以支撑“超时未结案”等更有业务价值的风险视角。
+2. 继续评估是否把风险动作按钮的说明也直接透给悬浮提示或二级说明，进一步降低收益页复盘入口的理解成本。
+3. 在风险复盘入口基本稳定后，再继续补剩余验收向测试、审计收口与最终交付材料。
+
 ### 14.200 2026-04-03（P3-M1 Slice 200）
 
 **概述**：延续上一轮把风险预设元数据全部收口到单一配置源后的状态，本轮继续把风险队列统计从“每个预设各扫一次订单数组”收口成“共享一次遍历聚合”的通用 counter。这样风险动作区和后续可能复用这套口径的入口，都能直接消费同一份计数 map，而不是继续堆叠独立 `filter`。

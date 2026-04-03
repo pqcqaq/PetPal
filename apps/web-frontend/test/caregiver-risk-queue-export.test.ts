@@ -7,6 +7,7 @@ import {
 } from '../src/pages/frontend/petpal/caregiver-risk-queue-preset-config.ts';
 import {
   buildCaregiverRiskQueueExportActions,
+  getCaregiverRiskQueueExportPresetDescription,
   getCaregiverRiskQueueExportPresetLabel,
 } from '../src/pages/frontend/petpal/caregiver-risk-queue-export.ts';
 
@@ -107,4 +108,19 @@ test('returns caregiver risk queue preset labels for composite views', () => {
     '照料者重复投诉',
   );
   assert.equal(getCaregiverRiskQueueExportPresetLabel('refundAwaitingSettlement'), '待退款');
+});
+
+test('returns caregiver risk queue preset descriptions for active queue views', () => {
+  assert.equal(
+    getCaregiverRiskQueueExportPresetDescription('openRepeatedComplaint'),
+    '当前经营导出已聚焦待受理且已重复出现的投诉，可优先处理高复发风险订单。',
+  );
+  assert.equal(
+    getCaregiverRiskQueueExportPresetDescription('repeatCaregiverComplaint'),
+    '当前经营导出已聚焦照料者重复投诉，可优先复盘同类服务质量风险。',
+  );
+  assert.equal(
+    getCaregiverRiskQueueExportPresetDescription('refundAwaitingSettlement'),
+    '当前经营导出已聚焦待退款订单，可直接核对已批准但尚未完成退款的风险单。',
+  );
 });

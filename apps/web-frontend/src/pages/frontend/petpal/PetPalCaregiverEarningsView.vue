@@ -720,6 +720,7 @@ import {
 } from './caregiver-earnings-export-state';
 import {
   buildCaregiverRiskQueueExportActions,
+  getCaregiverRiskQueueExportPresetDescription,
   getCaregiverRiskQueueExportPresetLabel,
 } from './caregiver-risk-queue-export';
 import {
@@ -1093,7 +1094,7 @@ const currentRiskQueueExportView = computed<{
     return {
       label,
       count: action?.count ?? 0,
-      description: `当前经营导出已对齐到${label}队列，可直接导出这一批同类风险明细。`,
+      description: getCaregiverRiskQueueExportPresetDescription(activeRiskQueueExportPreset.value),
     };
   }
 

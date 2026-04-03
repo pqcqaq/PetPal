@@ -19,6 +19,7 @@ type CaregiverRiskQueueExportPresetPatch = {
 type CaregiverRiskQueueExportPresetDefinition<P extends string = string> = {
   preset: P;
   label: string;
+  description: string;
   patch: CaregiverRiskQueueExportPresetPatch;
   matchesOrder: (order: CaregiverAftersalesRiskOrderRecord) => boolean;
 };
@@ -36,6 +37,7 @@ export const caregiverRiskQueueExportPresetDefinitions = [
   {
     preset: 'openComplaint',
     label: '待受理投诉',
+    description: '当前经营导出已聚焦待受理投诉，可优先复盘还未被接手的争议单。',
     patch: {
       complaintStatus: 'OPEN',
     },
@@ -44,6 +46,7 @@ export const caregiverRiskQueueExportPresetDefinitions = [
   {
     preset: 'openRepeatedComplaint',
     label: '待受理重复投诉',
+    description: '当前经营导出已聚焦待受理且已重复出现的投诉，可优先处理高复发风险订单。',
     patch: {
       complaintStatus: 'OPEN',
       minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
@@ -55,6 +58,7 @@ export const caregiverRiskQueueExportPresetDefinitions = [
   {
     preset: 'processingComplaint',
     label: '处理中投诉',
+    description: '当前经营导出已聚焦处理中投诉，可继续跟进仍在协商或核实中的争议单。',
     patch: {
       complaintStatus: 'PROCESSING',
     },
@@ -63,6 +67,7 @@ export const caregiverRiskQueueExportPresetDefinitions = [
   {
     preset: 'caregiverResponsibility',
     label: '照料者责任',
+    description: '当前经营导出已聚焦照料者责任投诉，可优先复盘需要自查整改的风险单。',
     patch: {
       complaintTargetRole: 'CAREGIVER',
     },
@@ -71,6 +76,7 @@ export const caregiverRiskQueueExportPresetDefinitions = [
   {
     preset: 'platformResponsibility',
     label: '平台责任',
+    description: '当前经营导出已聚焦平台责任投诉，可查看仍需平台继续跟进的争议单。',
     patch: {
       complaintTargetRole: 'PLATFORM',
     },
@@ -79,6 +85,7 @@ export const caregiverRiskQueueExportPresetDefinitions = [
   {
     preset: 'refundAwaitingSettlement',
     label: '待退款',
+    description: '当前经营导出已聚焦待退款订单，可直接核对已批准但尚未完成退款的风险单。',
     patch: {
       refundStatus: 'APPROVED',
     },
@@ -87,6 +94,7 @@ export const caregiverRiskQueueExportPresetDefinitions = [
   {
     preset: 'highRefundExposure',
     label: '高退款暴露',
+    description: '当前经营导出已聚焦高退款暴露订单，可优先复盘退款金额较高的售后风险。',
     patch: {
       minRefundAmount: CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT,
     },
@@ -96,6 +104,7 @@ export const caregiverRiskQueueExportPresetDefinitions = [
   {
     preset: 'repeatedComplaint',
     label: '重复投诉',
+    description: '当前经营导出已聚焦重复投诉订单，可优先识别反复出现的争议模式。',
     patch: {
       minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
     },
@@ -104,6 +113,7 @@ export const caregiverRiskQueueExportPresetDefinitions = [
   {
     preset: 'repeatCaregiverComplaint',
     label: '照料者重复投诉',
+    description: '当前经营导出已聚焦照料者重复投诉，可优先复盘同类服务质量风险。',
     patch: {
       minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
       complaintTargetRole: 'CAREGIVER',
@@ -123,6 +133,10 @@ export type CaregiverRiskQueueExportPresetCountMap =
 export const caregiverRiskQueueExportPresets = caregiverRiskQueueExportPresetDefinitions.map(
   (definition) => definition.preset,
 ) as CaregiverRiskQueueExportPreset[];
+
+const caregiverRiskQueueExportPresetDefinitionMap = Object.fromEntries(
+  caregiverRiskQueueExportPresetDefinitions.map((definition) => [definition.preset, definition] as const),
+) as Record<CaregiverRiskQueueExportPreset, (typeof caregiverRiskQueueExportPresetDefinitions)[number]>;
 
 export const createCaregiverRiskQueueExportPresetCountMap =
 (): CaregiverRiskQueueExportPresetCountMap => Object.fromEntries(
@@ -145,14 +159,19 @@ export const countCaregiverRiskQueueExportPresets = (
   return countMap;
 };
 
+export const getCaregiverRiskQueueExportPresetDefinition = (
+  preset: CaregiverRiskQueueExportPreset,
+) => caregiverRiskQueueExportPresetDefinitionMap[preset];
+
 export const getCaregiverRiskQueueExportPresetLabel = (
   preset: CaregiverRiskQueueExportPreset,
-) =>
-  caregiverRiskQueueExportPresetDefinitions.find((definition) => definition.preset === preset)?.label
-  ?? '待退款';
+) => getCaregiverRiskQueueExportPresetDefinition(preset)?.label ?? '待退款';
+
+export const getCaregiverRiskQueueExportPresetDescription = (
+  preset: CaregiverRiskQueueExportPreset,
+) => getCaregiverRiskQueueExportPresetDefinition(preset)?.description
+  ?? '当前经营导出已对齐到风险队列，可直接导出这一批同类风险明细。';
 
 export const getCaregiverRiskQueueExportPresetPatch = (
   preset: CaregiverRiskQueueExportPreset,
-) =>
-  caregiverRiskQueueExportPresetDefinitions.find((definition) => definition.preset === preset)?.patch
-  ?? {};
+) => getCaregiverRiskQueueExportPresetDefinition(preset)?.patch ?? {};

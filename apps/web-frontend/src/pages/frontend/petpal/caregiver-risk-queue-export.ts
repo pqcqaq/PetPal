@@ -2,6 +2,7 @@ import type { CaregiverAftersalesRiskOrderRecord } from '@rbac/api-common';
 import {
   countCaregiverRiskQueueExportPresets,
   caregiverRiskQueueExportPresetDefinitions,
+  getCaregiverRiskQueueExportPresetDescription,
   getCaregiverRiskQueueExportPresetLabel,
   type CaregiverRiskQueueExportPreset,
 } from './caregiver-risk-queue-preset-config';
@@ -13,6 +14,7 @@ export type CaregiverRiskQueueExportAction = {
 };
 
 export { getCaregiverRiskQueueExportPresetLabel };
+export { getCaregiverRiskQueueExportPresetDescription };
 
 export const buildCaregiverRiskQueueExportActions = (
   orders: CaregiverAftersalesRiskOrderRecord[],
