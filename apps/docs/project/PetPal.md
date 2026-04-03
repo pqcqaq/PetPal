@@ -7874,6 +7874,45 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.204 2026-04-03（P3-M1 Slice 204）
+
+**概述**：上一轮已经把投诉 SLA 手动筛选补进收益导出表单，但风险动作区仍只有“已超时投诉”快捷视角，手动筛选和快捷导出的覆盖面并不一致。本轮把 `DUE_SOON` 也补成独立风险预设，让照料者在真正超时前就能一键拉出“即将超时投诉”队列，提前介入处理。
+
+已完成：
+
+- 风险预设补齐即将超时视角：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-risk-queue-preset-config.ts`
+    - 新增 `dueSoonComplaint` 预设，统一维护标签、说明文案、快照 patch 和匹配规则。
+    - 预设顺序放在“已超时投诉”之后、“处理中投诉”之前，继续按风险紧迫度组织动作区顺序。
+- 风险导出状态识别继续对齐：
+  - `apps/web-frontend/test/caregiver-earnings-export-state.test.ts`
+    - 新增 `dueSoonComplaint` 快照生成与预设识别断言，确认 queue preset 和 `complaintSlaStatus: 'DUE_SOON'` 继续一一对应。
+  - `apps/web-frontend/test/caregiver-risk-queue-export.test.ts`
+    - 计数 map、动作区顺序、标签和说明文案断言都已补上“即将超时投诉”。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts ..\\web-frontend\\test\\caregiver-risk-queue-export.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有引入新的导出字段或页面局部状态，只是把既有的 `complaintSlaStatus: 'DUE_SOON'` 查询能力公开成统一预设，因此风险动作区、预设识别和导出快照仍然保持同一口径。
+- 已确认本轮改动仍限制在照料者收益风险导出链路，没有扩散到后台投诉页或主人端导出流程。
+
+风险与缓解：
+
+- 风险：当前“即将超时投诉”与“已超时投诉”都按固定顺序出现在动作区，后续如果运营希望进一步前置或合并 SLA 风险入口，仍需要结合真实值班习惯再微调顺序。
+- 缓解：先保持 `OVERDUE` 优先于 `DUE_SOON` 的顺序，后续若引入更多 SLA 预设或值班统计，再统一评估动作区排序。
+
+下一步（1-3）：
+
+1. 继续评估是否把投诉 SLA 预设与后台投诉治理入口做更统一的词汇和排序收口。
+2. 继续盘点收益页剩余的验收缺口，优先处理直接影响毕业设计演示的链路。
+3. 在风险导出入口稳定后，再继续推进最终验收向测试、审计收口与交付材料整理。
+
 ### 14.203 2026-04-03（P3-M1 Slice 203）
 
 **概述**：上一轮已经把投诉 SLA 接进收益摘要、风险队列和经营导出 query，但导出表单仍只能依赖快捷预设或“导出同类风险”隐式带入条件。本轮把这个缺口补齐，让照料者可以在收益页直接手动选择投诉 SLA 口径，避免为了一次简单筛选还要先切风险视角。

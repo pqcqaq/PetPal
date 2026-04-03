@@ -173,6 +173,15 @@ test('builds caregiver risk queue export snapshots for common queue views', () =
     riskOnly: true,
   });
 
+  assert.deepEqual(buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'dueSoonComplaint'), {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days',
+    complaintSlaStatus: 'DUE_SOON',
+    riskOnly: true,
+  });
+
   assert.deepEqual(buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'processingComplaint'), {
     ...createEmptyCaregiverEarningsExportFilterSnapshot(),
     startDate: '2026-04-01T00:00:00.000Z',
@@ -284,6 +293,15 @@ test('detects current caregiver risk queue export views without confusing other 
   assert.equal(
     resolveCaregiverRiskQueueExportPreset(overdueComplaintSnapshot),
     'overdueComplaint',
+  );
+
+  const dueSoonComplaintSnapshot = buildCaregiverRiskQueueExportSnapshot(
+    currentSnapshot,
+    'dueSoonComplaint',
+  );
+  assert.equal(
+    resolveCaregiverRiskQueueExportPreset(dueSoonComplaintSnapshot),
+    'dueSoonComplaint',
   );
 
   const processingComplaintSnapshot = buildCaregiverRiskQueueExportSnapshot(

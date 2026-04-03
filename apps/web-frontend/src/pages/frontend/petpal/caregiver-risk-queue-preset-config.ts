@@ -67,6 +67,15 @@ export const caregiverRiskQueueExportPresetDefinitions = [
     matchesOrder: (order) => order.primaryComplaintSlaStatus === 'OVERDUE',
   },
   {
+    preset: 'dueSoonComplaint',
+    label: '即将超时投诉',
+    description: '当前经营导出已聚焦投诉 SLA 即将超时的风险单，可优先提前介入避免争议超时。',
+    patch: {
+      complaintSlaStatus: 'DUE_SOON',
+    },
+    matchesOrder: (order) => order.primaryComplaintSlaStatus === 'DUE_SOON',
+  },
+  {
     preset: 'processingComplaint',
     label: '处理中投诉',
     description: '当前经营导出已聚焦处理中投诉，可继续跟进仍在协商或核实中的争议单。',
