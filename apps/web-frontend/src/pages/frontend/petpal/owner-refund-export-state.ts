@@ -15,6 +15,7 @@ import {
   applyPetPalExportSnapshot,
   clonePetPalExportSnapshot,
 } from './export-snapshot-helpers';
+import { definePetPalExportSnapshot } from './export-snapshot-definition';
 import {
   toPetPalOptionalQueryValue,
   toPetPalOptionalTrimmedQueryText,
@@ -37,19 +38,7 @@ export type OwnerRefundExportTemplate = OwnerRefundExportFilterSnapshot & {
   name: string;
 };
 
-const ownerRefundExportSnapshotKeys = [
-  'startDate',
-  'endDate',
-  'refundType',
-  'refundStatus',
-  'complaintStatus',
-  'complaintType',
-  'complaintTargetRole',
-  'serviceType',
-  'orderNoKeyword',
-] as const satisfies ReadonlyArray<keyof OwnerRefundExportFilterSnapshot>;
-
-export const createEmptyOwnerRefundExportFilterSnapshot = (): OwnerRefundExportFilterSnapshot => ({
+const ownerRefundExportSnapshot = definePetPalExportSnapshot<OwnerRefundExportFilterSnapshot>({
   startDate: '',
   endDate: '',
   refundType: '',
@@ -60,6 +49,12 @@ export const createEmptyOwnerRefundExportFilterSnapshot = (): OwnerRefundExportF
   serviceType: '',
   orderNoKeyword: '',
 });
+
+const ownerRefundExportSnapshotKeys = ownerRefundExportSnapshot.keys;
+
+export const createEmptyOwnerRefundExportFilterSnapshot = (): OwnerRefundExportFilterSnapshot => (
+  ownerRefundExportSnapshot.createEmpty()
+);
 
 export const cloneOwnerRefundExportFilterSnapshot = (
   snapshot: OwnerRefundExportFilterSnapshot,

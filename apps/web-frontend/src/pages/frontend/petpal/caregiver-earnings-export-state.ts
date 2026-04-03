@@ -15,6 +15,7 @@ import {
   applyPetPalExportSnapshot,
   clonePetPalExportSnapshot,
 } from './export-snapshot-helpers';
+import { definePetPalExportSnapshot } from './export-snapshot-definition';
 import {
   toPetPalOptionalQueryValue,
   toPetPalOptionalTrimmedQueryText,
@@ -44,24 +45,7 @@ export type CaregiverEarningsExportTemplate = CaregiverEarningsExportFilterSnaps
   name: string;
 };
 
-const caregiverEarningsExportSnapshotKeys = [
-  'startDate',
-  'endDate',
-  'serviceType',
-  'orderNoKeyword',
-  'refundType',
-  'refundStatus',
-  'refundReasonKeyword',
-  'complaintStatus',
-  'complaintType',
-  'complaintKeyword',
-  'complaintTargetRole',
-  'datePreset',
-  'riskOnly',
-] as const satisfies ReadonlyArray<keyof CaregiverEarningsExportFilterSnapshot>;
-
-export const createEmptyCaregiverEarningsExportFilterSnapshot =
-(): CaregiverEarningsExportFilterSnapshot => ({
+const caregiverEarningsExportSnapshot = definePetPalExportSnapshot<CaregiverEarningsExportFilterSnapshot>({
   startDate: '',
   endDate: '',
   serviceType: '',
@@ -76,6 +60,11 @@ export const createEmptyCaregiverEarningsExportFilterSnapshot =
   datePreset: '',
   riskOnly: false,
 });
+
+const caregiverEarningsExportSnapshotKeys = caregiverEarningsExportSnapshot.keys;
+
+export const createEmptyCaregiverEarningsExportFilterSnapshot =
+(): CaregiverEarningsExportFilterSnapshot => caregiverEarningsExportSnapshot.createEmpty();
 
 export const cloneCaregiverEarningsExportFilterSnapshot = (
   snapshot: CaregiverEarningsExportFilterSnapshot,

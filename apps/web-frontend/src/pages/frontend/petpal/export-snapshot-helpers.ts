@@ -2,7 +2,7 @@ export const clonePetPalExportSnapshot = <
   T extends Record<string, unknown>,
   K extends readonly (keyof T)[],
 >(
-  snapshot: T,
+  snapshot: Readonly<T>,
   keys: K,
 ): T => {
   const next = {} as T;
@@ -17,7 +17,7 @@ export const applyPetPalExportSnapshot = <
   K extends readonly (keyof T)[],
 >(
   target: T,
-  snapshot: T,
+  snapshot: Readonly<T>,
   keys: K,
 ): T => {
   for (const key of keys) {

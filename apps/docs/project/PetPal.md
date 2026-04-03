@@ -7874,6 +7874,53 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.186 2026-04-03（P3-M1 Slice 186）
+
+**概述**：延续上一轮对 filter presence 的共享化，本轮继续把三份导出状态模块里重复维护的 defaults 和 keys 收口成共享 snapshot definition helper，用一份默认值对象同时派生字段清单和 `createEmpty()`，减少状态模块里的双份快照元数据。
+
+已完成：
+
+- 提取共享 export snapshot definition helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/export-snapshot-definition.ts`
+    - 新增 `definePetPalExportSnapshot`，统一承接默认值冻结、字段清单推导和空快照克隆工厂。
+    - 新增 `PetPalExportSnapshotDefinition`，统一约束 `defaults / keys / createEmpty` 三元结构。
+- 三份导出状态模块改走共享 snapshot definition helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/owner-refund-export-state.ts`
+  - `apps/web-frontend/src/pages/frontend/petpal/owner-transaction-export-state.ts`
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-earnings-export-state.ts`
+    - 三份状态模块现已删除本地手写的 `SnapshotKeys` 数组和空快照字面量函数，统一改为由 definition helper 派生。
+- snapshot helper 小幅协同调整：
+  - `apps/web-frontend/src/pages/frontend/petpal/export-snapshot-helpers.ts`
+    - `clonePetPalExportSnapshot` 与 `applyPetPalExportSnapshot` 现在接受 `Readonly<T>` 输入，便于直接消费冻结后的默认快照定义。
+- 新增定向单测：
+  - `apps/web-frontend/test/petpal-export-snapshot-definition.test.ts`
+    - 覆盖字段清单推导和空快照克隆行为。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-export-snapshot-definition.test.ts ..\\web-frontend\\test\\petpal-export-snapshot-helpers.test.ts ..\\web-frontend\\test\\owner-refund-export-state.test.ts ..\\web-frontend\\test\\owner-transaction-export-state.test.ts ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增导出字段、后端契约或页面交互，只继续收口 Web 前端导出状态层的快照元数据定义。
+- 已确认三份状态模块仍各自保留自己的字段结构和查询语义，definition helper 只负责把默认值、keys 和 createEmpty 收口到同一个定义点。
+- 已确认收益导出状态里的 `datePreset` 与 `riskOnly` 仍然保留在收益模块自己的默认值定义内，没有被共享层错误泛化。
+
+风险与缓解：
+
+- 风险：虽然 defaults/keys 也已共享到 definition helper，但不同导出状态模块之间仍然存在独立字段集合和空快照内容，后续继续抽象时需要避免把“结构共享”误做成“业务统一”。
+- 缓解：下一轮继续优先评估是否还有纯机械重复残留；如果只剩业务差异，就停止继续抽象，转向更有业务价值的下一块开发。
+
+下一步（1-3）：
+
+1. 继续评估三份导出状态模块中是否还存在纯机械重复；如果没有，就结束这一段共享化收口。
+2. 继续评估收益页特有的 `datePreset` 是否保持当前页内逻辑即可，不为抽象而抽象。
+3. 在导出状态层稳定后，转向更细的经营归因导出维度或其它尚未完成的前端业务闭环。
+
 ### 14.185 2026-04-03（P3-M1 Slice 185）
 
 **概述**：延续上一轮对 query 值归一化的共享化，本轮继续把三份导出状态模块里重复的 `has*Filters` 存在性判断抽成共享 helper，统一承接文本去空白后的存在性判断、布尔旗标判断和可扩展的数值判断，减少状态模块里的重复布尔拼接。

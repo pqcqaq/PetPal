@@ -7,6 +7,7 @@ import {
   applyPetPalExportSnapshot,
   clonePetPalExportSnapshot,
 } from './export-snapshot-helpers';
+import { definePetPalExportSnapshot } from './export-snapshot-definition';
 import {
   toPetPalOptionalQueryValue,
   toPetPalOptionalTrimmedQueryText,
@@ -25,22 +26,18 @@ export type OwnerTransactionExportTemplate = OwnerTransactionExportFilterSnapsho
   name: string;
 };
 
-const ownerTransactionExportSnapshotKeys = [
-  'startDate',
-  'endDate',
-  'serviceType',
-  'orderStatus',
-  'orderNoKeyword',
-] as const satisfies ReadonlyArray<keyof OwnerTransactionExportFilterSnapshot>;
-
-export const createEmptyOwnerTransactionExportFilterSnapshot =
-(): OwnerTransactionExportFilterSnapshot => ({
+const ownerTransactionExportSnapshot = definePetPalExportSnapshot<OwnerTransactionExportFilterSnapshot>({
   startDate: '',
   endDate: '',
   serviceType: '',
   orderStatus: '',
   orderNoKeyword: '',
 });
+
+const ownerTransactionExportSnapshotKeys = ownerTransactionExportSnapshot.keys;
+
+export const createEmptyOwnerTransactionExportFilterSnapshot =
+(): OwnerTransactionExportFilterSnapshot => ownerTransactionExportSnapshot.createEmpty();
 
 export const cloneOwnerTransactionExportFilterSnapshot = (
   snapshot: OwnerTransactionExportFilterSnapshot,
