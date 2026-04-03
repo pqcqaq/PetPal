@@ -9,9 +9,12 @@
     <template #toolbar>
       <el-space wrap>
         <el-select v-model="pageState.filters.auditStatus" clearable placeholder="全部状态" style="width: 180px">
-          <el-option label="待审核" value="PENDING" />
-          <el-option label="已通过" value="APPROVED" />
-          <el-option label="已拒绝" value="REJECTED" />
+          <el-option
+            v-for="item in caregiverAuditAdminStatusOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
         </el-select>
         <el-input v-model="pageState.filters.city" clearable placeholder="服务城市" style="width: 180px" />
         <el-input v-model="pageState.filters.keyword" clearable placeholder="昵称/简介关键字" style="width: 220px" />
@@ -53,7 +56,9 @@
       </el-table-column>
       <el-table-column prop="auditStatus" label="审核状态" min-width="120">
         <template #default="scope">
-          <el-tag :type="statusTagType(scope.row.auditStatus)">{{ scope.row.auditStatus }}</el-tag>
+          <el-tag :type="statusTagType(scope.row.auditStatus)">
+            {{ getAuditStatusLabel(scope.row.auditStatus) }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="intro" label="简介" min-width="240" show-overflow-tooltip>
@@ -62,9 +67,15 @@
       <el-table-column label="操作" width="220" fixed="right">
         <template #default="scope">
           <el-space>
-            <el-button link type="success" @click="audit(scope.row.id, 'APPROVED')">通过</el-button>
-            <el-button link type="danger" @click="audit(scope.row.id, 'REJECTED')">拒绝</el-button>
-            <el-button link type="warning" @click="audit(scope.row.id, 'PENDING')">重置</el-button>
+            <el-button
+              v-for="item in caregiverAuditAdminActionOptions"
+              :key="item.value"
+              link
+              :type="getAuditActionButtonType(item.value)"
+              @click="audit(scope.row.id, item.value)"
+            >
+              {{ item.label }}
+            </el-button>
           </el-space>
         </template>
       </el-table-column>
@@ -119,6 +130,12 @@ import PageScaffold from '@/components/workbench/PageScaffold.vue';
 import { usePageState } from '@/composables/use-page-state';
 import { api } from '@/api/client';
 import { getErrorMessage } from '@/utils/errors';
+import {
+  caregiverAuditAdminActionOptions,
+  caregiverAuditAdminStatusOptions,
+  getCaregiverAuditAdminStatusLabel,
+  getCaregiverAuditAdminStatusTagType,
+} from './caregiver-audit-admin-options';
 
 defineOptions({ name: 'PetPalCaregiverAuditAdminView' });
 
@@ -169,15 +186,11 @@ const stats = computed(() => {
   ];
 });
 
-const statusTagType = (status: CaregiverAuditStatus) => {
-  if (status === 'APPROVED') {
-    return 'success';
-  }
-  if (status === 'REJECTED') {
-    return 'danger';
-  }
-  return 'warning';
-};
+const statusTagType = getCaregiverAuditAdminStatusTagType;
+const getAuditStatusLabel = getCaregiverAuditAdminStatusLabel;
+const getAuditActionButtonType = (
+  status: CaregiverAuditStatus,
+): 'success' | 'danger' | 'warning' => getCaregiverAuditAdminStatusTagType(status);
 
 const previewMaterials = (row: CaregiverAuditListItem) => {
   previewRow.value = row;
@@ -232,7 +245,9 @@ const hydrateStateFromRoute = () => {
   const page = Number.parseInt(getSingleQueryValue(route.query.page), 10);
 
   pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
-  pageState.filters.auditStatus = ['PENDING', 'APPROVED', 'REJECTED'].includes(auditStatus)
+  pageState.filters.auditStatus = caregiverAuditAdminStatusOptions.some(
+    (item) => item.value === auditStatus,
+  )
     ? auditStatus as CaregiverAuditStatus
     : undefined;
   pageState.filters.city = getSingleQueryValue(route.query.city) || undefined;

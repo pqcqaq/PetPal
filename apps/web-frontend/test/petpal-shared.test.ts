@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  getPetPalCaregiverAuditLabel,
   getPetPalComplaintSlaStatusLabel,
+  petPalCaregiverAuditOptions,
   petPalComplaintSlaStatusOptions,
 } from '../src/pages/frontend/petpal/shared.ts';
 
@@ -15,4 +17,15 @@ test('exposes complaint SLA options in a stable order for export forms', () => {
   for (const option of petPalComplaintSlaStatusOptions) {
     assert.equal(getPetPalComplaintSlaStatusLabel(option.value), option.label);
   }
+});
+
+test('exposes caregiver audit options in a stable order for shared admin and frontend flows', () => {
+  assert.deepEqual(petPalCaregiverAuditOptions, [
+    { label: '待审核', value: 'PENDING' },
+    { label: '已通过', value: 'APPROVED' },
+    { label: '已驳回', value: 'REJECTED' },
+  ]);
+
+  assert.equal(getPetPalCaregiverAuditLabel('APPROVED'), '已通过');
+  assert.equal(getPetPalCaregiverAuditLabel('REJECTED'), '已驳回');
 });

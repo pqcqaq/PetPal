@@ -7874,6 +7874,53 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.207 2026-04-03（P3-M1 Slice 207）
+
+**概述**：投诉治理页的后台专用枚举已经开始收口后，同类问题在照料者审核页也很明显：审核状态下拉、状态 tag 和“通过 / 拒绝 / 重置”动作都还由页面自行维护，而且后台文案与前台共享文案同样存在有意差异。本轮把照料者审核页也切到后台专用 helper，继续复用共享状态值集合，但保留后台“已拒绝”的值班表达。
+
+已完成：
+
+- 照料者审核页开始复用后台专用状态 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - 新增 `petPalCaregiverAuditOptions`，把照料者审核状态值集合提升为共享 option 定义，供前后台派生各自文案。
+  - `apps/web-frontend/src/pages/petpal-admin/caregiver-audits/caregiver-audit-admin-options.ts`
+    - 新增后台照料者审核页专用 helper，统一维护状态下拉、审核动作、状态 label 和 tag type。
+    - 后台继续使用“已拒绝”，不直接复用前台的“已驳回”。
+  - `apps/web-frontend/src/pages/petpal-admin/caregiver-audits/PetPalCaregiverAuditAdminView.vue`
+    - 筛选下拉改为消费共享派生的后台状态 options。
+    - 审核状态列改为显示后台 label helper，而不再直接输出枚举值。
+    - “通过 / 拒绝 / 重置”动作改为统一消费 action options。
+- 定向测试继续兜底：
+  - `apps/web-frontend/test/caregiver-audit-admin-options.test.ts`
+    - 新增后台审核选项与动作单测，锁定后台文案覆盖与 tag type。
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 新增共享审核状态 options 单测，避免前后台派生源漂移。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-audit-admin-options.test.ts ..\\web-frontend\\test\\petpal-shared.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+  - 仍保留既有的大 chunk warning，本轮没有新增新的构建告警。
+
+代码审计结论：
+
+- 本轮没有改照料者审核接口、审核动作语义或路由行为，只把后台审核页的业务枚举收口成统一 helper。
+- 已确认照料者审核页现在和投诉治理页一样，都开始从共享状态值集合派生后台专用文案，而不是直接在页面模板里手写常量。
+
+风险与缓解：
+
+- 风险：后台治理页之间目前已分别建立各自 helper，但尚未上升到更统一的“后台业务枚举层”，跨页面仍是并行模块。
+- 缓解：先保持按页面切片收口，等投诉治理页和审核页都稳定后，再评估是否需要抽更高一层的后台枚举基础模块。
+
+下一步（1-3）：
+
+1. 继续盘点其他 PetPal 后台治理页是否还有同类内联业务枚举，按相同模式收口。
+2. 继续评估是否要把后台统计卡片 / CTA 文案也逐步迁出页面脚本。
+3. 在后台治理页枚举层基本稳定后，再继续推进最终验收向测试、审计收口与交付材料整理。
+
 ### 14.206 2026-04-03（P3-M1 Slice 206）
 
 **概述**：上一轮已经把后台投诉页的筛选枚举和标签映射抽到独立 helper，但处理动作下拉、结案结果单选和处理进度 label 仍然保留在页面模板或脚本里，页面内部还是有第二层散落的投诉治理词汇。本轮继续把这些动作文案收口进同一模块，让后台投诉页的“筛选、展示、操作”三类枚举都由单一 helper 管理。

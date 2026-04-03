@@ -93,6 +93,12 @@ export const petPalComplaintSlaStatusOptions: Array<{
   { label: '投诉已超时', value: 'OVERDUE' },
 ];
 
+export const petPalCaregiverAuditOptions: Array<{ label: string; value: CaregiverAuditStatus }> = [
+  { label: '待审核', value: 'PENDING' },
+  { label: '已通过', value: 'APPROVED' },
+  { label: '已驳回', value: 'REJECTED' },
+];
+
 export const petPalRefundTypeOptions: Array<{ label: string; value: RefundType }> = [
   { label: '全额退款', value: 'FULL' },
   { label: '部分退款', value: 'PARTIAL' },
@@ -159,7 +165,7 @@ export const getPetPalCaregiverAuditLabel = (status: CaregiverAuditStatus) => ({
   PENDING: '审核中',
   APPROVED: '已通过',
   REJECTED: '已驳回',
-}[status] ?? status);
+}[status] ?? petPalCaregiverAuditOptions.find((item) => item.value === status)?.label ?? status);
 
 export const getPetPalConversationUnreadCount = (
   conversation: OrderConversationRecord | null | undefined,
