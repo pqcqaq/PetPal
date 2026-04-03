@@ -7874,6 +7874,52 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.205 2026-04-03（P3-M1 Slice 205）
+
+**概述**：上一轮已经把投诉 SLA 风险预设补齐到收益页，但后台投诉治理页里同一批状态 / 类型 / 对象 / SLA 选项仍然是模板内联硬编码，前后台已经开始出现同一枚举多处维护的风险。本轮把后台投诉页的筛选选项和标签 helper 抽成独立模块，直接复用前台已经稳定下来的 PetPal 投诉枚举定义，同时保留后台当前值班文案，不改变治理页的操作语义。
+
+已完成：
+
+- 后台投诉页开始复用共享投诉枚举定义：
+  - `apps/web-frontend/src/pages/petpal-admin/complaints/complaint-admin-options.ts`
+    - 新增后台投诉治理页专用选项与标签 helper。
+    - `complaintAdminStatusOptions` 由共享投诉状态派生，但继续保留后台“待处理”文案。
+    - `complaintAdminTypeOptions`、`complaintAdminTargetRoleOptions` 和 `complaintAdminSlaStatusOptions` 改为基于共享 PetPal 投诉定义派生，不再在页面模板中手写多份枚举。
+  - `apps/web-frontend/src/pages/petpal-admin/complaints/PetPalComplaintAdminView.vue`
+    - 工具条中的状态、投诉类型、投诉对象和 SLA 状态下拉改为统一消费新 helper。
+    - 表格里的状态 / 类型 / 对象 / SLA 标签也改为复用同一组 helper，避免模板和脚本各自维护一份映射。
+- 定向测试继续兜底：
+  - `apps/web-frontend/test/complaint-admin-options.test.ts`
+    - 新增后台投诉选项与标签单测，锁定后台保留文案、共享来源和 tag type 映射。
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 继续约束前台共享投诉 SLA 选项顺序，避免后台派生源发生漂移。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\complaint-admin-options.test.ts ..\\web-frontend\\test\\petpal-shared.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+  - 仍保留既有的大 chunk warning，本轮没有新增新的构建告警。
+
+代码审计结论：
+
+- 本轮没有改后台投诉接口或治理动作，只把页面层散落的枚举定义收口到可复用 helper。
+- 已确认后台投诉页继续保留“待处理 / 已超时”这类值班文案，没有被前台“待受理 / 投诉已超时”的表达强行覆盖。
+- 已确认前后台现在至少共用同一套投诉类型、责任角色和 SLA 值集合，后续扩展枚举时不再需要多处同步找模板文本。
+
+风险与缓解：
+
+- 风险：后台投诉页目前仍保留自己的状态与 SLA 展示文案，这意味着前后台词汇仍是“同值不同文案”的有意分叉，而不是完全统一文案。
+- 缓解：先保留值班侧现有表达，后续如需要统一用户侧与运营侧措辞，再在共享层增加显式的“前台/后台 label profile”，避免直接覆盖现有运营文案。
+
+下一步（1-3）：
+
+1. 继续评估是否把后台投诉页其余动作文案和 badge label 也抽成同一类 helper，减少页面内联映射。
+2. 继续盘点 PetPal 后台治理页里是否还有类似的硬编码业务枚举，需要按相同模式收口。
+3. 在前后台投诉语义基本稳定后，再继续推进最终验收向测试、审计收口与交付材料整理。
+
 ### 14.204 2026-04-03（P3-M1 Slice 204）
 
 **概述**：上一轮已经把投诉 SLA 手动筛选补进收益导出表单，但风险动作区仍只有“已超时投诉”快捷视角，手动筛选和快捷导出的覆盖面并不一致。本轮把 `DUE_SOON` 也补成独立风险预设，让照料者在真正超时前就能一键拉出“即将超时投诉”队列，提前介入处理。

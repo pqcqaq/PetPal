@@ -27,26 +27,36 @@
     <template #toolbar>
       <el-space wrap>
         <el-select v-model="pageState.filters.status" clearable placeholder="全部状态" style="width: 150px">
-          <el-option label="待处理" value="OPEN" />
-          <el-option label="处理中" value="PROCESSING" />
-          <el-option label="已解决" value="RESOLVED" />
-          <el-option label="已驳回" value="REJECTED" />
+          <el-option
+            v-for="item in complaintAdminStatusOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
         </el-select>
         <el-select v-model="pageState.filters.complaintType" clearable placeholder="全部类型" style="width: 160px">
-          <el-option label="安全问题" value="SAFETY" />
-          <el-option label="费用争议" value="FEE" />
-          <el-option label="服务质量" value="SERVICE" />
-          <el-option label="欺诈风险" value="FRAUD" />
-          <el-option label="其他问题" value="OTHER" />
+          <el-option
+            v-for="item in complaintAdminTypeOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
         </el-select>
         <el-select v-model="pageState.filters.targetRole" clearable placeholder="投诉对象" style="width: 150px">
-          <el-option label="照料者" value="CAREGIVER" />
-          <el-option label="平台" value="PLATFORM" />
+          <el-option
+            v-for="item in complaintAdminTargetRoleOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
         </el-select>
         <el-select v-model="pageState.filters.slaStatus" clearable placeholder="SLA状态" style="width: 150px">
-          <el-option label="正常" value="NORMAL" />
-          <el-option label="即将超时" value="DUE_SOON" />
-          <el-option label="已超时" value="OVERDUE" />
+          <el-option
+            v-for="item in complaintAdminSlaStatusOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
         </el-select>
         <el-select
           v-model="pageState.filters.assignedAdminId"
@@ -374,6 +384,18 @@ import { usePageState } from '@/composables/use-page-state';
 import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
+import {
+  complaintAdminSlaStatusOptions,
+  complaintAdminStatusOptions,
+  complaintAdminTargetRoleOptions,
+  complaintAdminTypeOptions,
+  getComplaintAdminSlaStatusLabel,
+  getComplaintAdminSlaTagType,
+  getComplaintAdminStatusLabel,
+  getComplaintAdminStatusType,
+  getComplaintAdminTargetRoleLabel,
+  getComplaintAdminTypeLabel,
+} from './complaint-admin-options';
 
 defineOptions({ name: 'PetPalComplaintAdminView' });
 
@@ -505,45 +527,6 @@ const isSelectableComplaint = (complaint: ComplaintAdminRecord) => {
   return !isClosedComplaint(complaint);
 };
 
-const getStatusLabel = (status: ComplaintStatus) => {
-  const labels: Record<ComplaintStatus, string> = {
-    OPEN: '待处理',
-    PROCESSING: '处理中',
-    RESOLVED: '已解决',
-    REJECTED: '已驳回',
-  };
-  return labels[status] ?? status;
-};
-
-const getStatusType = (status: ComplaintStatus): 'warning' | 'primary' | 'success' | 'info' => {
-  const types: Record<ComplaintStatus, 'warning' | 'primary' | 'success' | 'info'> = {
-    OPEN: 'warning',
-    PROCESSING: 'primary',
-    RESOLVED: 'success',
-    REJECTED: 'info',
-  };
-  return types[status] ?? 'info';
-};
-
-const getTypeLabel = (type: ComplaintType) => {
-  const labels: Record<ComplaintType, string> = {
-    SAFETY: '安全问题',
-    FEE: '费用争议',
-    SERVICE: '服务质量',
-    FRAUD: '欺诈风险',
-    OTHER: '其他问题',
-  };
-  return labels[type] ?? type;
-};
-
-const getTargetRoleLabel = (role: ComplaintTargetRole) => {
-  const labels: Record<ComplaintTargetRole, string> = {
-    CAREGIVER: '照料者',
-    PLATFORM: '平台',
-  };
-  return labels[role] ?? role;
-};
-
 const getActionLabel = (actionType: ComplaintAdminRecord['processLogs'][number]['actionType']) => {
   const labels: Record<ComplaintAdminRecord['processLogs'][number]['actionType'], string> = {
     OPEN: '发起投诉',
@@ -556,23 +539,12 @@ const getActionLabel = (actionType: ComplaintAdminRecord['processLogs'][number][
   return labels[actionType] ?? actionType;
 };
 
-const getSlaStatusLabel = (status: ComplaintAdminSlaStatus) => {
-  const labels: Record<ComplaintAdminSlaStatus, string> = {
-    NORMAL: '正常',
-    DUE_SOON: '即将超时',
-    OVERDUE: '已超时',
-  };
-  return labels[status] ?? status;
-};
-
-const getSlaTagType = (status: ComplaintAdminSlaStatus): 'success' | 'warning' | 'danger' => {
-  const types: Record<ComplaintAdminSlaStatus, 'success' | 'warning' | 'danger'> = {
-    NORMAL: 'success',
-    DUE_SOON: 'warning',
-    OVERDUE: 'danger',
-  };
-  return types[status] ?? 'success';
-};
+const getStatusLabel = getComplaintAdminStatusLabel;
+const getStatusType = getComplaintAdminStatusType;
+const getTypeLabel = getComplaintAdminTypeLabel;
+const getTargetRoleLabel = getComplaintAdminTargetRoleLabel;
+const getSlaStatusLabel = getComplaintAdminSlaStatusLabel;
+const getSlaTagType = getComplaintAdminSlaTagType;
 
 const formatDateTime = (value?: string | null) => {
   if (!value) {
