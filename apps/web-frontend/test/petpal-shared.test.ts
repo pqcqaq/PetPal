@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_MB,
+  PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
+  PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT,
+  PETPAL_CAREGIVER_QUALIFICATION_UPLOAD_MAX_COUNT,
   PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT,
   PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB,
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT,
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_MB,
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
   PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
 } from '@rbac/api-common';
 import {
@@ -39,4 +46,15 @@ test('exposes stable complaint attachment governance constants for web and app u
   assert.equal(PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG, 'petpal-order-complaint');
   assert.equal(PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT, 3);
   assert.equal(PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB, 8);
+});
+
+test('exposes stable message and caregiver attachment governance constants for shared uploads', () => {
+  assert.equal(PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG, 'petpal-order-message');
+  assert.equal(PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT, 3);
+  assert.equal(PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_MB, 8);
+
+  assert.equal(PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG, 'petpal-caregiver-qualification');
+  assert.equal(PETPAL_CAREGIVER_QUALIFICATION_UPLOAD_MAX_COUNT, 3);
+  assert.equal(PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT, 12);
+  assert.equal(PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_MB, 8);
 });

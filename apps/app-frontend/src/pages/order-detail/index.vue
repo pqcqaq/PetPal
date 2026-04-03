@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import type { ComplaintRecord, OrderConversationDetailRecord, OrderDetailRecord, OrderRefundProgressRecord, ServiceLogType } from '@rbac/api-common'
+import {
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT,
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_MB,
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
+  type ComplaintRecord,
+  type OrderConversationDetailRecord,
+  type OrderDetailRecord,
+  type OrderRefundProgressRecord,
+  type ServiceLogType,
+} from '@rbac/api-common'
 import { computed, ref, watch } from 'vue'
 import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
 import { storeToRefs } from 'pinia'
@@ -52,7 +61,10 @@ type UploadedMessageAttachment = PetPalMessageDraftAttachment
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const { userInfo } = storeToRefs(userStore)
-const upload = useManagedAttachmentUpload({ maxCount: 3, maxSizeMb: 8 })
+const upload = useManagedAttachmentUpload({
+  maxCount: PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT,
+  maxSizeMb: PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_MB,
+})
 
 const loading = ref(false)
 const actionLoading = ref(false)
@@ -71,7 +83,8 @@ const serviceLogNote = ref('')
 const isOwnerView = computed(() => Boolean(userInfo.value.id && order.value?.ownerId === userInfo.value.id))
 const roleLabel = computed(() => (isOwnerView.value ? '主人视角' : '照料者视角'))
 const conversationMessages = computed(() => conversation.value?.messages || [])
-const messageAttachmentSlotsLeft = computed(() => Math.max(0, 3 - messageAttachments.value.length))
+const messageAttachmentSlotsLeft = computed(() =>
+  Math.max(0, PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT - messageAttachments.value.length))
 const uploadingMessageAttachments = computed(() => upload.uploading.value)
 const currentMessageRecovery = computed(() => {
   const identity = buildMessageComposerIdentity(orderId.value)
@@ -256,13 +269,13 @@ async function uploadMessageMaterials() {
     return
   }
   if (messageAttachmentSlotsLeft.value <= 0) {
-    toast('消息附件最多上传 3 张')
+    toast(`消息附件最多上传 ${PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT} 张`)
     return
   }
 
   try {
     const files = await upload.selectAndUploadAttachments({
-      tag1: 'petpal-order-message',
+      tag1: PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
       tag2: orderId.value,
       maxCount: messageAttachmentSlotsLeft.value,
     })

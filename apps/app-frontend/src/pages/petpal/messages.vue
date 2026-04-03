@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import type { CaregiverOrderRecord, OrderConversationDetailRecord, OrderConversationRecord, OrderRecord } from '@rbac/api-common'
+import {
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT,
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_MB,
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
+  type CaregiverOrderRecord,
+  type OrderConversationDetailRecord,
+  type OrderConversationRecord,
+  type OrderRecord,
+} from '@rbac/api-common'
 import { computed, ref, watch } from 'vue'
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import { storeToRefs } from 'pinia'
@@ -44,7 +52,10 @@ const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const notificationStore = useNotificationStore()
 const { userInfo } = storeToRefs(userStore)
-const upload = useManagedAttachmentUpload({ maxCount: 3, maxSizeMb: 8 })
+const upload = useManagedAttachmentUpload({
+  maxCount: PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT,
+  maxSizeMb: PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_MB,
+})
 
 const loading = ref(false)
 const threadLoading = ref(false)
@@ -120,7 +131,8 @@ const currentThreadRecovery = computed(() => {
   return identity ? getPetPalMessageRecovery(identity) : null
 })
 const conversationMessages = computed(() => conversation.value?.messages || [])
-const messageAttachmentSlotsLeft = computed(() => Math.max(0, 3 - messageAttachments.value.length))
+const messageAttachmentSlotsLeft = computed(() =>
+  Math.max(0, PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT - messageAttachments.value.length))
 const uploadingMessageAttachments = computed(() => upload.uploading.value)
 const composerBusy = computed(() => upload.uploading.value || sendingMessage.value)
 
@@ -367,13 +379,13 @@ async function uploadMessageMaterials() {
     return
   }
   if (messageAttachmentSlotsLeft.value <= 0) {
-    toast('消息附件最多上传 3 张')
+    toast(`消息附件最多上传 ${PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT} 张`)
     return
   }
 
   try {
     const files = await upload.selectAndUploadAttachments({
-      tag1: 'petpal-order-message',
+      tag1: PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
       tag2: orderId,
       maxCount: messageAttachmentSlotsLeft.value,
     })

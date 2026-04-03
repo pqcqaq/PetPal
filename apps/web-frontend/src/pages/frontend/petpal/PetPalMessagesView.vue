@@ -260,6 +260,11 @@
 
 <script setup lang="ts">
 import type { CaregiverOrderRecord, OrderConversationDetailRecord, OrderRecord } from '@rbac/api-common';
+import {
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT,
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_BYTES,
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
+} from '@rbac/api-common';
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
@@ -319,8 +324,6 @@ type ConversationSummary = {
   updatedAt: string;
 };
 
-const MAX_MESSAGE_ATTACHMENTS = 3;
-const MAX_MESSAGE_ATTACHMENT_SIZE = 8 * 1024 * 1024;
 const IMAGE_ATTACHMENT_URL_RE = /\.(png|jpe?g|gif|webp|bmp|svg)(?:$|[?#])/i;
 
 const auth = useAuthStore();
@@ -370,7 +373,7 @@ const activeThreadUnreadCount = computed(() =>
       ? threadUnread(activeConversation.value)
       : 0);
 const messageAttachmentSlotsLeft = computed(() =>
-  Math.max(0, MAX_MESSAGE_ATTACHMENTS - messageAttachments.value.length));
+  Math.max(0, PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT - messageAttachments.value.length));
 const pageActions = computed(() => [
   {
     label: '提醒中心',
@@ -741,7 +744,7 @@ async function handleMessageAttachmentChange(event: Event) {
   }
 
   const validFiles = limitedFiles.filter((file) =>
-    (!file.type || file.type.startsWith('image/')) && file.size <= MAX_MESSAGE_ATTACHMENT_SIZE);
+    (!file.type || file.type.startsWith('image/')) && file.size <= PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_BYTES);
 
   if (validFiles.length < limitedFiles.length) {
     ElMessage.warning('仅支持上传不超过 8 MB 的图片文件');
@@ -765,7 +768,7 @@ async function handleMessageAttachmentChange(event: Event) {
       const uploaded = await uploadAttachmentFile(
         file,
         {
-          tag1: 'petpal-order-message',
+          tag1: PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
           tag2: currentOrderId,
         },
         (progress) => {

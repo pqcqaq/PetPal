@@ -7882,6 +7882,70 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.245 2026-04-04（P3-M1 Slice 245）
+
+**概述**：上一轮已经把投诉附件的共享约定提到 `api-common`，但订单消息附件和照料者资质附件仍在 Web / App 多处重复声明标签、数量和大小规则。这样后续如果继续调整上传治理，消息区和资质区仍然容易各自漂移。本轮继续沿同一条线，把消息附件与资质附件的前端共享配置也收口到 `api-common`，并顺手补掉 App 资质页超过上限后仍可继续上传再被截断的边界。
+
+已完成：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 新增订单消息附件共享常量：
+    - `PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG`
+    - `PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT`
+    - `PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_MB`
+    - `PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_BYTES`
+  - 新增照料者资质附件共享常量：
+    - `PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG`
+    - `PETPAL_CAREGIVER_QUALIFICATION_UPLOAD_MAX_COUNT`
+    - `PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT`
+    - `PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_MB`
+    - `PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_BYTES`
+- Web 订单沟通入口已切到共享消息附件配置：
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalMessagesView.vue`
+    - 两处消息图片上传不再各自手写 `petpal-order-message` 标签和 3 张 / 8 MB 约束，统一改读 `api-common` 常量。
+    - 剩余可上传槽位计算和上传大小校验也已对齐共享常量，后续调整规则只需改一处。
+- App 订单沟通入口已切到共享消息附件配置：
+  - `apps/app-frontend/src/pages/order-detail/index.vue`
+  - `apps/app-frontend/src/pages/petpal/messages.vue`
+    - 移动端订单详情页和跨订单消息中心已统一改用共享消息附件标签、数量和大小配置。
+    - “最多上传 3 张”的本地提示已改由共享上限常量驱动，不再继续硬编码。
+- App 照料者资料页已切到共享资质附件配置并补剩余名额控制：
+  - `apps/app-frontend/src/pages/petpal/caregiver-profile.vue`
+    - 资质材料上传已统一改用共享资质附件标签、单次上传上限和大小约束。
+    - 页面新增 `qualificationSlotsLeft`，达到 12 份上限后会直接禁用上传入口，并把单次上传 `maxCount` 限制到剩余名额。
+    - 这样不会再出现“最后只剩 1 个名额，却仍上传 3 份然后再被前端 `.slice(0, 12)` 静默截断”的情况。
+- Web 定向单测已扩展共享附件治理覆盖：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 新增订单消息附件和照料者资质附件共享常量断言，继续兜底双端共享配置稳定性。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common lint` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-shared.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有改动后端上传白名单、消息发送协议、照料者档案 payload 或附件治理定时器，只收口了前端共享上传配置和 App 端的资质名额边界。
+- 已确认 Web / App 的订单消息附件上传现在使用同一套标签和限额配置，投诉 / 消息两类订单附件的前端治理口径已经基本一致。
+- 已确认 App 资质页现在会在上传前按剩余名额限流，不再继续依赖上传后截断数组来维持 12 份上限。
+
+风险与缓解：
+
+- 风险：Web 端照料者资料页仍是手填材料链接草稿，尚未接到与 App 相同的受管资质附件上传链路。
+- 缓解：本轮先只收口共享配置和 App 端真实上传入口；后续如继续推进 Web 入驻资料页，再直接复用本轮已抽出的资质附件常量。
+
+- 风险：后台路由、测试和孤儿附件清理仍保留字符串字面量标签，没有同步切到共享常量。
+- 缓解：当前后端行为已经稳定且测试覆盖存在，本轮先避免横向扩大改动；后续如果继续做附件治理统一，可再逐步把后端同类标签提升到共享层。
+
+下一步（1-3）：
+
+1. 继续评估是否把 Web 照料者资料页从手填链接切到受管资质附件上传，彻底对齐 App 入驻资料页。
+2. 继续评估后台上传白名单、附件清理定时器和相关测试里的 PetPal 附件标签是否也要改读共享常量。
+3. 继续按切片节奏推进局部改动、定向验证、本地提交和文档同步，不回到无边界大改。
+
 ### 14.244 2026-04-04（P3-M1 Slice 244）
 
 **概述**：上一轮已经把 Web / App 投诉证据形态对齐到受管附件快照，但附件结构、投诉标签和上传限额仍散在各端页面里重复声明。这样后续一旦继续扩展投诉附件规则，Web / App 很容易再次漂移。本轮继续做一刀更小的共享约定收口，把投诉附件的公共类型和配置提升到 `api-common`。

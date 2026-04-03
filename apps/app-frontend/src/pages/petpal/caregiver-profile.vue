@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import type { CaregiverProfileRecord } from '@rbac/api-common'
-import { reactive, ref } from 'vue'
+import {
+  PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_MB,
+  PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
+  PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT,
+  PETPAL_CAREGIVER_QUALIFICATION_UPLOAD_MAX_COUNT,
+  type CaregiverProfileRecord,
+} from '@rbac/api-common'
+import { computed, reactive, ref } from 'vue'
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import { getCaregiverProfile, upsertCaregiverProfile } from '@/api/petpal'
 import { useManagedAttachmentUpload } from '@/composables/useManagedAttachmentUpload'
@@ -10,7 +16,10 @@ import PetpalSection from './rebuild/petpal-section.vue'
 import { getErrorMessage, helpers, openLoginPage, PETPAL_CAREGIVER_HOME_PAGE, splitTagText, stopPullDown, toast } from './rebuild/shared'
 
 const tokenStore = useTokenStore()
-const upload = useManagedAttachmentUpload({ maxCount: 3, maxSizeMb: 8 })
+const upload = useManagedAttachmentUpload({
+  maxCount: PETPAL_CAREGIVER_QUALIFICATION_UPLOAD_MAX_COUNT,
+  maxSizeMb: PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_MB,
+})
 
 const loading = ref(false)
 const saving = ref(false)
@@ -25,6 +34,9 @@ const form = reactive({
   serviceCommitment: '',
   qualificationMaterials: [] as CaregiverProfileRecord['qualificationMaterials'],
 })
+const uploadingMaterials = computed(() => upload.uploading.value)
+const qualificationSlotsLeft = computed(() =>
+  Math.max(0, PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT - form.qualificationMaterials.length))
 
 function hydrateForm(next: CaregiverProfileRecord | null) {
   profile.value = next
@@ -75,6 +87,11 @@ async function resolveCurrentCaregiverProfileId() {
 }
 
 async function uploadMaterials() {
+  if (qualificationSlotsLeft.value <= 0) {
+    toast(`资质材料最多保留 ${PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT} 份`)
+    return
+  }
+
   try {
     const caregiverProfileId = await resolveCurrentCaregiverProfileId()
     if (!caregiverProfileId) {
@@ -83,10 +100,12 @@ async function uploadMaterials() {
     }
 
     const files = await upload.selectAndUploadAttachments({
-      tag1: 'petpal-caregiver-qualification',
+      tag1: PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
       tag2: caregiverProfileId,
+      maxCount: qualificationSlotsLeft.value,
     })
-    form.qualificationMaterials = [...form.qualificationMaterials, ...files].slice(0, 12)
+    form.qualificationMaterials = [...form.qualificationMaterials, ...files]
+      .slice(0, PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT)
     toast('材料已添加', 'success')
   }
   catch (error: unknown) {
@@ -149,7 +168,7 @@ onPullDownRefresh(() => {
           <view class="petpal-stat">
             <text class="petpal-stat__label">材料份数</text>
             <text class="petpal-stat__value">{{ form.qualificationMaterials.length }}</text>
-            <text class="petpal-stat__meta">最多 12 份</text>
+            <text class="petpal-stat__meta">最多 {{ PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT }} 份</text>
           </view>
           <view class="petpal-stat">
             <text class="petpal-stat__label">服务城市</text>
@@ -191,7 +210,10 @@ onPullDownRefresh(() => {
         </view>
       </PetpalSection>
 
-      <PetpalSection title="资质材料" :subtitle="`${form.qualificationMaterials.length}/12 份`">
+      <PetpalSection
+        title="资质材料"
+        :subtitle="`${form.qualificationMaterials.length}/${PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT} 份`"
+      >
         <template v-if="form.qualificationMaterials.length">
           <view v-for="item in form.qualificationMaterials" :key="item.fileId" class="petpal-sheet">
             <text class="petpal-banner__eyebrow">Qualification</text>
@@ -202,8 +224,13 @@ onPullDownRefresh(() => {
             </view>
           </view>
         </template>
-        <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="uploadMaterials">
-          {{ upload.uploading ? '上传中...' : '添加材料' }}
+        <button
+          class="petpal-btn petpal-btn--secondary"
+          hover-class="none"
+          :disabled="uploadingMaterials || qualificationSlotsLeft <= 0"
+          @click="uploadMaterials"
+        >
+          {{ uploadingMaterials ? '上传中...' : `添加材料${qualificationSlotsLeft > 0 ? `（剩余 ${qualificationSlotsLeft} 份）` : ''}` }}
         </button>
       </PetpalSection>
 

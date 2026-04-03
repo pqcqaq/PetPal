@@ -221,6 +221,10 @@ Last updated: 2026-04-04
   - `packages/api-common` 已新增通用受管附件快照类型，并把投诉附件标签、最大数量和大小限制提升为共享常量。
   - Web / App 投诉页现在都直接消费这组共享常量和类型，不再各自手写 `petpal-order-complaint`、3 张和 8 MB 约束。
   - `apps/web-frontend/test/petpal-shared.test.ts` 已补投诉附件治理常量稳定性断言，继续兜底双端共享配置不会漂移。
+- 2026-04-04 已继续收口消息与资质附件共享约定：
+  - `packages/api-common` 已继续补订单消息附件与照料者资质附件的标签、上传限额和数量上限共享常量。
+  - Web / App 的订单沟通上传入口、App 资质材料上传入口现在都已直接消费这组共享常量，不再各自手写 `petpal-order-message`、`petpal-caregiver-qualification` 和 3 张 / 8 MB 规则。
+  - App 照料者资料页已继续按剩余资质名额限制上传，并在达到 12 份上限后直接禁用上传入口，避免继续超额上传后再被前端截断。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。
