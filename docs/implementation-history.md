@@ -197,6 +197,10 @@ Last updated: 2026-04-04
   - Web / App 两端的 `message-composer-state.ts` 现在都会以 `userId + scope + orderId` 复合键持久化草稿 / 恢复态，并兼容旧版仅按 `orderId` 的本地快照。
   - 消息中心与订单详情页现在会显式透传当前用户 identity，同订单下不同账号或极端双角色共用同一订单号时不再串写草稿与恢复提示。
   - `apps/web-frontend/test/petpal-message-composer-state.test.ts` 已补旧 key 兼容恢复、同订单不同用户并存的定向单测，继续兜底缓存主键演进。
+- 2026-04-04 已继续补旧匿名消息缓存迁移：
+  - Web / App 两端的 `message-composer-state.ts` 现在会在首次读取旧版匿名本地快照时，把同订单的草稿 / 恢复态迁移到当前登录用户 identity，而不是只停留在“能解析旧结构”。
+  - 对于 slice 237 遗留的“有 `scope` 但没有 `userId`”匿名快照，迁移时会保留原作用域；对于更早只有 `shared` 的匿名快照，迁移时会按当前显式角色落到对应作用域。
+  - `apps/web-frontend/test/petpal-message-composer-state.test.ts` 已补匿名 shared 快照迁移、匿名 scoped 快照迁移两组定向单测，继续兜底旧缓存升级链路。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

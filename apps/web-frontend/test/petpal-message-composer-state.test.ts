@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  adoptLegacyPetPalMessageComposerSnapshot,
   buildPetPalMessageComposerStorageKey,
   parsePersistedPetPalMessageComposerSnapshot,
 } from '../src/pages/frontend/petpal/message-composer-state.ts';
@@ -69,6 +70,87 @@ test('parses persisted petpal message composer snapshots from legacy JSON string
       [sharedKey('order-1')]: {
         stage: 'send',
         message: 'Network failed while sending',
+      },
+    },
+  });
+});
+
+test('adopts anonymous legacy shared snapshots to current user identity', () => {
+  const snapshot = adoptLegacyPetPalMessageComposerSnapshot({
+    drafts: {
+      'order-1': {
+        content: 'Legacy shared draft',
+        attachments: [],
+      },
+    },
+    recoveries: {
+      'order-1': {
+        stage: 'send',
+        message: 'Legacy shared recovery',
+      },
+    },
+  }, {
+    orderId: 'order-1',
+    userId: 'user-1',
+    scope: 'owner',
+  });
+
+  assert.deepEqual(snapshot, {
+    drafts: {
+      [ownerKey('order-1', 'user-1')]: {
+        content: 'Legacy shared draft',
+        attachments: [],
+      },
+    },
+    recoveries: {
+      [ownerKey('order-1', 'user-1')]: {
+        stage: 'send',
+        message: 'Legacy shared recovery',
+      },
+    },
+  });
+});
+
+test('adopts anonymous scoped snapshots without losing their original scope', () => {
+  const snapshot = adoptLegacyPetPalMessageComposerSnapshot({
+    drafts: {
+      [caregiverKey('order-2', '')]: {
+        orderId: 'order-2',
+        userId: '',
+        content: 'Legacy caregiver draft',
+        attachments: [],
+        updatedAt: '2026-04-08T10:00:00.000Z',
+        scope: 'caregiver',
+      },
+    },
+    recoveries: {
+      [caregiverKey('order-2', '')]: {
+        orderId: 'order-2',
+        userId: '',
+        stage: 'upload',
+        message: 'Legacy caregiver recovery',
+        updatedAt: '2026-04-08T10:30:00.000Z',
+        scope: 'caregiver',
+      },
+    },
+  }, {
+    orderId: 'order-2',
+    userId: 'user-2',
+  }, {
+    now: Date.parse('2026-04-08T12:00:00.000Z'),
+  });
+
+  assert.deepEqual(snapshot, {
+    drafts: {
+      [caregiverKey('order-2', 'user-2')]: {
+        content: 'Legacy caregiver draft',
+        attachments: [],
+      },
+    },
+    recoveries: {
+      [caregiverKey('order-2', 'user-2')]: {
+        stage: 'upload',
+        message: 'Legacy caregiver recovery',
       },
     },
   });
