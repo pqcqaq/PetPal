@@ -184,7 +184,7 @@ Last updated: 2026-04-04
 - `v-permission` / `v-role`
 - 页面目录下 `components` 子目录规范
 - 搜索表单、列表、详情、编辑等细节从页面组件中下沉
-- PetPal Web 订单详情页的消息发送区也已对齐订单范围附件口径，当前可直接上传 `petpal-order-message + orderId` 图片附件，并支持发送前移除与历史附件查看
+- PetPal Web 订单详情页与跨订单消息中心的消息发送区也已对齐订单范围附件口径，当前可直接上传 `petpal-order-message + orderId` 图片附件，并支持发送前移除、线程内快捷回复与历史附件查看
 
 ### 4.5 App 前端
 
