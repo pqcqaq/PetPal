@@ -3,6 +3,11 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
+import {
+  PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
+  PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
+} from '@rbac/api-common';
 import request from 'supertest';
 import {
   binaryParser,
@@ -783,7 +788,7 @@ describe('Attachment integration', () => {
       contentType: 'image/jpeg',
       content: 'stale-caregiver-qualification-content',
       kind: 'attachment',
-      tag1: 'petpal-caregiver-qualification',
+      tag1: PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
       tag2: caregiverProfile.id,
     });
     const referencedQualificationUpload = await uploadManagedFileForTest(app, {
@@ -792,7 +797,7 @@ describe('Attachment integration', () => {
       contentType: 'image/jpeg',
       content: 'referenced-caregiver-qualification-content',
       kind: 'attachment',
-      tag1: 'petpal-caregiver-qualification',
+      tag1: PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
       tag2: caregiverProfile.id,
     });
     const orphanPenaltyUpload = await uploadManagedFileForTest(app, {
@@ -819,7 +824,7 @@ describe('Attachment integration', () => {
       contentType: 'image/jpeg',
       content: 'stale-complaint-evidence-content',
       kind: 'attachment',
-      tag1: 'petpal-order-complaint',
+      tag1: PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
       tag2: orphanComplaintOrder.orderId,
     });
     const referencedComplaintUpload = await uploadManagedFileForTest(app, {
@@ -828,7 +833,7 @@ describe('Attachment integration', () => {
       contentType: 'image/jpeg',
       content: 'referenced-complaint-evidence-content',
       kind: 'attachment',
-      tag1: 'petpal-order-complaint',
+      tag1: PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
       tag2: referencedComplaintOrder.orderId,
     });
     const orphanMessageUpload = await uploadManagedFileForTest(app, {
@@ -837,7 +842,7 @@ describe('Attachment integration', () => {
       contentType: 'image/jpeg',
       content: 'stale-order-message-content',
       kind: 'attachment',
-      tag1: 'petpal-order-message',
+      tag1: PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
       tag2: orphanMessageOrder.orderId,
     });
     const referencedMessageUpload = await uploadManagedFileForTest(app, {
@@ -846,7 +851,7 @@ describe('Attachment integration', () => {
       contentType: 'image/jpeg',
       content: 'referenced-order-message-content',
       kind: 'attachment',
-      tag1: 'petpal-order-message',
+      tag1: PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
       tag2: referencedMessageOrder.orderId,
     });
     const genericAttachmentUpload = await uploadManagedFileForTest(app, {

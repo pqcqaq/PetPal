@@ -1,3 +1,8 @@
+import {
+  PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
+  PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
+} from '@rbac/api-common';
 import { env } from '../../config/env';
 import { prisma } from '../../lib/prisma';
 import { resolveMediaAssetReferenceMap } from '../../services/media-asset-references';
@@ -37,13 +42,13 @@ const listCleanupTargets = async (cutoff: Date, batchSize: number) =>
         {
           OR: [
             {
-              tag1: 'petpal-caregiver-qualification',
+              tag1: PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
             },
             {
-              tag1: 'petpal-order-complaint',
+              tag1: PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
             },
             {
-              tag1: 'petpal-order-message',
+              tag1: PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
             },
             {
               tag1: 'petpal-penalty',

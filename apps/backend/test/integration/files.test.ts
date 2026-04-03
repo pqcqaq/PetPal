@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it } from 'node:test';
+import {
+  PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
+  PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
+  PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
+} from '@rbac/api-common';
 import request from 'supertest';
 import {
   bootstrapBackendTestContext,
@@ -247,7 +252,7 @@ describe('File upload integration', () => {
         fileName: 'wrong-caregiver.jpg',
         contentType: 'image/jpeg',
         size: 256,
-        tag1: 'petpal-caregiver-qualification',
+        tag1: PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
         tag2: 'caregiver-not-owned',
       })
       .expect(403);
@@ -260,7 +265,7 @@ describe('File upload integration', () => {
         fileName: 'qualification.jpg',
         contentType: 'image/jpeg',
         size: Buffer.byteLength('petpal-qualification-binary'),
-        tag1: 'petpal-caregiver-qualification',
+        tag1: PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
         tag2: caregiverId,
       })
       .expect(200);
@@ -317,7 +322,7 @@ describe('File upload integration', () => {
     assert.ok(asset);
     assert.equal(asset.userId, memberSession.user.id);
     assert.equal(asset.kind, 'attachment');
-    assert.equal(asset.tag1, 'petpal-caregiver-qualification');
+    assert.equal(asset.tag1, PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG);
     assert.equal(asset.tag2, caregiverId);
     assert.equal(asset.uploadStatus, 'COMPLETED');
     assert.equal(asset.url, uploaded.url);
@@ -389,7 +394,7 @@ describe('File upload integration', () => {
       fileName: 'owner-message.jpg',
       contentType: 'image/jpeg',
       content: 'owner-message-binary',
-      tag1: 'petpal-order-message',
+      tag1: PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
       tag2: order.id,
     });
 
@@ -398,7 +403,7 @@ describe('File upload integration', () => {
       fileName: 'caregiver-message.jpg',
       contentType: 'image/jpeg',
       content: 'caregiver-message-binary',
-      tag1: 'petpal-order-message',
+      tag1: PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
       tag2: order.id,
     });
 
@@ -429,13 +434,13 @@ describe('File upload integration', () => {
 
     assert.ok(ownerAsset);
     assert.equal(ownerAsset.userId, ownerSession.user.id);
-    assert.equal(ownerAsset.tag1, 'petpal-order-message');
+    assert.equal(ownerAsset.tag1, PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG);
     assert.equal(ownerAsset.tag2, order.id);
     assert.equal(ownerAsset.uploadStatus, 'COMPLETED');
 
     assert.ok(caregiverAsset);
     assert.equal(caregiverAsset.userId, caregiverSession.user.id);
-    assert.equal(caregiverAsset.tag1, 'petpal-order-message');
+    assert.equal(caregiverAsset.tag1, PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG);
     assert.equal(caregiverAsset.tag2, order.id);
     assert.equal(caregiverAsset.uploadStatus, 'COMPLETED');
 
@@ -447,7 +452,7 @@ describe('File upload integration', () => {
         fileName: 'blocked-message.jpg',
         contentType: 'image/jpeg',
         size: 128,
-        tag1: 'petpal-order-message',
+        tag1: PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
         tag2: order.id,
       })
       .expect(403);
@@ -519,7 +524,7 @@ describe('File upload integration', () => {
       fileName: 'owner-complaint.jpg',
       contentType: 'image/jpeg',
       content: 'owner-complaint-binary',
-      tag1: 'petpal-order-complaint',
+      tag1: PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
       tag2: order.id,
     });
 
@@ -528,7 +533,7 @@ describe('File upload integration', () => {
       fileName: 'caregiver-complaint.jpg',
       contentType: 'image/jpeg',
       content: 'caregiver-complaint-binary',
-      tag1: 'petpal-order-complaint',
+      tag1: PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
       tag2: order.id,
     });
 
@@ -559,13 +564,13 @@ describe('File upload integration', () => {
 
     assert.ok(ownerAsset);
     assert.equal(ownerAsset.userId, ownerSession.user.id);
-    assert.equal(ownerAsset.tag1, 'petpal-order-complaint');
+    assert.equal(ownerAsset.tag1, PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG);
     assert.equal(ownerAsset.tag2, order.id);
     assert.equal(ownerAsset.uploadStatus, 'COMPLETED');
 
     assert.ok(caregiverAsset);
     assert.equal(caregiverAsset.userId, caregiverSession.user.id);
-    assert.equal(caregiverAsset.tag1, 'petpal-order-complaint');
+    assert.equal(caregiverAsset.tag1, PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG);
     assert.equal(caregiverAsset.tag2, order.id);
     assert.equal(caregiverAsset.uploadStatus, 'COMPLETED');
 
@@ -577,7 +582,7 @@ describe('File upload integration', () => {
         fileName: 'blocked-complaint.jpg',
         contentType: 'image/jpeg',
         size: 128,
-        tag1: 'petpal-order-complaint',
+        tag1: PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
         tag2: order.id,
       })
       .expect(403);
