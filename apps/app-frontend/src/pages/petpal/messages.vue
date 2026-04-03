@@ -6,6 +6,17 @@ import { storeToRefs } from 'pinia'
 import { getOrderMessages, listCaregiverOrders, listOrders, markOrderMessagesRead, sendOrderMessage } from '@/api/petpal'
 import { useManagedAttachmentUpload } from '@/composables/useManagedAttachmentUpload'
 import { useNotificationStore, useTokenStore, useUserStore } from '@/store'
+import {
+  clearPetPalMessageDraft,
+  clearPetPalMessageRecovery,
+  getPetPalMessageRecovery,
+  hasPetPalMessageDraft,
+  hasPetPalMessageRecovery,
+  persistPetPalMessageDraft,
+  restorePetPalMessageDraft,
+  setPetPalMessageRecovery,
+  type PetPalMessageDraftAttachment,
+} from './message-composer-state'
 import PetpalEmpty from './rebuild/petpal-empty.vue'
 import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
@@ -25,23 +36,7 @@ import {
 type FilterValue = 'ALL' | 'UNREAD'
 type RoleValue = 'owner' | 'caregiver'
 type ConversationSource = OrderRecord | CaregiverOrderRecord
-type UploadedMessageAttachment = {
-  fileId: string
-  url: string
-  name: string
-  mimeType: string
-  size: number
-  uploadedAt: string
-}
-type MessageDraftState = {
-  content: string
-  attachments: UploadedMessageAttachment[]
-}
-type MessageRecoveryStage = 'upload' | 'send'
-type MessageRecoveryState = {
-  stage: MessageRecoveryStage
-  message: string
-}
+type UploadedMessageAttachment = PetPalMessageDraftAttachment
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
@@ -61,8 +56,6 @@ const selectedOrderId = ref('')
 const conversation = ref<OrderConversationDetailRecord | null>(null)
 const messageText = ref('')
 const messageAttachments = ref<UploadedMessageAttachment[]>([])
-const messageDrafts = ref<Record<string, MessageDraftState>>({})
-const messageRecoveries = ref<Record<string, MessageRecoveryState>>({})
 
 let threadRequestVersion = 0
 
@@ -118,21 +111,11 @@ const currentThreadOrder = computed(() => currentOrders.value.find(item => item.
 const currentThreadSummary = computed(() =>
   currentThreadOrder.value ? describeConversation(currentThreadOrder.value, role.value) : null)
 const currentThreadRecovery = computed(() =>
-  currentThreadOrder.value ? messageRecoveries.value[currentThreadOrder.value.id] || null : null)
+  currentThreadOrder.value ? getPetPalMessageRecovery(currentThreadOrder.value.id) : null)
 const conversationMessages = computed(() => conversation.value?.messages || [])
 const messageAttachmentSlotsLeft = computed(() => Math.max(0, 3 - messageAttachments.value.length))
 const uploadingMessageAttachments = computed(() => upload.uploading.value)
 const composerBusy = computed(() => upload.uploading.value || sendingMessage.value)
-
-const cloneDraftAttachments = (attachments: UploadedMessageAttachment[]) =>
-  attachments.map(item => ({
-    fileId: item.fileId,
-    url: item.url,
-    name: item.name,
-    mimeType: item.mimeType,
-    size: item.size,
-    uploadedAt: item.uploadedAt,
-  }))
 
 function resetComposer() {
   messageText.value = ''
@@ -140,11 +123,11 @@ function resetComposer() {
 }
 
 function hasThreadDraft(orderId: string) {
-  return Boolean(messageDrafts.value[orderId])
+  return hasPetPalMessageDraft(orderId)
 }
 
 function hasThreadRecovery(orderId: string) {
-  return Boolean(messageRecoveries.value[orderId])
+  return hasPetPalMessageRecovery(orderId)
 }
 
 function clearThreadState() {
@@ -156,65 +139,21 @@ function clearThreadState() {
 }
 
 function clearThreadDraft(orderId: string) {
-  if (!messageDrafts.value[orderId]) {
-    return
-  }
-
-  const nextDrafts = { ...messageDrafts.value }
-  delete nextDrafts[orderId]
-  messageDrafts.value = nextDrafts
+  clearPetPalMessageDraft(orderId)
 }
 
 function clearThreadRecovery(orderId: string) {
-  if (!messageRecoveries.value[orderId]) {
-    return
-  }
-
-  const nextRecoveries = { ...messageRecoveries.value }
-  delete nextRecoveries[orderId]
-  messageRecoveries.value = nextRecoveries
-}
-
-function setThreadRecovery(orderId: string, stage: MessageRecoveryStage, message: string) {
-  if (!orderId) {
-    return
-  }
-
-  messageRecoveries.value = {
-    ...messageRecoveries.value,
-    [orderId]: {
-      stage,
-      message,
-    },
-  }
+  clearPetPalMessageRecovery(orderId)
 }
 
 function persistThreadDraft(orderId: string) {
-  if (!orderId) {
-    return
-  }
-
-  const content = messageText.value
-  const attachments = cloneDraftAttachments(messageAttachments.value)
-  const hasDraft = content.trim().length > 0 || attachments.length > 0
-  if (!hasDraft) {
-    clearThreadDraft(orderId)
-    return
-  }
-
-  messageDrafts.value = {
-    ...messageDrafts.value,
-    [orderId]: {
-      content,
-      attachments,
-    },
-  }
+  persistPetPalMessageDraft(orderId, messageText.value, messageAttachments.value)
 }
 
 function restoreThreadDraft(orderId: string) {
-  const draft = messageDrafts.value[orderId]
+  const draft = restorePetPalMessageDraft(orderId)
   messageText.value = draft?.content || ''
-  messageAttachments.value = draft ? cloneDraftAttachments(draft.attachments) : []
+  messageAttachments.value = draft?.attachments || []
 }
 
 function patchConversationSummary(orderId: string, nextConversation: OrderConversationRecord) {
@@ -397,7 +336,7 @@ async function uploadMessageMaterials() {
   }
   catch (error: unknown) {
     const message = `${getErrorMessage(error, '上传失败')}，已完成的图片仍会保留在当前草稿中。`
-    setThreadRecovery(orderId, 'upload', message)
+    setPetPalMessageRecovery(orderId, 'upload', message)
     toast(message)
   }
 }
@@ -434,7 +373,7 @@ async function handleSendMessage() {
   }
   catch (error: unknown) {
     const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`
-    setThreadRecovery(orderId, 'send', message)
+    setPetPalMessageRecovery(orderId, 'send', message)
     toast(message)
   }
   finally {

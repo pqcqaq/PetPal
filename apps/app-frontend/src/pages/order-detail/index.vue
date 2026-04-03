@@ -33,16 +33,18 @@ import {
   stopPullDown,
   toast,
 } from '../petpal/rebuild/shared'
+import {
+  clearPetPalMessageDraft,
+  clearPetPalMessageRecovery,
+  getPetPalMessageRecovery,
+  persistPetPalMessageDraft,
+  restorePetPalMessageDraft,
+  setPetPalMessageRecovery,
+  type PetPalMessageDraftAttachment,
+} from '../petpal/message-composer-state'
 
 type DetailTab = 'overview' | 'chat' | 'service' | 'aftersales'
-type UploadedMessageAttachment = {
-  fileId: string
-  url: string
-  name: string
-  mimeType: string
-  size: number
-  uploadedAt: string
-}
+type UploadedMessageAttachment = PetPalMessageDraftAttachment
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
@@ -66,6 +68,8 @@ const isOwnerView = computed(() => Boolean(userInfo.value.id && order.value?.own
 const roleLabel = computed(() => (isOwnerView.value ? '主人视角' : '照料者视角'))
 const conversationMessages = computed(() => conversation.value?.messages || [])
 const messageAttachmentSlotsLeft = computed(() => Math.max(0, 3 - messageAttachments.value.length))
+const uploadingMessageAttachments = computed(() => upload.uploading.value)
+const currentMessageRecovery = computed(() => orderId.value ? getPetPalMessageRecovery(orderId.value) : null)
 const currentStatusLabel = computed(() => order.value ? helpers.getOrderStatusLabel(order.value.orderStatus) : '')
 const recentTimeline = computed(() => order.value?.timeline.slice().reverse().slice(0, 6) || [])
 const visibleServiceLogs = computed(() => order.value?.serviceLogs.slice().reverse() || [])
@@ -93,6 +97,17 @@ const tabOptions = computed(() => [
   { label: '服务', value: 'service', badge: order.value?.serviceLogs.length || '' },
   { label: '售后', value: 'aftersales', badge: complaints.value.length || '' },
 ])
+
+function resetComposer() {
+  messageText.value = ''
+  messageAttachments.value = []
+}
+
+function restoreComposerState(currentOrderId: string) {
+  const draft = restorePetPalMessageDraft(currentOrderId)
+  messageText.value = draft?.content || ''
+  messageAttachments.value = draft?.attachments || []
+}
 
 async function loadPage() {
   if (!tokenStore.hasLogin || loading.value || !orderId.value) {
@@ -166,6 +181,9 @@ function previewImages(urls: string[], current?: string) {
 }
 
 async function uploadMessageMaterials() {
+  if (upload.uploading.value || actionLoading.value) {
+    return
+  }
   if (!orderId.value) {
     toast('缺少订单信息，暂时无法上传消息图片')
     return
@@ -182,10 +200,13 @@ async function uploadMessageMaterials() {
       maxCount: messageAttachmentSlotsLeft.value,
     })
     messageAttachments.value = [...messageAttachments.value, ...files]
-    toast('消息图片已上传', 'success')
+    clearPetPalMessageRecovery(orderId.value)
+    toast(files.length === 1 ? '消息图片已上传' : `已上传 ${files.length} 张图片`, 'success')
   }
   catch (error: unknown) {
-    toast(getErrorMessage(error, '上传失败'))
+    const message = `${getErrorMessage(error, '上传失败')}，已完成的图片仍会保留在当前草稿中。`
+    setPetPalMessageRecovery(orderId.value, 'upload', message)
+    toast(message)
   }
 }
 
@@ -196,7 +217,7 @@ function removeMessageAttachment(fileId: string) {
 async function handleSendMessage() {
   const content = messageText.value.trim()
   const mediaUrls = messageAttachments.value.map(item => item.url)
-  if (!order.value) {
+  if (!order.value || actionLoading.value) {
     return
   }
   if (!content && !mediaUrls.length) {
@@ -204,14 +225,39 @@ async function handleSendMessage() {
     return
   }
 
-  await withAction(async () => {
-    conversation.value = await sendOrderMessage(order.value!.id, {
+  actionLoading.value = true
+  try {
+    conversation.value = await sendOrderMessage(order.value.id, {
       content: content || undefined,
       mediaUrls,
     })
-    messageText.value = ''
-    messageAttachments.value = []
-  }, '消息已发送')
+    clearPetPalMessageDraft(order.value.id)
+    clearPetPalMessageRecovery(order.value.id)
+    resetComposer()
+    toast('消息已发送', 'success')
+    await loadPage()
+  }
+  catch (error: unknown) {
+    const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`
+    setPetPalMessageRecovery(order.value.id, 'send', message)
+    toast(message)
+  }
+  finally {
+    actionLoading.value = false
+  }
+}
+
+function retryCurrentMessageRecovery() {
+  if (!currentMessageRecovery.value || uploadingMessageAttachments.value || actionLoading.value) {
+    return
+  }
+
+  if (currentMessageRecovery.value.stage === 'send') {
+    void handleSendMessage()
+    return
+  }
+
+  void uploadMessageMaterials()
 }
 
 async function handleConfirmComplete() {
@@ -262,6 +308,32 @@ watch(activeTab, async (value) => {
     await markOrderMessagesRead(orderId.value).catch(() => undefined)
   }
 })
+
+watch(messageText, () => {
+  if (orderId.value) {
+    persistPetPalMessageDraft(orderId.value, messageText.value, messageAttachments.value)
+  }
+})
+
+watch(messageAttachments, () => {
+  if (orderId.value) {
+    persistPetPalMessageDraft(orderId.value, messageText.value, messageAttachments.value)
+  }
+}, { deep: true })
+
+watch(orderId, (value, previousValue) => {
+  if (value === previousValue) {
+    return
+  }
+  if (previousValue) {
+    persistPetPalMessageDraft(previousValue, messageText.value, messageAttachments.value)
+  }
+  if (!value) {
+    resetComposer()
+    return
+  }
+  restoreComposerState(value)
+}, { immediate: true })
 
 onLoad((options) => {
   orderId.value = options?.id || options?.orderId || ''
@@ -387,6 +459,23 @@ onPullDownRefresh(() => {
 
         <PetpalSection title="发送消息" subtitle="消息发送动作单独放在这里，不和订单概览混在一起。">
           <view class="petpal-form">
+            <view v-if="currentMessageRecovery" class="message-recovery">
+              <text class="message-recovery__title">{{ currentMessageRecovery.stage === 'send' ? '上一条消息还没发出去' : '上一轮图片上传没有完成' }}</text>
+              <text class="message-recovery__detail">{{ currentMessageRecovery.message }}</text>
+              <view class="petpal-action-row">
+                <button
+                  class="petpal-btn petpal-btn--secondary"
+                  hover-class="none"
+                  :disabled="uploadingMessageAttachments || actionLoading"
+                  @click="retryCurrentMessageRecovery"
+                >
+                  {{ currentMessageRecovery.stage === 'send' ? '重试发送' : '重新上传图片' }}
+                </button>
+                <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="clearPetPalMessageRecovery(order.id)">
+                  清除提示
+                </button>
+              </view>
+            </view>
             <template v-if="messageAttachments.length">
               <view class="detail-chat__composer-meta">
                 <text class="petpal-note">已上传 {{ messageAttachments.length }}/3 张，发送前可继续预览或移除。</text>
@@ -407,10 +496,12 @@ onPullDownRefresh(() => {
             </template>
             <textarea v-model="messageText" class="petpal-textarea" :maxlength="280" placeholder="输入要沟通的内容" />
             <view class="petpal-action-row">
-              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="uploadMessageMaterials">
-                {{ upload.uploading ? '上传中...' : `上传图片${messageAttachmentSlotsLeft ? `（剩余 ${messageAttachmentSlotsLeft} 张）` : ''}` }}
+              <button class="petpal-btn petpal-btn--secondary" hover-class="none" :disabled="uploadingMessageAttachments || actionLoading || messageAttachmentSlotsLeft <= 0" @click="uploadMessageMaterials">
+                {{ uploadingMessageAttachments ? '上传中...' : `上传图片${messageAttachmentSlotsLeft ? `（剩余 ${messageAttachmentSlotsLeft} 张）` : ''}` }}
               </button>
-              <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="handleSendMessage">发送消息</button>
+              <button class="petpal-btn petpal-btn--primary" hover-class="none" :disabled="uploadingMessageAttachments || actionLoading" @click="handleSendMessage">
+                {{ actionLoading ? '发送中...' : '发送消息' }}
+              </button>
             </view>
           </view>
         </PetpalSection>
@@ -543,5 +634,26 @@ onPullDownRefresh(() => {
 
 .detail-chat__remove-btn {
   min-width: 0;
+}
+
+.message-recovery {
+  display: grid;
+  gap: 12rpx;
+  padding: 20rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 247, 237, 0.92);
+  border: 1rpx solid rgba(217, 119, 6, 0.18);
+}
+
+.message-recovery__title {
+  color: #9a3412;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.message-recovery__detail {
+  color: var(--app-text);
+  font-size: 23rpx;
+  line-height: 1.7;
 }
 </style>

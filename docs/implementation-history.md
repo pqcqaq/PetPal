@@ -178,6 +178,10 @@ Last updated: 2026-04-04
 - 2026-04-04 已继续补消息中心局部失败恢复：
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalMessagesView.vue` 与 `apps/app-frontend/src/pages/petpal/messages.vue` 现在会按线程保留上传失败 / 发送失败提示，并提供就地重试入口。
   - 失败提示继续以 `orderId` 为边界，当前线程切换后仍可回到原线程继续发送，不会把待恢复状态串到别的订单。
+- 2026-04-04 已继续补消息中心与订单详情共享沟通状态：
+  - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts`、`PetPalMessagesView.vue`、`OrderDetailView.vue` 现已共用按订单隔离的草稿 / 恢复态，消息中心与订单详情之间切换时不会丢失未发送文字、已上传图片和恢复提示。
+  - `apps/app-frontend/src/pages/petpal/message-composer-state.ts`、`pages/petpal/messages.vue`、`pages/order-detail/index.vue` 也已对齐同一规则，移动端跨页面返回当前订单时仍可继续发送或补图。
+  - 当前共享状态仍只保留在运行时内存中，刷新 Web 页面或重启 App 后不会自动恢复。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

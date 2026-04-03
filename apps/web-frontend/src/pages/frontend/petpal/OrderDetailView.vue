@@ -150,6 +150,26 @@
         />
 
         <div class="petpal-side-stack">
+          <PetPalDeskNotice
+            v-if="currentMessageRecovery"
+            eyebrow="Recovery"
+            :title="currentMessageRecovery.stage === 'send' ? '上一条消息还没发出去' : '上一轮图片上传没有完成'"
+            :description="currentMessageRecovery.message"
+            tone="warning"
+          >
+            <template #actions>
+              <el-button
+                link
+                :disabled="uploadingMessageAttachments || sendingMessage"
+                @click="retryCurrentMessageRecovery"
+              >
+                {{ currentMessageRecovery.stage === 'send' ? '重试发送' : '重新上传图片' }}
+              </el-button>
+              <el-button link @click="clearPetPalMessageRecovery(order.id)">
+                清除提示
+              </el-button>
+            </template>
+          </PetPalDeskNotice>
           <div v-if="messageAttachments.length" class="petpal-message-drafts">
             <div v-for="item in messageAttachments" :key="item.fileId" class="petpal-message-draft-card">
               <button type="button" class="petpal-message-attachment-preview" @click="openMessageAttachment(item.url)">
@@ -266,6 +286,15 @@ import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage, isDialogCancellation } from '@/utils/errors';
+import {
+  clearPetPalMessageDraft,
+  clearPetPalMessageRecovery,
+  getPetPalMessageRecovery,
+  persistPetPalMessageDraft,
+  restorePetPalMessageDraft,
+  setPetPalMessageRecovery,
+  type PetPalMessageDraftAttachment,
+} from './message-composer-state';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
@@ -292,13 +321,7 @@ import {
   petPalOwnerWorkspaceNav,
 } from './shared';
 
-type DraftMessageAttachment = {
-  fileId: string;
-  url: string;
-  name: string;
-  size: number;
-  mimeType: string;
-};
+type DraftMessageAttachment = PetPalMessageDraftAttachment;
 
 const MAX_MESSAGE_ATTACHMENTS = 3;
 const MAX_MESSAGE_ATTACHMENT_SIZE = 8 * 1024 * 1024;
@@ -466,6 +489,7 @@ const conversationUnreadCount = computed(() => {
 const canConfirmComplete = computed(() => isOwnerView.value && order.value?.orderStatus === 'SERVING');
 const messageAttachmentSlotsLeft = computed(() =>
   Math.max(0, MAX_MESSAGE_ATTACHMENTS - messageAttachments.value.length));
+const currentMessageRecovery = computed(() => orderId.value ? getPetPalMessageRecovery(orderId.value) : null);
 
 const isLikelyImageAttachment = (url: string, mimeType?: string) =>
   mimeType?.startsWith('image/')
@@ -486,6 +510,25 @@ const formatMessageAttachmentSize = (size: number) => {
   }
   return `${size} B`;
 };
+
+function resetComposer() {
+  messageContent.value = '';
+  messageAttachments.value = [];
+  messageUploadProgress.value = null;
+  if (messageAttachmentInputRef.value) {
+    messageAttachmentInputRef.value.value = '';
+  }
+}
+
+function restoreComposerState(currentOrderId: string) {
+  const draft = restorePetPalMessageDraft(currentOrderId);
+  messageContent.value = draft?.content ?? '';
+  messageAttachments.value = draft?.attachments ?? [];
+  messageUploadProgress.value = null;
+  if (messageAttachmentInputRef.value) {
+    messageAttachmentInputRef.value.value = '';
+  }
+}
 
 async function scrollToRequestedTab() {
   const tab = getPetPalDeskSectionTab(route.query);
@@ -615,6 +658,19 @@ function removeMessageAttachment(fileId: string) {
   messageAttachments.value = messageAttachments.value.filter((item) => item.fileId !== fileId);
 }
 
+function retryCurrentMessageRecovery() {
+  if (!currentMessageRecovery.value || uploadingMessageAttachments.value || sendingMessage.value) {
+    return;
+  }
+
+  if (currentMessageRecovery.value.stage === 'send') {
+    void submitMessage();
+    return;
+  }
+
+  triggerMessageAttachmentInput();
+}
+
 async function handleMessageAttachmentChange(event: Event) {
   const input = event.target as HTMLInputElement;
   const selectedFiles = Array.from(input.files ?? []);
@@ -678,8 +734,11 @@ async function handleMessageAttachmentChange(event: Event) {
     }
 
     ElMessage.success(validFiles.length === 1 ? '消息图片已上传' : `已上传 ${validFiles.length} 张消息图片`);
+    clearPetPalMessageRecovery(order.value.id);
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '上传消息图片失败'));
+    const message = `${getErrorMessage(error, '上传消息图片失败')}，已完成的图片仍会保留在当前草稿中。`;
+    setPetPalMessageRecovery(order.value.id, 'upload', message);
+    ElMessage.error(message);
   } finally {
     uploadingMessageAttachments.value = false;
     messageUploadProgress.value = null;
@@ -716,11 +775,14 @@ async function submitMessage() {
         updatedAt: result.updatedAt,
       },
     };
-    messageContent.value = '';
-    messageAttachments.value = [];
+    clearPetPalMessageDraft(order.value.id);
+    clearPetPalMessageRecovery(order.value.id);
+    resetComposer();
     ElMessage.success('消息已发送');
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '发送消息失败'));
+    const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`;
+    setPetPalMessageRecovery(order.value.id, 'send', message);
+    ElMessage.error(message);
   } finally {
     sendingMessage.value = false;
   }
@@ -764,6 +826,43 @@ watch(
   () => {
     void scrollToRequestedTab();
   },
+);
+
+watch(
+  messageContent,
+  () => {
+    if (orderId.value) {
+      persistPetPalMessageDraft(orderId.value, messageContent.value, messageAttachments.value);
+    }
+  },
+);
+
+watch(
+  messageAttachments,
+  () => {
+    if (orderId.value) {
+      persistPetPalMessageDraft(orderId.value, messageContent.value, messageAttachments.value);
+    }
+  },
+  { deep: true },
+);
+
+watch(
+  orderId,
+  (value, previousValue) => {
+    if (value === previousValue) {
+      return;
+    }
+    if (previousValue) {
+      persistPetPalMessageDraft(previousValue, messageContent.value, messageAttachments.value);
+    }
+    if (!value) {
+      resetComposer();
+      return;
+    }
+    restoreComposerState(value);
+  },
+  { immediate: true },
 );
 </script>
 

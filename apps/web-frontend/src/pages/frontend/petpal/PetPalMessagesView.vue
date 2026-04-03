@@ -266,6 +266,17 @@ import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
+import {
+  clearPetPalMessageDraft,
+  clearPetPalMessageRecovery,
+  getPetPalMessageRecovery,
+  hasPetPalMessageDraft,
+  hasPetPalMessageRecovery,
+  persistPetPalMessageDraft,
+  restorePetPalMessageDraft,
+  setPetPalMessageRecovery,
+  type PetPalMessageDraftAttachment,
+} from './message-composer-state';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
@@ -292,13 +303,7 @@ import {
 type ConversationItem = Pick<OrderRecord, 'id' | 'orderNo' | 'orderStatus' | 'serviceType' | 'conversation'>
   | Pick<CaregiverOrderRecord, 'id' | 'orderNo' | 'orderStatus' | 'serviceType' | 'conversation'>;
 
-type DraftMessageAttachment = {
-  fileId: string;
-  url: string;
-  name: string;
-  size: number;
-  mimeType: string;
-};
+type DraftMessageAttachment = PetPalMessageDraftAttachment;
 
 type ConversationSummary = {
   id: string;
@@ -309,18 +314,6 @@ type ConversationSummary = {
   lastMessagePreview: string | null;
   createdAt: string;
   updatedAt: string;
-};
-
-type MessageDraftState = {
-  content: string;
-  attachments: DraftMessageAttachment[];
-};
-
-type ThreadRecoveryStage = 'upload' | 'send';
-
-type ThreadRecoveryState = {
-  stage: ThreadRecoveryStage;
-  message: string;
 };
 
 const MAX_MESSAGE_ATTACHMENTS = 3;
@@ -336,8 +329,6 @@ const activeThread = ref<OrderConversationDetailRecord | null>(null);
 const activeThreadState = ref<PetPalSectionLoadState>('idle');
 const messageContent = ref('');
 const messageAttachments = ref<DraftMessageAttachment[]>([]);
-const messageDrafts = ref<Record<string, MessageDraftState>>({});
-const messageRecoveries = ref<Record<string, ThreadRecoveryState>>({});
 const uploadingMessageAttachments = ref(false);
 const messageUploadProgress = ref<number | null>(null);
 const sendingMessage = ref(false);
@@ -362,7 +353,7 @@ const activeConversation = computed(() => conversations.value.find((item) => ite
 const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
 const composerBusy = computed(() => uploadingMessageAttachments.value || sendingMessage.value);
 const currentThreadRecovery = computed(() =>
-  activeConversation.value ? messageRecoveries.value[activeConversation.value.id] ?? null : null);
+  activeConversation.value ? getPetPalMessageRecovery(activeConversation.value.id) : null);
 const activeThreadUnreadCount = computed(() =>
   activeThread.value
     ? getPetPalConversationUnreadCount(activeThread.value, role.value)
@@ -421,15 +412,6 @@ const formatMessageAttachmentSize = (size: number) => {
   return `${size} B`;
 };
 
-const cloneDraftAttachments = (attachments: DraftMessageAttachment[]) =>
-  attachments.map((item) => ({
-    fileId: item.fileId,
-    url: item.url,
-    name: item.name,
-    size: item.size,
-    mimeType: item.mimeType,
-  }));
-
 function buildRemindersLink(notice: string, focusRole: 'owner' | 'caregiver') {
   return {
     name: 'frontend-petpal-reminders',
@@ -454,11 +436,11 @@ function buildOrderDetailLink(orderId: string) {
 }
 
 function hasThreadDraft(orderId: string) {
-  return Boolean(messageDrafts.value[orderId]);
+  return hasPetPalMessageDraft(orderId);
 }
 
 function hasThreadRecovery(orderId: string) {
-  return Boolean(messageRecoveries.value[orderId]);
+  return hasPetPalMessageRecovery(orderId);
 }
 
 function resetComposer() {
@@ -471,65 +453,21 @@ function resetComposer() {
 }
 
 function clearThreadDraft(orderId: string) {
-  if (!messageDrafts.value[orderId]) {
-    return;
-  }
-
-  const nextDrafts = { ...messageDrafts.value };
-  delete nextDrafts[orderId];
-  messageDrafts.value = nextDrafts;
+  clearPetPalMessageDraft(orderId);
 }
 
 function clearThreadRecovery(orderId: string) {
-  if (!messageRecoveries.value[orderId]) {
-    return;
-  }
-
-  const nextRecoveries = { ...messageRecoveries.value };
-  delete nextRecoveries[orderId];
-  messageRecoveries.value = nextRecoveries;
-}
-
-function setThreadRecovery(orderId: string, stage: ThreadRecoveryStage, message: string) {
-  if (!orderId) {
-    return;
-  }
-
-  messageRecoveries.value = {
-    ...messageRecoveries.value,
-    [orderId]: {
-      stage,
-      message,
-    },
-  };
+  clearPetPalMessageRecovery(orderId);
 }
 
 function persistThreadDraft(orderId: string) {
-  if (!orderId) {
-    return;
-  }
-
-  const content = messageContent.value;
-  const attachments = cloneDraftAttachments(messageAttachments.value);
-  const hasDraft = content.trim().length > 0 || attachments.length > 0;
-  if (!hasDraft) {
-    clearThreadDraft(orderId);
-    return;
-  }
-
-  messageDrafts.value = {
-    ...messageDrafts.value,
-    [orderId]: {
-      content,
-      attachments,
-    },
-  };
+  persistPetPalMessageDraft(orderId, messageContent.value, messageAttachments.value);
 }
 
 function restoreThreadDraft(orderId: string) {
-  const draft = messageDrafts.value[orderId];
+  const draft = restorePetPalMessageDraft(orderId);
   messageContent.value = draft?.content ?? '';
-  messageAttachments.value = draft ? cloneDraftAttachments(draft.attachments) : [];
+  messageAttachments.value = draft?.attachments ?? [];
   messageUploadProgress.value = null;
   if (messageAttachmentInputRef.value) {
     messageAttachmentInputRef.value.value = '';
@@ -805,7 +743,7 @@ async function handleMessageAttachmentChange(event: Event) {
     clearThreadRecovery(currentOrderId);
   } catch (error: unknown) {
     const message = `${getErrorMessage(error, '上传消息图片失败')}，已完成的图片仍会保留在当前草稿中。`;
-    setThreadRecovery(currentOrderId, 'upload', message);
+    setPetPalMessageRecovery(currentOrderId, 'upload', message);
     ElMessage.error(message);
   } finally {
     uploadingMessageAttachments.value = false;
@@ -841,7 +779,7 @@ async function submitMessage() {
     ElMessage.success('消息已发送');
   } catch (error: unknown) {
     const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`;
-    setThreadRecovery(orderId, 'send', message);
+    setPetPalMessageRecovery(orderId, 'send', message);
     ElMessage.error(message);
   } finally {
     sendingMessage.value = false;
