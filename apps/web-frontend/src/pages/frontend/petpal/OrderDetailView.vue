@@ -119,6 +119,27 @@
               <h3 class="petpal-sheet-row__title">{{ message.senderRole === 'OWNER' ? '宠物主人' : '照料者' }}</h3>
               <p class="petpal-sheet-row__desc">{{ formatPetPalTime(message.createdAt) }}</p>
               <p class="petpal-sheet-row__desc">{{ message.content || '发送了一条附件消息' }}</p>
+              <div v-if="message.mediaUrls.length" class="petpal-message-attachments">
+                <template v-for="url in message.mediaUrls" :key="url">
+                  <button
+                    v-if="isLikelyImageAttachment(url)"
+                    type="button"
+                    class="petpal-message-attachment-preview"
+                    @click="openMessageAttachment(url)"
+                  >
+                    <img :src="url" alt="订单消息附件" class="petpal-message-attachment-image">
+                  </button>
+                  <a
+                    v-else
+                    class="petpal-message-attachment-link"
+                    :href="url"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {{ getMessageAttachmentLabel(url) }}
+                  </a>
+                </template>
+              </div>
             </div>
           </div>
         </div>
@@ -129,6 +150,20 @@
         />
 
         <div class="petpal-side-stack">
+          <div v-if="messageAttachments.length" class="petpal-message-drafts">
+            <div v-for="item in messageAttachments" :key="item.fileId" class="petpal-message-draft-card">
+              <button type="button" class="petpal-message-attachment-preview" @click="openMessageAttachment(item.url)">
+                <img :src="item.url" :alt="item.name" class="petpal-message-attachment-image">
+              </button>
+              <div class="petpal-message-draft-meta">
+                <strong>{{ item.name }}</strong>
+                <span>{{ formatMessageAttachmentSize(item.size) }}</span>
+              </div>
+              <el-button class="petpal-message-draft-remove" link type="danger" @click="removeMessageAttachment(item.fileId)">
+                移除
+              </el-button>
+            </div>
+          </div>
           <el-input
             v-model="messageContent"
             type="textarea"
@@ -137,8 +172,32 @@
             show-word-limit
             placeholder="补充照料安排、交接说明或售后沟通内容"
           />
+          <input
+            ref="messageAttachmentInputRef"
+            class="petpal-message-upload-input"
+            type="file"
+            accept="image/*"
+            multiple
+            @change="handleMessageAttachmentChange"
+          >
+          <div class="petpal-message-upload-row">
+            <el-button
+              :loading="uploadingMessageAttachments"
+              :disabled="!order || sendingMessage || messageAttachmentSlotsLeft <= 0"
+              @click="triggerMessageAttachmentInput"
+            >
+              {{ uploadingMessageAttachments ? '上传中...' : `上传图片${messageAttachmentSlotsLeft > 0 ? `（剩余 ${messageAttachmentSlotsLeft} 张）` : ''}` }}
+            </el-button>
+            <span class="petpal-sheet-row__desc">消息图片会按当前订单范围上传，最多 3 张。</span>
+          </div>
+          <el-progress
+            v-if="messageUploadProgress !== null"
+            class="petpal-message-upload-progress"
+            :percentage="messageUploadProgress"
+            :status="messageUploadProgress >= 100 && !uploadingMessageAttachments ? 'success' : undefined"
+          />
           <div class="petpal-actions">
-            <el-button type="primary" :loading="sendingMessage" :disabled="!order" @click="submitMessage">发送消息</el-button>
+            <el-button type="primary" :loading="sendingMessage" :disabled="!order || uploadingMessageAttachments" @click="submitMessage">发送消息</el-button>
           </div>
         </div>
       </template>
@@ -205,6 +264,7 @@ import { RouterLink, useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
+import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage, isDialogCancellation } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
@@ -232,6 +292,18 @@ import {
   petPalOwnerWorkspaceNav,
 } from './shared';
 
+type DraftMessageAttachment = {
+  fileId: string;
+  url: string;
+  name: string;
+  size: number;
+  mimeType: string;
+};
+
+const MAX_MESSAGE_ATTACHMENTS = 3;
+const MAX_MESSAGE_ATTACHMENT_SIZE = 8 * 1024 * 1024;
+const IMAGE_ATTACHMENT_URL_RE = /\.(png|jpe?g|gif|webp|bmp|svg)(?:$|[?#])/i;
+
 const auth = useAuthStore();
 const route = useRoute();
 
@@ -243,6 +315,10 @@ const refundProgress = ref<OrderRefundProgressRecord | null>(null);
 const sendingMessage = ref(false);
 const confirming = ref(false);
 const messageContent = ref('');
+const messageAttachments = ref<DraftMessageAttachment[]>([]);
+const uploadingMessageAttachments = ref(false);
+const messageUploadProgress = ref<number | null>(null);
+const messageAttachmentInputRef = ref<HTMLInputElement | null>(null);
 const conversationState = ref<PetPalSectionLoadState>('idle');
 const aftersalesState = ref<PetPalSectionLoadState>('idle');
 const sectionReloadingKey = ref<'' | 'conversation' | 'aftersales'>('');
@@ -388,6 +464,28 @@ const conversationUnreadCount = computed(() => {
 });
 
 const canConfirmComplete = computed(() => isOwnerView.value && order.value?.orderStatus === 'SERVING');
+const messageAttachmentSlotsLeft = computed(() =>
+  Math.max(0, MAX_MESSAGE_ATTACHMENTS - messageAttachments.value.length));
+
+const isLikelyImageAttachment = (url: string, mimeType?: string) =>
+  mimeType?.startsWith('image/')
+  || IMAGE_ATTACHMENT_URL_RE.test(url);
+
+const getMessageAttachmentLabel = (url: string) => {
+  const normalized = url.split('?')[0]?.split('#')[0] ?? url;
+  const segment = normalized.slice(normalized.lastIndexOf('/') + 1).trim();
+  return segment || '查看附件';
+};
+
+const formatMessageAttachmentSize = (size: number) => {
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  if (size >= 1024) {
+    return `${Math.round(size / 1024)} KB`;
+  }
+  return `${size} B`;
+};
 
 async function scrollToRequestedTab() {
   const tab = getPetPalDeskSectionTab(route.query);
@@ -502,15 +600,107 @@ async function markConversationRead() {
   }
 }
 
+function triggerMessageAttachmentInput() {
+  if (!order.value || uploadingMessageAttachments.value || messageAttachmentSlotsLeft.value <= 0) {
+    return;
+  }
+  messageAttachmentInputRef.value?.click();
+}
+
+function openMessageAttachment(url: string) {
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function removeMessageAttachment(fileId: string) {
+  messageAttachments.value = messageAttachments.value.filter((item) => item.fileId !== fileId);
+}
+
+async function handleMessageAttachmentChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const selectedFiles = Array.from(input.files ?? []);
+  input.value = '';
+
+  if (!order.value || !selectedFiles.length) {
+    return;
+  }
+
+  const limitedFiles = selectedFiles.slice(0, messageAttachmentSlotsLeft.value);
+  if (selectedFiles.length > limitedFiles.length) {
+    ElMessage.warning(`一次最多还能添加 ${messageAttachmentSlotsLeft.value} 张图片`);
+  }
+
+  const validFiles = limitedFiles.filter((file) =>
+    (!file.type || file.type.startsWith('image/')) && file.size <= MAX_MESSAGE_ATTACHMENT_SIZE);
+
+  if (validFiles.length < limitedFiles.length) {
+    ElMessage.warning('仅支持上传不超过 8 MB 的图片文件');
+  }
+
+  if (!validFiles.length) {
+    return;
+  }
+
+  uploadingMessageAttachments.value = true;
+  messageUploadProgress.value = 0;
+
+  const progressMap = new Map<number, number>();
+  const reportProgress = () => {
+    const total = Array.from(progressMap.values()).reduce((sum, current) => sum + current, 0);
+    messageUploadProgress.value = Math.round(total / validFiles.length);
+  };
+
+  try {
+    for (const [index, file] of validFiles.entries()) {
+      const uploaded = await uploadAttachmentFile(
+        file,
+        {
+          tag1: 'petpal-order-message',
+          tag2: order.value.id,
+        },
+        (progress) => {
+          progressMap.set(index, progress);
+          reportProgress();
+        },
+      );
+
+      progressMap.set(index, 100);
+      reportProgress();
+      messageAttachments.value = [
+        ...messageAttachments.value,
+        {
+          fileId: uploaded.fileId,
+          url: uploaded.url,
+          name: file.name,
+          size: file.size,
+          mimeType: file.type || 'application/octet-stream',
+        },
+      ];
+    }
+
+    ElMessage.success(validFiles.length === 1 ? '消息图片已上传' : `已上传 ${validFiles.length} 张消息图片`);
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '上传消息图片失败'));
+  } finally {
+    uploadingMessageAttachments.value = false;
+    messageUploadProgress.value = null;
+  }
+}
+
 async function submitMessage() {
-  if (!order.value || !messageContent.value.trim()) {
-    ElMessage.warning('请先填写消息内容');
+  const content = messageContent.value.trim();
+  const mediaUrls = messageAttachments.value.map((item) => item.url);
+  if (!order.value) {
+    return;
+  }
+  if (!content && !mediaUrls.length) {
+    ElMessage.warning('请先填写消息内容或上传图片');
     return;
   }
   sendingMessage.value = true;
   try {
     const result = await api.petpal.orders.sendMessage(order.value.id, {
-      content: messageContent.value.trim(),
+      content: content || undefined,
+      mediaUrls: mediaUrls.length ? mediaUrls : undefined,
     });
     conversation.value = result;
     order.value = {
@@ -527,6 +717,7 @@ async function submitMessage() {
       },
     };
     messageContent.value = '';
+    messageAttachments.value = [];
     ElMessage.success('消息已发送');
   } catch (error: unknown) {
     ElMessage.error(getErrorMessage(error, '发送消息失败'));
@@ -575,3 +766,89 @@ watch(
   },
 );
 </script>
+
+<style scoped>
+.petpal-message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.petpal-message-attachment-preview {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.petpal-message-attachment-image {
+  display: block;
+  width: 112px;
+  height: 112px;
+  object-fit: cover;
+  border-radius: 18px;
+  border: 1px solid var(--el-border-color-light);
+  background: var(--el-fill-color-light);
+}
+
+.petpal-message-attachment-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-primary);
+  text-decoration: none;
+}
+
+.petpal-message-drafts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.petpal-message-draft-card {
+  display: grid;
+  gap: 8px;
+  width: 136px;
+}
+
+.petpal-message-draft-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.petpal-message-draft-meta strong {
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.petpal-message-draft-meta span {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.petpal-message-draft-remove {
+  justify-self: start;
+  padding: 0;
+}
+
+.petpal-message-upload-input {
+  display: none;
+}
+
+.petpal-message-upload-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.petpal-message-upload-progress {
+  max-width: 280px;
+}
+</style>
