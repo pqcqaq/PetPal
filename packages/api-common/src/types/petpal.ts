@@ -68,6 +68,7 @@ export type ComplaintActionType =
 export type PenaltyType = 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
 export type PenaltySeverity = 'LOW' | 'MEDIUM' | 'HIGH';
 export type PenaltyRectifyStatus = 'PENDING' | 'COMPLETED' | 'WAIVED';
+export type PenaltyAppealStatus = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
 export type PlatformRuleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
 type AmountValue = number | string;
@@ -340,6 +341,15 @@ export interface PenaltyAdminRecord {
   rectifyDueAt: string | null;
   rectifiedAt: string | null;
   rectifyNote: string | null;
+  appealStatus: PenaltyAppealStatus;
+  appealReason: string | null;
+  appealSubmittedAt: string | null;
+  appealSubmittedById: string | null;
+  appealSubmittedByNickname: string | null;
+  appealReviewedAt: string | null;
+  appealReviewedById: string | null;
+  appealReviewedByNickname: string | null;
+  appealReviewNote: string | null;
   creatorId: string | null;
   creatorNickname: string | null;
   updaterId: string | null;
@@ -582,6 +592,7 @@ export interface PenaltyAdminQuery {
   penaltyType?: PenaltyType;
   severity?: PenaltySeverity;
   rectifyStatus?: PenaltyRectifyStatus;
+  appealStatus?: PenaltyAppealStatus;
   overdueOnly?: boolean;
   keyword?: string;
 }
@@ -589,6 +600,7 @@ export interface PenaltyAdminQuery {
 export interface PenaltyAdminStats {
   total: number;
   byRectifyStatus: Record<PenaltyRectifyStatus, number>;
+  byAppealStatus: Record<PenaltyAppealStatus, number>;
   bySeverity: Record<PenaltySeverity, number>;
   dueSoonCount: number;
   overdueCount: number;
@@ -607,6 +619,15 @@ export interface PenaltyAdminPage {
 export interface RectifyPenaltyPayload {
   rectifyStatus: Exclude<PenaltyRectifyStatus, 'PENDING'>;
   rectifyNote: string;
+}
+
+export interface SubmitPenaltyAppealPayload {
+  appealReason: string;
+}
+
+export interface ReviewPenaltyAppealPayload {
+  decision: Extract<PenaltyAppealStatus, 'APPROVED' | 'REJECTED'>;
+  reviewNote: string;
 }
 
 export interface PlatformRuleRecord {

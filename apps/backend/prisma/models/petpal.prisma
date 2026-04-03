@@ -325,6 +325,13 @@ model PenaltyRecord {
   rectifyDueAt  DateTime?
   rectifiedAt   DateTime?
   rectifyNote   String?
+  appealStatus  PenaltyAppealStatus  @default(NONE)
+  appealReason  String?
+  appealSubmittedAt DateTime?
+  appealSubmittedById String?
+  appealReviewedAt DateTime?
+  appealReviewedById String?
+  appealReviewNote String?
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
   deleteAt      DateTime?
@@ -333,6 +340,8 @@ model PenaltyRecord {
   targetUser    User?                @relation("PetPalPenaltyTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
   creator       User?                @relation("PetPalPenaltyCreator", fields: [createId], references: [id], onDelete: SetNull)
   updater       User?                @relation("PetPalPenaltyUpdater", fields: [updateId], references: [id], onDelete: SetNull)
+  appealSubmitter User?              @relation("PetPalPenaltyAppealSubmitter", fields: [appealSubmittedById], references: [id], onDelete: SetNull)
+  appealReviewer User?               @relation("PetPalPenaltyAppealReviewer", fields: [appealReviewedById], references: [id], onDelete: SetNull)
 
   @@index([complaintId, createdAt])
   @@index([orderId, createdAt])
@@ -340,6 +349,9 @@ model PenaltyRecord {
   @@index([targetRole, createdAt])
   @@index([penaltyType, severity])
   @@index([rectifyStatus, rectifyDueAt])
+  @@index([appealStatus, appealSubmittedAt])
+  @@index([appealSubmittedById])
+  @@index([appealReviewedById])
   @@index([deleteAt])
 }
 

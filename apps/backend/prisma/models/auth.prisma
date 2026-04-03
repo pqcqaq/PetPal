@@ -35,6 +35,8 @@ model User {
   petpalPenaltyTargets PenaltyRecord[] @relation("PetPalPenaltyTarget")
   createdPetpalPenaltyRecords PenaltyRecord[] @relation("PetPalPenaltyCreator")
   updatedPetpalPenaltyRecords PenaltyRecord[] @relation("PetPalPenaltyUpdater")
+  submittedPetpalPenaltyAppeals PenaltyRecord[] @relation("PetPalPenaltyAppealSubmitter")
+  reviewedPetpalPenaltyAppeals PenaltyRecord[] @relation("PetPalPenaltyAppealReviewer")
 
   @@index([deleteAt])
 }

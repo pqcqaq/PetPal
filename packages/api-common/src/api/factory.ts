@@ -80,6 +80,7 @@ import type {
   CreateServiceRequestPayload,
   MatchCaregiverQuery,
   ManageComplaintPayload,
+  ReviewPenaltyAppealPayload,
   RectifyPenaltyPayload,
   BatchAssignComplaintsPayload,
   BatchAssignComplaintsResult,
@@ -95,6 +96,7 @@ import type {
   OwnerTransactionExportQuery,
   PetProfileRecord,
   ServiceRequestRecord,
+  SubmitPenaltyAppealPayload,
   UpdatePetPayload,
   UpsertCaregiverProfilePayload,
   UpsertCaregiverServicePayload,
@@ -625,6 +627,18 @@ export const createApiFactory = (options: ClientOptions) => {
         rectifyPenalty: (penaltyId: string, payload: RectifyPenaltyPayload) =>
           client.request<PenaltyAdminRecord>({
             url: `/petpal/admin/penalties/${penaltyId}/rectify`,
+            method: 'POST',
+            data: payload,
+          }),
+        submitPenaltyAppeal: (penaltyId: string, payload: SubmitPenaltyAppealPayload) =>
+          client.request<PenaltyAdminRecord>({
+            url: `/petpal/admin/penalties/${penaltyId}/appeal`,
+            method: 'POST',
+            data: payload,
+          }),
+        reviewPenaltyAppeal: (penaltyId: string, payload: ReviewPenaltyAppealPayload) =>
+          client.request<PenaltyAdminRecord>({
+            url: `/petpal/admin/penalties/${penaltyId}/appeal/review`,
             method: 'POST',
             data: payload,
           }),

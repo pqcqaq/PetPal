@@ -249,3 +249,10 @@ enum PenaltyRectifyStatus {
   COMPLETED
   WAIVED
 }
+
+enum PenaltyAppealStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}

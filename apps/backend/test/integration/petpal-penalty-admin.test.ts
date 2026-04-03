@@ -131,6 +131,36 @@ const createComplaintScenario = async () => {
   };
 };
 
+const createPenaltyScenario = async () => {
+  const complaintScenario = await createComplaintScenario();
+  const adminSession = await loginAs(complaintScenario.app, 'admin', 'Admin123!');
+
+  const penaltyActionResponse = await request(complaintScenario.app)
+    .post(`/api/petpal/admin/complaints/${complaintScenario.complaintId}/actions`)
+    .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+    .send({
+      actionType: 'PENALTY',
+      penaltyType: 'SERVICE_RESTRICTION',
+      penaltySeverity: 'HIGH',
+      penaltyReason: `未按平台要求上传服务影像 ${complaintScenario.suffix}`,
+      penaltyActionSummary: '限制接单 7 天并要求补交完整服务记录',
+      rectifyDueAt: '2026-04-06T08:00:00.000Z',
+    })
+    .expect(200);
+
+  const complaintRecord = penaltyActionResponse.body.data as {
+    penalties: Array<{
+      id: string;
+    }>;
+  };
+
+  return {
+    ...complaintScenario,
+    adminSession,
+    penaltyId: complaintRecord.penalties[0]!.id,
+  };
+};
+
 describe('PetPal penalty admin integration', () => {
   it('admin can create and rectify penalty records from complaint handling', async () => {
     const { app, prisma, suffix, complaintId, caregiverUserId, caregiverNickname } =
@@ -194,6 +224,12 @@ describe('PetPal penalty admin integration', () => {
         COMPLETED: 0,
         WAIVED: 0,
       },
+      byAppealStatus: {
+        NONE: 1,
+        PENDING: 0,
+        APPROVED: 0,
+        REJECTED: 0,
+      },
       bySeverity: {
         LOW: 0,
         MEDIUM: 0,
@@ -216,6 +252,7 @@ describe('PetPal penalty admin integration', () => {
     assert.equal(listResponse.body.data.pagination.total, 1);
     assert.equal(listResponse.body.data.items[0].id, penaltyId);
     assert.equal(listResponse.body.data.items[0].targetNickname, caregiverNickname);
+    assert.equal(listResponse.body.data.items[0].appealStatus, 'NONE');
 
     const rectifyResponse = await request(app)
       .post(`/api/petpal/admin/penalties/${penaltyId}/rectify`)
@@ -246,6 +283,152 @@ describe('PetPal penalty admin integration', () => {
     assert.equal(penaltyRecord.rectifyNote, '已补交服务影像并完成内部复盘。');
     assert.ok(penaltyRecord.rectifiedAt);
     assert.equal(penaltyRecord.updateId, adminSession.user.id);
+  });
+
+  it('admin can submit and approve penalty appeals', async () => {
+    const { app, prisma, adminSession, penaltyId, suffix } = await createPenaltyScenario();
+
+    const submitAppealResponse = await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/appeal`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        appealReason: `平台处罚依据不完整，需要补充复核 ${suffix}`,
+      })
+      .expect(200);
+
+    assert.equal(submitAppealResponse.body.data.appealStatus, 'PENDING');
+    assert.equal(submitAppealResponse.body.data.appealReason, `平台处罚依据不完整，需要补充复核 ${suffix}`);
+    assert.equal(submitAppealResponse.body.data.appealSubmittedById, adminSession.user.id);
+
+    const pendingListResponse = await request(app)
+      .get('/api/petpal/admin/penalties')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .query({
+        page: 1,
+        pageSize: 10,
+        appealStatus: 'PENDING',
+        keyword: suffix,
+      })
+      .expect(200);
+
+    assert.equal(pendingListResponse.body.data.pagination.total, 1);
+    assert.equal(pendingListResponse.body.data.items[0].id, penaltyId);
+    assert.equal(pendingListResponse.body.data.items[0].appealStatus, 'PENDING');
+
+    const pendingStatsResponse = await request(app)
+      .get('/api/petpal/admin/penalties/stats')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .query({
+        keyword: suffix,
+      })
+      .expect(200);
+
+    assert.deepEqual(pendingStatsResponse.body.data.byAppealStatus, {
+      NONE: 0,
+      PENDING: 1,
+      APPROVED: 0,
+      REJECTED: 0,
+    });
+
+    const reviewResponse = await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/appeal/review`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        decision: 'APPROVED',
+        reviewNote: '补充证据不足以支撑原处罚，改为豁免。',
+      })
+      .expect(200);
+
+    assert.equal(reviewResponse.body.data.appealStatus, 'APPROVED');
+    assert.equal(reviewResponse.body.data.rectifyStatus, 'WAIVED');
+    assert.equal(reviewResponse.body.data.appealReviewedById, adminSession.user.id);
+    assert.equal(reviewResponse.body.data.appealReviewNote, '补充证据不足以支撑原处罚，改为豁免。');
+
+    const penaltyRecord = await prisma.penaltyRecord.findFirst({
+      where: {
+        id: penaltyId,
+      },
+      select: {
+        appealStatus: true,
+        rectifyStatus: true,
+        rectifyNote: true,
+        appealReviewedAt: true,
+      },
+    });
+
+    assert.ok(penaltyRecord);
+    assert.equal(penaltyRecord.appealStatus, 'APPROVED');
+    assert.equal(penaltyRecord.rectifyStatus, 'WAIVED');
+    assert.equal(penaltyRecord.rectifyNote, '申诉通过：补充证据不足以支撑原处罚，改为豁免。');
+    assert.ok(penaltyRecord.appealReviewedAt);
+  });
+
+  it('rejects invalid penalty appeal state transitions', async () => {
+    const { app, adminSession, penaltyId } = await createPenaltyScenario();
+
+    await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/appeal/review`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        decision: 'REJECTED',
+        reviewNote: '未提交申诉材料',
+      })
+      .expect(400);
+
+    await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/appeal`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        appealReason: '对处罚事实存在异议，申请复核。',
+      })
+      .expect(200);
+
+    await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/rectify`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        rectifyStatus: 'COMPLETED',
+        rectifyNote: '申诉待审期间不应允许整改完成',
+      })
+      .expect(400);
+
+    const rejectResponse = await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/appeal/review`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        decision: 'REJECTED',
+        reviewNote: '现有补充材料不足，维持原处罚。',
+      })
+      .expect(200);
+
+    assert.equal(rejectResponse.body.data.appealStatus, 'REJECTED');
+    assert.equal(rejectResponse.body.data.rectifyStatus, 'PENDING');
+
+    await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/appeal`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        appealReason: '再次补交材料',
+      })
+      .expect(400);
+
+    await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/appeal/review`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        decision: 'APPROVED',
+        reviewNote: '重复审核',
+      })
+      .expect(400);
+
+    await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/rectify`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        rectifyStatus: 'COMPLETED',
+        rectifyNote: '申诉已驳回，完成整改。',
+      })
+      .expect(200);
   });
 
   it('requires penalty permission for complaint penalty action', async () => {

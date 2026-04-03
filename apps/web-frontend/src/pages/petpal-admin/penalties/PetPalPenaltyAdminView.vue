@@ -45,6 +45,19 @@
             :value="item.value"
           />
         </el-select>
+        <el-select
+          v-model="pageState.filters.appealStatus"
+          clearable
+          placeholder="申诉状态"
+          style="width: 150px"
+        >
+          <el-option
+            v-for="item in penaltyAppealStatusOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </el-select>
         <el-checkbox v-model="pageState.filters.overdueOnly">仅逾期整改</el-checkbox>
         <el-input v-model="pageState.filters.keyword" clearable placeholder="订单号/对象/原因关键词" style="width: 240px" />
         <el-button type="primary" @click="applyFilters">筛选</el-button>
@@ -67,6 +80,26 @@
             <div v-if="scope.row.rectifyNote" class="penalty-expand__section">
               <span class="penalty-expand__label">整改说明</span>
               <p>{{ scope.row.rectifyNote }}</p>
+            </div>
+            <div v-if="scope.row.appealStatus !== 'NONE'" class="penalty-expand__section">
+              <span class="penalty-expand__label">申诉原因</span>
+              <p>{{ scope.row.appealReason || '-' }}</p>
+              <p class="penalty-expand__meta">
+                提交人：{{ scope.row.appealSubmittedByNickname || '未记录' }}
+                <template v-if="scope.row.appealSubmittedAt">
+                  · {{ formatDateTime(scope.row.appealSubmittedAt) }}
+                </template>
+              </p>
+            </div>
+            <div v-if="scope.row.appealStatus === 'APPROVED' || scope.row.appealStatus === 'REJECTED'" class="penalty-expand__section">
+              <span class="penalty-expand__label">申诉审核</span>
+              <p>{{ scope.row.appealReviewNote || '-' }}</p>
+              <p class="penalty-expand__meta">
+                审核人：{{ scope.row.appealReviewedByNickname || '未记录' }}
+                <template v-if="scope.row.appealReviewedAt">
+                  · {{ formatDateTime(scope.row.appealReviewedAt) }}
+                </template>
+              </p>
             </div>
           </div>
         </template>
@@ -98,17 +131,54 @@
           </div>
         </template>
       </el-table-column>
+      <el-table-column label="申诉状态" min-width="150">
+        <template #default="scope">
+          <div class="penalty-appeal">
+            <el-tag :type="getAppealStatusTagType(scope.row.appealStatus)">
+              {{ getAppealStatusLabel(scope.row.appealStatus) }}
+            </el-tag>
+            <span>{{ getAppealHint(scope.row) }}</span>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column label="创建人" min-width="120">
         <template #default="scope">{{ scope.row.creatorNickname || '系统' }}</template>
       </el-table-column>
       <el-table-column label="最近更新" min-width="180">
         <template #default="scope">{{ formatDateTime(scope.row.updatedAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column label="操作" width="300" fixed="right">
         <template #default="scope">
           <el-space>
             <el-button
-              v-if="scope.row.rectifyStatus === 'PENDING'"
+              v-if="scope.row.rectifyStatus === 'PENDING' && scope.row.appealStatus === 'NONE'"
+              v-permission="'petpal.penalty.manage'"
+              link
+              type="primary"
+              @click="openAppealDialog(scope.row)"
+            >
+              发起申诉
+            </el-button>
+            <el-button
+              v-if="scope.row.appealStatus === 'PENDING'"
+              v-permission="'petpal.penalty.manage'"
+              link
+              type="primary"
+              @click="openReviewDialog(scope.row, 'APPROVED')"
+            >
+              通过申诉
+            </el-button>
+            <el-button
+              v-if="scope.row.appealStatus === 'PENDING'"
+              v-permission="'petpal.penalty.manage'"
+              link
+              type="danger"
+              @click="openReviewDialog(scope.row, 'REJECTED')"
+            >
+              驳回申诉
+            </el-button>
+            <el-button
+              v-if="scope.row.rectifyStatus === 'PENDING' && scope.row.appealStatus !== 'PENDING'"
               v-permission="'petpal.penalty.manage'"
               link
               type="success"
@@ -117,7 +187,7 @@
               完成整改
             </el-button>
             <el-button
-              v-if="scope.row.rectifyStatus === 'PENDING'"
+              v-if="scope.row.rectifyStatus === 'PENDING' && scope.row.appealStatus !== 'PENDING'"
               v-permission="'petpal.penalty.manage'"
               link
               type="warning"
@@ -185,12 +255,92 @@
         <el-button type="primary" :loading="rectifySubmitting" @click="submitRectify">提交</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="appealDialogVisible"
+      title="发起处罚申诉"
+      width="560px"
+      :close-on-click-modal="!appealSubmitting"
+      :close-on-press-escape="!appealSubmitting"
+      @closed="resetAppealDialog"
+    >
+      <template v-if="activePenalty">
+        <div class="penalty-dialog__summary">
+          <h3>{{ activePenalty.orderNo }}</h3>
+          <p>{{ activePenalty.targetNickname || '平台侧对象' }} · {{ getTypeLabel(activePenalty.penaltyType) }}</p>
+        </div>
+
+        <el-form label-position="top">
+          <el-form-item label="申诉原因">
+            <el-input
+              v-model="appealForm.appealReason"
+              type="textarea"
+              :rows="4"
+              maxlength="1000"
+              show-word-limit
+              placeholder="说明处罚争议点、补充证据或需要复核的事实"
+            />
+          </el-form-item>
+        </el-form>
+      </template>
+
+      <template #footer>
+        <el-button :disabled="appealSubmitting" @click="appealDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="appealSubmitting" @click="submitAppeal">提交</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="reviewDialogVisible"
+      title="审核处罚申诉"
+      width="560px"
+      :close-on-click-modal="!reviewSubmitting"
+      :close-on-press-escape="!reviewSubmitting"
+      @closed="resetReviewDialog"
+    >
+      <template v-if="activePenalty">
+        <div class="penalty-dialog__summary">
+          <h3>{{ activePenalty.orderNo }}</h3>
+          <p>{{ activePenalty.targetNickname || '平台侧对象' }} · {{ getTypeLabel(activePenalty.penaltyType) }}</p>
+        </div>
+
+        <el-form label-position="top">
+          <el-form-item label="申诉结论">
+            <el-radio-group v-model="reviewForm.decision">
+              <el-radio
+                v-for="item in reviewDecisionOptions"
+                :key="item.value"
+                :value="item.value"
+              >
+                {{ item.label }}
+              </el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="审核意见">
+            <el-input
+              v-model="reviewForm.reviewNote"
+              type="textarea"
+              :rows="4"
+              maxlength="1000"
+              show-word-limit
+              placeholder="说明通过或驳回申诉的依据"
+            />
+          </el-form-item>
+        </el-form>
+      </template>
+
+      <template #footer>
+        <el-button :disabled="reviewSubmitting" @click="reviewDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="reviewSubmitting" @click="submitReview">提交</el-button>
+      </template>
+    </el-dialog>
   </PageScaffold>
 </template>
 
 <script setup lang="ts">
 import type {
   ComplaintTargetRole,
+  PenaltyAppealStatus,
   PenaltyAdminQuery,
   PenaltyAdminRecord,
   PenaltyAdminStats,
@@ -213,6 +363,9 @@ import {
 } from '../shared/route-query';
 import { hasSelectOptionValue } from '../shared/option-value';
 import {
+  getPenaltyAppealStatusLabel,
+  getPenaltyAppealStatusTagType,
+  penaltyAppealStatusOptions,
   getPenaltyRectifyStatusLabel,
   getPenaltyRectifyStatusTagType,
   getPenaltySeverityLabel,
@@ -237,6 +390,7 @@ type Filters = {
   penaltyType?: PenaltyType;
   severity?: PenaltySeverity;
   rectifyStatus?: PenaltyRectifyStatus;
+  appealStatus?: PenaltyAppealStatus;
   overdueOnly: boolean;
   keyword?: string;
 };
@@ -251,6 +405,15 @@ type RectifyFormState = {
   rectifyNote: string;
 };
 
+type AppealFormState = {
+  appealReason: string;
+};
+
+type ReviewFormState = {
+  decision: Extract<PenaltyAppealStatus, 'APPROVED' | 'REJECTED'>;
+  reviewNote: string;
+};
+
 const rows = ref<PenaltyAdminRecord[]>([]);
 const summary = ref<PenaltyAdminStats | null>(null);
 const loading = ref(false);
@@ -260,11 +423,20 @@ const route = useRoute();
 const router = useRouter();
 const rectifyDialogVisible = ref(false);
 const rectifySubmitting = ref(false);
+const appealDialogVisible = ref(false);
+const appealSubmitting = ref(false);
+const reviewDialogVisible = ref(false);
+const reviewSubmitting = ref(false);
 const activePenalty = ref<PenaltyAdminRecord | null>(null);
 
 const rectifyActionOptions = penaltyRectifyStatusOptions.filter(
   (item): item is { label: string; value: 'COMPLETED' | 'WAIVED' } =>
     item.value === 'COMPLETED' || item.value === 'WAIVED',
+);
+
+const reviewDecisionOptions = penaltyAppealStatusOptions.filter(
+  (item): item is { label: string; value: 'APPROVED' | 'REJECTED' } =>
+    item.value === 'APPROVED' || item.value === 'REJECTED',
 );
 
 const { state: pageState, reset: resetPageState } = usePageState<State>('page:petpal:penalty-admin', {
@@ -274,6 +446,7 @@ const { state: pageState, reset: resetPageState } = usePageState<State>('page:pe
     penaltyType: undefined,
     severity: undefined,
     rectifyStatus: undefined,
+    appealStatus: undefined,
     overdueOnly: false,
     keyword: undefined,
   },
@@ -284,9 +457,20 @@ const createEmptyRectifyForm = (): RectifyFormState => ({
   rectifyNote: '',
 });
 
-const rectifyForm = reactive<RectifyFormState>(createEmptyRectifyForm());
+const createEmptyAppealForm = (): AppealFormState => ({
+  appealReason: '',
+});
 
-const routeFilterKeys = ['page', 'targetRole', 'penaltyType', 'severity', 'rectifyStatus', 'overdueOnly', 'keyword'] as const;
+const createEmptyReviewForm = (): ReviewFormState => ({
+  decision: 'APPROVED',
+  reviewNote: '',
+});
+
+const rectifyForm = reactive<RectifyFormState>(createEmptyRectifyForm());
+const appealForm = reactive<AppealFormState>(createEmptyAppealForm());
+const reviewForm = reactive<ReviewFormState>(createEmptyReviewForm());
+
+const routeFilterKeys = ['page', 'targetRole', 'penaltyType', 'severity', 'rectifyStatus', 'appealStatus', 'overdueOnly', 'keyword'] as const;
 
 const getTargetRoleLabel = getPenaltyTargetRoleLabel;
 const getTypeLabel = getPenaltyTypeLabel;
@@ -294,12 +478,16 @@ const getSeverityLabel = getPenaltySeverityLabel;
 const getSeverityTagType = getPenaltySeverityTagType;
 const getRectifyStatusLabel = getPenaltyRectifyStatusLabel;
 const getRectifyStatusTagType = getPenaltyRectifyStatusTagType;
+const getAppealStatusLabel = getPenaltyAppealStatusLabel;
+const getAppealStatusTagType = getPenaltyAppealStatusTagType;
 
 const stats = computed(() => [
   { label: '当前筛选总量', value: summary.value?.total ?? 0 },
   { label: '待整改', value: summary.value?.byRectifyStatus.PENDING ?? 0 },
   { label: '已完成', value: summary.value?.byRectifyStatus.COMPLETED ?? 0 },
   { label: '已豁免', value: summary.value?.byRectifyStatus.WAIVED ?? 0 },
+  { label: '待审核申诉', value: summary.value?.byAppealStatus.PENDING ?? 0 },
+  { label: '申诉通过', value: summary.value?.byAppealStatus.APPROVED ?? 0 },
   { label: '高风险处罚', value: summary.value?.bySeverity.HIGH ?? 0 },
   { label: '即将到期', value: summary.value?.dueSoonCount ?? 0 },
   { label: '已逾期', value: summary.value?.overdueCount ?? 0 },
@@ -336,6 +524,22 @@ const getRectifyHint = (record: PenaltyAdminRecord) => {
   return `截止 ${formatDateTime(record.rectifyDueAt)} · 剩余 ${diffHours} 小时`;
 };
 
+const getAppealHint = (record: PenaltyAdminRecord) => {
+  if (record.appealStatus === 'NONE') {
+    return '未提交申诉';
+  }
+
+  if (record.appealStatus === 'PENDING') {
+    return record.appealSubmittedAt
+      ? `提交于 ${formatDateTime(record.appealSubmittedAt)}`
+      : '待审核';
+  }
+
+  return record.appealReviewedAt
+    ? `审核于 ${formatDateTime(record.appealReviewedAt)}`
+    : '已完成审核';
+};
+
 const buildRouteQuery = () => {
   const query: Record<string, string> = {};
   if (pageState.page > 1) {
@@ -352,6 +556,9 @@ const buildRouteQuery = () => {
   }
   if (pageState.filters.rectifyStatus) {
     query.rectifyStatus = pageState.filters.rectifyStatus;
+  }
+  if (pageState.filters.appealStatus) {
+    query.appealStatus = pageState.filters.appealStatus;
   }
   if (pageState.filters.overdueOnly) {
     query.overdueOnly = 'true';
@@ -373,6 +580,7 @@ const hydrateStateFromRoute = () => {
   const penaltyType = getSingleRouteQueryValue(route.query.penaltyType);
   const severity = getSingleRouteQueryValue(route.query.severity);
   const rectifyStatus = getSingleRouteQueryValue(route.query.rectifyStatus);
+  const appealStatus = getSingleRouteQueryValue(route.query.appealStatus);
   const overdueOnly = getSingleRouteQueryValue(route.query.overdueOnly);
 
   pageState.page = page;
@@ -388,6 +596,9 @@ const hydrateStateFromRoute = () => {
   pageState.filters.rectifyStatus = hasSelectOptionValue(penaltyRectifyStatusOptions, rectifyStatus)
     ? rectifyStatus
     : undefined;
+  pageState.filters.appealStatus = hasSelectOptionValue(penaltyAppealStatusOptions, appealStatus)
+    ? appealStatus
+    : undefined;
   pageState.filters.overdueOnly = overdueOnly === 'true';
   pageState.filters.keyword = getSingleRouteQueryValue(route.query.keyword) || undefined;
 };
@@ -399,6 +610,7 @@ const buildQuery = (): PenaltyAdminQuery => ({
   penaltyType: pageState.filters.penaltyType,
   severity: pageState.filters.severity,
   rectifyStatus: pageState.filters.rectifyStatus,
+  appealStatus: pageState.filters.appealStatus,
   overdueOnly: pageState.filters.overdueOnly || undefined,
   keyword: pageState.filters.keyword?.trim() || undefined,
 });
@@ -408,6 +620,7 @@ const buildStatsQuery = (): PenaltyAdminQuery => ({
   penaltyType: pageState.filters.penaltyType,
   severity: pageState.filters.severity,
   rectifyStatus: pageState.filters.rectifyStatus,
+  appealStatus: pageState.filters.appealStatus,
   overdueOnly: pageState.filters.overdueOnly || undefined,
   keyword: pageState.filters.keyword?.trim() || undefined,
 });
@@ -463,6 +676,16 @@ const resetRectifyDialog = () => {
   Object.assign(rectifyForm, createEmptyRectifyForm());
 };
 
+const resetAppealDialog = () => {
+  activePenalty.value = null;
+  Object.assign(appealForm, createEmptyAppealForm());
+};
+
+const resetReviewDialog = () => {
+  activePenalty.value = null;
+  Object.assign(reviewForm, createEmptyReviewForm());
+};
+
 const openRectifyDialog = (
   penalty: PenaltyAdminRecord,
   rectifyStatus: Extract<PenaltyRectifyStatus, 'COMPLETED' | 'WAIVED'>,
@@ -472,6 +695,23 @@ const openRectifyDialog = (
     rectifyStatus,
   });
   rectifyDialogVisible.value = true;
+};
+
+const openAppealDialog = (penalty: PenaltyAdminRecord) => {
+  activePenalty.value = penalty;
+  Object.assign(appealForm, createEmptyAppealForm());
+  appealDialogVisible.value = true;
+};
+
+const openReviewDialog = (
+  penalty: PenaltyAdminRecord,
+  decision: Extract<PenaltyAppealStatus, 'APPROVED' | 'REJECTED'>,
+) => {
+  activePenalty.value = penalty;
+  Object.assign(reviewForm, createEmptyReviewForm(), {
+    decision,
+  });
+  reviewDialogVisible.value = true;
 };
 
 const submitRectify = async () => {
@@ -501,6 +741,59 @@ const submitRectify = async () => {
   }
 };
 
+const submitAppeal = async () => {
+  if (!activePenalty.value) {
+    return;
+  }
+
+  const appealReason = appealForm.appealReason.trim();
+  if (!appealReason) {
+    ElMessage.error('请填写申诉原因');
+    return;
+  }
+
+  try {
+    appealSubmitting.value = true;
+    await api.petpal.admin.submitPenaltyAppeal(activePenalty.value.id, {
+      appealReason,
+    });
+    appealDialogVisible.value = false;
+    ElMessage.success('处罚申诉已提交');
+    await loadRows();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '提交处罚申诉失败'));
+  } finally {
+    appealSubmitting.value = false;
+  }
+};
+
+const submitReview = async () => {
+  if (!activePenalty.value) {
+    return;
+  }
+
+  const reviewNote = reviewForm.reviewNote.trim();
+  if (!reviewNote) {
+    ElMessage.error('请填写审核意见');
+    return;
+  }
+
+  try {
+    reviewSubmitting.value = true;
+    await api.petpal.admin.reviewPenaltyAppeal(activePenalty.value.id, {
+      decision: reviewForm.decision,
+      reviewNote,
+    });
+    reviewDialogVisible.value = false;
+    ElMessage.success('处罚申诉已审核');
+    await loadRows();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '审核处罚申诉失败'));
+  } finally {
+    reviewSubmitting.value = false;
+  }
+};
+
 watch(
   () => route.fullPath,
   () => {
@@ -520,14 +813,16 @@ watch(
 
 .penalty-target,
 .penalty-type-cell,
-.penalty-rectify {
+.penalty-rectify,
+.penalty-appeal {
   display: grid;
   gap: 6px;
 }
 
 .penalty-target span,
 .penalty-type-cell span,
-.penalty-rectify span {
+.penalty-rectify span,
+.penalty-appeal span {
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
@@ -552,6 +847,11 @@ watch(
   margin: 0;
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+.penalty-expand__meta {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .penalty-dialog__summary {
