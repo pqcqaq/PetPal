@@ -1,5 +1,6 @@
 import type { CaregiverAftersalesRiskOrderRecord } from '@rbac/api-common';
 import {
+  countCaregiverRiskQueueExportPresets,
   caregiverRiskQueueExportPresetDefinitions,
   getCaregiverRiskQueueExportPresetLabel,
   type CaregiverRiskQueueExportPreset,
@@ -16,11 +17,13 @@ export { getCaregiverRiskQueueExportPresetLabel };
 export const buildCaregiverRiskQueueExportActions = (
   orders: CaregiverAftersalesRiskOrderRecord[],
 ): CaregiverRiskQueueExportAction[] => {
+  const countMap = countCaregiverRiskQueueExportPresets(orders);
+
   return caregiverRiskQueueExportPresetDefinitions
     .map((definition) => ({
       preset: definition.preset,
       label: definition.label,
-      count: orders.filter((order) => definition.matchesOrder(order)).length,
+      count: countMap[definition.preset],
     }))
     .filter((item) => item.count > 0);
 };

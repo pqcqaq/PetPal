@@ -117,9 +117,33 @@ export const caregiverRiskQueueExportPresetDefinitions = [
 export type CaregiverRiskQueueExportPreset =
   (typeof caregiverRiskQueueExportPresetDefinitions)[number]['preset'];
 
+export type CaregiverRiskQueueExportPresetCountMap =
+  Record<CaregiverRiskQueueExportPreset, number>;
+
 export const caregiverRiskQueueExportPresets = caregiverRiskQueueExportPresetDefinitions.map(
   (definition) => definition.preset,
 ) as CaregiverRiskQueueExportPreset[];
+
+export const createCaregiverRiskQueueExportPresetCountMap =
+(): CaregiverRiskQueueExportPresetCountMap => Object.fromEntries(
+  caregiverRiskQueueExportPresetDefinitions.map(({ preset }) => [preset, 0] as const),
+) as CaregiverRiskQueueExportPresetCountMap;
+
+export const countCaregiverRiskQueueExportPresets = (
+  orders: CaregiverAftersalesRiskOrderRecord[],
+): CaregiverRiskQueueExportPresetCountMap => {
+  const countMap = createCaregiverRiskQueueExportPresetCountMap();
+
+  for (const order of orders) {
+    for (const definition of caregiverRiskQueueExportPresetDefinitions) {
+      if (definition.matchesOrder(order)) {
+        countMap[definition.preset] += 1;
+      }
+    }
+  }
+
+  return countMap;
+};
 
 export const getCaregiverRiskQueueExportPresetLabel = (
   preset: CaregiverRiskQueueExportPreset,

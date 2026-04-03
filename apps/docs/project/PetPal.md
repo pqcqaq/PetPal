@@ -7874,6 +7874,50 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.200 2026-04-03（P3-M1 Slice 200）
+
+**概述**：延续上一轮把风险预设元数据全部收口到单一配置源后的状态，本轮继续把风险队列统计从“每个预设各扫一次订单数组”收口成“共享一次遍历聚合”的通用 counter。这样风险动作区和后续可能复用这套口径的入口，都能直接消费同一份计数 map，而不是继续堆叠独立 `filter`。
+
+已完成：
+
+- 新增共享风险计数器：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-risk-queue-preset-config.ts`
+    - 新增 `CaregiverRiskQueueExportPresetCountMap`、`createCaregiverRiskQueueExportPresetCountMap` 和 `countCaregiverRiskQueueExportPresets`。
+    - 风险队列计数现在会先创建完整 preset map，再单次遍历订单并按配置源里的 `matchesOrder` 规则累加。
+- 风险动作 helper 改为消费共享 counter：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-risk-queue-export.ts`
+    - `buildCaregiverRiskQueueExportActions` 改为先读取共享计数 map，再按既有预设顺序拼装动作区。
+    - helper 不再为每个预设重复执行一次 `orders.filter(...)`。
+- 定向测试继续兜底：
+  - `apps/web-frontend/test/caregiver-risk-queue-export.test.ts`
+    - 新增共享计数 map 形状断言，确认所有预设都有稳定初始值。
+    - 新增复合风险样例断言，确认待受理重复投诉、照料者重复投诉、高退款暴露等计数口径在共享 counter 下保持不变。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts ..\\web-frontend\\test\\caregiver-risk-queue-export.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增后端字段，也没有改动收益导出接口，变更面继续控制在 Web 前端风险导出模块内部。
+- 已确认风险动作区展示顺序不变，复合风险预设的计数口径也未发生漂移。
+- 已确认风险队列计数逻辑不再散落重复扫描订单数组，后续新增消费方时可以直接复用共享计数 map。
+
+风险与缓解：
+
+- 风险：当前实现虽然已经消除了“每个预设各做一次全量 `filter`”的重复扫描，但仍然是“每个订单按全部预设规则匹配一次”的通用嵌套遍历；若后续风险视角继续大量增长，仍可能需要进一步做分组索引。
+- 缓解：下一轮如继续深化，可优先评估是否只为真正新增业务价值的时效风险视角补更细的分类或后端聚合，而不是继续在前端无限扩预设数量。
+
+下一步（1-3）：
+
+1. 继续评估是否补“超时未结案”“近 7 天高频争议”这类真正需要时效语义支撑的新风险视角。
+2. 继续评估风险队列是否需要按投诉 / 退款信号预分组，再决定是否值得进一步压缩当前通用匹配循环。
+3. 在风险复盘入口基本稳定后，再继续补剩余验收向测试、审计收口与最终交付材料。
+
 ### 14.199 2026-04-03（P3-M1 Slice 199）
 
 **概述**：延续上一轮把风险预设标签和队列计数抽成 helper 的收口，本轮继续把最后一层维护风险收掉：预设清单、预设标签、快照映射和风险单匹配规则全部收口到单一配置源。这样后续再补新的风险视角时，不需要同时改状态模块和 helper 模块两套定义。

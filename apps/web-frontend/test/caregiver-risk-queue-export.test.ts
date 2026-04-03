@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { CaregiverAftersalesRiskOrderRecord } from '@rbac/api-common';
 import {
+  countCaregiverRiskQueueExportPresets,
+  createCaregiverRiskQueueExportPresetCountMap,
+} from '../src/pages/frontend/petpal/caregiver-risk-queue-preset-config.ts';
+import {
   buildCaregiverRiskQueueExportActions,
   getCaregiverRiskQueueExportPresetLabel,
 } from '../src/pages/frontend/petpal/caregiver-risk-queue-export.ts';
@@ -29,30 +33,58 @@ const createRiskOrder = (
   ...overrides,
 });
 
+const riskQueueOrders = [
+  createRiskOrder({
+    id: 'risk-order-open-repeat-caregiver',
+    complaintCount: 3,
+    primaryComplaintStatus: 'OPEN',
+    primaryComplaintTargetRole: 'CAREGIVER',
+    amountRefunded: 120,
+    latestRefundStatus: 'APPROVED',
+    latestRefundAmount: 120,
+  }),
+  createRiskOrder({
+    id: 'risk-order-processing-platform',
+    complaintCount: 1,
+    primaryComplaintStatus: 'PROCESSING',
+    primaryComplaintTargetRole: 'PLATFORM',
+  }),
+  createRiskOrder({
+    id: 'risk-order-repeat-only',
+    complaintCount: 2,
+    primaryComplaintStatus: 'RESOLVED',
+    primaryComplaintTargetRole: 'CAREGIVER',
+  }),
+];
+
+test('counts caregiver risk queue presets with a shared preset map', () => {
+  assert.deepEqual(createCaregiverRiskQueueExportPresetCountMap(), {
+    openComplaint: 0,
+    openRepeatedComplaint: 0,
+    processingComplaint: 0,
+    caregiverResponsibility: 0,
+    platformResponsibility: 0,
+    refundAwaitingSettlement: 0,
+    highRefundExposure: 0,
+    repeatedComplaint: 0,
+    repeatCaregiverComplaint: 0,
+  });
+
+  assert.deepEqual(countCaregiverRiskQueueExportPresets(riskQueueOrders), {
+    openComplaint: 1,
+    openRepeatedComplaint: 1,
+    processingComplaint: 1,
+    caregiverResponsibility: 2,
+    platformResponsibility: 1,
+    refundAwaitingSettlement: 1,
+    highRefundExposure: 1,
+    repeatedComplaint: 2,
+    repeatCaregiverComplaint: 2,
+  });
+});
+
 test('builds caregiver risk queue export actions in stable preset order', () => {
-  const actions = buildCaregiverRiskQueueExportActions([
-    createRiskOrder({
-      id: 'risk-order-open-repeat-caregiver',
-      complaintCount: 3,
-      primaryComplaintStatus: 'OPEN',
-      primaryComplaintTargetRole: 'CAREGIVER',
-      amountRefunded: 120,
-      latestRefundStatus: 'APPROVED',
-      latestRefundAmount: 120,
-    }),
-    createRiskOrder({
-      id: 'risk-order-processing-platform',
-      complaintCount: 1,
-      primaryComplaintStatus: 'PROCESSING',
-      primaryComplaintTargetRole: 'PLATFORM',
-    }),
-    createRiskOrder({
-      id: 'risk-order-repeat-only',
-      complaintCount: 2,
-      primaryComplaintStatus: 'RESOLVED',
-      primaryComplaintTargetRole: 'CAREGIVER',
-    }),
-  ]);
+  const actions = buildCaregiverRiskQueueExportActions(riskQueueOrders);
 
   assert.deepEqual(actions, [
     { preset: 'openComplaint', label: '待受理投诉', count: 1 },
