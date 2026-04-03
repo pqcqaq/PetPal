@@ -2,6 +2,7 @@ import type {
   CallbackAlertOutboxStats,
   CallbackAuditStats,
   ComplaintAdminStats,
+  PetPalAdminOperationsMetrics,
   PetPalAdminOverviewScope,
 } from '@rbac/api-common';
 import { prisma } from '../lib/prisma';
@@ -21,6 +22,10 @@ const toNumber = (value: Prisma.Decimal | number | null | undefined) => {
   }
   return Number(value);
 };
+
+const toRoundedPercentage = (numerator: number, denominator: number) => (
+  denominator > 0 ? Number(((numerator / denominator) * 100).toFixed(2)) : 0
+);
 
 const calcDistanceKm = (fromLat: number, fromLng: number, toLat: number, toLng: number) => {
   const radius = 6371;
@@ -5218,18 +5223,113 @@ export const petpalService = {
     };
   },
 
+  async queryAdminOperationsMetrics(windowDays = 30): Promise<PetPalAdminOperationsMetrics> {
+    const normalizedWindowDays = Math.max(1, Math.min(180, Math.trunc(windowDays)));
+    const windowStartAt = new Date(Date.now() - normalizedWindowDays * 24 * 60 * 60 * 1000);
+
+    const [demandCount, activeApprovedCaregiverCount, windowOrders, refundedOrders, complainedOrders] = await Promise.all([
+      prisma.serviceRequest.count({
+        where: {
+          deleteAt: null,
+          createdAt: {
+            gte: windowStartAt,
+          },
+        },
+      }),
+      prisma.caregiverProfile.count({
+        where: {
+          deleteAt: null,
+          auditStatus: 'APPROVED',
+          services: {
+            some: {
+              deleteAt: null,
+              isActive: true,
+            },
+          },
+        },
+      }),
+      prisma.orderMain.findMany({
+        where: {
+          deleteAt: null,
+          createdAt: {
+            gte: windowStartAt,
+          },
+        },
+        select: {
+          id: true,
+          amountPaid: true,
+          orderStatus: true,
+        },
+      }),
+      prisma.refundRecord.findMany({
+        where: {
+          deleteAt: null,
+          createdAt: {
+            gte: windowStartAt,
+          },
+          refundStatus: {
+            in: ['APPROVED', 'SUCCESS'],
+          },
+        },
+        distinct: ['orderId'],
+        select: {
+          orderId: true,
+        },
+      }),
+      prisma.complaint.findMany({
+        where: {
+          deleteAt: null,
+          createdAt: {
+            gte: windowStartAt,
+          },
+        },
+        distinct: ['orderId'],
+        select: {
+          orderId: true,
+        },
+      }),
+    ]);
+
+    const orderCount = windowOrders.length;
+    const completedOrderCount = windowOrders.filter((item) => (
+      item.orderStatus === 'COMPLETED' || item.orderStatus === 'PARTIAL_REFUNDED'
+    )).length;
+    const paidOrderCount = windowOrders.filter((item) => toNumber(item.amountPaid) > 0).length;
+    const refundedOrderCount = refundedOrders.length;
+    const complainedOrderCount = complainedOrders.length;
+
+    return {
+      windowDays: normalizedWindowDays,
+      demandCount,
+      activeApprovedCaregiverCount,
+      supplyDemandRatio: demandCount > 0
+        ? Number((activeApprovedCaregiverCount / demandCount).toFixed(2))
+        : null,
+      orderCount,
+      completedOrderCount,
+      completionRate: toRoundedPercentage(completedOrderCount, orderCount),
+      paidOrderCount,
+      refundedOrderCount,
+      refundRate: toRoundedPercentage(refundedOrderCount, paidOrderCount),
+      complainedOrderCount,
+      complaintRate: toRoundedPercentage(complainedOrderCount, orderCount),
+    };
+  },
+
   async queryAdminOverview(actorId: string, permissions: string[]) {
     const result: {
       complaintStats: ComplaintAdminStats | null;
       pendingCaregiverCount: number | null;
       callbackAuditStats: CallbackAuditStats | null;
       callbackAlertStats: CallbackAlertOutboxStats | null;
+      operationsMetrics: PetPalAdminOperationsMetrics | null;
       unavailableScopes: PetPalAdminOverviewScope[];
     } = {
       complaintStats: null,
       pendingCaregiverCount: null,
       callbackAuditStats: null,
       callbackAlertStats: null,
+      operationsMetrics: null,
       unavailableScopes: [] as PetPalAdminOverviewScope[],
     };
 
@@ -5291,6 +5391,17 @@ export const petpalService = {
           }),
       );
     }
+
+    tasks.push(
+      petpalService.queryAdminOperationsMetrics()
+        .then((metrics) => {
+          result.operationsMetrics = metrics;
+        })
+        .catch((error: unknown) => {
+          result.unavailableScopes.push('operationsMetrics');
+          console.error('[petpal] failed to load admin overview operations metrics scope', error);
+        }),
+    );
 
     await Promise.all(tasks);
 

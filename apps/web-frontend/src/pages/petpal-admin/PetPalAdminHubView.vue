@@ -72,6 +72,25 @@
       </div>
     </section>
 
+    <section v-if="operationsMetricCards.length" class="petpal-admin-hub__section">
+      <header class="petpal-admin-hub__section-header">
+        <p>经营信号</p>
+        <h2>补齐看板里的四个基础指标</h2>
+      </header>
+      <div class="petpal-admin-hub__operations-grid">
+        <article
+          v-for="card in operationsMetricCards"
+          :key="card.label"
+          class="petpal-admin-hub__operations-card"
+          :class="`is-${card.tone}`"
+        >
+          <span class="petpal-admin-hub__operations-label">{{ card.label }}</span>
+          <strong class="petpal-admin-hub__operations-value">{{ card.value }}</strong>
+          <p class="petpal-admin-hub__operations-hint">{{ card.hint }}</p>
+        </article>
+      </div>
+    </section>
+
     <section v-if="quickActions.length" class="petpal-admin-hub__section">
       <header class="petpal-admin-hub__section-header">
         <p>值班动作</p>
@@ -144,7 +163,12 @@
 </template>
 
 <script setup lang="ts">
-import type { CallbackAlertOutboxStats, CallbackAuditStats, ComplaintAdminStats } from '@rbac/api-common';
+import type {
+  CallbackAlertOutboxStats,
+  CallbackAuditStats,
+  ComplaintAdminStats,
+  PetPalAdminOperationsMetrics,
+} from '@rbac/api-common';
 import { ElMessage } from 'element-plus';
 import { computed, ref, watch } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
@@ -170,6 +194,7 @@ const complaintStats = ref<ComplaintAdminStats | null>(null);
 const pendingCaregiverCount = ref<number | null>(null);
 const callbackAuditStats = ref<CallbackAuditStats | null>(null);
 const callbackAlertStats = ref<CallbackAlertOutboxStats | null>(null);
+const operationsMetrics = ref<PetPalAdminOperationsMetrics | null>(null);
 const deadRetrySubmitting = ref(false);
 const assignUrgentComplaintsSubmitting = ref(false);
 
@@ -180,6 +205,10 @@ const canReadCallbackAudits = computed(() => auth.permissions.includes('petpal.c
 const canReadCallbackAlerts = computed(() => auth.permissions.includes('petpal.callback-alert.read'));
 const canRetryCallbackAlerts = computed(() => auth.permissions.includes('petpal.callback-alert.retry'));
 const currentAdminDisplayName = computed(() => auth.user?.nickname ?? auth.user?.username ?? '当前管理员');
+const formatRate = (value: number) => `${value}%`;
+const formatSupplyDemandRatio = (value: number | null) => (
+  value === null ? '暂无需求' : `${value.toFixed(2)} : 1`
+);
 
 const signalCards = computed(() => {
   const cards = [
@@ -279,6 +308,45 @@ const metricCards = computed(() => {
   }
 
   return cards;
+});
+
+const operationsMetricCards = computed(() => {
+  if (!operationsMetrics.value) {
+    return [];
+  }
+
+  const metrics = operationsMetrics.value;
+
+  return [
+    {
+      label: '供需比',
+      value: formatSupplyDemandRatio(metrics.supplyDemandRatio),
+      hint: `${metrics.windowDays} 天需求 ${metrics.demandCount} · 活跃供给 ${metrics.activeApprovedCaregiverCount}`,
+      tone: metrics.supplyDemandRatio === null
+        ? 'neutral'
+        : metrics.supplyDemandRatio < 1
+          ? 'warning'
+          : 'accent',
+    },
+    {
+      label: '完单率',
+      value: formatRate(metrics.completionRate),
+      hint: `${metrics.windowDays} 天订单 ${metrics.orderCount} · 完成 ${metrics.completedOrderCount}`,
+      tone: metrics.completionRate >= 80 ? 'accent' : metrics.completionRate >= 60 ? 'warning' : 'danger',
+    },
+    {
+      label: '退款率',
+      value: formatRate(metrics.refundRate),
+      hint: `已支付 ${metrics.paidOrderCount} · 发生退款 ${metrics.refundedOrderCount}`,
+      tone: metrics.refundRate >= 15 ? 'danger' : metrics.refundRate >= 5 ? 'warning' : 'neutral',
+    },
+    {
+      label: '投诉率',
+      value: formatRate(metrics.complaintRate),
+      hint: `${metrics.windowDays} 天投诉订单 ${metrics.complainedOrderCount} / ${metrics.orderCount}`,
+      tone: metrics.complaintRate >= 10 ? 'danger' : metrics.complaintRate >= 3 ? 'warning' : 'neutral',
+    },
+  ];
 });
 
 const priorityItems = computed(() => {
@@ -491,6 +559,7 @@ const loadHubOverview = async () => {
   pendingCaregiverCount.value = null;
   callbackAuditStats.value = null;
   callbackAlertStats.value = null;
+  operationsMetrics.value = null;
 
   try {
     const response = await api.petpal.admin.overview();
@@ -498,6 +567,7 @@ const loadHubOverview = async () => {
     pendingCaregiverCount.value = response.pendingCaregiverCount;
     callbackAuditStats.value = response.callbackAuditStats;
     callbackAlertStats.value = response.callbackAlertStats;
+    operationsMetrics.value = response.operationsMetrics;
 
     if (response.unavailableScopes.length > 0) {
       overviewNotice.value = '部分治理摘要加载失败，仍可直接进入对应工作区处理。';
@@ -648,6 +718,56 @@ watch(
   gap: 12px;
 }
 
+.petpal-admin-hub__operations-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.petpal-admin-hub__operations-card {
+  display: grid;
+  gap: 10px;
+  min-height: 168px;
+  padding: 18px;
+  border: 1px solid rgba(24, 62, 57, 0.1);
+  border-radius: 22px;
+  background: rgba(248, 253, 250, 0.74);
+}
+
+.petpal-admin-hub__operations-card.is-accent {
+  border-color: rgba(26, 111, 94, 0.2);
+}
+
+.petpal-admin-hub__operations-card.is-warning {
+  border-color: rgba(169, 124, 46, 0.24);
+  background: rgba(255, 249, 238, 0.88);
+}
+
+.petpal-admin-hub__operations-card.is-danger {
+  border-color: rgba(169, 67, 50, 0.24);
+  background: rgba(255, 244, 241, 0.92);
+}
+
+.petpal-admin-hub__operations-label {
+  color: #698077;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.petpal-admin-hub__operations-value {
+  color: #183e39;
+  font-size: clamp(24px, 2.8vw, 32px);
+  line-height: 1;
+}
+
+.petpal-admin-hub__operations-hint {
+  margin: 0;
+  color: #556a62;
+  line-height: 1.72;
+}
+
 .petpal-admin-hub__stack-row,
 .petpal-admin-hub__workspace-row {
   display: grid;
@@ -766,6 +886,10 @@ watch(
   }
 
   .petpal-admin-hub__hero-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .petpal-admin-hub__operations-grid {
     grid-template-columns: 1fr;
   }
 

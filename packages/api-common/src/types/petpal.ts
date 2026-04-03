@@ -842,13 +842,30 @@ export type PetPalAdminOverviewScope =
   | 'complaints'
   | 'caregiverAudits'
   | 'callbackAudits'
-  | 'callbackAlerts';
+  | 'callbackAlerts'
+  | 'operationsMetrics';
+
+export interface PetPalAdminOperationsMetrics {
+  windowDays: number;
+  demandCount: number;
+  activeApprovedCaregiverCount: number;
+  supplyDemandRatio: number | null;
+  orderCount: number;
+  completedOrderCount: number;
+  completionRate: number;
+  paidOrderCount: number;
+  refundedOrderCount: number;
+  refundRate: number;
+  complainedOrderCount: number;
+  complaintRate: number;
+}
 
 export interface PetPalAdminOverview {
   complaintStats: ComplaintAdminStats | null;
   pendingCaregiverCount: number | null;
   callbackAuditStats: CallbackAuditStats | null;
   callbackAlertStats: CallbackAlertOutboxStats | null;
+  operationsMetrics: PetPalAdminOperationsMetrics | null;
   unavailableScopes: PetPalAdminOverviewScope[];
 }
 

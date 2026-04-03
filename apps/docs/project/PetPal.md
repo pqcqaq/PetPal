@@ -7874,6 +7874,59 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.214 2026-04-03（P3-M1 Slice 214）
+
+**概述**：上一轮已经把根级后台首页摘要聚合成单次请求，但“运营看板”在文档里要求的四个基础指标还没有真正落到后台首页。本轮继续沿同一条概览链路补齐近 30 天经营信号，把供需比、完单率、退款率、投诉率接入后台概览接口，并在 `/petpal-admin` 首页以独立经营信号区块展示，作为后续规则治理和更深经营分析的第一层看板基线。
+
+已完成：
+
+- 后台概览接口补齐经营指标：
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增 `PetPalAdminOperationsMetrics`。
+    - `PetPalAdminOverview` 现已包含 `operationsMetrics`，`unavailableScopes` 也新增 `operationsMetrics`。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 新增 `queryAdminOperationsMetrics(windowDays = 30)`。
+    - 当前口径：
+      - 供需比 = 当前活跃供给数 / 近 30 天需求数。
+      - 完单率 = 近 30 天 `COMPLETED + PARTIAL_REFUNDED` 订单数 / 近 30 天订单数。
+      - 退款率 = 近 30 天发生 `APPROVED / SUCCESS` 退款的订单数 / 近 30 天已支付订单数。
+      - 投诉率 = 近 30 天发生投诉的订单数 / 近 30 天订单数。
+    - `queryAdminOverview()` 已并行聚合这组经营指标，并在失败时回填 `operationsMetrics` scope。
+- 根级后台首页增加经营信号区块：
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalAdminHubView.vue`
+    - 新增“经营信号”区块，展示供需比、完单率、退款率、投诉率四个指标。
+    - 首页会同步显示指标窗口、分子分母和当前风险 tone，不再只有值班队列级摘要。
+- 定向测试继续扩覆盖：
+  - `apps/backend/test/integration/petpal-admin-overview.test.ts`
+    - 继续复用后台概览独立测试文件。
+    - 新增对 `operationsMetrics` 的数据库口径比对，直接校验接口返回值与测试库统计一致。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test test/integration/petpal-admin-overview.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+  - 仍保留既有的大 chunk warning，本轮没有新增新的构建告警。
+
+代码审计结论：
+
+- 本轮没有引入新的后台页面或新的权限模型，只是在现有概览接口内补齐文档里已经明确的四个基础经营指标。
+- 已确认经营指标不是前端本地拼装，统计口径统一收口在后端，并由独立集成测试对齐数据库结果。
+- 已确认后台首页现在同时具备“值班治理摘要”和“近 30 天经营信号”两层信息，不再把运营看板完全留在文档层。
+
+风险与缓解：
+
+- 风险：当前经营信号仍是基础总览，尚未覆盖规则发布、处罚执行、按城市/服务类型拆分、趋势钻取或导出。
+- 缓解：下一轮继续优先补规则治理、处罚执行或更细分的经营筛选，而不把这四个首页指标误判为运营看板整体完成。
+
+下一步（1-3）：
+
+1. 继续补规则发布、违规处罚或更细的经营筛选维度，把治理层从“基础总览”推进到“可执行策略台”。
+2. 如后台首页继续承接更多经营信号，优先保持后端统一统计和独立定向测试，不回退到前端本地二次聚合。
+3. 在治理与经营链路进一步稳定后，再继续集中收口验收脚本、演示路径和答辩素材。
+
 ### 14.213 2026-04-03（P3-M1 Slice 213）
 
 **概述**：根级 `/petpal-admin` 首页现在已经承担值班入口职责，但此前仍要分别请求投诉统计、待审照料者分页、回调审计统计和告警统计四条接口，首页刷新链路偏散。本轮补了后台概览聚合接口，把这四块治理摘要统一收口成单次请求，并保留按权限裁剪和局部失败提示，作为后续运营看板继续扩展的基础。

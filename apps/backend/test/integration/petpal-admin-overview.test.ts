@@ -89,13 +89,15 @@ const createFulfillmentScenario = async () => {
     prisma,
     ownerSession,
     caregiverSession,
+    petId: pet.id,
+    caregiverId: caregiverProfile.id,
     order,
   };
 };
 
 describe('PetPal admin overview integration', () => {
   it('admin can query aggregated overview summary', async () => {
-    const { app, prisma, ownerSession, caregiverSession, order } = await createFulfillmentScenario();
+    const { app, prisma, ownerSession, caregiverSession, petId, caregiverId, order } = await createFulfillmentScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
     const suffix = Date.now().toString(36);
 
@@ -215,6 +217,70 @@ describe('PetPal admin overview integration', () => {
       },
     });
 
+    const completedRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-admin-ops-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId,
+        serviceType: 'FEEDING',
+        startTime: new Date('2026-04-02T09:00:00.000Z'),
+        endTime: new Date('2026-04-02T09:30:00.000Z'),
+        locationText: '杭州市滨江区经营指标测试',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 66,
+        demandTags: ['ops-metrics'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverId,
+      },
+    });
+
+    const completedOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-admin-ops-${suffix}`,
+        orderNo: `PP-ADMIN-OPS-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId,
+        serviceRequestId: completedRequest.id,
+        serviceType: 'FEEDING',
+        appointmentStart: new Date('2026-04-02T09:00:00.000Z'),
+        appointmentEnd: new Date('2026-04-02T09:30:00.000Z'),
+        amountTotal: 66,
+        amountAdjusted: 0,
+        amountPaid: 66,
+        amountRefunded: 16,
+        orderStatus: 'PARTIAL_REFUNDED',
+        closedAt: new Date('2026-04-02T10:10:00.000Z'),
+      },
+    });
+
+    await prisma.refundRecord.create({
+      data: {
+        id: `refund-admin-ops-${suffix}`,
+        orderId: completedOrder.id,
+        refundNo: `REF-ADMIN-OPS-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '经营指标退款率测试',
+        refundAmount: 16,
+        refundStatus: 'SUCCESS',
+        reviewedBy: adminSession.user.id,
+        reviewedAt: new Date('2026-04-02T10:00:00.000Z'),
+      },
+    });
+
+    await prisma.complaint.create({
+      data: {
+        id: `complaint-admin-ops-${suffix}`,
+        orderId: completedOrder.id,
+        complainantId: ownerSession.user.id,
+        targetRole: 'CAREGIVER',
+        complaintType: 'FEE',
+        description: '经营指标投诉率测试',
+        status: 'OPEN',
+      },
+    });
+
     const response = await request(app)
       .get('/api/petpal/admin/overview')
       .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
@@ -223,12 +289,114 @@ describe('PetPal admin overview integration', () => {
     assert.ok(response.body.data.complaintStats);
     assert.ok(response.body.data.callbackAuditStats);
     assert.ok(response.body.data.callbackAlertStats);
+    assert.ok(response.body.data.operationsMetrics);
     assert.equal(response.body.data.unavailableScopes.length, 0);
     assert.ok(response.body.data.complaintStats.overdueCount >= 1);
     assert.ok(response.body.data.complaintStats.unassignedCount >= 1);
     assert.ok(response.body.data.pendingCaregiverCount >= 1);
     assert.ok(response.body.data.callbackAuditStats.total >= 1);
     assert.ok(response.body.data.callbackAlertStats.byStatus.DEAD >= 1);
+
+    const metrics = response.body.data.operationsMetrics as {
+      windowDays: number;
+      demandCount: number;
+      activeApprovedCaregiverCount: number;
+      supplyDemandRatio: number | null;
+      orderCount: number;
+      completedOrderCount: number;
+      completionRate: number;
+      paidOrderCount: number;
+      refundedOrderCount: number;
+      refundRate: number;
+      complainedOrderCount: number;
+      complaintRate: number;
+    };
+    const windowStartAt = new Date(Date.now() - metrics.windowDays * 24 * 60 * 60 * 1000);
+    const [activeApprovedCaregiverCount, demandCount, windowOrders, refundedOrders, complainedOrders] = await Promise.all([
+      prisma.caregiverProfile.count({
+        where: {
+          deleteAt: null,
+          auditStatus: 'APPROVED',
+          services: {
+            some: {
+              deleteAt: null,
+              isActive: true,
+            },
+          },
+        },
+      }),
+      prisma.serviceRequest.count({
+        where: {
+          deleteAt: null,
+          createdAt: {
+            gte: windowStartAt,
+          },
+        },
+      }),
+      prisma.orderMain.findMany({
+        where: {
+          deleteAt: null,
+          createdAt: {
+            gte: windowStartAt,
+          },
+        },
+        select: {
+          id: true,
+          amountPaid: true,
+          orderStatus: true,
+        },
+      }),
+      prisma.refundRecord.findMany({
+        where: {
+          deleteAt: null,
+          createdAt: {
+            gte: windowStartAt,
+          },
+          refundStatus: {
+            in: ['APPROVED', 'SUCCESS'],
+          },
+        },
+        distinct: ['orderId'],
+        select: {
+          orderId: true,
+        },
+      }),
+      prisma.complaint.findMany({
+        where: {
+          deleteAt: null,
+          createdAt: {
+            gte: windowStartAt,
+          },
+        },
+        distinct: ['orderId'],
+        select: {
+          orderId: true,
+        },
+      }),
+    ]);
+
+    const orderCount = windowOrders.length;
+    const completedOrderCount = windowOrders.filter((item) => (
+      item.orderStatus === 'COMPLETED' || item.orderStatus === 'PARTIAL_REFUNDED'
+    )).length;
+    const paidOrderCount = windowOrders.filter((item) => Number(item.amountPaid) > 0).length;
+    const refundedOrderCount = refundedOrders.length;
+    const complainedOrderCount = complainedOrders.length;
+
+    assert.deepEqual(metrics, {
+      windowDays: metrics.windowDays,
+      demandCount,
+      activeApprovedCaregiverCount,
+      supplyDemandRatio: demandCount > 0 ? Number((activeApprovedCaregiverCount / demandCount).toFixed(2)) : null,
+      orderCount,
+      completedOrderCount,
+      completionRate: orderCount > 0 ? Number(((completedOrderCount / orderCount) * 100).toFixed(2)) : 0,
+      paidOrderCount,
+      refundedOrderCount,
+      refundRate: paidOrderCount > 0 ? Number(((refundedOrderCount / paidOrderCount) * 100).toFixed(2)) : 0,
+      complainedOrderCount,
+      complaintRate: orderCount > 0 ? Number(((complainedOrderCount / orderCount) * 100).toFixed(2)) : 0,
+    });
   });
 
   it('forbids ordinary member from querying admin overview summary', async () => {
