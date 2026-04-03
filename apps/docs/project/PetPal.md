@@ -7874,6 +7874,52 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.212 2026-04-03（P3-M1 Slice 212）
+
+**概述**：后台治理页的 route query 字符串桥接和 option value 校验都已经开始共享后，还剩最后一组明显的基础重复：已知 query key 检测、正整数页码解析，以及 callback audit 页的分页大小白名单恢复。这些判断继续散在页面里没有业务价值，本轮把它们一并收进 `route-query` helper，后台页的路由恢复逻辑进一步压缩到“读值 + 业务筛选判定”。
+
+已完成：
+
+- 后台治理页开始复用共享 route-query 解析 helper：
+  - `apps/web-frontend/src/pages/petpal-admin/shared/route-query.ts`
+    - 新增 `hasAnyStringRouteQuery`，统一判断当前 route query 是否包含已知字符串键。
+    - 新增 `parsePositiveIntegerRouteQuery`，统一处理页码等正整数参数的恢复与 fallback。
+    - 新增 `parseAllowedIntegerRouteQuery`，统一处理 callback audit 分页大小这类白名单整数参数。
+  - `apps/web-frontend/src/pages/petpal-admin/callback-alert-outbox/PetPalCallbackAlertOutboxAdminView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/callback-audits/PetPalCallbackAuditAdminView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/complaints/PetPalComplaintAdminView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/caregiver-audits/PetPalCaregiverAuditAdminView.vue`
+    - 四页都已改为复用共享 helper，不再手写 `routeFilterKeys.some(...)`、`Number.isFinite(page) && page > 0` 以及 callback audit 的分页大小白名单判断。
+- 定向测试继续兜底：
+  - `apps/web-frontend/test/petpal-admin-route-query.test.ts`
+    - 已补充已知字符串 query 检测、正整数解析和白名单整数解析单测，锁定 fallback 行为。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-admin-route-query.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+  - 仍保留既有的大 chunk warning，本轮没有新增新的构建告警。
+
+代码审计结论：
+
+- 本轮没有新增后台筛选语义、路由字段或接口契约，变化仅限于 route query 恢复基础解析层共享化。
+- 已确认 callback audit 页的分页大小恢复现在也走统一白名单解析，不再把 `[10, 20, 50, 100]` 直接写在页面逻辑里。
+- 已确认四个后台治理页对“是否存在已知 route query”与“页码默认值”的处理口径已经一致。
+
+风险与缓解：
+
+- 风险：route query 基础桥接层已经比较完整，继续沿这个方向抽象的收益会快速下降。
+- 缓解：这一组基础 helper 先到这里为止；后续优先回到更高价值的验收补测、剩余业务闭环和交付材料整理，而不是继续过度抽基础工具。
+
+下一步（1-3）：
+
+1. 优先转向更高价值的 PetPal 剩余业务闭环、验收向测试和最终交付收口，而不是继续细碎抽 helper。
+2. 如后台治理页后续再有明确的跨页同构逻辑，再按“小 helper + 单测 + 单 slice”方式补充。
+3. 集中整理下一批更接近演示与答辩的缺口，避免项目后期只停留在代码洁癖式收口。
+
 ### 14.211 2026-04-03（P3-M1 Slice 211）
 
 **概述**：route query 基础桥接层共享之后，后台治理页里还保留着另一组同构重复：`hydrateStateFromRoute()` 在四个页面里分别用 `includes()` 或 `options.some()` 校验 query 值是否合法，再配合类型断言写回筛选状态。这种逻辑小而散，继续复制只会放大维护噪音。本轮把这组“option value 合法性判断”提炼成共享 type guard，让后台页的 query 恢复直接基于选项源完成类型收窄。

@@ -414,7 +414,9 @@ import {
 import {
   buildRouteQuerySnapshot,
   getSingleRouteQueryValue,
+  hasAnyStringRouteQuery,
   normalizeStringRouteQuery,
+  parsePositiveIntegerRouteQuery,
 } from '../shared/route-query';
 import { hasSelectOptionValue } from '../shared/option-value';
 
@@ -622,12 +624,15 @@ const buildRouteQuery = () => {
 };
 
 const hydrateStateFromRoute = () => {
-  const hasKnownQuery = routeFilterKeys.some((key) => typeof route.query[key] === 'string');
+  const hasKnownQuery = hasAnyStringRouteQuery(
+    routeFilterKeys,
+    route.query as Record<string, unknown>,
+  );
   if (!hasKnownQuery) {
     return;
   }
 
-  const page = Number.parseInt(getSingleRouteQueryValue(route.query.page), 10);
+  const page = parsePositiveIntegerRouteQuery(route.query.page);
   const status = getSingleRouteQueryValue(route.query.status);
   const complaintType = getSingleRouteQueryValue(route.query.complaintType);
   const targetRole = getSingleRouteQueryValue(route.query.targetRole);
@@ -635,7 +640,7 @@ const hydrateStateFromRoute = () => {
   const assignedAdminId = getSingleRouteQueryValue(route.query.assignedAdminId);
   const unassignedOnly = getSingleRouteQueryValue(route.query.unassignedOnly);
 
-  pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
+  pageState.page = page;
   pageState.filters.status = hasSelectOptionValue(complaintAdminStatusOptions, status)
     ? status
     : undefined;

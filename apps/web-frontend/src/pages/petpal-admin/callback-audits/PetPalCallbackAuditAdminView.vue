@@ -75,7 +75,10 @@ import {
 import {
   buildRouteQuerySnapshot,
   getSingleRouteQueryValue,
+  hasAnyStringRouteQuery,
   normalizeStringRouteQuery,
+  parseAllowedIntegerRouteQuery,
+  parsePositiveIntegerRouteQuery,
 } from '../shared/route-query';
 import { hasSelectOptionValue } from '../shared/option-value';
 import CallbackAuditDetailDrawer from './components/CallbackAuditDetailDrawer.vue';
@@ -183,19 +186,22 @@ const buildRouteQuery = () => {
 };
 
 const hydrateStateFromRoute = () => {
-  const hasKnownQuery = routeFilterKeys.some((key) => typeof route.query[key] === 'string');
+  const hasKnownQuery = hasAnyStringRouteQuery(
+    routeFilterKeys,
+    route.query as Record<string, unknown>,
+  );
   if (!hasKnownQuery) {
     return;
   }
 
-  const page = Number.parseInt(getSingleRouteQueryValue(route.query.page), 10);
-  const pageSize = Number.parseInt(getSingleRouteQueryValue(route.query.pageSize), 10);
+  const page = parsePositiveIntegerRouteQuery(route.query.page);
+  const pageSize = parseAllowedIntegerRouteQuery(route.query.pageSize, [10, 20, 50, 100], 10);
   const callbackType = getSingleRouteQueryValue(route.query.callbackType);
   const callbackStatus = getSingleRouteQueryValue(route.query.callbackStatus);
   const sourceMode = getSingleRouteQueryValue(route.query.sourceMode);
 
-  pageState.page = Number.isFinite(page) && page > 0 ? page : 1;
-  pageState.pageSize = [10, 20, 50, 100].includes(pageSize) ? pageSize : 10;
+  pageState.page = page;
+  pageState.pageSize = pageSize;
   pageState.filters.callbackType = hasSelectOptionValue(callbackAuditTypeOptions, callbackType)
     ? callbackType
     : undefined;

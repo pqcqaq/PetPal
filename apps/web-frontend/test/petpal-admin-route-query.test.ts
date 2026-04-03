@@ -3,7 +3,10 @@ import test from 'node:test';
 import {
   buildRouteQuerySnapshot,
   getSingleRouteQueryValue,
+  hasAnyStringRouteQuery,
   normalizeStringRouteQuery,
+  parseAllowedIntegerRouteQuery,
+  parsePositiveIntegerRouteQuery,
 } from '../src/pages/petpal-admin/shared/route-query.ts';
 
 test('trims a single route query value and ignores non-string input', () => {
@@ -38,4 +41,25 @@ test('builds a stable route query snapshot regardless of key order', () => {
   });
 
   assert.equal(left, right);
+});
+
+test('detects known string route query keys only when present', () => {
+  assert.equal(hasAnyStringRouteQuery(['page', 'status'], {
+    page: 2,
+    status: ['OPEN'],
+  }), false);
+
+  assert.equal(hasAnyStringRouteQuery(['page', 'status'], {
+    page: ' 3 ',
+  }), true);
+});
+
+test('parses positive and allowed integer route query values with fallbacks', () => {
+  assert.equal(parsePositiveIntegerRouteQuery(' 5 '), 5);
+  assert.equal(parsePositiveIntegerRouteQuery('0'), 1);
+  assert.equal(parsePositiveIntegerRouteQuery('abc', 2), 2);
+
+  assert.equal(parseAllowedIntegerRouteQuery(' 20 ', [10, 20, 50], 10), 20);
+  assert.equal(parseAllowedIntegerRouteQuery('30', [10, 20, 50], 10), 10);
+  assert.equal(parseAllowedIntegerRouteQuery(undefined, [10, 20, 50], 10), 10);
 });
