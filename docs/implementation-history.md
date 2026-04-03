@@ -225,6 +225,10 @@ Last updated: 2026-04-04
   - `packages/api-common` 已继续补订单消息附件与照料者资质附件的标签、上传限额和数量上限共享常量。
   - Web / App 的订单沟通上传入口、App 资质材料上传入口现在都已直接消费这组共享常量，不再各自手写 `petpal-order-message`、`petpal-caregiver-qualification` 和 3 张 / 8 MB 规则。
   - App 照料者资料页已继续按剩余资质名额限制上传，并在达到 12 份上限后直接禁用上传入口，避免继续超额上传后再被前端截断。
+- 2026-04-04 已继续对齐 Web 照料者资质上传：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverProfileView.vue` 已从手填材料名称 / URL 改成受管资质附件上传，上传时会绑定当前照料者档案 ID 和 `petpal-caregiver-qualification` 标签。
+  - 页面现在会直接展示材料大小 / 日期，并支持查看 / 移除；首次上传前如果档案还没生成 ID，会先提示保存一次基础资料。
+  - 历史上已经保存为手填链接的资质材料仍会继续显示，不会因为本轮切换上传形态而丢失。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

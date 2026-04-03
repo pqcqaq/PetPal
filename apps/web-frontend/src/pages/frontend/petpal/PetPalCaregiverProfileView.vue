@@ -55,24 +55,12 @@
       v-if="profileState !== 'error'"
       eyebrow="Materials"
       title="资质材料"
-      description="为了简化流程，这里改成手动维护材料条目，不再堆叠上传卡片。"
+      description="材料会按当前照料者档案范围上传；首次上传前请先保存一次基础资料。"
     >
-      <div class="petpal-field-grid petpal-material-entry">
-        <el-form-item label="材料名称">
-          <el-input v-model="materialDraft.name" maxlength="40" placeholder="例如：宠物护理证书" />
-        </el-form-item>
-        <el-form-item label="材料链接">
-          <el-input v-model="materialDraft.url" maxlength="240" placeholder="例如：https://..." />
-        </el-form-item>
-      </div>
-      <div class="petpal-actions">
-        <el-button @click="appendMaterial">添加材料</el-button>
-      </div>
-
       <PetPalDeskEmpty
         v-if="!form.qualificationMaterials.length"
         title="当前没有资质材料"
-        description="如果暂时没有材料，也可以先保存基础资料，后续再补充。"
+        description="可以先保存基础资料，后续再补上传资质截图。"
       />
 
       <div v-else class="petpal-sheet-list">
@@ -80,13 +68,32 @@
           <div class="petpal-sheet-row__copy">
             <h3 class="petpal-sheet-row__title">{{ item.name }}</h3>
             <p class="petpal-sheet-row__desc">{{ item.url }}</p>
-            <p class="petpal-sheet-row__desc">{{ item.mimeType }} · {{ item.uploadedAt.slice(0, 10) }}</p>
+            <p class="petpal-sheet-row__desc">{{ formatQualificationMaterialMeta(item) }}</p>
           </div>
           <div class="petpal-sheet-row__tail">
-            <a :href="item.url" target="_blank" rel="noreferrer">查看</a>
+            <button type="button" class="petpal-link-button" @click="openQualificationMaterial(item.url)">查看</button>
             <button type="button" class="petpal-link-button" @click="removeMaterial(item.fileId)">移除</button>
           </div>
         </div>
+      </div>
+
+      <input
+        ref="qualificationInputRef"
+        class="petpal-qualification-upload-input"
+        type="file"
+        accept="image/*"
+        multiple
+        @change="handleQualificationMaterialChange"
+      >
+      <div class="petpal-actions">
+        <el-button
+          :loading="uploadingMaterials"
+          :disabled="profileState !== 'ready' || qualificationSlotsLeft <= 0 || submitting"
+          @click="triggerQualificationMaterialInput"
+        >
+          {{ uploadingMaterials ? '上传中...' : `上传资质截图${qualificationSlotsLeft > 0 ? `（剩余 ${qualificationSlotsLeft} 份）` : ''}` }}
+        </el-button>
+        <span class="petpal-sheet-row__desc">当前最多保留 {{ PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT }} 份，每次最多上传 {{ PETPAL_CAREGIVER_QUALIFICATION_UPLOAD_MAX_COUNT }} 份图片。</span>
       </div>
     </PetPalDeskSection>
 
@@ -104,11 +111,19 @@
 </template>
 
 <script setup lang="ts">
-import type { CaregiverProfileRecord, CaregiverQualificationMaterialRecord } from '@rbac/api-common';
+import {
+  PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_BYTES,
+  PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
+  PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT,
+  PETPAL_CAREGIVER_QUALIFICATION_UPLOAD_MAX_COUNT,
+  type CaregiverProfileRecord,
+  type CaregiverQualificationMaterialRecord,
+} from '@rbac/api-common';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
+import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
@@ -130,6 +145,8 @@ const profile = ref<CaregiverProfileRecord | null>(null);
 const profileState = ref<PetPalSectionLoadState>('idle');
 const sectionReloadingKey = ref<'' | 'profile'>('');
 const submitting = ref(false);
+const uploadingMaterials = ref(false);
+const qualificationInputRef = ref<HTMLInputElement | null>(null);
 
 const form = reactive({
   intro: '',
@@ -140,11 +157,8 @@ const form = reactive({
   serviceCommitment: '',
   qualificationMaterials: [] as CaregiverQualificationMaterialRecord[],
 });
-
-const materialDraft = reactive({
-  name: '',
-  url: '',
-});
+const qualificationSlotsLeft = computed(() =>
+  Math.max(0, PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT - form.qualificationMaterials.length));
 
 const pageNotice = computed(() => buildPetPalPageNotice({
   baseNotice: getPetPalQueryString(route.query, 'notice'),
@@ -200,26 +214,6 @@ function applyProfile(value: CaregiverProfileRecord) {
   form.qualificationMaterials = [...value.qualificationMaterials];
 }
 
-function appendMaterial() {
-  if (!materialDraft.name.trim() || !materialDraft.url.trim()) {
-    ElMessage.warning('请先填写材料名称和链接');
-    return;
-  }
-  form.qualificationMaterials = [
-    ...form.qualificationMaterials,
-    {
-      fileId: `manual-${Date.now()}`,
-      url: materialDraft.url.trim(),
-      name: materialDraft.name.trim(),
-      mimeType: 'link/manual',
-      size: 0,
-      uploadedAt: new Date().toISOString(),
-    },
-  ];
-  materialDraft.name = '';
-  materialDraft.url = '';
-}
-
 function buildCaregiverDashboardRoute(notice: string) {
   return {
     name: 'frontend-petpal-caregiver',
@@ -229,6 +223,97 @@ function buildCaregiverDashboardRoute(notice: string) {
 
 function removeMaterial(fileId: string) {
   form.qualificationMaterials = form.qualificationMaterials.filter((item) => item.fileId !== fileId);
+}
+
+function formatQualificationMaterialSize(size: number) {
+  if (!Number.isFinite(size) || size <= 0) {
+    return '大小未知';
+  }
+  if (size >= 1024 * 1024) {
+    return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  }
+  return `${Math.max(1, Math.round(size / 1024))} KB`;
+}
+
+function formatQualificationMaterialMeta(item: CaregiverQualificationMaterialRecord) {
+  const uploadedAt = item.uploadedAt ? item.uploadedAt.slice(0, 10) : '--';
+  const segments = [formatQualificationMaterialSize(item.size)];
+  if (item.mimeType && item.mimeType !== 'link/manual') {
+    segments.unshift(item.mimeType);
+  }
+  segments.push(uploadedAt);
+  return segments.join(' · ');
+}
+
+function openQualificationMaterial(url: string) {
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function triggerQualificationMaterialInput() {
+  if (!profile.value?.id) {
+    ElMessage.warning('请先保存一次基础资料，再上传资质材料');
+    return;
+  }
+  qualificationInputRef.value?.click();
+}
+
+async function handleQualificationMaterialChange(event: Event) {
+  const input = event.target as HTMLInputElement | null;
+  const selectedFiles = Array.from(input?.files ?? []);
+  if (input) {
+    input.value = '';
+  }
+
+  if (!profile.value?.id || !selectedFiles.length) {
+    return;
+  }
+
+  const allowedCount = Math.min(
+    qualificationSlotsLeft.value,
+    PETPAL_CAREGIVER_QUALIFICATION_UPLOAD_MAX_COUNT,
+  );
+  const limitedFiles = selectedFiles.slice(0, allowedCount);
+  if (selectedFiles.length > limitedFiles.length) {
+    ElMessage.warning(`一次最多还能添加 ${allowedCount} 份资质材料`);
+  }
+
+  const validFiles = limitedFiles.filter((file) =>
+    (!file.type || file.type.startsWith('image/')) && file.size <= PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_BYTES);
+  if (validFiles.length < limitedFiles.length) {
+    ElMessage.warning('仅支持上传不超过 8 MB 的图片文件');
+  }
+
+  if (!validFiles.length) {
+    return;
+  }
+
+  uploadingMaterials.value = true;
+  try {
+    for (const file of validFiles) {
+      const uploaded = await uploadAttachmentFile(file, {
+        tag1: PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
+        tag2: profile.value.id,
+      });
+
+      form.qualificationMaterials = [
+        ...form.qualificationMaterials,
+        {
+          fileId: uploaded.fileId,
+          url: uploaded.url,
+          name: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          size: file.size,
+          uploadedAt: new Date().toISOString(),
+        },
+      ].slice(0, PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT);
+    }
+
+    ElMessage.success(validFiles.length === 1 ? '资质材料已上传' : `已上传 ${validFiles.length} 份资质材料`);
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '上传资质材料失败'));
+  } finally {
+    uploadingMaterials.value = false;
+  }
 }
 
 async function loadProfile() {
@@ -305,6 +390,10 @@ onMounted(() => {
 <style scoped lang="scss">
 .petpal-material-entry {
   align-items: end;
+}
+
+.petpal-qualification-upload-input {
+  display: none;
 }
 
 .petpal-link-button {
