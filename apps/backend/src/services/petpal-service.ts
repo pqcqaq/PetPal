@@ -1340,6 +1340,9 @@ const normalizeReviewTags = (tags?: string[]) =>
 const normalizeEvidenceUrls = (urls?: string[]) =>
   [...new Set((urls ?? []).map((item) => item.trim()).filter(Boolean))].slice(0, 10);
 
+const normalizeAttachmentIds = (fileIds?: string[], limit = 10) =>
+  [...new Set((fileIds ?? []).map((item) => item.trim()).filter(Boolean))].slice(0, limit);
+
 const toStringArray = (value: Prisma.JsonValue | null | undefined) =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 
@@ -1416,6 +1419,15 @@ const normalizeQualificationMaterials = (
     }))
     .filter((item) => item.fileId && item.url && item.name && item.mimeType);
 
+type PenaltyRectifyMaterialSnapshot = {
+  fileId: string;
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+};
+
 const toQualificationMaterials = (value: Prisma.JsonValue | null | undefined) => {
   if (!Array.isArray(value)) {
     return [];
@@ -1455,6 +1467,103 @@ const toQualificationMaterials = (value: Prisma.JsonValue | null | undefined) =>
         uploadedAt,
       },
     ];
+  });
+};
+
+const normalizePenaltyRectifyMaterials = (materials?: PenaltyRectifyMaterialSnapshot[]) =>
+  (materials ?? [])
+    .map((item) => ({
+      fileId: item.fileId.trim(),
+      url: item.url.trim(),
+      name: item.name.trim(),
+      mimeType: item.mimeType.trim(),
+      size: Math.max(1, Math.trunc(item.size)),
+      uploadedAt: item.uploadedAt,
+    }))
+    .filter((item) => item.fileId && item.url && item.name && item.mimeType && item.uploadedAt);
+
+const toPenaltyRectifyMaterials = (value: Prisma.JsonValue | null | undefined) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return [];
+    }
+
+    const fileId = typeof item.fileId === 'string' ? item.fileId.trim() : '';
+    const url = typeof item.url === 'string' ? item.url.trim() : '';
+    const name = typeof item.name === 'string' ? item.name.trim() : '';
+    const mimeType = typeof item.mimeType === 'string' ? item.mimeType.trim() : '';
+    const uploadedAt = typeof item.uploadedAt === 'string' ? item.uploadedAt : '';
+    const size = typeof item.size === 'number' ? Math.trunc(item.size) : Number(item.size ?? 0);
+
+    if (
+      !fileId ||
+      !url ||
+      !name ||
+      !mimeType ||
+      !uploadedAt ||
+      !Number.isFinite(size) ||
+      size <= 0
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        fileId,
+        url,
+        name,
+        mimeType,
+        size,
+        uploadedAt,
+      },
+    ];
+  });
+};
+
+const resolvePenaltyRectifyMaterials = async (fileIds: string[]) => {
+  if (fileIds.length === 0) {
+    return [];
+  }
+
+  const assets = await prisma.mediaAsset.findMany({
+    where: {
+      id: {
+        in: fileIds,
+      },
+      kind: 'attachment',
+      uploadStatus: 'COMPLETED',
+      deleteAt: null,
+    },
+    select: {
+      id: true,
+      url: true,
+      originalName: true,
+      mimeType: true,
+      size: true,
+      completedAt: true,
+      createdAt: true,
+    },
+  });
+
+  const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
+  return fileIds.map((fileId) => {
+    const asset = assetMap.get(fileId);
+    if (!asset || !asset.url) {
+      throw badRequest('Penalty rectification evidence attachments are invalid');
+    }
+
+    return {
+      fileId: asset.id,
+      url: asset.url,
+      name: asset.originalName,
+      mimeType: asset.mimeType,
+      size: Number(asset.size),
+      uploadedAt: (asset.completedAt ?? asset.createdAt).toISOString(),
+    };
   });
 };
 
@@ -1671,45 +1780,53 @@ const toComplaintRecord = (complaint: ComplaintEntity) => ({
   })),
 });
 
-const toPenaltyAdminRecord = (penalty: PenaltyAdminEntity) => ({
-  id: penalty.id,
-  complaintId: penalty.complaintId,
-  orderId: penalty.orderId,
-  orderNo: penalty.order.orderNo,
-  targetRole: penalty.targetRole,
-  targetUserId: penalty.targetUserId,
-  targetNickname: penalty.targetUser?.nickname ?? null,
-  complaintType: penalty.complaint.complaintType,
-  penaltyType: penalty.penaltyType,
-  severity: penalty.severity,
-  reason: penalty.reason,
-  actionSummary: penalty.actionSummary,
-  rectifyStatus: penalty.rectifyStatus,
-  rectifyDueAt: penalty.rectifyDueAt,
-  rectifiedAt: penalty.rectifiedAt,
-  rectifyNote: penalty.rectifyNote,
-  rectifyEvidenceUrls: toStringArray(penalty.rectifyEvidenceUrls),
-  rectifyReviewStatus: penalty.rectifyReviewStatus,
-  rectifyReviewNote: penalty.rectifyReviewNote,
-  rectifyReviewedAt: penalty.rectifyReviewedAt,
-  rectifyReviewedById: penalty.rectifyReviewedById ?? null,
-  rectifyReviewedByNickname: penalty.rectifyReviewer?.nickname ?? null,
-  appealStatus: penalty.appealStatus,
-  appealReason: penalty.appealReason,
-  appealSubmittedAt: penalty.appealSubmittedAt,
-  appealSubmittedById: penalty.appealSubmittedById ?? null,
-  appealSubmittedByNickname: penalty.appealSubmitter?.nickname ?? null,
-  appealReviewedAt: penalty.appealReviewedAt,
-  appealReviewedById: penalty.appealReviewedById ?? null,
-  appealReviewedByNickname: penalty.appealReviewer?.nickname ?? null,
-  appealReviewNote: penalty.appealReviewNote,
-  creatorId: penalty.createId ?? null,
-  creatorNickname: penalty.creator?.nickname ?? null,
-  updaterId: penalty.updateId ?? null,
-  updaterNickname: penalty.updater?.nickname ?? null,
-  createdAt: penalty.createdAt,
-  updatedAt: penalty.updatedAt,
-});
+const toPenaltyAdminRecord = (penalty: PenaltyAdminEntity) => {
+  const rectifyEvidenceMaterials = toPenaltyRectifyMaterials(penalty.rectifyEvidenceMaterials);
+
+  return {
+    id: penalty.id,
+    complaintId: penalty.complaintId,
+    orderId: penalty.orderId,
+    orderNo: penalty.order.orderNo,
+    targetRole: penalty.targetRole,
+    targetUserId: penalty.targetUserId,
+    targetNickname: penalty.targetUser?.nickname ?? null,
+    complaintType: penalty.complaint.complaintType,
+    penaltyType: penalty.penaltyType,
+    severity: penalty.severity,
+    reason: penalty.reason,
+    actionSummary: penalty.actionSummary,
+    rectifyStatus: penalty.rectifyStatus,
+    rectifyDueAt: penalty.rectifyDueAt,
+    rectifiedAt: penalty.rectifiedAt,
+    rectifyNote: penalty.rectifyNote,
+    rectifyEvidenceMaterials,
+    rectifyEvidenceUrls:
+      rectifyEvidenceMaterials.length > 0
+        ? rectifyEvidenceMaterials.map((item) => item.url)
+        : toStringArray(penalty.rectifyEvidenceUrls),
+    rectifyReviewStatus: penalty.rectifyReviewStatus,
+    rectifyReviewNote: penalty.rectifyReviewNote,
+    rectifyReviewedAt: penalty.rectifyReviewedAt,
+    rectifyReviewedById: penalty.rectifyReviewedById ?? null,
+    rectifyReviewedByNickname: penalty.rectifyReviewer?.nickname ?? null,
+    appealStatus: penalty.appealStatus,
+    appealReason: penalty.appealReason,
+    appealSubmittedAt: penalty.appealSubmittedAt,
+    appealSubmittedById: penalty.appealSubmittedById ?? null,
+    appealSubmittedByNickname: penalty.appealSubmitter?.nickname ?? null,
+    appealReviewedAt: penalty.appealReviewedAt,
+    appealReviewedById: penalty.appealReviewedById ?? null,
+    appealReviewedByNickname: penalty.appealReviewer?.nickname ?? null,
+    appealReviewNote: penalty.appealReviewNote,
+    creatorId: penalty.createId ?? null,
+    creatorNickname: penalty.creator?.nickname ?? null,
+    updaterId: penalty.updateId ?? null,
+    updaterNickname: penalty.updater?.nickname ?? null,
+    createdAt: penalty.createdAt,
+    updatedAt: penalty.updatedAt,
+  };
+};
 
 const toComplaintAdminRecord = (complaint: ComplaintAdminEntity) => ({
   ...toComplaintRecord(complaint),
@@ -5546,7 +5663,7 @@ export const petpalService = {
     payload: {
       rectifyStatus: 'COMPLETED' | 'WAIVED';
       rectifyNote: string;
-      rectifyEvidenceUrls?: string[];
+      rectifyEvidenceFileIds?: string[];
     },
   ) {
     const existing = await prisma.penaltyRecord.findFirst({
@@ -5577,10 +5694,12 @@ export const petpalService = {
     if (!rectifyNote) {
       throw badRequest('Penalty rectify note is required');
     }
-    const rectifyEvidenceUrls = normalizeEvidenceUrls(payload.rectifyEvidenceUrls);
-    if (payload.rectifyStatus === 'COMPLETED' && rectifyEvidenceUrls.length === 0) {
-      throw badRequest('Completed penalty rectification requires at least one evidence url');
+    const rectifyEvidenceFileIds = normalizeAttachmentIds(payload.rectifyEvidenceFileIds);
+    if (payload.rectifyStatus === 'COMPLETED' && rectifyEvidenceFileIds.length === 0) {
+      throw badRequest('Completed penalty rectification requires at least one evidence attachment');
     }
+    const rectifyEvidenceMaterials = await resolvePenaltyRectifyMaterials(rectifyEvidenceFileIds);
+    const rectifyEvidenceUrls = rectifyEvidenceMaterials.map((item) => item.url);
 
     const updated = await prisma.penaltyRecord.update({
       where: {
@@ -5593,6 +5712,10 @@ export const petpalService = {
         rectifyEvidenceUrls:
           rectifyEvidenceUrls.length > 0
             ? (rectifyEvidenceUrls as Prisma.InputJsonValue)
+            : Prisma.DbNull,
+        rectifyEvidenceMaterials:
+          rectifyEvidenceMaterials.length > 0
+            ? (normalizePenaltyRectifyMaterials(rectifyEvidenceMaterials) as Prisma.InputJsonValue)
             : Prisma.DbNull,
         rectifyReviewStatus:
           payload.rectifyStatus === 'COMPLETED' ? 'PENDING' : 'NOT_REQUIRED',
@@ -5776,6 +5899,7 @@ export const petpalService = {
               rectifiedAt: reviewedAt,
               rectifyNote: existing.rectifyNote?.trim() || `申诉通过：${reviewNote}`,
               rectifyEvidenceUrls: Prisma.DbNull,
+              rectifyEvidenceMaterials: Prisma.DbNull,
               rectifyReviewStatus: 'NOT_REQUIRED' as const,
               rectifyReviewNote: null,
               rectifyReviewedAt: null,

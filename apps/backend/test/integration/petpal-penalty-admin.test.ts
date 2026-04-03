@@ -7,6 +7,7 @@ import {
   loginAs,
   reseedBackendTestContext,
   teardownBackendTestContext,
+  uploadManagedFileForTest,
 } from '../support/backend-testkit';
 import { invalidatePermissionCache } from '../../src/utils/rbac';
 
@@ -161,8 +162,39 @@ const createPenaltyScenario = async () => {
   };
 };
 
+const uploadRectifyEvidenceFiles = async (
+  app: BackendTestContext['app'],
+  accessToken: string,
+  files: Array<{
+    fileName: string;
+    contentType: string;
+    content: string;
+  }>,
+) => {
+  const uploads: Array<{
+    fileId: string;
+    url: string;
+  }> = [];
+
+  for (const file of files) {
+    uploads.push(
+      await uploadManagedFileForTest(app, {
+        accessToken,
+        fileName: file.fileName,
+        contentType: file.contentType,
+        content: file.content,
+        kind: 'attachment',
+        tag1: 'petpal-penalty',
+        tag2: 'rectify',
+      }),
+    );
+  }
+
+  return uploads;
+};
+
 describe('PetPal penalty admin integration', () => {
-  it('admin can submit and approve penalty rectification evidence', async () => {
+  it('admin can submit and approve penalty rectification attachments', async () => {
     const { app, prisma, suffix, complaintId, caregiverUserId, caregiverNickname } =
       await createComplaintScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
@@ -208,6 +240,22 @@ describe('PetPal penalty admin integration', () => {
     );
 
     const penaltyId = complaintRecord.penalties[0]!.id;
+    const [rectifyVideo, rectifyReport] = await uploadRectifyEvidenceFiles(
+      app,
+      adminSession.tokens.accessToken,
+      [
+        {
+          fileName: `rectify-video-${suffix}.mp4`,
+          contentType: 'video/mp4',
+          content: 'rectify-video-content',
+        },
+        {
+          fileName: `rectify-report-${suffix}.pdf`,
+          contentType: 'application/pdf',
+          content: 'rectify-report-content',
+        },
+      ],
+    );
 
     const statsResponse = await request(app)
       .get('/api/petpal/admin/penalties/stats')
@@ -266,19 +314,20 @@ describe('PetPal penalty admin integration', () => {
       .send({
         rectifyStatus: 'COMPLETED',
         rectifyNote: '已补交服务影像并完成内部复盘。',
-        rectifyEvidenceUrls: [
-          'https://example.com/evidence/rectify-video',
-          'https://example.com/evidence/rectify-report',
-        ],
+        rectifyEvidenceFileIds: [rectifyVideo.fileId, rectifyReport.fileId],
       })
       .expect(200);
 
     assert.equal(rectifyResponse.body.data.rectifyStatus, 'COMPLETED');
     assert.equal(rectifyResponse.body.data.rectifyReviewStatus, 'PENDING');
     assert.equal(rectifyResponse.body.data.rectifyNote, '已补交服务影像并完成内部复盘。');
+    assert.deepEqual(
+      rectifyResponse.body.data.rectifyEvidenceMaterials.map((item: { fileId: string }) => item.fileId),
+      [rectifyVideo.fileId, rectifyReport.fileId],
+    );
     assert.deepEqual(rectifyResponse.body.data.rectifyEvidenceUrls, [
-      'https://example.com/evidence/rectify-video',
-      'https://example.com/evidence/rectify-report',
+      rectifyVideo.url,
+      rectifyReport.url,
     ]);
     assert.equal(rectifyResponse.body.data.rectifyReviewNote, null);
     assert.equal(rectifyResponse.body.data.rectifyReviewedAt, null);
@@ -334,6 +383,7 @@ describe('PetPal penalty admin integration', () => {
       select: {
         rectifyStatus: true,
         rectifyNote: true,
+        rectifyEvidenceMaterials: true,
         rectifyEvidenceUrls: true,
         rectifyReviewStatus: true,
         rectifyReviewNote: true,
@@ -350,16 +400,20 @@ describe('PetPal penalty admin integration', () => {
     assert.equal(penaltyRecord.rectifyNote, '已补交服务影像并完成内部复盘。');
     assert.equal(penaltyRecord.rectifyReviewNote, '整改材料齐全，复核通过。');
     assert.equal(penaltyRecord.rectifyReviewedById, adminSession.user.id);
+    assert.deepEqual(
+      (penaltyRecord.rectifyEvidenceMaterials as Array<{ fileId: string }>).map((item) => item.fileId),
+      [rectifyVideo.fileId, rectifyReport.fileId],
+    );
     assert.deepEqual(penaltyRecord.rectifyEvidenceUrls, [
-      'https://example.com/evidence/rectify-video',
-      'https://example.com/evidence/rectify-report',
+      rectifyVideo.url,
+      rectifyReport.url,
     ]);
     assert.ok(penaltyRecord.rectifiedAt);
     assert.ok(penaltyRecord.rectifyReviewedAt);
     assert.equal(penaltyRecord.updateId, adminSession.user.id);
   });
 
-  it('requires evidence urls for completed rectification but allows waived without evidence', async () => {
+  it('requires evidence attachments for completed rectification but allows waived without evidence', async () => {
     const { app, prisma, adminSession, penaltyId } = await createPenaltyScenario();
 
     await request(app)
@@ -370,6 +424,21 @@ describe('PetPal penalty admin integration', () => {
         rectifyNote: '仅填写说明但未补交材料',
       })
       .expect(400);
+
+    const invalidAttachmentResponse = await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/rectify`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        rectifyStatus: 'COMPLETED',
+        rectifyNote: '尝试提交不存在的整改附件',
+        rectifyEvidenceFileIds: ['missing-rectify-attachment'],
+      })
+      .expect(400);
+
+    assert.equal(
+      invalidAttachmentResponse.body.message,
+      'Penalty rectification evidence attachments are invalid',
+    );
 
     const waiveResponse = await request(app)
       .post(`/api/petpal/admin/penalties/${penaltyId}/rectify`)
@@ -390,12 +459,14 @@ describe('PetPal penalty admin integration', () => {
       },
       select: {
         rectifyStatus: true,
+        rectifyEvidenceMaterials: true,
         rectifyEvidenceUrls: true,
       },
     });
 
     assert.ok(penaltyRecord);
     assert.equal(penaltyRecord.rectifyStatus, 'WAIVED');
+    assert.equal(penaltyRecord.rectifyEvidenceMaterials, null);
     assert.equal(penaltyRecord.rectifyEvidenceUrls, null);
   });
 
@@ -411,13 +482,25 @@ describe('PetPal penalty admin integration', () => {
       })
       .expect(400);
 
+    const [firstPassAttachment] = await uploadRectifyEvidenceFiles(
+      app,
+      adminSession.tokens.accessToken,
+      [
+        {
+          fileName: 'rectify-first-pass.mp4',
+          contentType: 'video/mp4',
+          content: 'rectify-first-pass',
+        },
+      ],
+    );
+
     await request(app)
       .post(`/api/petpal/admin/penalties/${penaltyId}/rectify`)
       .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
       .send({
         rectifyStatus: 'COMPLETED',
         rectifyNote: '已先补交第一版整改材料。',
-        rectifyEvidenceUrls: ['https://example.com/evidence/rectify-first-pass'],
+        rectifyEvidenceFileIds: [firstPassAttachment.fileId],
       })
       .expect(200);
 
@@ -433,8 +516,12 @@ describe('PetPal penalty admin integration', () => {
     assert.equal(rejectReviewResponse.body.data.rectifyStatus, 'PENDING');
     assert.equal(rejectReviewResponse.body.data.rectifyReviewStatus, 'REJECTED');
     assert.equal(rejectReviewResponse.body.data.rectifyReviewNote, '缺少完整服务轨迹，请重新补件。');
+    assert.deepEqual(
+      rejectReviewResponse.body.data.rectifyEvidenceMaterials.map((item: { fileId: string }) => item.fileId),
+      [firstPassAttachment.fileId],
+    );
     assert.deepEqual(rejectReviewResponse.body.data.rectifyEvidenceUrls, [
-      'https://example.com/evidence/rectify-first-pass',
+      firstPassAttachment.url,
     ]);
 
     await request(app)
@@ -446,16 +533,30 @@ describe('PetPal penalty admin integration', () => {
       })
       .expect(400);
 
+    const [secondPassAttachment, trackLogAttachment] = await uploadRectifyEvidenceFiles(
+      app,
+      adminSession.tokens.accessToken,
+      [
+        {
+          fileName: 'rectify-second-pass.mp4',
+          contentType: 'video/mp4',
+          content: 'rectify-second-pass',
+        },
+        {
+          fileName: 'rectify-track-log.pdf',
+          contentType: 'application/pdf',
+          content: 'rectify-track-log',
+        },
+      ],
+    );
+
     const resubmitResponse = await request(app)
       .post(`/api/petpal/admin/penalties/${penaltyId}/rectify`)
       .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
       .send({
         rectifyStatus: 'COMPLETED',
         rectifyNote: '已补交第二版整改材料并附上完整服务轨迹。',
-        rectifyEvidenceUrls: [
-          'https://example.com/evidence/rectify-second-pass',
-          'https://example.com/evidence/rectify-track-log',
-        ],
+        rectifyEvidenceFileIds: [secondPassAttachment.fileId, trackLogAttachment.fileId],
       })
       .expect(200);
 
@@ -463,9 +564,13 @@ describe('PetPal penalty admin integration', () => {
     assert.equal(resubmitResponse.body.data.rectifyReviewStatus, 'PENDING');
     assert.equal(resubmitResponse.body.data.rectifyReviewNote, null);
     assert.equal(resubmitResponse.body.data.rectifyReviewedAt, null);
+    assert.deepEqual(
+      resubmitResponse.body.data.rectifyEvidenceMaterials.map((item: { fileId: string }) => item.fileId),
+      [secondPassAttachment.fileId, trackLogAttachment.fileId],
+    );
     assert.deepEqual(resubmitResponse.body.data.rectifyEvidenceUrls, [
-      'https://example.com/evidence/rectify-second-pass',
-      'https://example.com/evidence/rectify-track-log',
+      secondPassAttachment.url,
+      trackLogAttachment.url,
     ]);
 
     const penaltyRecord = await prisma.penaltyRecord.findFirst({
@@ -477,6 +582,7 @@ describe('PetPal penalty admin integration', () => {
         rectifyReviewStatus: true,
         rectifyReviewNote: true,
         rectifyReviewedAt: true,
+        rectifyEvidenceMaterials: true,
         rectifyEvidenceUrls: true,
       },
     });
@@ -486,9 +592,13 @@ describe('PetPal penalty admin integration', () => {
     assert.equal(penaltyRecord.rectifyReviewStatus, 'PENDING');
     assert.equal(penaltyRecord.rectifyReviewNote, null);
     assert.equal(penaltyRecord.rectifyReviewedAt, null);
+    assert.deepEqual(
+      (penaltyRecord.rectifyEvidenceMaterials as Array<{ fileId: string }>).map((item) => item.fileId),
+      [secondPassAttachment.fileId, trackLogAttachment.fileId],
+    );
     assert.deepEqual(penaltyRecord.rectifyEvidenceUrls, [
-      'https://example.com/evidence/rectify-second-pass',
-      'https://example.com/evidence/rectify-track-log',
+      secondPassAttachment.url,
+      trackLogAttachment.url,
     ]);
   });
 
@@ -631,13 +741,25 @@ describe('PetPal penalty admin integration', () => {
       })
       .expect(400);
 
+    const [reviewedRectifyAttachment] = await uploadRectifyEvidenceFiles(
+      app,
+      adminSession.tokens.accessToken,
+      [
+        {
+          fileName: 'reviewed-rectify.pdf',
+          contentType: 'application/pdf',
+          content: 'reviewed-rectify',
+        },
+      ],
+    );
+
     await request(app)
       .post(`/api/petpal/admin/penalties/${penaltyId}/rectify`)
       .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
       .send({
         rectifyStatus: 'COMPLETED',
         rectifyNote: '申诉已驳回，完成整改。',
-        rectifyEvidenceUrls: ['https://example.com/evidence/reviewed-rectify'],
+        rectifyEvidenceFileIds: [reviewedRectifyAttachment.fileId],
       })
       .expect(200);
   });

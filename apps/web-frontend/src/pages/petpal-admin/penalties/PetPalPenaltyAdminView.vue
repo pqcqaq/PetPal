@@ -94,7 +94,26 @@
               <span class="penalty-expand__label">整改说明</span>
               <p>{{ scope.row.rectifyNote }}</p>
             </div>
-            <div v-if="scope.row.rectifyEvidenceUrls.length" class="penalty-expand__section">
+            <div v-if="scope.row.rectifyEvidenceMaterials.length" class="penalty-expand__section">
+              <span class="penalty-expand__label">整改附件</span>
+              <div class="penalty-material-list penalty-material-list--readonly">
+                <article
+                  v-for="item in scope.row.rectifyEvidenceMaterials"
+                  :key="item.fileId"
+                  class="penalty-material-list__item"
+                >
+                  <div>
+                    <strong>{{ item.name }}</strong>
+                    <p>{{ item.mimeType }} · {{ formatAttachmentSize(item.size) }} · {{ formatDateTime(item.uploadedAt) }}</p>
+                  </div>
+                  <el-button link type="primary" @click="openMaterial(item.url)">打开</el-button>
+                </article>
+              </div>
+            </div>
+            <div
+              v-else-if="scope.row.rectifyEvidenceUrls.length"
+              class="penalty-expand__section"
+            >
               <span class="penalty-expand__label">整改材料</span>
               <ul class="penalty-expand__links">
                 <li v-for="url in scope.row.rectifyEvidenceUrls" :key="url">
@@ -275,8 +294,8 @@
       v-model="rectifyDialogVisible"
       title="更新整改状态"
       width="560px"
-      :close-on-click-modal="!rectifySubmitting"
-      :close-on-press-escape="!rectifySubmitting"
+      :close-on-click-modal="!rectifySubmitting && !rectifyUploading"
+      :close-on-press-escape="!rectifySubmitting && !rectifyUploading"
       @closed="resetRectifyDialog"
     >
       <template v-if="activePenalty">
@@ -307,25 +326,68 @@
               placeholder="说明整改证据、复核结果或豁免原因"
             />
           </el-form-item>
-          <el-form-item label="整改材料链接">
-            <el-input
-              v-model="rectifyForm.rectifyEvidenceInput"
-              type="textarea"
-              :rows="4"
-              maxlength="4000"
-              show-word-limit
-              placeholder="每行一个材料链接；完成整改时至少填写 1 个"
+          <el-form-item label="整改材料附件">
+            <input
+              ref="rectifyFileInput"
+              class="penalty-dialog__file-input"
+              type="file"
+              multiple
+              @change="handleRectifyFileChange"
             />
+            <div class="penalty-upload">
+              <div class="penalty-upload__toolbar">
+                <el-button
+                  type="primary"
+                  plain
+                  :loading="rectifyUploading"
+                  :disabled="rectifySubmitting || rectifyForm.rectifyEvidenceMaterials.length >= RECTIFY_MATERIAL_LIMIT"
+                  @click="triggerRectifyFileSelect"
+                >
+                  上传整改附件
+                </el-button>
+                <span>{{ rectifyForm.rectifyEvidenceMaterials.length }}/{{ RECTIFY_MATERIAL_LIMIT }} 份</span>
+              </div>
+              <div
+                v-if="activePenalty.rectifyEvidenceMaterials.length === 0 && activePenalty.rectifyEvidenceUrls.length > 0"
+                class="penalty-dialog__legacy-note"
+              >
+                当前记录仍有历史链接材料，本次重新提交流程请改用附件上传。
+              </div>
+              <div v-if="rectifyForm.rectifyEvidenceMaterials.length" class="penalty-material-list">
+                <article
+                  v-for="item in rectifyForm.rectifyEvidenceMaterials"
+                  :key="item.fileId"
+                  class="penalty-material-list__item"
+                >
+                  <div>
+                    <strong>{{ item.name }}</strong>
+                    <p>{{ item.mimeType }} · {{ formatAttachmentSize(item.size) }} · {{ formatDateTime(item.uploadedAt) }}</p>
+                  </div>
+                  <el-space>
+                    <el-button link type="primary" @click="openMaterial(item.url)">打开</el-button>
+                    <el-button
+                      link
+                      type="danger"
+                      :disabled="rectifySubmitting || rectifyUploading"
+                      @click="removeRectifyMaterial(item.fileId)"
+                    >
+                      移除
+                    </el-button>
+                  </el-space>
+                </article>
+              </div>
+              <el-empty v-else description="暂无整改附件" :image-size="72" />
+            </div>
             <p class="penalty-dialog__helper">
-              支持填写视频、图片、复盘文档等 URL，提交后将按行去重保存，最多 10 条。
+              复用附件中心直传能力，支持视频、图片和复盘文档；完成整改时至少上传 1 份，最多 10 份。
             </p>
           </el-form-item>
         </el-form>
       </template>
 
       <template #footer>
-        <el-button :disabled="rectifySubmitting" @click="rectifyDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="rectifySubmitting" @click="submitRectify">提交</el-button>
+        <el-button :disabled="rectifySubmitting || rectifyUploading" @click="rectifyDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="rectifySubmitting" :disabled="rectifyUploading" @click="submitRectify">提交</el-button>
       </template>
     </el-dialog>
 
@@ -344,6 +406,31 @@
         </div>
 
         <el-form label-position="top">
+          <el-form-item v-if="activePenalty.rectifyEvidenceMaterials.length" label="整改附件">
+            <div class="penalty-material-list penalty-material-list--readonly">
+              <article
+                v-for="item in activePenalty.rectifyEvidenceMaterials"
+                :key="item.fileId"
+                class="penalty-material-list__item"
+              >
+                <div>
+                  <strong>{{ item.name }}</strong>
+                  <p>{{ item.mimeType }} · {{ formatAttachmentSize(item.size) }} · {{ formatDateTime(item.uploadedAt) }}</p>
+                </div>
+                <el-button link type="primary" @click="openMaterial(item.url)">打开</el-button>
+              </article>
+            </div>
+          </el-form-item>
+          <el-form-item
+            v-else-if="activePenalty.rectifyEvidenceUrls.length"
+            label="整改材料链接"
+          >
+            <ul class="penalty-expand__links penalty-expand__links--compact">
+              <li v-for="url in activePenalty.rectifyEvidenceUrls" :key="url">
+                <a :href="url" target="_blank" rel="noreferrer">{{ url }}</a>
+              </li>
+            </ul>
+          </el-form-item>
           <el-form-item label="复核结论">
             <el-radio-group v-model="rectifyReviewForm.decision">
               <el-radio
@@ -458,10 +545,12 @@
 <script setup lang="ts">
 import type {
   ComplaintTargetRole,
+  MediaAssetRecord,
   PenaltyAppealStatus,
   PenaltyAdminQuery,
   PenaltyAdminRecord,
   PenaltyAdminStats,
+  PenaltyRectifyMaterialRecord,
   PenaltyRectifyReviewStatus,
   PenaltyRectifyStatus,
   PenaltySeverity,
@@ -472,6 +561,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '@/api/client';
 import { usePageState } from '@/composables/use-page-state';
+import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
 import {
   buildRouteQuerySnapshot,
@@ -526,7 +616,7 @@ type State = {
 type RectifyFormState = {
   rectifyStatus: Extract<PenaltyRectifyStatus, 'COMPLETED' | 'WAIVED'>;
   rectifyNote: string;
-  rectifyEvidenceInput: string;
+  rectifyEvidenceMaterials: PenaltyRectifyMaterialRecord[];
 };
 
 type AppealFormState = {
@@ -552,6 +642,7 @@ const route = useRoute();
 const router = useRouter();
 const rectifyDialogVisible = ref(false);
 const rectifySubmitting = ref(false);
+const rectifyUploading = ref(false);
 const rectifyReviewDialogVisible = ref(false);
 const rectifyReviewSubmitting = ref(false);
 const appealDialogVisible = ref(false);
@@ -559,6 +650,7 @@ const appealSubmitting = ref(false);
 const reviewDialogVisible = ref(false);
 const reviewSubmitting = ref(false);
 const activePenalty = ref<PenaltyAdminRecord | null>(null);
+const rectifyFileInput = ref<HTMLInputElement | null>(null);
 
 const rectifyActionOptions = penaltyRectifyStatusOptions.filter(
   (item): item is { label: string; value: 'COMPLETED' | 'WAIVED' } =>
@@ -592,7 +684,7 @@ const { state: pageState, reset: resetPageState } = usePageState<State>('page:pe
 const createEmptyRectifyForm = (): RectifyFormState => ({
   rectifyStatus: 'COMPLETED',
   rectifyNote: '',
-  rectifyEvidenceInput: '',
+  rectifyEvidenceMaterials: [],
 });
 
 const createEmptyAppealForm = (): AppealFormState => ({
@@ -658,6 +750,23 @@ const formatDateTime = (value?: string | null) => {
   return new Date(value).toLocaleString('zh-CN', {
     hour12: false,
   });
+};
+
+const formatAttachmentSize = (value: number) => {
+  if (value >= 1024 * 1024 * 1024) {
+    return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  }
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  if (value >= 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+  return `${value} B`;
+};
+
+const openMaterial = (url: string) => {
+  window.open(url, '_blank', 'noopener,noreferrer');
 };
 
 const getRectifyHint = (record: PenaltyAdminRecord) => {
@@ -744,15 +853,91 @@ const getRectifyReviewHint = (record: PenaltyAdminRecord) => {
   return '当前整改无需复核。';
 };
 
-const parseEvidenceUrls = (input: string) =>
-  Array.from(
-    new Set(
-      input
-        .split(/\r?\n/)
-        .map((item) => item.trim())
-        .filter(Boolean),
-    ),
+const RECTIFY_MATERIAL_LIMIT = 10;
+
+const toRectifyMaterialRecord = (detail: MediaAssetRecord): PenaltyRectifyMaterialRecord => {
+  if (!detail.url) {
+    throw new Error('上传附件缺少可访问地址');
+  }
+
+  return {
+    fileId: detail.id,
+    url: detail.url,
+    name: detail.originalName,
+    mimeType: detail.mimeType,
+    size: detail.size,
+    uploadedAt: detail.completedAt ?? detail.createdAt,
+  };
+};
+
+const upsertRectifyMaterial = (material: PenaltyRectifyMaterialRecord) => {
+  const nextMaterials = rectifyForm.rectifyEvidenceMaterials.slice();
+  const existingIndex = nextMaterials.findIndex((item) => item.fileId === material.fileId);
+
+  if (existingIndex >= 0) {
+    nextMaterials.splice(existingIndex, 1, material);
+  } else {
+    nextMaterials.push(material);
+  }
+
+  rectifyForm.rectifyEvidenceMaterials = nextMaterials;
+};
+
+const triggerRectifyFileSelect = () => {
+  if (rectifyUploading.value) {
+    return;
+  }
+  if (rectifyForm.rectifyEvidenceMaterials.length >= RECTIFY_MATERIAL_LIMIT) {
+    ElMessage.warning(`整改附件最多上传 ${RECTIFY_MATERIAL_LIMIT} 份`);
+    return;
+  }
+
+  rectifyFileInput.value?.click();
+};
+
+const uploadRectifyFiles = async (files: File[]) => {
+  if (!files.length) {
+    return;
+  }
+
+  if (rectifyForm.rectifyEvidenceMaterials.length + files.length > RECTIFY_MATERIAL_LIMIT) {
+    ElMessage.error(`整改附件最多上传 ${RECTIFY_MATERIAL_LIMIT} 份`);
+    return;
+  }
+
+  try {
+    rectifyUploading.value = true;
+    for (const file of files) {
+      const uploaded = await uploadAttachmentFile(
+        file,
+        {
+          tag1: 'petpal-penalty',
+          tag2: 'rectify',
+        },
+      );
+      const detail = await api.attachments.detail(uploaded.fileId);
+      upsertRectifyMaterial(toRectifyMaterialRecord(detail));
+    }
+    ElMessage.success(`已上传 ${files.length} 份整改附件`);
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '上传整改附件失败'));
+  } finally {
+    rectifyUploading.value = false;
+  }
+};
+
+const handleRectifyFileChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = '';
+  await uploadRectifyFiles(files);
+};
+
+const removeRectifyMaterial = (fileId: string) => {
+  rectifyForm.rectifyEvidenceMaterials = rectifyForm.rectifyEvidenceMaterials.filter(
+    (item) => item.fileId !== fileId,
   );
+};
 
 const buildRouteQuery = () => {
   const query: Record<string, string> = {};
@@ -899,6 +1084,10 @@ const changePage = async (page: number) => {
 
 const resetRectifyDialog = () => {
   activePenalty.value = null;
+  rectifyUploading.value = false;
+  if (rectifyFileInput.value) {
+    rectifyFileInput.value.value = '';
+  }
   Object.assign(rectifyForm, createEmptyRectifyForm());
 };
 
@@ -925,7 +1114,7 @@ const openRectifyDialog = (
   Object.assign(rectifyForm, createEmptyRectifyForm(), {
     rectifyStatus,
     rectifyNote: penalty.rectifyNote || '',
-    rectifyEvidenceInput: penalty.rectifyEvidenceUrls.join('\n'),
+    rectifyEvidenceMaterials: penalty.rectifyEvidenceMaterials.map((item) => ({ ...item })),
   });
   rectifyDialogVisible.value = true;
 };
@@ -968,9 +1157,14 @@ const submitRectify = async () => {
     ElMessage.error('请填写整改说明');
     return;
   }
-  const rectifyEvidenceUrls = parseEvidenceUrls(rectifyForm.rectifyEvidenceInput);
-  if (rectifyForm.rectifyStatus === 'COMPLETED' && rectifyEvidenceUrls.length === 0) {
-    ElMessage.error('完成整改时至少需要填写 1 个整改材料链接');
+  if (rectifyUploading.value) {
+    ElMessage.warning('请等待整改附件上传完成');
+    return;
+  }
+
+  const rectifyEvidenceFileIds = rectifyForm.rectifyEvidenceMaterials.map((item) => item.fileId);
+  if (rectifyForm.rectifyStatus === 'COMPLETED' && rectifyEvidenceFileIds.length === 0) {
+    ElMessage.error('完成整改时至少需要上传 1 份整改附件');
     return;
   }
 
@@ -979,7 +1173,7 @@ const submitRectify = async () => {
     await api.petpal.admin.rectifyPenalty(activePenalty.value.id, {
       rectifyStatus: rectifyForm.rectifyStatus,
       rectifyNote,
-      rectifyEvidenceUrls,
+      rectifyEvidenceFileIds,
     });
     rectifyDialogVisible.value = false;
     ElMessage.success('处罚整改状态已更新');
@@ -1142,6 +1336,10 @@ watch(
   padding-left: 18px;
 }
 
+.penalty-expand__links--compact {
+  width: 100%;
+}
+
 .penalty-expand__links a {
   color: var(--el-color-primary);
   word-break: break-all;
@@ -1164,10 +1362,80 @@ watch(
   color: var(--el-text-color-secondary);
 }
 
+.penalty-dialog__file-input {
+  display: none;
+}
+
+.penalty-upload {
+  display: grid;
+  gap: 12px;
+}
+
+.penalty-upload__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.penalty-upload__toolbar span {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.penalty-dialog__legacy-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--el-color-warning-light-9);
+  color: var(--el-color-warning-dark-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.penalty-material-list {
+  display: grid;
+  gap: 10px;
+}
+
+.penalty-material-list__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: var(--el-bg-color-page);
+}
+
+.penalty-material-list__item strong,
+.penalty-material-list__item p {
+  margin: 0;
+}
+
+.penalty-material-list__item p {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.penalty-material-list--readonly .penalty-material-list__item {
+  background: var(--el-fill-color-light);
+}
+
 .penalty-dialog__helper {
   margin: 8px 0 0;
   font-size: 12px;
   line-height: 1.5;
   color: var(--el-text-color-secondary);
+}
+
+@media (max-width: 768px) {
+  .penalty-material-list__item,
+  .penalty-upload__toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

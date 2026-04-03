@@ -7882,6 +7882,77 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.221 2026-04-04（P3-M1 Slice 221）
+
+**概述**：上一轮已经把整改材料复核补到根级后台，但整改材料本体仍然只是 URL 文本，后台无法确认链接是否对应真实附件，也无法直接展示文件元数据。本轮继续沿根级 `/petpal-admin` 治理工作区把处罚整改材料升级为附件化提交，让处罚治理从“材料可复核”推进到“材料来自真实上传实体、可直接展示附件元数据”的更稳闭环。
+
+已完成：
+
+- 整改附件化数据模型与共享契约落地：
+  - `apps/backend/prisma/models/petpal.prisma`
+    - `PenaltyRecord` 新增 `rectifyEvidenceMaterials`，用于沉淀整改附件快照。
+  - `apps/backend/prisma/migrations/20260404033000_add_petpal_penalty_rectify_materials/migration.sql`
+    - 新增处罚整改附件快照字段迁移。
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增 `PenaltyRectifyMaterialRecord`。
+    - `PenaltyAdminRecord` 新增 `rectifyEvidenceMaterials`，并继续保留 `rectifyEvidenceUrls` 作为派生/兼容字段。
+    - `RectifyPenaltyPayload` 改为提交 `rectifyEvidenceFileIds`，不再直接回传 URL 文本。
+- 后端整改附件校验与落库链路落地：
+  - `apps/backend/src/routes/petpal.ts`
+    - 整改接口 schema 已改为接收附件 `fileId` 列表。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 整改提交会校验附件必须真实存在、类型为 `attachment`、上传状态为 `COMPLETED`。
+    - 服务层会按 `fileId` 回填附件 URL、文件名、MIME、大小和上传时间，再统一落到 `rectifyEvidenceMaterials`。
+    - 为兼容旧数据和旧展示口径，处罚返回值仍会附带 `rectifyEvidenceUrls`；新数据由附件快照自动派生 URL。
+    - 申诉通过后改为豁免处罚时，会同时清空整改附件快照和旧 URL 字段，避免遗留脏数据。
+- 根级后台处罚页整改附件直传与展示落地：
+  - `apps/web-frontend/src/pages/petpal-admin/penalties/PetPalPenaltyAdminView.vue`
+    - 整改弹窗已改为直接上传附件，复用现有 `MediaAsset` 直传能力，不再要求人工粘贴链接。
+    - 已上传整改附件会展示文件名、类型、大小和上传时间，并支持移除。
+    - 整改详情展开区和整改复核弹窗会直接展示结构化附件列表。
+    - 旧的 URL 型整改材料仍保留只读展示，避免历史处罚记录不可见。
+- 定向测试与文档同步：
+  - `apps/backend/test/integration/petpal-penalty-admin.test.ts`
+    - 处罚定向集成测试已切到“先上传附件、再提交整改”的链路，覆盖：
+      - 完成整改时附件校验与快照持久化；
+      - 无附件或无效附件 ID 时拒绝；
+      - 驳回复核后的重新补件；
+      - 申诉驳回后继续按附件链路完成整改。
+  - 文档已同步：
+    - `README.md`
+    - `docs/project-memory.md`
+    - `docs/implementation-history.md`
+    - `apps/docs/project/PetPal.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/backend exec -- prisma migrate deploy` 通过。
+- `pnpm --filter @rbac/backend exec -- prisma generate` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test test/integration/petpal-penalty-admin.test.ts` 通过。
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮把处罚整改材料从 URL 文本升级为附件实体驱动的提交流程，后台现在可以确认材料来自真实上传记录而不是任意字符串。
+- 已确认整改复核状态机没有被重做，只是在现有链路上把材料输入源切换为 `MediaAsset`，避免继续扩散改动面。
+- 已确认旧处罚记录仍能通过 `rectifyEvidenceUrls` 继续展示，不会因为本轮切换附件化而失去历史可读性。
+
+风险与缓解：
+
+- 风险：当前整改附件仍以 JSON 快照形式挂在处罚记录上，没有建立严格的数据库外键或独立附件关系表。
+- 缓解：现阶段已通过 `fileId` 校验把输入收口到真实 `MediaAsset`；后续如需更强约束，可继续把快照升级为关系表，不必推翻当前页面和状态机。
+
+- 风险：当前已上传但最终未提交到处罚记录的附件，仍可能形成孤儿资源。
+- 缓解：后续可在现有上传治理或附件清理链路里继续补“未引用整改附件”的回收策略，本轮先保证处罚闭环可用。
+
+下一步（1-3）：
+
+1. 继续补整改附件引用治理和孤儿附件回收，避免后台多轮试传后沉淀无主资源。
+2. 继续评估是否把整改附件从 JSON 快照升级为显式关系表，并补审计轨迹。
+3. 继续按切片节奏做定向测试、局部构建验证、本地提交和文档更新，不回退到无边界全量验证。
+
 ### 14.220 2026-04-04（P3-M1 Slice 220）
 
 **概述**：上一轮已经把整改材料回传补到根级后台，但处罚链路仍停留在“材料已提交、没有复核结论”的状态，后台值班无法区分“已补件待看”与“复核通过”。本轮继续沿根级 `/petpal-admin` 治理工作区补齐整改材料复核，把处罚治理从“有证据回传”推进到“证据可复核、驳回可退回重提”的更完整执行闭环。

@@ -291,7 +291,7 @@ const adminPenaltyStatsQuerySchema = adminPenaltyQuerySchema.omit({
 const adminPenaltyRectifySchema = z.object({
   rectifyStatus: z.enum(['COMPLETED', 'WAIVED']),
   rectifyNote: z.string().trim().min(1).max(1000),
-  rectifyEvidenceUrls: z.array(z.string().trim().url().max(500)).max(10).optional(),
+  rectifyEvidenceFileIds: z.array(z.string().trim().min(1).max(64)).max(10).optional(),
 });
 
 const adminPenaltyAppealSchema = z.object({

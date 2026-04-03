@@ -63,7 +63,7 @@ Last updated: 2026-04-04
 - 根级 `/petpal-admin` 首页治理摘要已收口为单一聚合接口，投诉 SLA、待审照料者、回调审计和告警队列不再由前端分别发起四次统计请求。
 - 根级 `/petpal-admin` 首页现已继续补入近 30 天供需比、完单率、退款率、投诉率四个基础经营信号，后台总览开始具备最小运营看板能力。
 - 根级 `/petpal-admin/rules` 已落地平台规则管理页，支持草稿、发布、归档、版本号与计划生效时间管理，并新增 `petpal.rule.read` / `petpal.rule.publish` 独立权限。
-- 根级 `/petpal-admin/penalties` 已落地违规处罚工作台，支持从投诉处理动作生成处罚记录、按整改状态跟踪、整改材料回传与复核、完成/豁免整改，并已补上单次处罚申诉提交 / 审核流与 `petpal.penalty.read` / `petpal.penalty.manage` 独立权限；规则治理已开始接到执行链路。
+- 根级 `/petpal-admin/penalties` 已落地违规处罚工作台，支持从投诉处理动作生成处罚记录、按整改状态跟踪、整改附件直传 / 结构化回填与复核、完成/豁免整改，并已补上单次处罚申诉提交 / 审核流与 `petpal.penalty.read` / `petpal.penalty.manage` 独立权限；规则治理已开始接到执行链路。
 - 根级 `/petpal-admin/penalty-templates` 已补处罚模板治理页，支持模板编码/适用对象/默认整改天数维护、启停管理、使用次数追踪，并把投诉处罚动作改成可按模板自动带入处罚字段。
 
 ### 2.3 App 端

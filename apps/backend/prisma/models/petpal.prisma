@@ -326,6 +326,7 @@ model PenaltyRecord {
   rectifiedAt   DateTime?
   rectifyNote   String?
   rectifyEvidenceUrls Json?
+  rectifyEvidenceMaterials Json?
   rectifyReviewStatus PenaltyRectifyReviewStatus @default(NOT_REQUIRED)
   rectifyReviewNote String?
   rectifyReviewedAt DateTime?

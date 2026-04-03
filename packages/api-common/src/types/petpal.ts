@@ -342,6 +342,7 @@ export interface PenaltyAdminRecord {
   rectifyDueAt: string | null;
   rectifiedAt: string | null;
   rectifyNote: string | null;
+  rectifyEvidenceMaterials: PenaltyRectifyMaterialRecord[];
   rectifyEvidenceUrls: string[];
   rectifyReviewStatus: PenaltyRectifyReviewStatus;
   rectifyReviewNote: string | null;
@@ -648,10 +649,19 @@ export interface PenaltyAdminPage {
   };
 }
 
+export interface PenaltyRectifyMaterialRecord {
+  fileId: string;
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+}
+
 export interface RectifyPenaltyPayload {
   rectifyStatus: Exclude<PenaltyRectifyStatus, 'PENDING'>;
   rectifyNote: string;
-  rectifyEvidenceUrls?: string[];
+  rectifyEvidenceFileIds?: string[];
 }
 
 export interface SubmitPenaltyAppealPayload {
