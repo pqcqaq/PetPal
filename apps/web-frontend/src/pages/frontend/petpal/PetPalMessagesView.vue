@@ -70,6 +70,7 @@
             <div class="petpal-sheet-row__tail">
               <span class="petpal-pill" :class="threadUnread(item) ? 'is-danger' : ''">未读 {{ threadUnread(item) }}</span>
               <span v-if="hasThreadDraft(item.id)" class="petpal-pill">草稿</span>
+              <span v-if="hasThreadRecovery(item.id)" class="petpal-pill is-warning">待恢复</span>
               <span class="petpal-muted">{{ formatPetPalConversationMeta(item.conversation, role, formatPetPalTime) }}</span>
             </div>
           </button>
@@ -103,6 +104,9 @@
             <p class="petpal-sheet-row__desc">{{ formatPetPalConversationPreview(activeConversation.conversation) }}</p>
             <p class="petpal-sheet-row__desc">{{ formatPetPalConversationMeta(activeConversation.conversation, role, formatPetPalTime) }}</p>
             <p v-if="hasThreadDraft(activeConversation.id)" class="petpal-sheet-row__desc">当前线程已有未发送草稿，切换会话后会继续保留。</p>
+            <p v-if="currentThreadRecovery" class="petpal-sheet-row__desc">
+              {{ currentThreadRecovery.stage === 'send' ? '当前线程上次发送失败，草稿仍已保留。' : '当前线程上次上传没有完成，可继续补图。' }}
+            </p>
           </div>
 
           <div class="petpal-toolbar">
@@ -171,6 +175,22 @@
             />
 
             <div class="petpal-side-stack">
+              <PetPalDeskNotice
+                v-if="currentThreadRecovery"
+                eyebrow="Recovery"
+                :title="currentThreadRecovery.stage === 'send' ? '上一条消息还没发出去' : '上一轮图片上传没有完成'"
+                :description="currentThreadRecovery.message"
+                tone="warning"
+              >
+                <template #actions>
+                  <el-button link @click="retryCurrentThreadRecovery">
+                    {{ currentThreadRecovery.stage === 'send' ? '重试发送' : '重新上传图片' }}
+                  </el-button>
+                  <el-button link @click="clearThreadRecovery(activeConversation.id)">
+                    清除提示
+                  </el-button>
+                </template>
+              </PetPalDeskNotice>
               <div v-if="messageAttachments.length" class="petpal-message-drafts">
                 <div v-for="item in messageAttachments" :key="item.fileId" class="petpal-message-draft-card">
                   <button type="button" class="petpal-message-attachment-preview" @click="openMessageAttachment(item.url)">
@@ -296,6 +316,13 @@ type MessageDraftState = {
   attachments: DraftMessageAttachment[];
 };
 
+type ThreadRecoveryStage = 'upload' | 'send';
+
+type ThreadRecoveryState = {
+  stage: ThreadRecoveryStage;
+  message: string;
+};
+
 const MAX_MESSAGE_ATTACHMENTS = 3;
 const MAX_MESSAGE_ATTACHMENT_SIZE = 8 * 1024 * 1024;
 const IMAGE_ATTACHMENT_URL_RE = /\.(png|jpe?g|gif|webp|bmp|svg)(?:$|[?#])/i;
@@ -310,6 +337,7 @@ const activeThreadState = ref<PetPalSectionLoadState>('idle');
 const messageContent = ref('');
 const messageAttachments = ref<DraftMessageAttachment[]>([]);
 const messageDrafts = ref<Record<string, MessageDraftState>>({});
+const messageRecoveries = ref<Record<string, ThreadRecoveryState>>({});
 const uploadingMessageAttachments = ref(false);
 const messageUploadProgress = ref<number | null>(null);
 const sendingMessage = ref(false);
@@ -333,6 +361,8 @@ const conversations = computed<ConversationItem[]>(() => {
 const activeConversation = computed(() => conversations.value.find((item) => item.id === selectedOrderId.value) ?? conversations.value[0] ?? null);
 const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
 const composerBusy = computed(() => uploadingMessageAttachments.value || sendingMessage.value);
+const currentThreadRecovery = computed(() =>
+  activeConversation.value ? messageRecoveries.value[activeConversation.value.id] ?? null : null);
 const activeThreadUnreadCount = computed(() =>
   activeThread.value
     ? getPetPalConversationUnreadCount(activeThread.value, role.value)
@@ -427,6 +457,10 @@ function hasThreadDraft(orderId: string) {
   return Boolean(messageDrafts.value[orderId]);
 }
 
+function hasThreadRecovery(orderId: string) {
+  return Boolean(messageRecoveries.value[orderId]);
+}
+
 function resetComposer() {
   messageContent.value = '';
   messageAttachments.value = [];
@@ -444,6 +478,30 @@ function clearThreadDraft(orderId: string) {
   const nextDrafts = { ...messageDrafts.value };
   delete nextDrafts[orderId];
   messageDrafts.value = nextDrafts;
+}
+
+function clearThreadRecovery(orderId: string) {
+  if (!messageRecoveries.value[orderId]) {
+    return;
+  }
+
+  const nextRecoveries = { ...messageRecoveries.value };
+  delete nextRecoveries[orderId];
+  messageRecoveries.value = nextRecoveries;
+}
+
+function setThreadRecovery(orderId: string, stage: ThreadRecoveryStage, message: string) {
+  if (!orderId) {
+    return;
+  }
+
+  messageRecoveries.value = {
+    ...messageRecoveries.value,
+    [orderId]: {
+      stage,
+      message,
+    },
+  };
 }
 
 function persistThreadDraft(orderId: string) {
@@ -667,6 +725,19 @@ function removeMessageAttachment(fileId: string) {
   messageAttachments.value = messageAttachments.value.filter((item) => item.fileId !== fileId);
 }
 
+function retryCurrentThreadRecovery() {
+  if (!activeConversation.value || !currentThreadRecovery.value || composerBusy.value) {
+    return;
+  }
+
+  if (currentThreadRecovery.value.stage === 'send') {
+    void submitMessage();
+    return;
+  }
+
+  triggerMessageAttachmentInput();
+}
+
 async function handleMessageAttachmentChange(event: Event) {
   const input = event.target as HTMLInputElement;
   const selectedFiles = Array.from(input.files ?? []);
@@ -731,8 +802,11 @@ async function handleMessageAttachmentChange(event: Event) {
     }
 
     ElMessage.success(validFiles.length === 1 ? '消息图片已上传' : `已上传 ${validFiles.length} 张消息图片`);
+    clearThreadRecovery(currentOrderId);
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '上传消息图片失败'));
+    const message = `${getErrorMessage(error, '上传消息图片失败')}，已完成的图片仍会保留在当前草稿中。`;
+    setThreadRecovery(currentOrderId, 'upload', message);
+    ElMessage.error(message);
   } finally {
     uploadingMessageAttachments.value = false;
     messageUploadProgress.value = null;
@@ -762,10 +836,13 @@ async function submitMessage() {
     activeThreadState.value = 'ready';
     patchConversationSummary(orderId, result);
     clearThreadDraft(orderId);
+    clearThreadRecovery(orderId);
     resetComposer();
     ElMessage.success('消息已发送');
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '发送消息失败'));
+    const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`;
+    setThreadRecovery(orderId, 'send', message);
+    ElMessage.error(message);
   } finally {
     sendingMessage.value = false;
   }
@@ -868,6 +945,11 @@ watch(role, () => {
   margin-inline: -10px;
   padding-inline: 10px;
   background: rgba(244, 248, 255, 0.9);
+}
+
+.petpal-conversation-row :deep(.petpal-pill.is-warning) {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
 }
 
 .petpal-message-attachments {

@@ -37,6 +37,11 @@ type MessageDraftState = {
   content: string
   attachments: UploadedMessageAttachment[]
 }
+type MessageRecoveryStage = 'upload' | 'send'
+type MessageRecoveryState = {
+  stage: MessageRecoveryStage
+  message: string
+}
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
@@ -57,6 +62,7 @@ const conversation = ref<OrderConversationDetailRecord | null>(null)
 const messageText = ref('')
 const messageAttachments = ref<UploadedMessageAttachment[]>([])
 const messageDrafts = ref<Record<string, MessageDraftState>>({})
+const messageRecoveries = ref<Record<string, MessageRecoveryState>>({})
 
 let threadRequestVersion = 0
 
@@ -111,6 +117,8 @@ const priorityRow = computed(() => visibleRows.value[0] ?? null)
 const currentThreadOrder = computed(() => currentOrders.value.find(item => item.id === selectedOrderId.value) ?? null)
 const currentThreadSummary = computed(() =>
   currentThreadOrder.value ? describeConversation(currentThreadOrder.value, role.value) : null)
+const currentThreadRecovery = computed(() =>
+  currentThreadOrder.value ? messageRecoveries.value[currentThreadOrder.value.id] || null : null)
 const conversationMessages = computed(() => conversation.value?.messages || [])
 const messageAttachmentSlotsLeft = computed(() => Math.max(0, 3 - messageAttachments.value.length))
 const uploadingMessageAttachments = computed(() => upload.uploading.value)
@@ -135,6 +143,10 @@ function hasThreadDraft(orderId: string) {
   return Boolean(messageDrafts.value[orderId])
 }
 
+function hasThreadRecovery(orderId: string) {
+  return Boolean(messageRecoveries.value[orderId])
+}
+
 function clearThreadState() {
   threadRequestVersion += 1
   threadLoading.value = false
@@ -151,6 +163,30 @@ function clearThreadDraft(orderId: string) {
   const nextDrafts = { ...messageDrafts.value }
   delete nextDrafts[orderId]
   messageDrafts.value = nextDrafts
+}
+
+function clearThreadRecovery(orderId: string) {
+  if (!messageRecoveries.value[orderId]) {
+    return
+  }
+
+  const nextRecoveries = { ...messageRecoveries.value }
+  delete nextRecoveries[orderId]
+  messageRecoveries.value = nextRecoveries
+}
+
+function setThreadRecovery(orderId: string, stage: MessageRecoveryStage, message: string) {
+  if (!orderId) {
+    return
+  }
+
+  messageRecoveries.value = {
+    ...messageRecoveries.value,
+    [orderId]: {
+      stage,
+      message,
+    },
+  }
 }
 
 function persistThreadDraft(orderId: string) {
@@ -339,7 +375,8 @@ async function markCurrentThreadRead() {
 }
 
 async function uploadMessageMaterials() {
-  if (!currentThreadOrder.value) {
+  const orderId = currentThreadOrder.value?.id || ''
+  if (!orderId) {
     toast('请先选择一条会话')
     return
   }
@@ -351,14 +388,17 @@ async function uploadMessageMaterials() {
   try {
     const files = await upload.selectAndUploadAttachments({
       tag1: 'petpal-order-message',
-      tag2: currentThreadOrder.value.id,
+      tag2: orderId,
       maxCount: messageAttachmentSlotsLeft.value,
     })
     messageAttachments.value = [...messageAttachments.value, ...files]
+    clearThreadRecovery(orderId)
     toast(files.length === 1 ? '消息图片已上传' : `已上传 ${files.length} 张图片`, 'success')
   }
   catch (error: unknown) {
-    toast(getErrorMessage(error, '上传失败'))
+    const message = `${getErrorMessage(error, '上传失败')}，已完成的图片仍会保留在当前草稿中。`
+    setThreadRecovery(orderId, 'upload', message)
+    toast(message)
   }
 }
 
@@ -367,9 +407,10 @@ function removeMessageAttachment(fileId: string) {
 }
 
 async function handleSendMessage() {
+  const orderId = currentThreadOrder.value?.id || ''
   const content = messageText.value.trim()
   const mediaUrls = messageAttachments.value.map(item => item.url)
-  if (!currentThreadOrder.value) {
+  if (!orderId) {
     toast('请先选择一条会话')
     return
   }
@@ -380,22 +421,38 @@ async function handleSendMessage() {
 
   sendingMessage.value = true
   try {
-    const nextConversation = await sendOrderMessage(currentThreadOrder.value.id, {
+    const nextConversation = await sendOrderMessage(orderId, {
       content: content || undefined,
       mediaUrls,
     })
     conversation.value = nextConversation
-    patchConversationSummary(currentThreadOrder.value.id, nextConversation)
-    clearThreadDraft(currentThreadOrder.value.id)
+    patchConversationSummary(orderId, nextConversation)
+    clearThreadDraft(orderId)
+    clearThreadRecovery(orderId)
     resetComposer()
     toast('消息已发送', 'success')
   }
   catch (error: unknown) {
-    toast(getErrorMessage(error, '发送消息失败'))
+    const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`
+    setThreadRecovery(orderId, 'send', message)
+    toast(message)
   }
   finally {
     sendingMessage.value = false
   }
+}
+
+function retryCurrentThreadRecovery() {
+  if (!currentThreadRecovery.value || composerBusy.value) {
+    return
+  }
+
+  if (currentThreadRecovery.value.stage === 'send') {
+    void handleSendMessage()
+    return
+  }
+
+  void uploadMessageMaterials()
 }
 
 onShow(() => {
@@ -485,6 +542,7 @@ watch(selectedOrderId, (value, previousValue) => {
           <text class="petpal-note">{{ priorityRow.summary.preview }}</text>
           <text class="petpal-note">{{ priorityRow.summary.meta }}</text>
           <text v-if="hasThreadDraft(priorityRow.order.id)" class="petpal-note">这条线程还有未发送草稿。</text>
+          <text v-if="hasThreadRecovery(priorityRow.order.id)" class="petpal-note">这条线程还有待恢复的发送或上传。</text>
         </view>
         <view class="petpal-action-row">
           <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openPriorityThread">打开线程</button>
@@ -522,6 +580,9 @@ watch(selectedOrderId, (value, previousValue) => {
             <text class="petpal-note">{{ currentThreadSummary?.preview }}</text>
             <text class="petpal-note">{{ currentThreadSummary?.meta }}</text>
             <text v-if="hasThreadDraft(currentThreadOrder.id)" class="petpal-note">当前线程已有未发送草稿，切换会话后会继续保留。</text>
+            <text v-if="currentThreadRecovery" class="petpal-note">
+              {{ currentThreadRecovery.stage === 'send' ? '当前线程上次发送失败，草稿仍已保留。' : '当前线程上次上传没有完成，可继续补图。' }}
+            </text>
           </view>
           <view class="message-thread__stats">
             <view class="message-thread__stat">
@@ -596,6 +657,18 @@ watch(selectedOrderId, (value, previousValue) => {
       <PetpalSection title="直接回复" subtitle="不用每次都先进订单详情，当前线程可以直接回一句或补图片。">
         <template v-if="currentThreadOrder">
           <view class="petpal-form">
+            <view v-if="currentThreadRecovery" class="message-recovery">
+              <text class="message-recovery__title">{{ currentThreadRecovery.stage === 'send' ? '上一条消息还没发出去' : '上一轮图片上传没有完成' }}</text>
+              <text class="message-recovery__detail">{{ currentThreadRecovery.message }}</text>
+              <view class="petpal-action-row">
+                <button class="petpal-btn petpal-btn--secondary" hover-class="none" :disabled="composerBusy" @click="retryCurrentThreadRecovery">
+                  {{ currentThreadRecovery.stage === 'send' ? '重试发送' : '重新上传图片' }}
+                </button>
+                <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="clearThreadRecovery(currentThreadOrder.id)">
+                  清除提示
+                </button>
+              </view>
+            </view>
             <template v-if="messageAttachments.length">
               <view class="detail-chat__composer-meta">
                 <text class="petpal-note">已上传 {{ messageAttachments.length }}/3 张，发送前可继续预览或移除。</text>
@@ -660,7 +733,15 @@ watch(selectedOrderId, (value, previousValue) => {
             <view class="petpal-row__copy">
               <text class="petpal-row__title">{{ item.order.orderNo }}</text>
               <text class="petpal-row__meta">{{ item.summary.preview }}</text>
-              <text class="petpal-row__hint">{{ hasThreadDraft(item.order.id) ? `${item.summary.meta} · 草稿待发` : item.summary.meta }}</text>
+              <text class="petpal-row__hint">
+                {{
+                  hasThreadRecovery(item.order.id)
+                    ? `${hasThreadDraft(item.order.id) ? `${item.summary.meta} · 草稿待发` : item.summary.meta} · 待恢复`
+                    : hasThreadDraft(item.order.id)
+                      ? `${item.summary.meta} · 草稿待发`
+                      : item.summary.meta
+                }}
+              </text>
             </view>
             <text class="petpal-row__value">{{ item.summary.unread ? `${item.summary.unread} 未读` : '打开' }}</text>
           </button>
@@ -762,5 +843,26 @@ watch(selectedOrderId, (value, previousValue) => {
 
 .detail-chat__remove-btn {
   min-width: 0;
+}
+
+.message-recovery {
+  display: grid;
+  gap: 12rpx;
+  padding: 20rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 247, 237, 0.92);
+  border: 1rpx solid rgba(217, 119, 6, 0.18);
+}
+
+.message-recovery__title {
+  color: #9a3412;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.message-recovery__detail {
+  color: var(--app-text);
+  font-size: 23rpx;
+  line-height: 1.7;
 }
 </style>
