@@ -92,7 +92,7 @@
       <template v-else>
         <PetPalExportToolbar
           class="petpal-export-toolbar"
-          hint="导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按订单号关键词、退款类型、退款状态、退款原因关键词、退款风险单、投诉状态、投诉类型、投诉摘要关键词或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。"
+          hint="导出筛选只影响经营明细，不改变当前摘要和趋势口径；可额外按订单号关键词、退款金额门槛、退款类型、退款状态、退款原因关键词、退款风险单、投诉状态、投诉类型、投诉摘要关键词或责任角色导出经营明细，系统会按当前账号记住最近一次导出条件，并可保存最多 5 套常用模板。"
         >
           <template #presets>
             <div class="petpal-export-toolbar__presets">
@@ -149,6 +149,19 @@
               placeholder="订单号关键词"
               class="petpal-export-toolbar__service"
             />
+            <el-select
+              v-model="exportMinRefundAmount"
+              clearable
+              placeholder="退款金额门槛"
+              class="petpal-export-toolbar__service"
+            >
+              <el-option
+                v-for="item in refundExposureAmountOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
             <el-select
               v-model="exportRefundType"
               clearable
@@ -674,6 +687,7 @@ import {
 } from './export-filter-summary';
 import {
   applyCaregiverEarningsExportFilterSnapshot,
+  CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT,
   buildCaregiverAllRiskExportSnapshot,
   buildCaregiverRiskOrderExportSnapshot,
   buildCaregiverRiskQueueExportSnapshot,
@@ -725,6 +739,14 @@ const exportPresetOptions: Array<{ label: string; value: Exclude<EarningsExportD
   { label: '本月', value: 'thisMonth' },
   { label: '上月', value: 'lastMonth' },
 ];
+const refundExposureAmountOptions = [
+  { label: '退款 >= ¥50', value: 50 },
+  {
+    label: `退款 >= ¥${CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT}`,
+    value: CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT,
+  },
+  { label: '退款 >= ¥200', value: 200 },
+] as const;
 
 const { state: exportPageState } = usePageState<CaregiverEarningsExportPageState>(
   'page:petpal:caregiver-earnings-export-filters',
@@ -947,6 +969,12 @@ const exportOrderNoKeyword = createPetPalTrimmedTextFieldBinding<string>({
     exportPageState.orderNoKeyword = value;
   },
 });
+const exportMinRefundAmount = createPetPalFieldBinding<number | null>({
+  get: () => exportPageState.minRefundAmount,
+  set: (value) => {
+    exportPageState.minRefundAmount = value;
+  },
+});
 const exportRefundType = createPetPalClearableFieldBinding<RefundType | ''>({
   get: () => exportPageState.refundType,
   set: (value) => {
@@ -1027,6 +1055,7 @@ const riskQueueExportActions = computed<
     caregiverResponsibility: 0,
     platformResponsibility: 0,
     refundAwaitingSettlement: 0,
+    highRefundExposure: 0,
   } satisfies Record<CaregiverRiskQueueExportPreset, number>;
 
   for (const order of recentAftersalesOrders.value) {
@@ -1044,6 +1073,9 @@ const riskQueueExportActions = computed<
     }
     if (order.latestRefundStatus === 'APPROVED') {
       counts.refundAwaitingSettlement += 1;
+    }
+    if (toAmount(order.amountRefunded) >= CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT) {
+      counts.highRefundExposure += 1;
     }
   }
 
@@ -1068,6 +1100,11 @@ const riskQueueExportActions = computed<
       preset: 'refundAwaitingSettlement',
       label: getRiskQueueExportPresetLabel('refundAwaitingSettlement'),
       count: counts.refundAwaitingSettlement,
+    },
+    {
+      preset: 'highRefundExposure',
+      label: getRiskQueueExportPresetLabel('highRefundExposure'),
+      count: counts.highRefundExposure,
     },
   ];
 
@@ -1422,6 +1459,9 @@ function getRiskQueueExportPresetLabel(preset: CaregiverRiskQueueExportPreset) {
   }
   if (preset === 'platformResponsibility') {
     return '平台责任';
+  }
+  if (preset === 'highRefundExposure') {
+    return '高退款暴露';
   }
   return '待退款';
 }

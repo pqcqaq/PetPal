@@ -7874,6 +7874,65 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.194 2026-04-03（P3-M1 Slice 194）
+
+**概述**：延续上一轮把风险队列快捷导出继续扩到更多现有视角的收口，本轮开始正式补“高退款暴露”这类需要真实金额门槛的经营复盘能力。照料者经营导出现在支持按最低退款金额过滤，收益页风险队列也同步增加“高退款暴露”快捷视角，不再只能围绕投诉状态和责任角色切换。
+
+已完成：
+
+- 后端经营导出补退款金额门槛：
+  - `packages/api-common/src/types/petpal.ts`
+    - `CaregiverEarningsExportQuery` 新增 `minRefundAmount`。
+  - `apps/backend/src/routes/petpal.ts`
+    - 照料者经营导出查询 schema 新增 `minRefundAmount` 数值校验。
+  - `apps/backend/src/services/petpal-service.ts`
+    - `listCaregiverEarningsExportRows` 现支持按 `amountRefunded >= minRefundAmount` 过滤。
+    - 与 `riskOnly` 同时存在时，会继续按退款金额门槛收窄，不会生成第二套冲突的风险条件。
+- 补后端定向集成测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增“最低退款金额”导出用例，验证 `minRefundAmount=100` 时：
+      - 只导出当前照料者名下的高退款订单
+      - 不会混入低退款、无退款或其他照料者订单
+- Web 收益页补高退款暴露视角：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-earnings-export-state.ts`
+    - 收益导出快照新增 `minRefundAmount`。
+    - 风险队列预设新增 `highRefundExposure`，当前默认阈值为 `¥100`。
+  - `apps/web-frontend/src/pages/frontend/petpal/export-filter-summary.ts`
+    - 当前导出条件摘要现可直接展示并清除“退款门槛”。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 导出工具条新增“退款金额门槛”筛选。
+    - 风险队列快捷导出新增“高退款暴露”入口，并沿用当前风险视角高亮逻辑。
+- 补前端定向单测：
+  - `apps/web-frontend/test/caregiver-earnings-export-state.test.ts`
+    - 新增 `minRefundAmount` 查询构建断言。
+    - 新增 `highRefundExposure` 预设与当前视角识别断言。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test --test-name-pattern "filters caregiver earnings export by minimum refunded amount" test/integration/petpal-api.test.ts` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮是当前收益复盘链路第一次为更强风险聚类扩充后端导出契约，但只新增了单个明确的金额门槛字段，没有把风险规则泛化成复杂 DSL。
+- 已确认金额门槛直接作用于 `amountRefunded`，与现有经营导出“只统计当前照料者已完成订单”的范围保持一致。
+- 已确认前端风险队列的“高退款暴露”快捷视角与后端导出门槛共用同一条金额基线，不会出现页面上叫高退款、导出却按另一口径筛选的偏差。
+
+风险与缓解：
+
+- 风险：当前高退款暴露仍采用固定门槛 `¥100` 的快捷视角，虽然工具条允许切换金额门槛，但风险队列上的快捷动作还没有按城市、服务类型或客单价做更细分层。
+- 缓解：下一轮如继续深化经营风险聚类，可优先评估是否补更多门槛档位、百分比口径或重复投诉聚类，而不是继续堆叠更多单一状态按钮。
+
+下一步（1-3）：
+
+1. 继续评估是否围绕退款金额档位、重复投诉或超时未结案补更细的经营风险聚类。
+2. 继续评估是否把退款金额门槛扩到其它导出页或运营视图，形成更统一的售后资金风险口径。
+3. 在收益复盘入口和金额门槛相对稳定后，再集中处理剩余验收向测试、审计收口与最终交付材料。
+
 ### 14.193 2026-04-03（P3-M1 Slice 193）
 
 **概述**：延续上一轮把当前风险视角做成可见、可恢复的收口，本轮继续沿“现有契约内尽量补足经营复盘入口”的原则推进，把风险队列快捷导出再扩两类当前已经有明确业务含义的视角：处理中投诉和照料者责任。这样照料者不只看得到平台责任或待退款，也能直接切到更贴近自己整改动作的队列。

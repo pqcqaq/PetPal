@@ -25,12 +25,14 @@ import {
 import { hasPetPalActiveFilters } from './export-filter-presence';
 
 export type EarningsExportDatePreset = '' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
+export const CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT = 100;
 
 export type CaregiverEarningsExportFilterSnapshot = {
   startDate: string;
   endDate: string;
   serviceType: PetServiceType | '';
   orderNoKeyword: string;
+  minRefundAmount: number | null;
   refundType: RefundType | '';
   refundStatus: RefundStatus | '';
   refundReasonKeyword: string;
@@ -51,7 +53,8 @@ export type CaregiverRiskQueueExportPreset =
   | 'processingComplaint'
   | 'caregiverResponsibility'
   | 'platformResponsibility'
-  | 'refundAwaitingSettlement';
+  | 'refundAwaitingSettlement'
+  | 'highRefundExposure';
 
 const caregiverRiskQueueExportPresets = [
   'openComplaint',
@@ -59,6 +62,7 @@ const caregiverRiskQueueExportPresets = [
   'caregiverResponsibility',
   'platformResponsibility',
   'refundAwaitingSettlement',
+  'highRefundExposure',
 ] as const satisfies readonly CaregiverRiskQueueExportPreset[];
 
 const caregiverEarningsExportSnapshot = definePetPalExportSnapshot<CaregiverEarningsExportFilterSnapshot>({
@@ -66,6 +70,7 @@ const caregiverEarningsExportSnapshot = definePetPalExportSnapshot<CaregiverEarn
   endDate: '',
   serviceType: '',
   orderNoKeyword: '',
+  minRefundAmount: null,
   refundType: '',
   refundStatus: '',
   refundReasonKeyword: '',
@@ -113,6 +118,7 @@ export const hasCaregiverEarningsExportFilters = (
   snapshot.endDate,
   snapshot.serviceType,
   snapshot.orderNoKeyword,
+  snapshot.minRefundAmount,
   snapshot.refundType,
   snapshot.refundStatus,
   snapshot.refundReasonKeyword,
@@ -130,6 +136,7 @@ export const buildCaregiverEarningsExportQuery = (
   endDate: toPetPalOptionalQueryValue(snapshot.endDate),
   serviceType: toPetPalOptionalQueryValue(snapshot.serviceType),
   orderNoKeyword: toPetPalOptionalTrimmedQueryText(snapshot.orderNoKeyword),
+  minRefundAmount: toPetPalOptionalQueryValue(snapshot.minRefundAmount),
   refundType: toPetPalOptionalQueryValue(snapshot.refundType),
   refundStatus: toPetPalOptionalQueryValue(snapshot.refundStatus),
   refundReasonKeyword: toPetPalOptionalTrimmedQueryText(snapshot.refundReasonKeyword),
@@ -216,6 +223,11 @@ export const buildCaregiverRiskQueueExportSnapshot = (
       return {
         ...baseSnapshot,
         refundStatus: 'APPROVED',
+      };
+    case 'highRefundExposure':
+      return {
+        ...baseSnapshot,
+        minRefundAmount: CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT,
       };
   }
 };

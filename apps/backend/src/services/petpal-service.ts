@@ -266,6 +266,7 @@ type CaregiverEarningsExportFilters = {
   endDate?: Date;
   serviceType?: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
   orderNoKeyword?: string;
+  minRefundAmount?: number;
   refundType?: 'FULL' | 'PARTIAL';
   refundStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
   refundReasonKeyword?: string;
@@ -470,6 +471,10 @@ const normalizeCaregiverEarningsExportFilters = (
   return {
     ...filters,
     orderNoKeyword: filters.orderNoKeyword?.trim() || undefined,
+    minRefundAmount:
+      typeof filters.minRefundAmount === 'number' && Number.isFinite(filters.minRefundAmount)
+        ? Number(filters.minRefundAmount.toFixed(2))
+        : undefined,
     refundReasonKeyword: filters.refundReasonKeyword?.trim() || undefined,
     complaintKeyword: filters.complaintKeyword?.trim() || undefined,
     riskOnly: Boolean(filters.riskOnly),
@@ -2186,10 +2191,16 @@ export const petpalService = {
               },
             }
           : {}),
-        ...(normalizedFilters.riskOnly
+        ...(normalizedFilters.riskOnly || normalizedFilters.minRefundAmount != null
           ? {
               amountRefunded: {
-                gt: 0,
+                ...(normalizedFilters.minRefundAmount != null
+                  ? {
+                      gte: normalizedFilters.minRefundAmount,
+                    }
+                  : {
+                      gt: 0,
+                    }),
               },
             }
           : {}),

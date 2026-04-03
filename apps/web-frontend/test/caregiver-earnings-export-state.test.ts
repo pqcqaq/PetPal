@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT,
   applyCaregiverEarningsExportFilterSnapshot,
   buildCaregiverAllRiskExportSnapshot,
   buildCaregiverRiskOrderExportSnapshot,
@@ -61,6 +62,7 @@ test('builds caregiver earnings export query payloads without leaking empty valu
     ...createEmptyCaregiverEarningsExportFilterSnapshot(),
     serviceType: 'WALKING' as const,
     orderNoKeyword: '  earning-order-9  ',
+    minRefundAmount: 88,
     refundStatus: 'SUCCESS' as const,
     refundReasonKeyword: '  late arrival  ',
     complaintStatus: 'PROCESSING' as const,
@@ -74,6 +76,7 @@ test('builds caregiver earnings export query payloads without leaking empty valu
     endDate: undefined,
     serviceType: 'WALKING',
     orderNoKeyword: 'earning-order-9',
+    minRefundAmount: 88,
     refundType: undefined,
     refundStatus: 'SUCCESS',
     refundReasonKeyword: 'late arrival',
@@ -127,6 +130,7 @@ test('builds caregiver risk queue export snapshots for common queue views', () =
     datePreset: 'last7days' as const,
     serviceType: 'BOARDING' as const,
     orderNoKeyword: ' old-order ',
+    minRefundAmount: 66,
     refundReasonKeyword: ' old-reason ',
     complaintKeyword: ' old-complaint ',
     complaintType: 'SERVICE' as const,
@@ -178,6 +182,15 @@ test('builds caregiver risk queue export snapshots for common queue views', () =
     endDate: '2026-04-07T23:59:59.999Z',
     datePreset: 'last7days',
     refundStatus: 'APPROVED',
+    riskOnly: true,
+  });
+
+  assert.deepEqual(buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'highRefundExposure'), {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days',
+    minRefundAmount: CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT,
     riskOnly: true,
   });
 });
@@ -240,6 +253,15 @@ test('detects current caregiver risk queue export views without confusing other 
   assert.equal(
     resolveCaregiverRiskQueueExportPreset(refundAwaitingSettlementSnapshot),
     'refundAwaitingSettlement',
+  );
+
+  const highRefundExposureSnapshot = buildCaregiverRiskQueueExportSnapshot(
+    currentSnapshot,
+    'highRefundExposure',
+  );
+  assert.equal(
+    resolveCaregiverRiskQueueExportPreset(highRefundExposureSnapshot),
+    'highRefundExposure',
   );
 
   assert.equal(

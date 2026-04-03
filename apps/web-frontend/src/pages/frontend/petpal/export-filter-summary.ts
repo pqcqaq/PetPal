@@ -18,6 +18,7 @@ import {
 } from './owner-transaction-export-state';
 import {
   formatPetPalDate,
+  formatPetPalMoney,
   getPetPalComplaintStatusLabel,
   getPetPalComplaintTargetRoleLabel,
   getPetPalComplaintTypeLabel,
@@ -53,6 +54,7 @@ export type CaregiverEarningsExportSummaryItemKey =
   | 'dateRange'
   | 'serviceType'
   | 'orderNoKeyword'
+  | 'minRefundAmount'
   | 'refundType'
   | 'refundStatus'
   | 'refundReasonKeyword'
@@ -282,6 +284,13 @@ export const buildCaregiverEarningsExportSummaryItems = (
   if (orderNoKeyword) {
     items.push({ key: 'orderNoKeyword', label: '订单号', value: orderNoKeyword });
   }
+  if (snapshot.minRefundAmount != null) {
+    items.push({
+      key: 'minRefundAmount',
+      label: '退款门槛',
+      value: `${formatPetPalMoney(snapshot.minRefundAmount)} 起`,
+    });
+  }
   if (snapshot.refundType) {
     items.push({
       key: 'refundType',
@@ -359,6 +368,9 @@ export const clearCaregiverEarningsExportSummaryItem = (
       break;
     case 'orderNoKeyword':
       nextSnapshot.orderNoKeyword = '';
+      break;
+    case 'minRefundAmount':
+      nextSnapshot.minRefundAmount = null;
       break;
     case 'refundType':
       nextSnapshot.refundType = '';

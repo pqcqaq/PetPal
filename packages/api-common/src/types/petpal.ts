@@ -570,6 +570,7 @@ export interface CaregiverEarningsExportQuery {
   endDate?: string;
   serviceType?: PetServiceType;
   orderNoKeyword?: string;
+  minRefundAmount?: number;
   refundType?: RefundType;
   refundStatus?: RefundStatus;
   refundReasonKeyword?: string;
