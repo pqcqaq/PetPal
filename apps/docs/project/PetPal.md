@@ -7874,6 +7874,54 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.193 2026-04-03（P3-M1 Slice 193）
+
+**概述**：延续上一轮把当前风险视角做成可见、可恢复的收口，本轮继续沿“现有契约内尽量补足经营复盘入口”的原则推进，把风险队列快捷导出再扩两类当前已经有明确业务含义的视角：处理中投诉和照料者责任。这样照料者不只看得到平台责任或待退款，也能直接切到更贴近自己整改动作的队列。
+
+已完成：
+
+- 扩充风险队列导出预设：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-earnings-export-state.ts`
+    - `CaregiverRiskQueueExportPreset` 新增 `processingComplaint` 和 `caregiverResponsibility` 两类预设。
+    - `buildCaregiverRiskQueueExportSnapshot` 现支持把“处理中投诉”和“照料者责任”直接转换成标准经营导出快照。
+    - 现有当前视角识别逻辑继续复用同一套快照比对规则，不需要再引入额外状态模型。
+- 补前端定向单测：
+  - `apps/web-frontend/test/caregiver-earnings-export-state.test.ts`
+    - 新增两类队列预设断言，确认：
+      - `processingComplaint` 会映射到 `complaintStatus=PROCESSING`
+      - `caregiverResponsibility` 会映射到 `complaintTargetRole=CAREGIVER`
+      - 当前风险视角识别也能正确识别这两类新预设
+- Web 收益页扩充快捷导出入口：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 风险队列顶部快捷导出现在会根据当前队列动态补出“处理中投诉”和“照料者责任”两类动作。
+    - 当前风险视角提示区会同步识别并展示这两类新视角，保持“点击什么，就明确看到当前在哪个队列”的闭环。
+    - 所有快捷导出标签现在统一走同一套预设名称映射，避免页面上再散落手写文案分支。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮继续只改 Web 收益页与前端导出状态模块，没有新增接口、数据库结构或导出字段。
+- 已确认两类新视角都建立在既有 `complaintStatus` 与 `complaintTargetRole` 导出契约上，不会引入新的筛选协议。
+- 已确认当前风险视角识别继续采用“整份快照严格匹配”的策略，用户一旦叠加额外筛选，不会被误标成标准队列预设。
+
+风险与缓解：
+
+- 风险：当前风险队列虽然已经补齐开放、处理中、照料者责任、平台责任和待退款五类快捷视角，但仍缺按退款金额分层、重复投诉或超时状态聚类的经营信号。
+- 缓解：下一轮如继续深化风险复盘，可优先评估“高退款暴露”这类真正需要新增筛选契约的视角，再决定是否扩后端协议。
+
+下一步（1-3）：
+
+1. 继续评估是否补高退款暴露、重复投诉或超时未结案这类需要更强聚类能力的风险视角。
+2. 继续评估是否把当前风险视角的标签映射和识别模式抽成更通用的 helper，供其它导出页复用。
+3. 在收益复盘入口基本稳定后，再集中处理剩余验收向测试、审计收口与最终交付材料。
+
 ### 14.192 2026-04-03（P3-M1 Slice 192）
 
 **概述**：延续上一轮把风险队列扩到队列级快捷导出的收口，本轮继续解决“切过去之后看不出来当前在哪个风险视角”的问题。照料者现在可以在收益页直接看到当前经营导出是否对齐到“全部风险 / 待受理投诉 / 平台责任 / 待退款”，并可一键恢复到整条风险队列视角。

@@ -142,6 +142,27 @@ test('builds caregiver risk queue export snapshots for common queue views', () =
     riskOnly: true,
   });
 
+  assert.deepEqual(buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'processingComplaint'), {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days',
+    complaintStatus: 'PROCESSING',
+    riskOnly: true,
+  });
+
+  assert.deepEqual(
+    buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'caregiverResponsibility'),
+    {
+      ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+      startDate: '2026-04-01T00:00:00.000Z',
+      endDate: '2026-04-07T23:59:59.999Z',
+      datePreset: 'last7days',
+      complaintTargetRole: 'CAREGIVER',
+      riskOnly: true,
+    },
+  );
+
   assert.deepEqual(buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'platformResponsibility'), {
     ...createEmptyCaregiverEarningsExportFilterSnapshot(),
     startDate: '2026-04-01T00:00:00.000Z',
@@ -184,6 +205,24 @@ test('detects current caregiver risk queue export views without confusing other 
   const openComplaintSnapshot = buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'openComplaint');
   assert.equal(resolveCaregiverRiskQueueExportPreset(openComplaintSnapshot), 'openComplaint');
   assert.equal(isCaregiverAllRiskExportSnapshot(openComplaintSnapshot), false);
+
+  const processingComplaintSnapshot = buildCaregiverRiskQueueExportSnapshot(
+    currentSnapshot,
+    'processingComplaint',
+  );
+  assert.equal(
+    resolveCaregiverRiskQueueExportPreset(processingComplaintSnapshot),
+    'processingComplaint',
+  );
+
+  const caregiverResponsibilitySnapshot = buildCaregiverRiskQueueExportSnapshot(
+    currentSnapshot,
+    'caregiverResponsibility',
+  );
+  assert.equal(
+    resolveCaregiverRiskQueueExportPreset(caregiverResponsibilitySnapshot),
+    'caregiverResponsibility',
+  );
 
   const platformResponsibilitySnapshot = buildCaregiverRiskQueueExportSnapshot(
     currentSnapshot,

@@ -1023,6 +1023,8 @@ const riskQueueExportActions = computed<
 >(() => {
   const counts = {
     openComplaint: 0,
+    processingComplaint: 0,
+    caregiverResponsibility: 0,
     platformResponsibility: 0,
     refundAwaitingSettlement: 0,
   } satisfies Record<CaregiverRiskQueueExportPreset, number>;
@@ -1030,6 +1032,12 @@ const riskQueueExportActions = computed<
   for (const order of recentAftersalesOrders.value) {
     if (order.primaryComplaintStatus === 'OPEN') {
       counts.openComplaint += 1;
+    }
+    if (order.primaryComplaintStatus === 'PROCESSING') {
+      counts.processingComplaint += 1;
+    }
+    if (order.primaryComplaintTargetRole === 'CAREGIVER') {
+      counts.caregiverResponsibility += 1;
     }
     if (order.primaryComplaintTargetRole === 'PLATFORM') {
       counts.platformResponsibility += 1;
@@ -1040,9 +1048,27 @@ const riskQueueExportActions = computed<
   }
 
   const items: Array<{ preset: CaregiverRiskQueueExportPreset; label: string; count: number }> = [
-    { preset: 'openComplaint', label: '待受理投诉', count: counts.openComplaint },
-    { preset: 'platformResponsibility', label: '平台责任', count: counts.platformResponsibility },
-    { preset: 'refundAwaitingSettlement', label: '待退款', count: counts.refundAwaitingSettlement },
+    { preset: 'openComplaint', label: getRiskQueueExportPresetLabel('openComplaint'), count: counts.openComplaint },
+    {
+      preset: 'processingComplaint',
+      label: getRiskQueueExportPresetLabel('processingComplaint'),
+      count: counts.processingComplaint,
+    },
+    {
+      preset: 'caregiverResponsibility',
+      label: getRiskQueueExportPresetLabel('caregiverResponsibility'),
+      count: counts.caregiverResponsibility,
+    },
+    {
+      preset: 'platformResponsibility',
+      label: getRiskQueueExportPresetLabel('platformResponsibility'),
+      count: counts.platformResponsibility,
+    },
+    {
+      preset: 'refundAwaitingSettlement',
+      label: getRiskQueueExportPresetLabel('refundAwaitingSettlement'),
+      count: counts.refundAwaitingSettlement,
+    },
   ];
 
   return items.filter((item) => item.count > 0);
@@ -1372,12 +1398,7 @@ function applyRiskQueueExportPreset(preset: CaregiverRiskQueueExportPreset) {
     buildCaregiverRiskQueueExportSnapshot(exportPageState, preset),
   );
 
-  const label =
-    preset === 'openComplaint'
-      ? '待受理投诉'
-      : preset === 'platformResponsibility'
-        ? '平台责任'
-      : '待退款';
+  const label = getRiskQueueExportPresetLabel(preset);
   ElMessage.success(`已切到${label}导出条件，可直接导出当前队列里的同类风险明细。`);
 }
 
@@ -1392,6 +1413,12 @@ function applyAllRiskQueueExportPreset() {
 function getRiskQueueExportPresetLabel(preset: CaregiverRiskQueueExportPreset) {
   if (preset === 'openComplaint') {
     return '待受理投诉';
+  }
+  if (preset === 'processingComplaint') {
+    return '处理中投诉';
+  }
+  if (preset === 'caregiverResponsibility') {
+    return '照料者责任';
   }
   if (preset === 'platformResponsibility') {
     return '平台责任';
