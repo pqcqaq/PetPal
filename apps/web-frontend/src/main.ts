@@ -10,6 +10,7 @@ import { installAdminRealtimeSync } from './realtime/admin-sync';
 import { pinia } from './stores';
 import { router } from './router';
 import { beginBootProgress, markAppReady } from './utils/app-progress';
+import './petpal/startup';
 import './styles/main.scss';
 
 beginBootProgress();

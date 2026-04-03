@@ -7882,6 +7882,58 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.241 2026-04-04（P3-M1 Slice 241）
+
+**概述**：上一轮已经把长期未命中的匿名旧消息缓存缩短到 24 小时，但真正的压缩回写仍依赖消息状态模块被加载。也就是说，用户如果一直没有进入消息页或订单详情页，启动时并不会主动把这些旧匿名残留收掉。本轮继续沿同一条缓存收口链路，把这次性清理显式接到双端启动阶段，让 PetPal 工作区一启动就先 warmup 本地消息缓存。
+
+已完成：
+
+- Web 端已补启动期消息缓存 warmup：
+  - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts`
+    - 新增 `warmupPetPalMessageComposerPersistence(...)`，会先重读 `localStorage` 里的消息缓存，再按当前裁剪规则压缩并回写。
+    - `warmup` 现在支持注入 `now`，便于稳定验证“启动时就会清理匿名旧缓存”的边界，不再只能依赖运行时真实时钟。
+    - 原有同步写回逻辑已抽到独立 writer helper，避免启动 warmup 和运行时持久化继续各自手写删除 / setItem 分支。
+  - `apps/web-frontend/src/petpal/startup.ts`
+  - `apps/web-frontend/src/main.ts`
+    - Web 主入口现在会在应用启动时主动执行一次 PetPal 消息缓存 warmup，不再要求用户先进入消息中心或订单详情页才触发旧匿名缓存收口。
+- App 端已补同一套启动期 warmup：
+  - `apps/app-frontend/src/pages/petpal/message-composer-state.ts`
+    - `uni` 本地存储链路也已导出同名 `warmup` 入口，并统一复用显式 writer helper。
+    - App 端 warmup 同样支持注入 `now`，后续如果要继续补更细的启动迁移测试，不需要再依赖真实时钟。
+  - `apps/app-frontend/src/petpal/startup.ts`
+  - `apps/app-frontend/src/main.ts`
+    - App 主入口现在也会在工作区启动时先 warmup 一次 PetPal 消息缓存，双端匿名旧缓存的压缩触发时机重新对齐。
+- Web 定向单测已补启动 warmup 覆盖：
+  - `apps/web-frontend/test/petpal-message-composer-state.test.ts`
+    - 新增“warmup 会主动压缩 stale anonymous legacy snapshots”用例，验证只靠启动期 warmup 也会把 24 小时外的匿名旧缓存从存储里清掉。
+    - 同一条用例还覆盖了 warmup 在空快照时会走 remove 分支，避免启动链路只改内存、不改存储。
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-message-composer-state.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有改动消息发送接口、附件上传协议、页面草稿读写口径或匿名迁移规则，变化继续收敛在消息状态模块和双端启动入口。
+- 已确认旧匿名消息缓存现在不只会在消息页首次命中时被裁剪，PetPal 前台启动时也会主动压缩回写，进一步降低共享设备长期残留历史匿名键的概率。
+- 已确认双端 warmup 仍复用现有裁剪和持久化规则，没有引入额外一套“启动专用”缓存口径，避免后续规则漂移。
+
+风险与缓解：
+
+- 风险：双端主入口现在都静态引入了 PetPal 启动 warmup 文件，初始包会多带上一段消息状态逻辑。
+- 缓解：本轮只引入一段本地存储读写和轻量状态模块，没有带入消息页面 UI；同时 Web 构建已通过，可继续在后续观察是否有必要再把 warmup 挪到更细的前台入口。
+
+- 风险：启动 warmup 仍只能做“压缩与清理”，无法在没有用户 identity 的情况下批量把匿名旧缓存认领到某个用户。
+- 缓解：这类认领仍然保留在首次命中线程时执行；本轮先把共享设备上的匿名残留清理时机前移，不在启动阶段引入高风险的用户归属推断。
+
+下一步（1-3）：
+
+1. 继续评估是否需要把旧匿名缓存的启动期 warmup 再细分到仅 PetPal 前台首次访问，避免在非 PetPal 场景也提前拉起相关状态模块。
+2. 继续评估订单消息与投诉证据是否要统一升级为带 `fileId` 的受控附件快照，进一步提升附件引用追踪可靠性。
+3. 继续按切片节奏推进局部改动、定向验证、本地提交和文档同步，不回到无边界大改。
+
 ### 14.240 2026-04-04（P3-M1 Slice 240）
 
 **概述**：上一轮已经补上旧匿名消息缓存的首次命中迁移，但那些一直没有被任何用户认领的匿名残留仍会继续占着本地存储，并按普通用户缓存一样保留 7 天。在共享设备或长时间未清理的浏览器环境里，这会让升级前的匿名草稿留得过久。本轮继续沿消息缓存升级链路补短期清理策略，把“可迁移但长期未命中”的匿名残留收口为短生命周期过渡数据。

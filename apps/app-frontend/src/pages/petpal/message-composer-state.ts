@@ -784,23 +784,67 @@ const hasMessageComposerStorage = () =>
   && typeof uni.setStorageSync === 'function'
   && typeof uni.removeStorageSync === 'function'
 
-const readPersistedPetPalMessageComposerSnapshot = (): PersistedPetPalMessageComposerRecords => {
-  if (!hasMessageComposerStorage()) {
-    return createEmptyPersistedSnapshot()
-  }
-
+const parsePersistedPetPalMessageComposerStorageValue = (
+  rawValue: unknown,
+  now = Date.now(),
+): PersistedPetPalMessageComposerRecords => {
   try {
-    return parsePersistedPetPalMessageComposerRecords(uni.getStorageSync(STORAGE_KEY))
+    return parsePersistedPetPalMessageComposerRecords(rawValue, now)
   }
   catch {
     return createEmptyPersistedSnapshot()
   }
 }
 
+const writePersistedPetPalMessageComposerSnapshot = (
+  snapshot: PersistedPetPalMessageComposerRecords,
+) => {
+  if (!Object.keys(snapshot.drafts).length && !Object.keys(snapshot.recoveries).length) {
+    uni.removeStorageSync(STORAGE_KEY)
+    return
+  }
+
+  uni.setStorageSync(STORAGE_KEY, {
+    drafts: snapshot.drafts,
+    recoveries: snapshot.recoveries,
+  } satisfies PersistedPetPalMessageComposerRecords)
+}
+
+const readPersistedPetPalMessageComposerSnapshot = (): PersistedPetPalMessageComposerRecords => {
+  if (!hasMessageComposerStorage()) {
+    return createEmptyPersistedSnapshot()
+  }
+
+  return parsePersistedPetPalMessageComposerStorageValue(uni.getStorageSync(STORAGE_KEY))
+}
+
 const persistedSnapshot = readPersistedPetPalMessageComposerSnapshot()
 
 const messageDrafts = ref<Record<string, PersistedPetPalMessageDraftRecord>>(persistedSnapshot.drafts)
 const messageRecoveries = ref<Record<string, PersistedPetPalMessageRecoveryRecord>>(persistedSnapshot.recoveries)
+
+export function warmupPetPalMessageComposerPersistence(
+  options: {
+    now?: number
+  } = {},
+) {
+  if (!hasMessageComposerStorage()) {
+    return
+  }
+
+  try {
+    const persistedSnapshot = parsePersistedPetPalMessageComposerStorageValue(
+      uni.getStorageSync(STORAGE_KEY),
+      options.now,
+    )
+    messageDrafts.value = persistedSnapshot.drafts
+    messageRecoveries.value = persistedSnapshot.recoveries
+    writePersistedPetPalMessageComposerSnapshot(persistedSnapshot)
+  }
+  catch {
+    // Ignore storage failures and keep runtime state usable.
+  }
+}
 
 function syncPersistedPetPalMessageComposerSnapshot() {
   if (!hasMessageComposerStorage()) {
@@ -815,23 +859,14 @@ function syncPersistedPetPalMessageComposerSnapshot() {
 
     messageDrafts.value = compactedSnapshot.drafts
     messageRecoveries.value = compactedSnapshot.recoveries
-
-    if (!Object.keys(compactedSnapshot.drafts).length && !Object.keys(compactedSnapshot.recoveries).length) {
-      uni.removeStorageSync(STORAGE_KEY)
-      return
-    }
-
-    uni.setStorageSync(STORAGE_KEY, {
-      drafts: compactedSnapshot.drafts,
-      recoveries: compactedSnapshot.recoveries,
-    } satisfies PersistedPetPalMessageComposerRecords)
+    writePersistedPetPalMessageComposerSnapshot(compactedSnapshot)
   }
   catch {
     // Ignore storage failures and keep runtime state usable.
   }
 }
 
-syncPersistedPetPalMessageComposerSnapshot()
+warmupPetPalMessageComposerPersistence()
 
 const getMessageComposerEntryForIdentity = <
   T extends {

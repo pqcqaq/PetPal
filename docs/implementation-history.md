@@ -205,6 +205,10 @@ Last updated: 2026-04-04
   - Web / App 两端的 `message-composer-state.ts` 现在都会把未命中的匿名旧快照视为短期过渡数据，仅保留 24 小时；已迁移到用户 identity 的消息草稿 / 恢复态仍按现有 7 天规则保留。
   - 这样可以避免共享设备长期残留升级前的匿名消息草稿，同时不影响当前用户已经认领的线程恢复体验。
   - `apps/web-frontend/test/petpal-message-composer-state.test.ts` 已补匿名旧快照与用户级快照的保留边界单测，继续兜底后续缓存淘汰规则演进。
+- 2026-04-04 已继续补消息缓存启动期 warmup：
+  - Web / App 两端的 `message-composer-state.ts` 现在都已导出显式 `warmup` 入口，启动时会先重读本地存储并立即压缩回写旧匿名消息缓存，不再要求用户先进入消息页或订单详情页才触发清理。
+  - `apps/web-frontend/src/main.ts` 与 `apps/app-frontend/src/main.ts` 已分别接入 PetPal 启动文件，让这次性清理更早发生在前台工作区启动阶段。
+  - `apps/web-frontend/test/petpal-message-composer-state.test.ts` 已补“仅靠 warmup 就会改写存储”的定向单测，继续兜底启动期缓存收口链路。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

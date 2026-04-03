@@ -4,6 +4,7 @@ import {
   adoptLegacyPetPalMessageComposerSnapshot,
   buildPetPalMessageComposerStorageKey,
   parsePersistedPetPalMessageComposerSnapshot,
+  warmupPetPalMessageComposerPersistence,
 } from '../src/pages/frontend/petpal/message-composer-state.ts';
 
 const sharedKey = (orderId: string, userId = '') =>
@@ -338,6 +339,105 @@ test('drops stale anonymous legacy snapshots earlier than user scoped entries', 
       },
     },
   });
+});
+
+test('warmup proactively compacts stale anonymous legacy snapshots in storage', () => {
+  let storedValue: string | null = JSON.stringify({
+    drafts: {
+      [sharedKey('order-legacy')]: {
+        orderId: 'order-legacy',
+        userId: '',
+        content: 'legacy anonymous draft',
+        attachments: [],
+        updatedAt: '2026-04-07T00:00:00.000Z',
+        scope: 'shared',
+      },
+      [ownerKey('order-user', 'user-1')]: {
+        orderId: 'order-user',
+        userId: 'user-1',
+        content: 'user scoped draft',
+        attachments: [],
+        updatedAt: '2026-04-07T00:00:00.000Z',
+        scope: 'owner',
+      },
+    },
+    recoveries: {
+      [sharedKey('order-legacy')]: {
+        orderId: 'order-legacy',
+        userId: '',
+        stage: 'upload',
+        message: 'legacy anonymous recovery',
+        updatedAt: '2026-04-07T00:00:00.000Z',
+        scope: 'shared',
+      },
+      [ownerKey('order-user', 'user-1')]: {
+        orderId: 'order-user',
+        userId: 'user-1',
+        stage: 'send',
+        message: 'user scoped recovery',
+        updatedAt: '2026-04-07T00:00:00.000Z',
+        scope: 'owner',
+      },
+    },
+  });
+  let removedCount = 0;
+  const previousWindow = (globalThis as typeof globalThis & { window?: unknown }).window;
+
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      localStorage: {
+        getItem() {
+          return storedValue;
+        },
+        setItem(_key: string, value: string) {
+          storedValue = value;
+        },
+        removeItem() {
+          removedCount += 1;
+          storedValue = null;
+        },
+      },
+    },
+  });
+
+  try {
+    warmupPetPalMessageComposerPersistence({
+      now: Date.parse('2026-04-08T12:00:00.000Z'),
+    });
+
+    assert.equal(removedCount, 0);
+    assert.ok(storedValue);
+    assert.deepEqual(parsePersistedPetPalMessageComposerSnapshot(storedValue), {
+      drafts: {
+        [ownerKey('order-user', 'user-1')]: {
+          content: 'user scoped draft',
+          attachments: [],
+        },
+      },
+      recoveries: {
+        [ownerKey('order-user', 'user-1')]: {
+          stage: 'send',
+          message: 'user scoped recovery',
+        },
+      },
+    });
+
+    storedValue = null;
+    warmupPetPalMessageComposerPersistence({
+      now: Date.parse('2026-04-08T12:00:00.000Z'),
+    });
+    assert.equal(removedCount, 1);
+  } finally {
+    if (previousWindow === undefined) {
+      Reflect.deleteProperty(globalThis, 'window');
+    } else {
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: previousWindow,
+      });
+    }
+  }
 });
 
 test('keeps only the newest persisted petpal message composer threads per user and scope', () => {

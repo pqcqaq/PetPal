@@ -785,23 +785,68 @@ const getMessageComposerStorage = () => {
   }
 };
 
+const parsePersistedPetPalMessageComposerStorageValue = (
+  rawValue: unknown,
+  now = Date.now(),
+): PersistedPetPalMessageComposerRecords => {
+  try {
+    return parsePersistedPetPalMessageComposerRecords(rawValue, now);
+  } catch {
+    return createEmptyPersistedSnapshot();
+  }
+};
+
+const writePersistedPetPalMessageComposerSnapshot = (
+  storage: Pick<Storage, 'setItem' | 'removeItem'>,
+  snapshot: PersistedPetPalMessageComposerRecords,
+) => {
+  if (!Object.keys(snapshot.drafts).length && !Object.keys(snapshot.recoveries).length) {
+    storage.removeItem(STORAGE_KEY);
+    return;
+  }
+
+  storage.setItem(STORAGE_KEY, JSON.stringify({
+    drafts: snapshot.drafts,
+    recoveries: snapshot.recoveries,
+  } satisfies PersistedPetPalMessageComposerRecords));
+};
+
 const readPersistedPetPalMessageComposerSnapshot = (): PersistedPetPalMessageComposerRecords => {
   const storage = getMessageComposerStorage();
   if (!storage) {
     return createEmptyPersistedSnapshot();
   }
 
-  try {
-    return parsePersistedPetPalMessageComposerRecords(storage.getItem(STORAGE_KEY));
-  } catch {
-    return createEmptyPersistedSnapshot();
-  }
+  return parsePersistedPetPalMessageComposerStorageValue(storage.getItem(STORAGE_KEY));
 };
 
 const persistedSnapshot = readPersistedPetPalMessageComposerSnapshot();
 
 const messageDrafts = ref<Record<string, PersistedPetPalMessageDraftRecord>>(persistedSnapshot.drafts);
 const messageRecoveries = ref<Record<string, PersistedPetPalMessageRecoveryRecord>>(persistedSnapshot.recoveries);
+
+export function warmupPetPalMessageComposerPersistence(
+  options: {
+    now?: number;
+  } = {},
+) {
+  const storage = getMessageComposerStorage();
+  if (!storage) {
+    return;
+  }
+
+  try {
+    const persistedSnapshot = parsePersistedPetPalMessageComposerStorageValue(
+      storage.getItem(STORAGE_KEY),
+      options.now,
+    );
+    messageDrafts.value = persistedSnapshot.drafts;
+    messageRecoveries.value = persistedSnapshot.recoveries;
+    writePersistedPetPalMessageComposerSnapshot(storage, persistedSnapshot);
+  } catch {
+    // Ignore storage quota or privacy-mode failures and keep runtime state usable.
+  }
+}
 
 function syncPersistedPetPalMessageComposerSnapshot() {
   const storage = getMessageComposerStorage();
@@ -817,22 +862,13 @@ function syncPersistedPetPalMessageComposerSnapshot() {
 
     messageDrafts.value = compactedSnapshot.drafts;
     messageRecoveries.value = compactedSnapshot.recoveries;
-
-    if (!Object.keys(compactedSnapshot.drafts).length && !Object.keys(compactedSnapshot.recoveries).length) {
-      storage.removeItem(STORAGE_KEY);
-      return;
-    }
-
-    storage.setItem(STORAGE_KEY, JSON.stringify({
-      drafts: compactedSnapshot.drafts,
-      recoveries: compactedSnapshot.recoveries,
-    } satisfies PersistedPetPalMessageComposerRecords));
+    writePersistedPetPalMessageComposerSnapshot(storage, compactedSnapshot);
   } catch {
     // Ignore storage quota or privacy-mode failures and keep runtime state usable.
   }
 }
 
-syncPersistedPetPalMessageComposerSnapshot();
+warmupPetPalMessageComposerPersistence();
 
 const getMessageComposerEntryForIdentity = <
   T extends {
