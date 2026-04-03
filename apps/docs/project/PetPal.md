@@ -7874,6 +7874,51 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.198 2026-04-03（P3-M1 Slice 198）
+
+**概述**：延续上一轮继续补复合风险视角后的状态，本轮先不再增加新按钮，而是把收益页里已经明显膨胀的风险预设标签和队列计数逻辑做一次共享化收口。这样后续继续扩风险视角时，不必再回到页面里维护一大段 preset / label / count 分支。
+
+已完成：
+
+- 抽离风险预设 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-risk-queue-export.ts`
+    - 新增独立 helper，统一维护风险预设展示顺序、预设标签和风险队列计数规则。
+    - `待受理重复投诉`、`照料者重复投诉` 等复合视角的计数口径现在不再散落在页面里。
+- 收益页接回共享 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 风险快捷导出动作改为直接消费 helper 输出。
+    - 当前风险视角文案与切换成功提示也改为共用同一套预设标签来源。
+- 补前端定向单测：
+  - `apps/web-frontend/test/caregiver-risk-queue-export.test.ts`
+    - 新增 helper 单测，覆盖预设顺序、复合视角计数和标签输出。
+  - `apps/web-frontend/test/caregiver-earnings-export-state.test.ts`
+    - 继续保留状态快照构建与当前视角识别断言，形成“状态层 + helper 层”双层兜底。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts ..\\web-frontend\\test\\caregiver-risk-queue-export.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有变更后端契约，也没有新增新的导出筛选字段，变更面保持在前端展示和共享逻辑层。
+- 已确认风险预设标签、动作顺序和复合计数规则现在只在一个 helper 中维护，收益页不再复制这套业务组合判断。
+- 已确认 helper 单测已经覆盖当前所有风险快捷视角的基础顺序和关键复合口径，后续扩展更容易发现回归。
+
+风险与缓解：
+
+- 风险：虽然页面层逻辑已经收口，但风险预设本身仍在状态模块和 helper 模块之间分开维护，后续继续增加新视角时仍可能出现“状态已加、helper 漏加”。
+- 缓解：下一轮如继续深化，可优先评估是否把预设元数据再进一步抽成单一配置源，而不是继续在多个文件同步追加常量。
+
+下一步（1-3）：
+
+1. 继续评估是否把风险预设列表、标签与快照映射再收口成单一配置源。
+2. 继续评估是否补“超时未结案”这类真正需要后端时效语义支撑的新风险视角。
+3. 在风险复盘入口相对稳定后，再集中补剩余验收向测试、审计收口与最终交付材料。
+
 ### 14.197 2026-04-03（P3-M1 Slice 197）
 
 **概述**：延续上一轮把“重复投诉 + 照料者责任”正式做进经营导出的收口，本轮继续补另一个同样无需新增契约、但更贴近售后优先级的复合视角：`待受理投诉 + 重复投诉`。照料者收益页现在可以直接切到“待受理重复投诉”队列，优先导出需要立即介入处理的多次争议订单。

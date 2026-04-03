@@ -719,6 +719,10 @@ import {
   withCaregiverEarningsExportDateRange,
 } from './caregiver-earnings-export-state';
 import {
+  buildCaregiverRiskQueueExportActions,
+  getCaregiverRiskQueueExportPresetLabel,
+} from './caregiver-risk-queue-export';
+import {
   formatPetPalMoney,
   formatPetPalRange,
   getPetPalCaregiverAuditLabel,
@@ -1070,97 +1074,9 @@ const recentCompletedOrders = computed(() => {
   }
   return items;
 });
-const riskQueueExportActions = computed<
-  Array<{ preset: CaregiverRiskQueueExportPreset; label: string; count: number }>
->(() => {
-  const counts = {
-    openComplaint: 0,
-    openRepeatedComplaint: 0,
-    processingComplaint: 0,
-    caregiverResponsibility: 0,
-    platformResponsibility: 0,
-    refundAwaitingSettlement: 0,
-    highRefundExposure: 0,
-    repeatedComplaint: 0,
-    repeatCaregiverComplaint: 0,
-  } satisfies Record<CaregiverRiskQueueExportPreset, number>;
-
-  for (const order of recentAftersalesOrders.value) {
-    if (order.primaryComplaintStatus === 'OPEN') {
-      counts.openComplaint += 1;
-      if (order.complaintCount >= CAREGIVER_REPEAT_COMPLAINT_COUNT) {
-        counts.openRepeatedComplaint += 1;
-      }
-    }
-    if (order.primaryComplaintStatus === 'PROCESSING') {
-      counts.processingComplaint += 1;
-    }
-    if (order.primaryComplaintTargetRole === 'CAREGIVER') {
-      counts.caregiverResponsibility += 1;
-    }
-    if (order.primaryComplaintTargetRole === 'PLATFORM') {
-      counts.platformResponsibility += 1;
-    }
-    if (order.latestRefundStatus === 'APPROVED') {
-      counts.refundAwaitingSettlement += 1;
-    }
-    if (toAmount(order.amountRefunded) >= CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT) {
-      counts.highRefundExposure += 1;
-    }
-    if (order.complaintCount >= CAREGIVER_REPEAT_COMPLAINT_COUNT) {
-      counts.repeatedComplaint += 1;
-      if (order.primaryComplaintTargetRole === 'CAREGIVER') {
-        counts.repeatCaregiverComplaint += 1;
-      }
-    }
-  }
-
-  const items: Array<{ preset: CaregiverRiskQueueExportPreset; label: string; count: number }> = [
-    { preset: 'openComplaint', label: getRiskQueueExportPresetLabel('openComplaint'), count: counts.openComplaint },
-    {
-      preset: 'openRepeatedComplaint',
-      label: getRiskQueueExportPresetLabel('openRepeatedComplaint'),
-      count: counts.openRepeatedComplaint,
-    },
-    {
-      preset: 'processingComplaint',
-      label: getRiskQueueExportPresetLabel('processingComplaint'),
-      count: counts.processingComplaint,
-    },
-    {
-      preset: 'caregiverResponsibility',
-      label: getRiskQueueExportPresetLabel('caregiverResponsibility'),
-      count: counts.caregiverResponsibility,
-    },
-    {
-      preset: 'platformResponsibility',
-      label: getRiskQueueExportPresetLabel('platformResponsibility'),
-      count: counts.platformResponsibility,
-    },
-    {
-      preset: 'refundAwaitingSettlement',
-      label: getRiskQueueExportPresetLabel('refundAwaitingSettlement'),
-      count: counts.refundAwaitingSettlement,
-    },
-    {
-      preset: 'highRefundExposure',
-      label: getRiskQueueExportPresetLabel('highRefundExposure'),
-      count: counts.highRefundExposure,
-    },
-    {
-      preset: 'repeatedComplaint',
-      label: getRiskQueueExportPresetLabel('repeatedComplaint'),
-      count: counts.repeatedComplaint,
-    },
-    {
-      preset: 'repeatCaregiverComplaint',
-      label: getRiskQueueExportPresetLabel('repeatCaregiverComplaint'),
-      count: counts.repeatCaregiverComplaint,
-    },
-  ];
-
-  return items.filter((item) => item.count > 0);
-});
+const riskQueueExportActions = computed(() =>
+  buildCaregiverRiskQueueExportActions(recentAftersalesOrders.value),
+);
 const activeRiskQueueExportPreset = computed(() => resolveCaregiverRiskQueueExportPreset(exportPageState));
 const isAllRiskQueueExportView = computed(() => isCaregiverAllRiskExportSnapshot(exportPageState));
 const currentRiskQueueExportView = computed<{
@@ -1172,7 +1088,8 @@ const currentRiskQueueExportView = computed<{
     const action = riskQueueExportActions.value.find(
       (item) => item.preset === activeRiskQueueExportPreset.value,
     );
-    const label = action?.label ?? getRiskQueueExportPresetLabel(activeRiskQueueExportPreset.value);
+    const label =
+      action?.label ?? getCaregiverRiskQueueExportPresetLabel(activeRiskQueueExportPreset.value);
     return {
       label,
       count: action?.count ?? 0,
@@ -1486,7 +1403,7 @@ function applyRiskQueueExportPreset(preset: CaregiverRiskQueueExportPreset) {
     buildCaregiverRiskQueueExportSnapshot(exportPageState, preset),
   );
 
-  const label = getRiskQueueExportPresetLabel(preset);
+  const label = getCaregiverRiskQueueExportPresetLabel(preset);
   ElMessage.success(`已切到${label}导出条件，可直接导出当前队列里的同类风险明细。`);
 }
 
@@ -1496,34 +1413,6 @@ function applyAllRiskQueueExportPreset() {
     buildCaregiverAllRiskExportSnapshot(exportPageState),
   );
   ElMessage.success('已切到全部风险导出条件，可直接导出当前周期内的全部风险明细。');
-}
-
-function getRiskQueueExportPresetLabel(preset: CaregiverRiskQueueExportPreset) {
-  if (preset === 'openComplaint') {
-    return '待受理投诉';
-  }
-  if (preset === 'openRepeatedComplaint') {
-    return '待受理重复投诉';
-  }
-  if (preset === 'processingComplaint') {
-    return '处理中投诉';
-  }
-  if (preset === 'caregiverResponsibility') {
-    return '照料者责任';
-  }
-  if (preset === 'platformResponsibility') {
-    return '平台责任';
-  }
-  if (preset === 'highRefundExposure') {
-    return '高退款暴露';
-  }
-  if (preset === 'repeatedComplaint') {
-    return '重复投诉';
-  }
-  if (preset === 'repeatCaregiverComplaint') {
-    return '照料者重复投诉';
-  }
-  return '待退款';
 }
 
 const primaryAction = computed(() => {

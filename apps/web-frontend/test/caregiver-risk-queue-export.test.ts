@@ -1,0 +1,78 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import type { CaregiverAftersalesRiskOrderRecord } from '@rbac/api-common';
+import {
+  buildCaregiverRiskQueueExportActions,
+  getCaregiverRiskQueueExportPresetLabel,
+} from '../src/pages/frontend/petpal/caregiver-risk-queue-export.ts';
+
+const createRiskOrder = (
+  overrides: Partial<CaregiverAftersalesRiskOrderRecord> = {},
+): CaregiverAftersalesRiskOrderRecord => ({
+  id: 'risk-order-1',
+  orderNo: 'PP-20260403-001',
+  serviceType: 'BOARDING',
+  appointmentStart: '2026-04-03T08:00:00.000Z',
+  appointmentEnd: '2026-04-03T12:00:00.000Z',
+  amountPaid: 280,
+  amountRefunded: 0,
+  orderStatus: 'DISPUTED',
+  ownerNickname: '主人A',
+  petName: '可乐',
+  locationText: '上海市静安区',
+  latestRefundStatus: null,
+  latestRefundAmount: null,
+  complaintCount: 0,
+  primaryComplaintStatus: null,
+  primaryComplaintTargetRole: null,
+  primaryComplaintType: null,
+  ...overrides,
+});
+
+test('builds caregiver risk queue export actions in stable preset order', () => {
+  const actions = buildCaregiverRiskQueueExportActions([
+    createRiskOrder({
+      id: 'risk-order-open-repeat-caregiver',
+      complaintCount: 3,
+      primaryComplaintStatus: 'OPEN',
+      primaryComplaintTargetRole: 'CAREGIVER',
+      amountRefunded: 120,
+      latestRefundStatus: 'APPROVED',
+      latestRefundAmount: 120,
+    }),
+    createRiskOrder({
+      id: 'risk-order-processing-platform',
+      complaintCount: 1,
+      primaryComplaintStatus: 'PROCESSING',
+      primaryComplaintTargetRole: 'PLATFORM',
+    }),
+    createRiskOrder({
+      id: 'risk-order-repeat-only',
+      complaintCount: 2,
+      primaryComplaintStatus: 'RESOLVED',
+      primaryComplaintTargetRole: 'CAREGIVER',
+    }),
+  ]);
+
+  assert.deepEqual(actions, [
+    { preset: 'openComplaint', label: '待受理投诉', count: 1 },
+    { preset: 'openRepeatedComplaint', label: '待受理重复投诉', count: 1 },
+    { preset: 'processingComplaint', label: '处理中投诉', count: 1 },
+    { preset: 'caregiverResponsibility', label: '照料者责任', count: 2 },
+    { preset: 'platformResponsibility', label: '平台责任', count: 1 },
+    { preset: 'refundAwaitingSettlement', label: '待退款', count: 1 },
+    { preset: 'highRefundExposure', label: '高退款暴露', count: 1 },
+    { preset: 'repeatedComplaint', label: '重复投诉', count: 2 },
+    { preset: 'repeatCaregiverComplaint', label: '照料者重复投诉', count: 2 },
+  ]);
+});
+
+test('returns caregiver risk queue preset labels for composite views', () => {
+  assert.equal(getCaregiverRiskQueueExportPresetLabel('openComplaint'), '待受理投诉');
+  assert.equal(getCaregiverRiskQueueExportPresetLabel('openRepeatedComplaint'), '待受理重复投诉');
+  assert.equal(
+    getCaregiverRiskQueueExportPresetLabel('repeatCaregiverComplaint'),
+    '照料者重复投诉',
+  );
+  assert.equal(getCaregiverRiskQueueExportPresetLabel('refundAwaitingSettlement'), '待退款');
+});
