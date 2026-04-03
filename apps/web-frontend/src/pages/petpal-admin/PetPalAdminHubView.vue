@@ -487,58 +487,26 @@ const loadHubOverview = async () => {
   overviewLoading.value = true;
   overviewNotice.value = '';
 
-  const tasks: Promise<void>[] = [];
-
   complaintStats.value = null;
   pendingCaregiverCount.value = null;
   callbackAuditStats.value = null;
   callbackAlertStats.value = null;
 
-  if (canReadComplaints.value) {
-    tasks.push(
-      api.petpal.admin.complaintStats().then((response) => {
-        complaintStats.value = response;
-      }),
-    );
-  }
-
-  if (canAuditCaregivers.value) {
-    tasks.push(
-      api.petpal.admin.caregiverAudits({
-        page: 1,
-        pageSize: 1,
-        auditStatus: 'PENDING',
-      }).then((response) => {
-        pendingCaregiverCount.value = response.pagination.total;
-      }),
-    );
-  }
-
-  if (canReadCallbackAudits.value) {
-    tasks.push(
-      api.petpal.admin.callbackAuditStats().then((response) => {
-        callbackAuditStats.value = response;
-      }),
-    );
-  }
-
-  if (canReadCallbackAlerts.value) {
-    tasks.push(
-      api.petpal.admin.callbackAlertOutboxStats().then((response) => {
-        callbackAlertStats.value = response;
-      }),
-    );
-  }
-
   try {
-    const results = await Promise.allSettled(tasks);
-    const firstRejected = results.find((item) => item.status === 'rejected');
-    if (firstRejected?.status === 'rejected') {
+    const response = await api.petpal.admin.overview();
+    complaintStats.value = response.complaintStats;
+    pendingCaregiverCount.value = response.pendingCaregiverCount;
+    callbackAuditStats.value = response.callbackAuditStats;
+    callbackAlertStats.value = response.callbackAlertStats;
+
+    if (response.unavailableScopes.length > 0) {
       overviewNotice.value = '部分治理摘要加载失败，仍可直接进入对应工作区处理。';
-      ElMessage.warning(getErrorMessage(firstRejected.reason, overviewNotice.value));
     }
 
     statsUpdatedAt.value = formatRefreshTime(new Date());
+  } catch (error: unknown) {
+    overviewNotice.value = '治理摘要加载失败，仍可直接进入对应工作区处理。';
+    ElMessage.warning(getErrorMessage(error, overviewNotice.value));
   } finally {
     overviewLoading.value = false;
   }

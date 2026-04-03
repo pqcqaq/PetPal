@@ -1,3 +1,9 @@
+import type {
+  CallbackAlertOutboxStats,
+  CallbackAuditStats,
+  ComplaintAdminStats,
+  PetPalAdminOverviewScope,
+} from '@rbac/api-common';
 import { prisma } from '../lib/prisma';
 import { Prisma, PrismaClient } from '../lib/prisma-generated';
 import type { CaregiverProfile, PetProfile, ServiceRequest } from '../lib/prisma-generated';
@@ -5210,6 +5216,85 @@ export const petpalService = {
       stuckProcessingCount,
       processingTimeoutMinutes,
     };
+  },
+
+  async queryAdminOverview(actorId: string, permissions: string[]) {
+    const result: {
+      complaintStats: ComplaintAdminStats | null;
+      pendingCaregiverCount: number | null;
+      callbackAuditStats: CallbackAuditStats | null;
+      callbackAlertStats: CallbackAlertOutboxStats | null;
+      unavailableScopes: PetPalAdminOverviewScope[];
+    } = {
+      complaintStats: null,
+      pendingCaregiverCount: null,
+      callbackAuditStats: null,
+      callbackAlertStats: null,
+      unavailableScopes: [] as PetPalAdminOverviewScope[],
+    };
+
+    const tasks: Array<Promise<void>> = [];
+
+    if (permissions.includes('petpal.complaint.read')) {
+      tasks.push(
+        petpalService.queryAdminComplaintStats({}, actorId)
+          .then((stats) => {
+            result.complaintStats = stats;
+          })
+          .catch((error: unknown) => {
+            result.unavailableScopes.push('complaints');
+            console.error('[petpal] failed to load admin overview complaints scope', error);
+          }),
+      );
+    }
+
+    if (permissions.includes('petpal.caregiver.audit')) {
+      tasks.push(
+        prisma.caregiverProfile.count({
+          where: {
+            deleteAt: null,
+            auditStatus: 'PENDING',
+          },
+        })
+          .then((count) => {
+            result.pendingCaregiverCount = count;
+          })
+          .catch((error: unknown) => {
+            result.unavailableScopes.push('caregiverAudits');
+            console.error('[petpal] failed to load admin overview caregiver scope', error);
+          }),
+      );
+    }
+
+    if (permissions.includes('petpal.callback-audit.read')) {
+      tasks.push(
+        petpalService.queryCallbackAuditStats({})
+          .then((stats) => {
+            result.callbackAuditStats = stats;
+          })
+          .catch((error: unknown) => {
+            result.unavailableScopes.push('callbackAudits');
+            console.error('[petpal] failed to load admin overview callback audit scope', error);
+          }),
+      );
+    }
+
+    if (permissions.includes('petpal.callback-alert.read')) {
+      tasks.push(
+        petpalService.queryCallbackAlertOutboxStats({})
+          .then((stats) => {
+            result.callbackAlertStats = stats;
+          })
+          .catch((error: unknown) => {
+            result.unavailableScopes.push('callbackAlerts');
+            console.error('[petpal] failed to load admin overview callback alert scope', error);
+          }),
+      );
+    }
+
+    await Promise.all(tasks);
+
+    return result;
   },
 
   async retryCallbackAlertOutbox(id: string, options?: { actorId?: string | null }) {

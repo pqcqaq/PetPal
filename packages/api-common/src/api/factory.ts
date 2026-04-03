@@ -58,6 +58,7 @@ import type {
   CallbackAlertOutboxPage,
   CallbackAlertOutboxQuery,
   CallbackAlertOutboxStats,
+  PetPalAdminOverview,
   CallbackAuditPage,
   CallbackAuditQuery,
   CallbackAuditStats,
@@ -581,6 +582,10 @@ export const createApiFactory = (options: ClientOptions) => {
           }),
       },
       admin: {
+        overview: () =>
+          client.request<PetPalAdminOverview>({
+            url: '/petpal/admin/overview',
+          }),
         caregiverAudits: (query?: CaregiverAuditQuery) =>
           client.request<CaregiverAuditPage>({
             url: '/petpal/admin/caregivers',

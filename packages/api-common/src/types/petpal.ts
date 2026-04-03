@@ -838,6 +838,20 @@ export interface CallbackAlertOutboxStats {
   processingTimeoutMinutes: number;
 }
 
+export type PetPalAdminOverviewScope =
+  | 'complaints'
+  | 'caregiverAudits'
+  | 'callbackAudits'
+  | 'callbackAlerts';
+
+export interface PetPalAdminOverview {
+  complaintStats: ComplaintAdminStats | null;
+  pendingCaregiverCount: number | null;
+  callbackAuditStats: CallbackAuditStats | null;
+  callbackAlertStats: CallbackAlertOutboxStats | null;
+  unavailableScopes: PetPalAdminOverviewScope[];
+}
+
 export interface CallbackAlertReplayLogRecord {
   id: string;
   actionType: 'REQUEUE' | 'REQUEUE_DEAD_BATCH';

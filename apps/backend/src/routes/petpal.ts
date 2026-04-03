@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../middlewares/auth';
-import { requirePermission } from '../middlewares/require-permission';
+import { requireAnyPermission, requirePermission } from '../middlewares/require-permission';
 import { asyncHandler, ok, parsePagination } from '../utils/http';
 import { createExcelExportHandler, createTimestampedExcelFileName } from '../utils/excel-export';
 import { petpalService } from '../services/petpal-service';
@@ -892,6 +892,23 @@ petpalRouter.post(
       payload,
     );
     return ok(res, order, 'Order checked out');
+  }),
+);
+
+petpalRouter.get(
+  '/admin/overview',
+  requireAnyPermission(
+    'petpal.complaint.read',
+    'petpal.complaint.manage',
+    'petpal.caregiver.audit',
+    'petpal.callback-audit.read',
+    'petpal.callback-alert.read',
+    'petpal.callback-alert.retry',
+  ),
+  asyncHandler(async (req, res) => {
+    const auth = req.auth!;
+    const result = await petpalService.queryAdminOverview(auth.id, auth.permissions);
+    return ok(res, result, 'PetPal admin overview');
   }),
 );
 

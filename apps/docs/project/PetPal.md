@@ -7874,6 +7874,57 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.213 2026-04-03（P3-M1 Slice 213）
+
+**概述**：根级 `/petpal-admin` 首页现在已经承担值班入口职责，但此前仍要分别请求投诉统计、待审照料者分页、回调审计统计和告警统计四条接口，首页刷新链路偏散。本轮补了后台概览聚合接口，把这四块治理摘要统一收口成单次请求，并保留按权限裁剪和局部失败提示，作为后续运营看板继续扩展的基础。
+
+已完成：
+
+- 新增后台概览聚合接口：
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增 `PetPalAdminOverview` 与 `PetPalAdminOverviewScope`，统一描述后台首页治理摘要返回结构和局部失败 scope。
+  - `packages/api-common/src/api/factory.ts`
+    - 新增 `api.petpal.admin.overview()`，前端不再手动拼接四类摘要请求。
+  - `apps/backend/src/routes/petpal.ts`
+  - `apps/backend/src/services/petpal-service.ts`
+    - 新增 `/api/petpal/admin/overview`。
+    - 后端会按当前账号权限裁剪投诉摘要、待审照料者数、回调审计摘要和告警摘要。
+    - 若个别摘要查询失败，接口会回传 `unavailableScopes`，保留其余可用摘要。
+- 根级后台首页改为单次拉取治理摘要：
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalAdminHubView.vue`
+    - `loadHubOverview()` 已改为调用新的聚合接口，不再在首页内维护四路统计请求和 `Promise.allSettled()`。
+    - 页面仍会在摘要不完整或整次请求失败时保留值班提示文案。
+- 新增定向集成测试：
+  - `apps/backend/test/integration/petpal-admin-overview.test.ts`
+    - 覆盖管理员查询聚合摘要成功。
+    - 覆盖普通成员访问后台概览接口返回 403。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test test/integration/petpal-admin-overview.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+  - 仍保留既有的大 chunk warning，本轮没有新增新的构建告警。
+
+代码审计结论：
+
+- 本轮没有新增后台业务口径，只把后台首页已经依赖的四类摘要统一收口到后端聚合层。
+- 已确认聚合接口不会越权返回摘要，是否拉取某块数据仍由当前账号权限决定。
+- 已确认根级后台首页刷新不再为同一屏摘要发起四次请求，值班入口更接近真实运营总览。
+
+风险与缓解：
+
+- 风险：当前能力仍属于“治理摘要入口”，并不等于规则发布、处罚执行和经营指标分析都已经完成。
+- 缓解：下一轮继续围绕规则治理、违规处罚和更完整的经营指标聚合扩后台看板，避免把首页摘要误判为运营看板整体收口。
+
+下一步（1-3）：
+
+1. 继续补规则发布、违规处罚和更深的经营指标聚合，形成真正可验收的治理看板。
+2. 继续按“独立测试文件 + 局部验证”方式补后台剩余闭环，避免后期只能跑大而慢的全量集成。
+3. 在治理链路继续稳定后，再集中收口最终验收脚本、截图和答辩材料。
+
 ### 14.212 2026-04-03（P3-M1 Slice 212）
 
 **概述**：后台治理页的 route query 字符串桥接和 option value 校验都已经开始共享后，还剩最后一组明显的基础重复：已知 query key 检测、正整数页码解析，以及 callback audit 页的分页大小白名单恢复。这些判断继续散在页面里没有业务价值，本轮把它们一并收进 `route-query` helper，后台页的路由恢复逻辑进一步压缩到“读值 + 业务筛选判定”。
