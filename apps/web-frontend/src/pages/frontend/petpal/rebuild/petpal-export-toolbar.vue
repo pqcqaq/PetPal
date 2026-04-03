@@ -5,6 +5,7 @@
     <div class="petpal-export-toolbar__filters">
       <slot name="filters" />
     </div>
+    <slot name="summary" />
     <p v-if="hint" class="petpal-export-toolbar__hint">{{ hint }}</p>
   </div>
 </template>

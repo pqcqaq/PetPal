@@ -142,6 +142,14 @@
             pending-label="导出中"
           />
         </template>
+        <template #summary>
+          <PetPalExportFilterSummary
+            :items="exportSummaryItems"
+            empty-text="当前没有附加退款导出条件，导出时会带出全部售后明细。"
+            @remove="clearExportSummaryItem"
+            @clear="clearExportFilters"
+          />
+        </template>
       </PetPalExportToolbar>
     </PetPalDeskSection>
 
@@ -247,6 +255,7 @@ import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
+import PetPalExportFilterSummary from './rebuild/petpal-export-filter-summary.vue';
 import PetPalExportTemplateActions from './rebuild/petpal-export-template-actions.vue';
 import PetPalExportToolbar from './rebuild/petpal-export-toolbar.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
@@ -259,6 +268,11 @@ import {
   createPetPalFieldBinding,
   createPetPalTrimmedTextFieldBinding,
 } from './export-field-bindings';
+import {
+  buildOwnerRefundExportSummaryItems,
+  clearOwnerRefundExportSummaryItem,
+  type OwnerRefundExportSummaryItemKey,
+} from './export-filter-summary';
 import {
   applyOwnerRefundExportFilterSnapshot,
   buildOwnerRefundExportQuery,
@@ -417,6 +431,7 @@ const exportComplaintTargetRole = createPetPalClearableFieldBinding<OwnerRefundE
 });
 const exportTemplates = computed(() => exportPageState.templates);
 const hasExportFilters = computed(() => hasOwnerRefundExportFilters(exportPageState));
+const exportSummaryItems = computed(() => buildOwnerRefundExportSummaryItems(exportPageState));
 
 function buildOrderDetailLink(orderId: string) {
   return {
@@ -479,6 +494,10 @@ function clearExportFilters() {
     exportPageState,
     createEmptyOwnerRefundExportFilterSnapshot(),
   );
+}
+
+function clearExportSummaryItem(key: string) {
+  clearOwnerRefundExportSummaryItem(exportPageState, key as OwnerRefundExportSummaryItemKey);
 }
 
 function applySelectedExportTemplate() {

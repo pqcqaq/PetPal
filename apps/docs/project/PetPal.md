@@ -7874,6 +7874,56 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.187 2026-04-03（P3-M1 Slice 187）
+
+**概述**：结束上一轮只做导出状态共享化的收口，转回用户可见交互。本轮给主人订单页、售后中心和照料者收益页补上“当前已生效导出条件”摘要，让用户不必重新展开整条工具栏回查当前导出范围，也可以直接移除单个条件。
+
+已完成：
+
+- 新增共享导出条件摘要逻辑：
+  - `apps/web-frontend/src/pages/frontend/petpal/export-filter-summary.ts`
+    - 新增三份导出状态对应的摘要构建函数，统一把日期范围、服务类型、退款/投诉筛选、关键词和风险视角翻译成可读文案。
+    - 新增三份导出状态对应的单项清除 helper，支持按摘要 tag 直接移除某个导出条件，而不用重新找到原输入控件。
+  - `apps/web-frontend/test/petpal-export-filter-summary.test.ts`
+    - 新增定向单测，覆盖主人交易导出、主人退款导出和照料者经营导出三类摘要构建与单项移除行为。
+- 新增共享摘要展示组件：
+  - `apps/web-frontend/src/pages/frontend/petpal/rebuild/petpal-export-filter-summary.vue`
+    - 新增 closable tag 摘要区，统一展示“当前导出条件”和空筛选时的默认导出范围说明。
+  - `apps/web-frontend/src/pages/frontend/petpal/rebuild/petpal-export-toolbar.vue`
+    - 导出工具条新增 `summary` 槽位，便于各页面在同一位置承接当前条件摘要。
+- 三张导出页完成接入：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOwnerOrdersView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalAftersalesView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 三张页面现在都会在工具条下方展示当前已生效导出条件。
+    - 用户可以逐项关闭条件，也可以继续使用原有的“清空导出筛选”一次清空全部条件。
+    - 当当前没有任何附加筛选时，页面会明确提示默认导出范围，避免误以为还在沿用上一次条件。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-export-filter-summary.test.ts ..\\web-frontend\\test\\owner-refund-export-state.test.ts ..\\web-frontend\\test\\owner-transaction-export-state.test.ts ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增后端导出字段、接口契约或持久化键，只补强 Web 前端三张导出页对“当前导出条件”的可见性和可撤销性。
+- 已确认最近一次导出条件持久化、模板保存/套用/删除和原有导出请求构建逻辑保持不变；新增摘要区只消费现有状态，不改变导出协议。
+- 已确认照料者收益页的 `datePreset` 仍保持收益页本地语义：摘要会显示快捷时间窗标签，但清空日期条件时也会同步清掉 preset，避免 UI 与真实导出范围不一致。
+
+风险与缓解：
+
+- 风险：如果后续继续给三份导出状态新增字段，摘要构建和单项移除规则也需要同步补齐，否则容易出现“筛选已生效但摘要没显示”的偏差。
+- 缓解：本轮已把三份摘要规则集中到单一 helper，并补上定向单测；后续新增字段时优先在该 helper 和测试里同步更新。
+
+下一步（1-3）：
+
+1. 在导出条件已可见、可撤销后，继续评估是否还需要补更细的经营归因导出维度，而不是再做状态层抽象。
+2. 继续收口结果页、提醒页或其它尚未完成的前端业务闭环，把“状态 + 下一步动作”标准推进到剩余辅助页。
+3. 如果后续导出字段继续增长，优先复用当前摘要 helper 和单测模式，避免再把交互规则散回页面内。
+
 ### 14.186 2026-04-03（P3-M1 Slice 186）
 
 **概述**：延续上一轮对 filter presence 的共享化，本轮继续把三份导出状态模块里重复维护的 defaults 和 keys 收口成共享 snapshot definition helper，用一份默认值对象同时派生字段清单和 `createEmpty()`，减少状态模块里的双份快照元数据。

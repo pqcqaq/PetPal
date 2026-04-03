@@ -233,6 +233,14 @@
               清空导出筛选
             </el-button>
           </template>
+          <template #summary>
+            <PetPalExportFilterSummary
+              :items="exportSummaryItems"
+              empty-text="当前没有附加经营导出条件，导出时会带出全部已完成订单经营明细。"
+              @remove="clearExportSummaryItem"
+              @clear="clearExportFilters"
+            />
+          </template>
         </PetPalExportToolbar>
 
         <div class="petpal-metric-grid">
@@ -498,6 +506,7 @@ import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
 import PetPalDeskPage from './rebuild/petpal-desk-page.vue';
+import PetPalExportFilterSummary from './rebuild/petpal-export-filter-summary.vue';
 import PetPalExportTemplateActions from './rebuild/petpal-export-template-actions.vue';
 import PetPalExportToolbar from './rebuild/petpal-export-toolbar.vue';
 import PetPalDeskSection from './rebuild/petpal-desk-section.vue';
@@ -517,6 +526,11 @@ import {
   createPetPalFieldBinding,
   createPetPalTrimmedTextFieldBinding,
 } from './export-field-bindings';
+import {
+  buildCaregiverEarningsExportSummaryItems,
+  clearCaregiverEarningsExportSummaryItem,
+  type CaregiverEarningsExportSummaryItemKey,
+} from './export-filter-summary';
 import {
   applyCaregiverEarningsExportFilterSnapshot,
   buildCaregiverEarningsExportQuery,
@@ -770,6 +784,7 @@ const trendGroups = computed(() =>
 const hasTrendData = computed(() => totals.value.completedOrderCount > 0);
 const activeExportPreset = computed(() => exportPageState.datePreset);
 const hasExportFilters = computed(() => hasCaregiverEarningsExportFilters(exportPageState));
+const exportSummaryItems = computed(() => buildCaregiverEarningsExportSummaryItems(exportPageState));
 const revenueCards = computed(() => [
   {
     label: '累计收入',
@@ -893,6 +908,13 @@ function clearExportFilters() {
   applyCaregiverEarningsExportFilterSnapshot(
     exportPageState,
     createEmptyCaregiverEarningsExportFilterSnapshot(),
+  );
+}
+
+function clearExportSummaryItem(key: string) {
+  clearCaregiverEarningsExportSummaryItem(
+    exportPageState,
+    key as CaregiverEarningsExportSummaryItemKey,
   );
 }
 
