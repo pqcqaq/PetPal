@@ -186,6 +186,9 @@ Last updated: 2026-04-04
   - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts` 现在会把按订单隔离的草稿 / 恢复态写入 `localStorage`，Web 刷新后仍能恢复到原订单的未发送内容。
   - `apps/app-frontend/src/pages/petpal/message-composer-state.ts` 现在会把同一份状态写入 `uni` 本地存储，App 重新进入后仍能继续当前订单的补图或重发。
   - `apps/web-frontend/test/petpal-message-composer-state.test.ts` 已补持久化快照解析的定向单测，用来兜底历史脏数据和非法恢复态过滤。
+- 2026-04-04 已继续补消息沟通缓存淘汰策略：
+  - Web / App 两端的 `message-composer-state.ts` 现在都会对本地消息草稿 / 恢复态做自动裁剪，只保留最近更新的有限线程，并淘汰超过 7 天的旧缓存。
+  - `apps/web-frontend/test/petpal-message-composer-state.test.ts` 已继续补 stale entry 和最大线程数裁剪的单测，避免后续改动把淘汰规则放松。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

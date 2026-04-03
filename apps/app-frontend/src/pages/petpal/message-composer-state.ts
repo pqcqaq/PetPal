@@ -26,9 +26,24 @@ export type PersistedPetPalMessageComposerSnapshot = {
   recoveries: Record<string, PetPalMessageRecoveryState>
 }
 
-const STORAGE_KEY = 'petpal-message-composer-state-v1'
+type PersistedPetPalMessageDraftRecord = PetPalMessageDraftState & {
+  updatedAt: string
+}
 
-const createEmptyPersistedSnapshot = (): PersistedPetPalMessageComposerSnapshot => ({
+type PersistedPetPalMessageRecoveryRecord = PetPalMessageRecoveryState & {
+  updatedAt: string
+}
+
+type PersistedPetPalMessageComposerRecords = {
+  drafts: Record<string, PersistedPetPalMessageDraftRecord>
+  recoveries: Record<string, PersistedPetPalMessageRecoveryRecord>
+}
+
+const STORAGE_KEY = 'petpal-message-composer-state-v1'
+const MAX_PERSISTED_THREADS = 12
+const MAX_PERSISTED_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+const createEmptyPersistedSnapshot = (): PersistedPetPalMessageComposerRecords => ({
   drafts: {},
   recoveries: {},
 })
@@ -45,6 +60,16 @@ const cloneMessageDraftAttachments = (attachments: PetPalMessageDraftAttachment[
     size: item.size,
     uploadedAt: item.uploadedAt,
   }))
+
+const cloneMessageDraftState = (draft: PetPalMessageDraftState): PetPalMessageDraftState => ({
+  content: draft.content,
+  attachments: cloneMessageDraftAttachments(draft.attachments),
+})
+
+const toTimestamp = (value: string) => {
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : null
+}
 
 const normalizePersistedValue = (rawValue: unknown) => {
   if (typeof rawValue !== 'string') {
@@ -114,6 +139,29 @@ const toDraftState = (rawValue: unknown): PetPalMessageDraftState | null => {
   }
 }
 
+const toDraftRecord = (
+  rawValue: unknown,
+  fallbackUpdatedAt: string,
+): PersistedPetPalMessageDraftRecord | null => {
+  if (!isRecord(rawValue)) {
+    return null
+  }
+
+  const draft = toDraftState(rawValue)
+  if (!draft) {
+    return null
+  }
+
+  const updatedAt = typeof rawValue.updatedAt === 'string' && toTimestamp(rawValue.updatedAt)
+    ? rawValue.updatedAt
+    : fallbackUpdatedAt
+
+  return {
+    ...cloneMessageDraftState(draft),
+    updatedAt,
+  }
+}
+
 const toRecoveryState = (rawValue: unknown): PetPalMessageRecoveryState | null => {
   if (!isRecord(rawValue)) {
     return null
@@ -130,12 +178,119 @@ const toRecoveryState = (rawValue: unknown): PetPalMessageRecoveryState | null =
   }
 }
 
-export function parsePersistedPetPalMessageComposerSnapshot(rawValue: unknown): PersistedPetPalMessageComposerSnapshot {
+const toRecoveryRecord = (
+  rawValue: unknown,
+  fallbackUpdatedAt: string,
+): PersistedPetPalMessageRecoveryRecord | null => {
+  if (!isRecord(rawValue)) {
+    return null
+  }
+
+  const recovery = toRecoveryState(rawValue)
+  if (!recovery) {
+    return null
+  }
+
+  const updatedAt = typeof rawValue.updatedAt === 'string' && toTimestamp(rawValue.updatedAt)
+    ? rawValue.updatedAt
+    : fallbackUpdatedAt
+
+  return {
+    stage: recovery.stage,
+    message: recovery.message,
+    updatedAt,
+  }
+}
+
+const compactPersistedPetPalMessageComposerRecords = (
+  snapshot: PersistedPetPalMessageComposerRecords,
+  now = Date.now(),
+): PersistedPetPalMessageComposerRecords => {
+  const orderTimestamps = new Map<string, number>()
+  const collectTimestamp = (orderId: string, updatedAt: string) => {
+    const timestamp = toTimestamp(updatedAt)
+    if (timestamp === null) {
+      return
+    }
+
+    const previousTimestamp = orderTimestamps.get(orderId)
+    if (previousTimestamp === undefined || timestamp > previousTimestamp) {
+      orderTimestamps.set(orderId, timestamp)
+    }
+  }
+
+  Object.entries(snapshot.drafts).forEach(([orderId, draft]) => {
+    collectTimestamp(orderId, draft.updatedAt)
+  })
+  Object.entries(snapshot.recoveries).forEach(([orderId, recovery]) => {
+    collectTimestamp(orderId, recovery.updatedAt)
+  })
+
+  const retainedOrderIds = new Set(
+    Array.from(orderTimestamps.entries())
+      .filter(([, timestamp]) => now - timestamp <= MAX_PERSISTED_AGE_MS)
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, MAX_PERSISTED_THREADS)
+      .map(([orderId]) => orderId),
+  )
+
+  return {
+    drafts: Object.fromEntries(
+      Object.entries(snapshot.drafts)
+        .filter(([orderId]) => retainedOrderIds.has(orderId))
+        .map(([orderId, draft]) => [
+          orderId,
+          {
+            ...cloneMessageDraftState(draft),
+            updatedAt: draft.updatedAt,
+          } satisfies PersistedPetPalMessageDraftRecord,
+        ]),
+    ),
+    recoveries: Object.fromEntries(
+      Object.entries(snapshot.recoveries)
+        .filter(([orderId]) => retainedOrderIds.has(orderId))
+        .map(([orderId, recovery]) => [
+          orderId,
+          {
+            stage: recovery.stage,
+            message: recovery.message,
+            updatedAt: recovery.updatedAt,
+          } satisfies PersistedPetPalMessageRecoveryRecord,
+        ]),
+    ),
+  }
+}
+
+const toPublicPersistedSnapshot = (
+  snapshot: PersistedPetPalMessageComposerRecords,
+): PersistedPetPalMessageComposerSnapshot => ({
+  drafts: Object.fromEntries(
+    Object.entries(snapshot.drafts).map(([orderId, draft]) => [
+      orderId,
+      cloneMessageDraftState(draft),
+    ]),
+  ),
+  recoveries: Object.fromEntries(
+    Object.entries(snapshot.recoveries).map(([orderId, recovery]) => [
+      orderId,
+      {
+        stage: recovery.stage,
+        message: recovery.message,
+      } satisfies PetPalMessageRecoveryState,
+    ]),
+  ),
+})
+
+const parsePersistedPetPalMessageComposerRecords = (
+  rawValue: unknown,
+  now = Date.now(),
+): PersistedPetPalMessageComposerRecords => {
   const normalized = normalizePersistedValue(rawValue)
   if (!isRecord(normalized)) {
     return createEmptyPersistedSnapshot()
   }
 
+  const fallbackUpdatedAt = new Date(now).toISOString()
   const rawDrafts = isRecord(normalized.drafts) ? normalized.drafts : {}
   const drafts = Object.fromEntries(
     Object.entries(rawDrafts).flatMap(([orderId, rawDraft]) => {
@@ -143,7 +298,7 @@ export function parsePersistedPetPalMessageComposerSnapshot(rawValue: unknown): 
         return []
       }
 
-      const draft = toDraftState(rawDraft)
+      const draft = toDraftRecord(rawDraft, fallbackUpdatedAt)
       return draft ? [[orderId, draft] as const] : []
     }),
   )
@@ -155,15 +310,26 @@ export function parsePersistedPetPalMessageComposerSnapshot(rawValue: unknown): 
         return []
       }
 
-      const recovery = toRecoveryState(rawRecovery)
+      const recovery = toRecoveryRecord(rawRecovery, fallbackUpdatedAt)
       return recovery ? [[orderId, recovery] as const] : []
     }),
   )
 
-  return {
+  return compactPersistedPetPalMessageComposerRecords({
     drafts,
     recoveries,
-  }
+  }, now)
+}
+
+export function parsePersistedPetPalMessageComposerSnapshot(
+  rawValue: unknown,
+  options: {
+    now?: number
+  } = {},
+): PersistedPetPalMessageComposerSnapshot {
+  return toPublicPersistedSnapshot(
+    parsePersistedPetPalMessageComposerRecords(rawValue, options.now),
+  )
 }
 
 const hasMessageComposerStorage = () =>
@@ -172,13 +338,13 @@ const hasMessageComposerStorage = () =>
   && typeof uni.setStorageSync === 'function'
   && typeof uni.removeStorageSync === 'function'
 
-const readPersistedPetPalMessageComposerSnapshot = (): PersistedPetPalMessageComposerSnapshot => {
+const readPersistedPetPalMessageComposerSnapshot = (): PersistedPetPalMessageComposerRecords => {
   if (!hasMessageComposerStorage()) {
     return createEmptyPersistedSnapshot()
   }
 
   try {
-    return parsePersistedPetPalMessageComposerSnapshot(uni.getStorageSync(STORAGE_KEY))
+    return parsePersistedPetPalMessageComposerRecords(uni.getStorageSync(STORAGE_KEY))
   }
   catch {
     return createEmptyPersistedSnapshot()
@@ -187,8 +353,8 @@ const readPersistedPetPalMessageComposerSnapshot = (): PersistedPetPalMessageCom
 
 const persistedSnapshot = readPersistedPetPalMessageComposerSnapshot()
 
-const messageDrafts = ref<Record<string, PetPalMessageDraftState>>(persistedSnapshot.drafts)
-const messageRecoveries = ref<Record<string, PetPalMessageRecoveryState>>(persistedSnapshot.recoveries)
+const messageDrafts = ref<Record<string, PersistedPetPalMessageDraftRecord>>(persistedSnapshot.drafts)
+const messageRecoveries = ref<Record<string, PersistedPetPalMessageRecoveryRecord>>(persistedSnapshot.recoveries)
 
 function syncPersistedPetPalMessageComposerSnapshot() {
   if (!hasMessageComposerStorage()) {
@@ -196,20 +362,30 @@ function syncPersistedPetPalMessageComposerSnapshot() {
   }
 
   try {
-    if (!Object.keys(messageDrafts.value).length && !Object.keys(messageRecoveries.value).length) {
+    const compactedSnapshot = compactPersistedPetPalMessageComposerRecords({
+      drafts: messageDrafts.value,
+      recoveries: messageRecoveries.value,
+    })
+
+    messageDrafts.value = compactedSnapshot.drafts
+    messageRecoveries.value = compactedSnapshot.recoveries
+
+    if (!Object.keys(compactedSnapshot.drafts).length && !Object.keys(compactedSnapshot.recoveries).length) {
       uni.removeStorageSync(STORAGE_KEY)
       return
     }
 
     uni.setStorageSync(STORAGE_KEY, {
-      drafts: messageDrafts.value,
-      recoveries: messageRecoveries.value,
-    } satisfies PersistedPetPalMessageComposerSnapshot)
+      drafts: compactedSnapshot.drafts,
+      recoveries: compactedSnapshot.recoveries,
+    } satisfies PersistedPetPalMessageComposerRecords)
   }
   catch {
     // Ignore storage failures and keep runtime state usable.
   }
 }
+
+syncPersistedPetPalMessageComposerSnapshot()
 
 export function hasPetPalMessageDraft(orderId: string) {
   return Boolean(messageDrafts.value[orderId])
@@ -220,10 +396,7 @@ export function restorePetPalMessageDraft(orderId: string) {
   if (!draft) {
     return null
   }
-  return {
-    content: draft.content,
-    attachments: cloneMessageDraftAttachments(draft.attachments),
-  } satisfies PetPalMessageDraftState
+  return cloneMessageDraftState(draft)
 }
 
 export function clearPetPalMessageDraft(orderId: string) {
@@ -258,6 +431,7 @@ export function persistPetPalMessageDraft(
     [orderId]: {
       content,
       attachments: nextAttachments,
+      updatedAt: new Date().toISOString(),
     },
   }
   syncPersistedPetPalMessageComposerSnapshot()
@@ -268,7 +442,15 @@ export function hasPetPalMessageRecovery(orderId: string) {
 }
 
 export function getPetPalMessageRecovery(orderId: string) {
-  return messageRecoveries.value[orderId] || null
+  const recovery = messageRecoveries.value[orderId]
+  if (!recovery) {
+    return null
+  }
+
+  return {
+    stage: recovery.stage,
+    message: recovery.message,
+  } satisfies PetPalMessageRecoveryState
 }
 
 export function clearPetPalMessageRecovery(orderId: string) {
@@ -296,6 +478,7 @@ export function setPetPalMessageRecovery(
     [orderId]: {
       stage,
       message,
+      updatedAt: new Date().toISOString(),
     },
   }
   syncPersistedPetPalMessageComposerSnapshot()

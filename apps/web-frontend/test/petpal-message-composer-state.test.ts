@@ -125,3 +125,79 @@ test('drops malformed petpal message composer drafts and recovery entries', () =
     },
   });
 });
+
+test('drops stale persisted petpal message composer entries', () => {
+  const snapshot = parsePersistedPetPalMessageComposerSnapshot({
+    drafts: {
+      'order-stale': {
+        content: 'old draft',
+        attachments: [],
+        updatedAt: '2026-04-01T00:00:00.000Z',
+      },
+      'order-fresh': {
+        content: 'fresh draft',
+        attachments: [],
+        updatedAt: '2026-04-08T00:00:00.000Z',
+      },
+    },
+    recoveries: {
+      'order-fresh': {
+        stage: 'send',
+        message: 'retry me',
+        updatedAt: '2026-04-08T00:00:00.000Z',
+      },
+    },
+  }, {
+    now: Date.parse('2026-04-08T12:00:00.000Z'),
+  });
+
+  assert.deepEqual(snapshot, {
+    drafts: {
+      'order-fresh': {
+        content: 'fresh draft',
+        attachments: [],
+      },
+    },
+    recoveries: {
+      'order-fresh': {
+        stage: 'send',
+        message: 'retry me',
+      },
+    },
+  });
+});
+
+test('keeps only the newest persisted petpal message composer threads', () => {
+  const drafts = Object.fromEntries(
+    Array.from({ length: 14 }, (_, index) => [
+      `order-${index + 1}`,
+      {
+        content: `draft-${index + 1}`,
+        attachments: [],
+        updatedAt: `2026-04-08T${String(index).padStart(2, '0')}:00:00.000Z`,
+      },
+    ]),
+  );
+
+  const snapshot = parsePersistedPetPalMessageComposerSnapshot({
+    drafts,
+    recoveries: {},
+  }, {
+    now: Date.parse('2026-04-08T14:30:00.000Z'),
+  });
+
+  assert.deepEqual(Object.keys(snapshot.drafts), [
+    'order-3',
+    'order-4',
+    'order-5',
+    'order-6',
+    'order-7',
+    'order-8',
+    'order-9',
+    'order-10',
+    'order-11',
+    'order-12',
+    'order-13',
+    'order-14',
+  ]);
+});
