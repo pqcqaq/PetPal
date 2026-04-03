@@ -41,6 +41,7 @@ import {
   persistPetPalMessageDraft,
   restorePetPalMessageDraft,
   setPetPalMessageRecovery,
+  type PetPalMessageComposerIdentity,
   type PetPalMessageComposerScope,
   type PetPalMessageDraftAttachment,
 } from '../petpal/message-composer-state'
@@ -72,7 +73,10 @@ const roleLabel = computed(() => (isOwnerView.value ? '主人视角' : '照料�
 const conversationMessages = computed(() => conversation.value?.messages || [])
 const messageAttachmentSlotsLeft = computed(() => Math.max(0, 3 - messageAttachments.value.length))
 const uploadingMessageAttachments = computed(() => upload.uploading.value)
-const currentMessageRecovery = computed(() => orderId.value ? getPetPalMessageRecovery(orderId.value) : null)
+const currentMessageRecovery = computed(() => {
+  const identity = buildMessageComposerIdentity(orderId.value)
+  return identity ? getPetPalMessageRecovery(identity) : null
+})
 const currentStatusLabel = computed(() => order.value ? helpers.getOrderStatusLabel(order.value.orderStatus) : '')
 const recentTimeline = computed(() => order.value?.timeline.slice().reverse().slice(0, 6) || [])
 const visibleServiceLogs = computed(() => order.value?.serviceLogs.slice().reverse() || [])
@@ -106,10 +110,69 @@ function resetComposer() {
   messageAttachments.value = []
 }
 
+function buildMessageComposerIdentity(
+  currentOrderId: string,
+  scope?: PetPalMessageComposerScope,
+): PetPalMessageComposerIdentity | null {
+  const normalizedOrderId = currentOrderId.trim()
+  const userId = userInfo.value.id?.trim()
+  if (!normalizedOrderId || !userId) {
+    return null
+  }
+
+  return scope
+    ? {
+        orderId: normalizedOrderId,
+        userId,
+        scope,
+      }
+    : {
+        orderId: normalizedOrderId,
+        userId,
+      }
+}
+
 function restoreComposerState(currentOrderId: string) {
-  const draft = restorePetPalMessageDraft(currentOrderId)
+  const identity = buildMessageComposerIdentity(currentOrderId, messageComposerScope.value)
+  const draft = identity ? restorePetPalMessageDraft(identity) : null
   messageText.value = draft?.content || ''
   messageAttachments.value = draft?.attachments || []
+}
+
+function persistCurrentMessageDraft(
+  currentOrderId: string,
+  scope: PetPalMessageComposerScope = messageComposerScope.value,
+) {
+  const identity = buildMessageComposerIdentity(currentOrderId, scope)
+  if (!identity) {
+    return
+  }
+
+  persistPetPalMessageDraft(identity, messageText.value, messageAttachments.value)
+}
+
+function clearCurrentMessageDraft(
+  currentOrderId: string,
+  scope: PetPalMessageComposerScope = messageComposerScope.value,
+) {
+  const identity = buildMessageComposerIdentity(currentOrderId, scope)
+  if (!identity) {
+    return
+  }
+
+  clearPetPalMessageDraft(identity)
+}
+
+function clearCurrentMessageRecovery(
+  currentOrderId: string,
+  scope: PetPalMessageComposerScope = messageComposerScope.value,
+) {
+  const identity = buildMessageComposerIdentity(currentOrderId, scope)
+  if (!identity) {
+    return
+  }
+
+  clearPetPalMessageRecovery(identity)
 }
 
 async function loadPage() {
@@ -204,12 +267,15 @@ async function uploadMessageMaterials() {
       maxCount: messageAttachmentSlotsLeft.value,
     })
     messageAttachments.value = [...messageAttachments.value, ...files]
-    clearPetPalMessageRecovery(orderId.value)
+    clearCurrentMessageRecovery(orderId.value)
     toast(files.length === 1 ? '消息图片已上传' : `已上传 ${files.length} 张图片`, 'success')
   }
   catch (error: unknown) {
     const message = `${getErrorMessage(error, '上传失败')}，已完成的图片仍会保留在当前草稿中。`
-    setPetPalMessageRecovery(orderId.value, 'upload', message, messageComposerScope.value)
+    const identity = buildMessageComposerIdentity(orderId.value, messageComposerScope.value)
+    if (identity) {
+      setPetPalMessageRecovery(identity, 'upload', message)
+    }
     toast(message)
   }
 }
@@ -235,15 +301,18 @@ async function handleSendMessage() {
       content: content || undefined,
       mediaUrls,
     })
-    clearPetPalMessageDraft(order.value.id)
-    clearPetPalMessageRecovery(order.value.id)
+    clearCurrentMessageDraft(order.value.id)
+    clearCurrentMessageRecovery(order.value.id)
     resetComposer()
     toast('消息已发送', 'success')
     await loadPage()
   }
   catch (error: unknown) {
     const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`
-    setPetPalMessageRecovery(order.value.id, 'send', message, messageComposerScope.value)
+    const identity = buildMessageComposerIdentity(order.value.id, messageComposerScope.value)
+    if (identity) {
+      setPetPalMessageRecovery(identity, 'send', message)
+    }
     toast(message)
   }
   finally {
@@ -315,23 +384,13 @@ watch(activeTab, async (value) => {
 
 watch(messageText, () => {
   if (orderId.value) {
-    persistPetPalMessageDraft(
-      orderId.value,
-      messageText.value,
-      messageAttachments.value,
-      messageComposerScope.value,
-    )
+    persistCurrentMessageDraft(orderId.value, messageComposerScope.value)
   }
 })
 
 watch(messageAttachments, () => {
   if (orderId.value) {
-    persistPetPalMessageDraft(
-      orderId.value,
-      messageText.value,
-      messageAttachments.value,
-      messageComposerScope.value,
-    )
+    persistCurrentMessageDraft(orderId.value, messageComposerScope.value)
   }
 }, { deep: true })
 
@@ -340,19 +399,15 @@ watch(orderId, (value, previousValue) => {
     return
   }
   if (previousValue) {
-    persistPetPalMessageDraft(
-      previousValue,
-      messageText.value,
-      messageAttachments.value,
-      messageComposerScope.value,
-    )
+    persistCurrentMessageDraft(previousValue, messageComposerScope.value)
   }
   if (!value) {
     messageComposerScope.value = 'shared'
     resetComposer()
     return
   }
-  messageComposerScope.value = getPetPalMessageComposerScope(value) ?? 'shared'
+  const identity = buildMessageComposerIdentity(value)
+  messageComposerScope.value = identity ? (getPetPalMessageComposerScope(identity) ?? 'shared') : 'shared'
   restoreComposerState(value)
 }, { immediate: true })
 
@@ -492,7 +547,7 @@ onPullDownRefresh(() => {
                 >
                   {{ currentMessageRecovery.stage === 'send' ? '重试发送' : '重新上传图片' }}
                 </button>
-                <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="clearPetPalMessageRecovery(order.id)">
+                <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="clearCurrentMessageRecovery(order.id)">
                   清除提示
                 </button>
               </view>

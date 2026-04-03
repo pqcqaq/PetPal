@@ -7882,6 +7882,60 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.238 2026-04-04（P3-M1 Slice 238）
+
+**概述**：上一轮已经把消息缓存按 `owner / caregiver / shared` 作用域分桶，但真正的缓存主键仍只有 `orderId`。这意味着同一订单号下如果出现不同账号切换，或极端情况下同一账号以不同角色命中同一订单，会话草稿与恢复提示仍存在串扰边界。本轮继续沿消息状态主链路把缓存 identity 升级为“用户 + 角色 + 订单”复合键，彻底收掉跨账号和同订单双角色的歧义。
+
+已完成：
+
+- Web 端已补消息缓存复合 identity：
+  - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts`
+    - 新增 `PetPalMessageComposerIdentity` 与 `buildPetPalMessageComposerStorageKey(...)`，本地草稿 / 恢复态现在统一按 `userId + scope + orderId` 复合键存取。
+    - 持久化记录已补 `orderId`、`userId`、`scope`、`updatedAt` 元数据，并继续兼容旧版本只按 `orderId` 存储、缺少 `scope` 或缺少 `userId` 的本地快照。
+    - 读取显式作用域时会优先命中当前 `userId + scope + orderId`，必要时仅回退到同一用户同一订单的 `shared` 记录；写入显式作用域时会主动清掉该用户该订单遗留的 `shared` 记录，避免旧桶长期并存。
+    - 本地缓存裁剪粒度已进一步收口到 `userId + scope` 分桶，不同账号之间不再共享同一批缓存名额。
+- App 端已补同一套复合 identity 规则：
+  - `apps/app-frontend/src/pages/petpal/message-composer-state.ts`
+    - `uni` 本地存储中的消息草稿 / 恢复态也已对齐为 `userId + scope + orderId` 复合键，并继续兼容旧版按 `orderId` 的历史快照。
+    - 同一用户不同角色、同一订单不同用户的本地缓存现在都会自然隔离，不再依赖“作用域不冲突”的前提假设。
+- 四个消息入口页已对齐透传当前用户 identity：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalMessagesView.vue`
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+  - `apps/app-frontend/src/pages/petpal/messages.vue`
+  - `apps/app-frontend/src/pages/order-detail/index.vue`
+    - 消息中心和订单详情沟通区现在都会显式透传当前 `userId + scope + orderId` 读写草稿 / 恢复态，不再只依赖订单号和页面当前角色推断。
+    - 当前线程草稿提示、失败恢复提示、上传失败写回、发送失败写回以及切单前自动保存都已统一切到复合 identity。
+- Web 定向单测已补复合 key 覆盖：
+  - `apps/web-frontend/test/petpal-message-composer-state.test.ts`
+    - 现已改为断言复合 storage key 输出，并补了旧版 `orderId` key 兼容恢复。
+    - 新增“同订单不同用户并存”的定向单测，保证后续不会再把缓存主键退回单一 `orderId`。
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-message-composer-state.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有改动订单消息接口、附件上传标签、消息发送协议或订单详情数据结构，变化继续收敛在消息状态模块和页面侧 identity 透传链路。
+- 已确认旧版只按 `orderId` 存储的本地快照仍可恢复，并会在下一次写入时自然升级到复合 key，不会因为结构升级直接丢历史草稿。
+- 已确认消息中心、订单详情、Web 与 App 四个入口的本地草稿 / 恢复提示现在都要求同一用户 identity 才会命中，不会把别的账号在同订单下的本地缓存误恢复出来。
+
+风险与缓解：
+
+- 风险：在极早的登录态恢复窗口内，如果当前用户 identity 还没准备好，页面不会立即把输入落到本地缓存。
+- 缓解：本轮优先保证“有明确用户 identity 时绝不串缓存”；消息发送本身也要求已登录，登录态完成后后续输入仍会正常持久化。
+
+- 风险：为了兼容旧版 `shared` 快照，当前显式作用域读取仍保留“同用户同订单 shared 回退”逻辑，极少数陈旧旧桶会在下一次写入或清理前暂时存在。
+- 缓解：本轮已经把写入链路改为自动清掉同用户同订单的 `shared` 旧记录，并把裁剪粒度收口到 `userId + scope`，历史歧义会随着正常使用逐步被自然消解。
+
+下一步（1-3）：
+
+1. 继续评估是否需要对旧版匿名 `shared` 快照补一次显式迁移或清理，让本地结构更快完全收口到复合 identity。
+2. 继续评估订单消息与投诉证据是否要统一升级为带 `fileId` 的受控附件快照，进一步提升附件引用追踪可靠性。
+3. 继续按切片节奏推进局部改动、定向验证、本地提交和文档同步，不回到无边界大改。
+
 ### 14.237 2026-04-04（P3-M1 Slice 237）
 
 **概述**：上一轮已经给消息草稿 / 恢复态补了本地持久化和统一淘汰规则，但缓存容量仍按单一线程池计算。对于同时拥有主人与照料者身份的账号，某一侧高频切单会把另一侧的本地草稿挤掉。本轮继续沿消息状态主链路补齐“按角色作用域分桶缓存”，让双身份用户在两套工作上下文之间切换时仍能分别保留最近会话。

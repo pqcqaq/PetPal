@@ -15,6 +15,7 @@ import {
   persistPetPalMessageDraft,
   restorePetPalMessageDraft,
   setPetPalMessageRecovery,
+  type PetPalMessageComposerIdentity,
   type PetPalMessageComposerScope,
   type PetPalMessageDraftAttachment,
 } from './message-composer-state'
@@ -112,12 +113,38 @@ const priorityRow = computed(() => visibleRows.value[0] ?? null)
 const currentThreadOrder = computed(() => currentOrders.value.find(item => item.id === selectedOrderId.value) ?? null)
 const currentThreadSummary = computed(() =>
   currentThreadOrder.value ? describeConversation(currentThreadOrder.value, role.value) : null)
-const currentThreadRecovery = computed(() =>
-  currentThreadOrder.value ? getPetPalMessageRecovery(currentThreadOrder.value.id) : null)
+const currentThreadRecovery = computed(() => {
+  const identity = currentThreadOrder.value
+    ? buildThreadIdentity(currentThreadOrder.value.id, selectedThreadScope.value)
+    : null
+  return identity ? getPetPalMessageRecovery(identity) : null
+})
 const conversationMessages = computed(() => conversation.value?.messages || [])
 const messageAttachmentSlotsLeft = computed(() => Math.max(0, 3 - messageAttachments.value.length))
 const uploadingMessageAttachments = computed(() => upload.uploading.value)
 const composerBusy = computed(() => upload.uploading.value || sendingMessage.value)
+
+function buildThreadIdentity(
+  orderId: string,
+  scope?: PetPalMessageComposerScope,
+): PetPalMessageComposerIdentity | null {
+  const normalizedOrderId = orderId.trim()
+  const userId = userInfo.value.id?.trim()
+  if (!normalizedOrderId || !userId) {
+    return null
+  }
+
+  return scope
+    ? {
+        orderId: normalizedOrderId,
+        userId,
+        scope,
+      }
+    : {
+        orderId: normalizedOrderId,
+        userId,
+      }
+}
 
 function resetComposer() {
   messageText.value = ''
@@ -125,11 +152,13 @@ function resetComposer() {
 }
 
 function hasThreadDraft(orderId: string) {
-  return hasPetPalMessageDraft(orderId)
+  const identity = buildThreadIdentity(orderId, role.value)
+  return identity ? hasPetPalMessageDraft(identity) : false
 }
 
 function hasThreadRecovery(orderId: string) {
-  return hasPetPalMessageRecovery(orderId)
+  const identity = buildThreadIdentity(orderId, role.value)
+  return identity ? hasPetPalMessageRecovery(identity) : false
 }
 
 function clearThreadState() {
@@ -141,22 +170,35 @@ function clearThreadState() {
 }
 
 function clearThreadDraft(orderId: string) {
-  clearPetPalMessageDraft(orderId)
+  const identity = buildThreadIdentity(orderId, selectedThreadScope.value)
+  if (!identity) {
+    return
+  }
+  clearPetPalMessageDraft(identity)
 }
 
 function clearThreadRecovery(orderId: string) {
-  clearPetPalMessageRecovery(orderId)
+  const identity = buildThreadIdentity(orderId, selectedThreadScope.value)
+  if (!identity) {
+    return
+  }
+  clearPetPalMessageRecovery(identity)
 }
 
 function persistThreadDraft(
   orderId: string,
   scope: PetPalMessageComposerScope = selectedThreadScope.value,
 ) {
-  persistPetPalMessageDraft(orderId, messageText.value, messageAttachments.value, scope)
+  const identity = buildThreadIdentity(orderId, scope)
+  if (!identity) {
+    return
+  }
+  persistPetPalMessageDraft(identity, messageText.value, messageAttachments.value)
 }
 
 function restoreThreadDraft(orderId: string) {
-  const draft = restorePetPalMessageDraft(orderId)
+  const identity = buildThreadIdentity(orderId, selectedThreadScope.value)
+  const draft = identity ? restorePetPalMessageDraft(identity) : null
   messageText.value = draft?.content || ''
   messageAttachments.value = draft?.attachments || []
 }
@@ -341,7 +383,10 @@ async function uploadMessageMaterials() {
   }
   catch (error: unknown) {
     const message = `${getErrorMessage(error, '上传失败')}，已完成的图片仍会保留在当前草稿中。`
-    setPetPalMessageRecovery(orderId, 'upload', message, selectedThreadScope.value)
+    const identity = buildThreadIdentity(orderId, selectedThreadScope.value)
+    if (identity) {
+      setPetPalMessageRecovery(identity, 'upload', message)
+    }
     toast(message)
   }
 }
@@ -378,7 +423,10 @@ async function handleSendMessage() {
   }
   catch (error: unknown) {
     const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`
-    setPetPalMessageRecovery(orderId, 'send', message, selectedThreadScope.value)
+    const identity = buildThreadIdentity(orderId, selectedThreadScope.value)
+    if (identity) {
+      setPetPalMessageRecovery(identity, 'send', message)
+    }
     toast(message)
   }
   finally {

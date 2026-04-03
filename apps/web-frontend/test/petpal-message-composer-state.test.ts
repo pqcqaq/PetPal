@@ -1,8 +1,32 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parsePersistedPetPalMessageComposerSnapshot } from '../src/pages/frontend/petpal/message-composer-state.ts';
+import {
+  buildPetPalMessageComposerStorageKey,
+  parsePersistedPetPalMessageComposerSnapshot,
+} from '../src/pages/frontend/petpal/message-composer-state.ts';
 
-test('parses persisted petpal message composer snapshots from JSON strings', () => {
+const sharedKey = (orderId: string, userId = '') =>
+  buildPetPalMessageComposerStorageKey({
+    orderId,
+    userId,
+    scope: 'shared',
+  });
+
+const ownerKey = (orderId: string, userId: string) =>
+  buildPetPalMessageComposerStorageKey({
+    orderId,
+    userId,
+    scope: 'owner',
+  });
+
+const caregiverKey = (orderId: string, userId: string) =>
+  buildPetPalMessageComposerStorageKey({
+    orderId,
+    userId,
+    scope: 'caregiver',
+  });
+
+test('parses persisted petpal message composer snapshots from legacy JSON strings', () => {
   const snapshot = parsePersistedPetPalMessageComposerSnapshot(JSON.stringify({
     drafts: {
       'order-1': {
@@ -28,7 +52,7 @@ test('parses persisted petpal message composer snapshots from JSON strings', () 
 
   assert.deepEqual(snapshot, {
     drafts: {
-      'order-1': {
+      [sharedKey('order-1')]: {
         content: 'Need an update before pickup',
         attachments: [
           {
@@ -42,7 +66,7 @@ test('parses persisted petpal message composer snapshots from JSON strings', () 
       },
     },
     recoveries: {
-      'order-1': {
+      [sharedKey('order-1')]: {
         stage: 'send',
         message: 'Network failed while sending',
       },
@@ -104,7 +128,7 @@ test('drops malformed petpal message composer drafts and recovery entries', () =
 
   assert.deepEqual(snapshot, {
     drafts: {
-      'order-valid': {
+      [sharedKey('order-valid')]: {
         content: '',
         attachments: [
           {
@@ -118,7 +142,7 @@ test('drops malformed petpal message composer drafts and recovery entries', () =
       },
     },
     recoveries: {
-      'order-valid': {
+      [sharedKey('order-valid')]: {
         stage: 'upload',
         message: 'Need to reselect the image',
       },
@@ -129,22 +153,31 @@ test('drops malformed petpal message composer drafts and recovery entries', () =
 test('drops stale persisted petpal message composer entries', () => {
   const snapshot = parsePersistedPetPalMessageComposerSnapshot({
     drafts: {
-      'order-stale': {
+      [ownerKey('order-stale', 'user-1')]: {
+        orderId: 'order-stale',
+        userId: 'user-1',
         content: 'old draft',
         attachments: [],
         updatedAt: '2026-04-01T00:00:00.000Z',
+        scope: 'owner',
       },
-      'order-fresh': {
+      [ownerKey('order-fresh', 'user-1')]: {
+        orderId: 'order-fresh',
+        userId: 'user-1',
         content: 'fresh draft',
         attachments: [],
         updatedAt: '2026-04-08T00:00:00.000Z',
+        scope: 'owner',
       },
     },
     recoveries: {
-      'order-fresh': {
+      [ownerKey('order-fresh', 'user-1')]: {
+        orderId: 'order-fresh',
+        userId: 'user-1',
         stage: 'send',
         message: 'retry me',
         updatedAt: '2026-04-08T00:00:00.000Z',
+        scope: 'owner',
       },
     },
   }, {
@@ -153,13 +186,13 @@ test('drops stale persisted petpal message composer entries', () => {
 
   assert.deepEqual(snapshot, {
     drafts: {
-      'order-fresh': {
+      [ownerKey('order-fresh', 'user-1')]: {
         content: 'fresh draft',
         attachments: [],
       },
     },
     recoveries: {
-      'order-fresh': {
+      [ownerKey('order-fresh', 'user-1')]: {
         stage: 'send',
         message: 'retry me',
       },
@@ -167,14 +200,17 @@ test('drops stale persisted petpal message composer entries', () => {
   });
 });
 
-test('keeps only the newest persisted petpal message composer threads', () => {
+test('keeps only the newest persisted petpal message composer threads per user and scope', () => {
   const drafts = Object.fromEntries(
     Array.from({ length: 14 }, (_, index) => [
-      `order-${index + 1}`,
+      ownerKey(`order-${index + 1}`, 'user-1'),
       {
+        orderId: `order-${index + 1}`,
+        userId: 'user-1',
         content: `draft-${index + 1}`,
         attachments: [],
         updatedAt: `2026-04-08T${String(index).padStart(2, '0')}:00:00.000Z`,
+        scope: 'owner',
       },
     ]),
   );
@@ -187,26 +223,28 @@ test('keeps only the newest persisted petpal message composer threads', () => {
   });
 
   assert.deepEqual(Object.keys(snapshot.drafts), [
-    'order-3',
-    'order-4',
-    'order-5',
-    'order-6',
-    'order-7',
-    'order-8',
-    'order-9',
-    'order-10',
-    'order-11',
-    'order-12',
-    'order-13',
-    'order-14',
+    ownerKey('order-3', 'user-1'),
+    ownerKey('order-4', 'user-1'),
+    ownerKey('order-5', 'user-1'),
+    ownerKey('order-6', 'user-1'),
+    ownerKey('order-7', 'user-1'),
+    ownerKey('order-8', 'user-1'),
+    ownerKey('order-9', 'user-1'),
+    ownerKey('order-10', 'user-1'),
+    ownerKey('order-11', 'user-1'),
+    ownerKey('order-12', 'user-1'),
+    ownerKey('order-13', 'user-1'),
+    ownerKey('order-14', 'user-1'),
   ]);
 });
 
 test('keeps persisted petpal message composer threads independently per scope', () => {
   const drafts = Object.fromEntries([
     ...Array.from({ length: 14 }, (_, index) => [
-      `owner-order-${index + 1}`,
+      ownerKey(`owner-order-${index + 1}`, 'user-1'),
       {
+        orderId: `owner-order-${index + 1}`,
+        userId: 'user-1',
         content: `owner-draft-${index + 1}`,
         attachments: [],
         updatedAt: `2026-04-08T${String(index).padStart(2, '0')}:00:00.000Z`,
@@ -214,8 +252,10 @@ test('keeps persisted petpal message composer threads independently per scope', 
       },
     ]),
     ...Array.from({ length: 14 }, (_, index) => [
-      `caregiver-order-${index + 1}`,
+      caregiverKey(`caregiver-order-${index + 1}`, 'user-1'),
       {
+        orderId: `caregiver-order-${index + 1}`,
+        userId: 'user-1',
         content: `caregiver-draft-${index + 1}`,
         attachments: [],
         updatedAt: `2026-04-09T${String(index).padStart(2, '0')}:00:00.000Z`,
@@ -232,12 +272,78 @@ test('keeps persisted petpal message composer threads independently per scope', 
   });
 
   assert.equal(Object.keys(snapshot.drafts).length, 24);
-  assert.equal(snapshot.drafts['owner-order-1'], undefined);
-  assert.equal(snapshot.drafts['owner-order-2'], undefined);
-  assert.equal(snapshot.drafts['caregiver-order-1'], undefined);
-  assert.equal(snapshot.drafts['caregiver-order-2'], undefined);
-  assert.equal(snapshot.drafts['owner-order-3']?.content, 'owner-draft-3');
-  assert.equal(snapshot.drafts['owner-order-14']?.content, 'owner-draft-14');
-  assert.equal(snapshot.drafts['caregiver-order-3']?.content, 'caregiver-draft-3');
-  assert.equal(snapshot.drafts['caregiver-order-14']?.content, 'caregiver-draft-14');
+  assert.equal(snapshot.drafts[ownerKey('owner-order-1', 'user-1')], undefined);
+  assert.equal(snapshot.drafts[ownerKey('owner-order-2', 'user-1')], undefined);
+  assert.equal(snapshot.drafts[caregiverKey('caregiver-order-1', 'user-1')], undefined);
+  assert.equal(snapshot.drafts[caregiverKey('caregiver-order-2', 'user-1')], undefined);
+  assert.equal(snapshot.drafts[ownerKey('owner-order-3', 'user-1')]?.content, 'owner-draft-3');
+  assert.equal(snapshot.drafts[ownerKey('owner-order-14', 'user-1')]?.content, 'owner-draft-14');
+  assert.equal(snapshot.drafts[caregiverKey('caregiver-order-3', 'user-1')]?.content, 'caregiver-draft-3');
+  assert.equal(snapshot.drafts[caregiverKey('caregiver-order-14', 'user-1')]?.content, 'caregiver-draft-14');
+});
+
+test('keeps same-order drafts independently per user identity', () => {
+  const snapshot = parsePersistedPetPalMessageComposerSnapshot({
+    drafts: {
+      [ownerKey('order-1', 'user-1')]: {
+        orderId: 'order-1',
+        userId: 'user-1',
+        content: 'owner one draft',
+        attachments: [],
+        updatedAt: '2026-04-08T10:00:00.000Z',
+        scope: 'owner',
+      },
+      [ownerKey('order-1', 'user-2')]: {
+        orderId: 'order-1',
+        userId: 'user-2',
+        content: 'owner two draft',
+        attachments: [],
+        updatedAt: '2026-04-08T11:00:00.000Z',
+        scope: 'owner',
+      },
+    },
+    recoveries: {
+      [ownerKey('order-1', 'user-1')]: {
+        orderId: 'order-1',
+        userId: 'user-1',
+        stage: 'send',
+        message: 'user one retry',
+        updatedAt: '2026-04-08T10:30:00.000Z',
+        scope: 'owner',
+      },
+      [ownerKey('order-1', 'user-2')]: {
+        orderId: 'order-1',
+        userId: 'user-2',
+        stage: 'upload',
+        message: 'user two retry',
+        updatedAt: '2026-04-08T11:30:00.000Z',
+        scope: 'owner',
+      },
+    },
+  }, {
+    now: Date.parse('2026-04-08T12:00:00.000Z'),
+  });
+
+  assert.deepEqual(snapshot, {
+    drafts: {
+      [ownerKey('order-1', 'user-1')]: {
+        content: 'owner one draft',
+        attachments: [],
+      },
+      [ownerKey('order-1', 'user-2')]: {
+        content: 'owner two draft',
+        attachments: [],
+      },
+    },
+    recoveries: {
+      [ownerKey('order-1', 'user-1')]: {
+        stage: 'send',
+        message: 'user one retry',
+      },
+      [ownerKey('order-1', 'user-2')]: {
+        stage: 'upload',
+        message: 'user two retry',
+      },
+    },
+  });
 });

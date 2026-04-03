@@ -22,17 +22,27 @@ export type PetPalMessageRecoveryState = {
 
 export type PetPalMessageComposerScope = 'owner' | 'caregiver' | 'shared';
 
+export type PetPalMessageComposerIdentity = {
+  orderId: string;
+  userId: string;
+  scope?: PetPalMessageComposerScope;
+};
+
 export type PersistedPetPalMessageComposerSnapshot = {
   drafts: Record<string, PetPalMessageDraftState>;
   recoveries: Record<string, PetPalMessageRecoveryState>;
 };
 
 type PersistedPetPalMessageDraftRecord = PetPalMessageDraftState & {
+  orderId: string;
+  userId: string;
   updatedAt: string;
   scope: PetPalMessageComposerScope;
 };
 
 type PersistedPetPalMessageRecoveryRecord = PetPalMessageRecoveryState & {
+  orderId: string;
+  userId: string;
   updatedAt: string;
   scope: PetPalMessageComposerScope;
 };
@@ -42,7 +52,21 @@ type PersistedPetPalMessageComposerRecords = {
   recoveries: Record<string, PersistedPetPalMessageRecoveryRecord>;
 };
 
+type ResolvedPetPalMessageComposerIdentity = {
+  orderId: string;
+  userId: string;
+  scope: PetPalMessageComposerScope;
+};
+
+type PetPalMessageComposerLookupIdentity = {
+  orderId: string;
+  userId: string;
+  scope?: PetPalMessageComposerScope;
+};
+
 const STORAGE_KEY = 'petpal-message-composer-state-v1';
+const MESSAGE_COMPOSER_STORAGE_KEY_PREFIX = 'petpal-message-composer';
+const MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR = '::';
 const MAX_PERSISTED_THREADS = 12;
 const MAX_PERSISTED_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -56,6 +80,94 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const normalizeMessageComposerScope = (value: unknown): PetPalMessageComposerScope =>
   value === 'owner' || value === 'caregiver' ? value : 'shared';
+
+const normalizeMessageComposerOrderId = (value: unknown) =>
+  typeof value === 'string' ? value.trim() : '';
+
+const normalizeMessageComposerUserId = (value: unknown) =>
+  typeof value === 'string' ? value.trim() : '';
+
+const resolveMessageComposerLookupIdentity = (
+  identity: PetPalMessageComposerIdentity,
+): PetPalMessageComposerLookupIdentity | null => {
+  const orderId = normalizeMessageComposerOrderId(identity.orderId);
+  const userId = normalizeMessageComposerUserId(identity.userId);
+  if (!orderId || !userId) {
+    return null;
+  }
+
+  return identity.scope
+    ? {
+        orderId,
+        userId,
+        scope: normalizeMessageComposerScope(identity.scope),
+      }
+    : {
+        orderId,
+        userId,
+      };
+};
+
+const resolveMessageComposerIdentity = (
+  identity: PetPalMessageComposerIdentity,
+  fallbackScope: PetPalMessageComposerScope = 'shared',
+): ResolvedPetPalMessageComposerIdentity | null => {
+  const lookupIdentity = resolveMessageComposerLookupIdentity(identity);
+  if (!lookupIdentity) {
+    return null;
+  }
+
+  return {
+    orderId: lookupIdentity.orderId,
+    userId: lookupIdentity.userId,
+    scope: lookupIdentity.scope ?? fallbackScope,
+  };
+};
+
+export function buildPetPalMessageComposerStorageKey(
+  identity: {
+    orderId: string;
+    userId: string;
+    scope: PetPalMessageComposerScope;
+  },
+) {
+  return [
+    MESSAGE_COMPOSER_STORAGE_KEY_PREFIX,
+    `order=${encodeURIComponent(identity.orderId)}`,
+    `scope=${identity.scope}`,
+    `user=${encodeURIComponent(identity.userId)}`,
+  ].join(MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR);
+}
+
+const parsePetPalMessageComposerStorageKey = (
+  storageKey: string,
+): ResolvedPetPalMessageComposerIdentity | null => {
+  const segments = storageKey.split(MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR);
+  if (segments.length !== 4 || segments[0] !== MESSAGE_COMPOSER_STORAGE_KEY_PREFIX) {
+    return null;
+  }
+
+  const orderId = segments[1]?.startsWith('order=')
+    ? decodeURIComponent(segments[1].slice('order='.length))
+    : '';
+  const scope = segments[2]?.startsWith('scope=')
+    ? normalizeMessageComposerScope(segments[2].slice('scope='.length))
+    : 'shared';
+  const userId = segments[3]?.startsWith('user=')
+    ? decodeURIComponent(segments[3].slice('user='.length))
+    : '';
+
+  const normalizedOrderId = normalizeMessageComposerOrderId(orderId);
+  if (!normalizedOrderId) {
+    return null;
+  }
+
+  return {
+    orderId: normalizedOrderId,
+    userId: typeof userId === 'string' ? userId : '',
+    scope,
+  };
+};
 
 const cloneMessageDraftAttachments = (attachments: PetPalMessageDraftAttachment[]) =>
   attachments.map((item) => ({
@@ -141,7 +253,30 @@ const toDraftState = (rawValue: unknown): PetPalMessageDraftState | null => {
   };
 };
 
+const resolvePersistedRecordIdentity = (
+  storageKey: string,
+  rawValue: Record<string, unknown>,
+  fallbackScope: PetPalMessageComposerScope = 'shared',
+): ResolvedPetPalMessageComposerIdentity | null => {
+  const parsedIdentity = parsePetPalMessageComposerStorageKey(storageKey);
+  const orderId = normalizeMessageComposerOrderId(rawValue.orderId)
+    || parsedIdentity?.orderId
+    || normalizeMessageComposerOrderId(storageKey);
+  if (!orderId) {
+    return null;
+  }
+
+  return {
+    orderId,
+    userId: normalizeMessageComposerUserId(rawValue.userId) || parsedIdentity?.userId || '',
+    scope: rawValue.scope !== undefined
+      ? normalizeMessageComposerScope(rawValue.scope)
+      : parsedIdentity?.scope ?? fallbackScope,
+  };
+};
+
 const toDraftRecord = (
+  storageKey: string,
   rawValue: unknown,
   fallbackUpdatedAt: string,
 ): PersistedPetPalMessageDraftRecord | null => {
@@ -154,14 +289,21 @@ const toDraftRecord = (
     return null;
   }
 
+  const identity = resolvePersistedRecordIdentity(storageKey, rawValue);
+  if (!identity) {
+    return null;
+  }
+
   const updatedAt = typeof rawValue.updatedAt === 'string' && toTimestamp(rawValue.updatedAt)
     ? rawValue.updatedAt
     : fallbackUpdatedAt;
 
   return {
     ...cloneMessageDraftState(draft),
+    orderId: identity.orderId,
+    userId: identity.userId,
     updatedAt,
-    scope: normalizeMessageComposerScope(rawValue.scope),
+    scope: identity.scope,
   };
 };
 
@@ -182,6 +324,7 @@ const toRecoveryState = (rawValue: unknown): PetPalMessageRecoveryState | null =
 };
 
 const toRecoveryRecord = (
+  storageKey: string,
   rawValue: unknown,
   fallbackUpdatedAt: string,
 ): PersistedPetPalMessageRecoveryRecord | null => {
@@ -194,15 +337,22 @@ const toRecoveryRecord = (
     return null;
   }
 
+  const identity = resolvePersistedRecordIdentity(storageKey, rawValue);
+  if (!identity) {
+    return null;
+  }
+
   const updatedAt = typeof rawValue.updatedAt === 'string' && toTimestamp(rawValue.updatedAt)
     ? rawValue.updatedAt
     : fallbackUpdatedAt;
 
   return {
+    orderId: identity.orderId,
+    userId: identity.userId,
     stage: recovery.stage,
     message: recovery.message,
     updatedAt,
-    scope: normalizeMessageComposerScope(rawValue.scope),
+    scope: identity.scope,
   };
 };
 
@@ -210,86 +360,268 @@ const compactPersistedPetPalMessageComposerRecords = (
   snapshot: PersistedPetPalMessageComposerRecords,
   now = Date.now(),
 ): PersistedPetPalMessageComposerRecords => {
-  const orderTimestampsByScope = new Map<PetPalMessageComposerScope, Map<string, number>>();
+  const identityTimestampsByBucket = new Map<string, Map<string, number>>();
   const collectTimestamp = (
-    orderId: string,
+    identity: ResolvedPetPalMessageComposerIdentity,
     updatedAt: string,
-    scope: PetPalMessageComposerScope,
   ) => {
     const timestamp = toTimestamp(updatedAt);
     if (timestamp === null) {
       return;
     }
 
-    const scopedTimestamps = orderTimestampsByScope.get(scope) ?? new Map<string, number>();
-    const previousTimestamp = scopedTimestamps.get(orderId);
+    const bucketKey = `${identity.userId}${MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR}${identity.scope}`;
+    const identityKey = buildPetPalMessageComposerStorageKey(identity);
+    const bucketTimestamps = identityTimestampsByBucket.get(bucketKey) ?? new Map<string, number>();
+    const previousTimestamp = bucketTimestamps.get(identityKey);
     if (previousTimestamp === undefined || timestamp > previousTimestamp) {
-      scopedTimestamps.set(orderId, timestamp);
-      orderTimestampsByScope.set(scope, scopedTimestamps);
+      bucketTimestamps.set(identityKey, timestamp);
+      identityTimestampsByBucket.set(bucketKey, bucketTimestamps);
     }
   };
 
-  Object.entries(snapshot.drafts).forEach(([orderId, draft]) => {
-    collectTimestamp(orderId, draft.updatedAt, draft.scope);
+  Object.values(snapshot.drafts).forEach((draft) => {
+    collectTimestamp({
+      orderId: draft.orderId,
+      userId: draft.userId,
+      scope: draft.scope,
+    }, draft.updatedAt);
   });
-  Object.entries(snapshot.recoveries).forEach(([orderId, recovery]) => {
-    collectTimestamp(orderId, recovery.updatedAt, recovery.scope);
+  Object.values(snapshot.recoveries).forEach((recovery) => {
+    collectTimestamp({
+      orderId: recovery.orderId,
+      userId: recovery.userId,
+      scope: recovery.scope,
+    }, recovery.updatedAt);
   });
 
-  const retainedOrderIdsByScope = new Map(
-    Array.from(orderTimestampsByScope.entries()).map(([scope, orderTimestamps]) => [
-      scope,
+  const retainedIdentityKeysByBucket = new Map(
+    Array.from(identityTimestampsByBucket.entries()).map(([bucketKey, identityTimestamps]) => [
+      bucketKey,
       new Set(
-        Array.from(orderTimestamps.entries())
+        Array.from(identityTimestamps.entries())
           .filter(([, timestamp]) => now - timestamp <= MAX_PERSISTED_AGE_MS)
           .sort((left, right) => right[1] - left[1])
           .slice(0, MAX_PERSISTED_THREADS)
-          .map(([orderId]) => orderId),
+          .map(([identityKey]) => identityKey),
       ),
     ] as const),
   );
 
   return {
     drafts: Object.fromEntries(
-      Object.entries(snapshot.drafts)
-        .filter(([orderId, draft]) => retainedOrderIdsByScope.get(draft.scope)?.has(orderId))
-        .map(([orderId, draft]) => [
-          orderId,
-          {
-            ...cloneMessageDraftState(draft),
-            updatedAt: draft.updatedAt,
-            scope: draft.scope,
-          } satisfies PersistedPetPalMessageDraftRecord,
-        ]),
+      Object.values(snapshot.drafts).flatMap((draft) => {
+        const identity = {
+          orderId: draft.orderId,
+          userId: draft.userId,
+          scope: draft.scope,
+        } satisfies ResolvedPetPalMessageComposerIdentity;
+        const storageKey = buildPetPalMessageComposerStorageKey(identity);
+        const bucketKey = `${draft.userId}${MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR}${draft.scope}`;
+        return retainedIdentityKeysByBucket.get(bucketKey)?.has(storageKey)
+          ? [[
+              storageKey,
+              {
+                ...cloneMessageDraftState(draft),
+                orderId: draft.orderId,
+                userId: draft.userId,
+                updatedAt: draft.updatedAt,
+                scope: draft.scope,
+              } satisfies PersistedPetPalMessageDraftRecord,
+            ] as const]
+          : [];
+      }),
     ),
     recoveries: Object.fromEntries(
-      Object.entries(snapshot.recoveries)
-        .filter(([orderId, recovery]) => retainedOrderIdsByScope.get(recovery.scope)?.has(orderId))
-        .map(([orderId, recovery]) => [
-          orderId,
-          {
-            stage: recovery.stage,
-            message: recovery.message,
-            updatedAt: recovery.updatedAt,
-            scope: recovery.scope,
-          } satisfies PersistedPetPalMessageRecoveryRecord,
-        ]),
+      Object.values(snapshot.recoveries).flatMap((recovery) => {
+        const identity = {
+          orderId: recovery.orderId,
+          userId: recovery.userId,
+          scope: recovery.scope,
+        } satisfies ResolvedPetPalMessageComposerIdentity;
+        const storageKey = buildPetPalMessageComposerStorageKey(identity);
+        const bucketKey = `${recovery.userId}${MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR}${recovery.scope}`;
+        return retainedIdentityKeysByBucket.get(bucketKey)?.has(storageKey)
+          ? [[
+              storageKey,
+              {
+                orderId: recovery.orderId,
+                userId: recovery.userId,
+                stage: recovery.stage,
+                message: recovery.message,
+                updatedAt: recovery.updatedAt,
+                scope: recovery.scope,
+              } satisfies PersistedPetPalMessageRecoveryRecord,
+            ] as const]
+          : [];
+      }),
     ),
   };
+};
+
+const matchesMessageComposerLookup = (
+  record: {
+    orderId: string;
+    userId: string;
+    scope: PetPalMessageComposerScope;
+  },
+  identity: PetPalMessageComposerLookupIdentity,
+) =>
+  record.orderId === identity.orderId
+  && record.userId === identity.userId
+  && (!identity.scope || record.scope === identity.scope);
+
+const getLatestMessageComposerEntry = <
+  T extends {
+    orderId: string;
+    userId: string;
+    scope: PetPalMessageComposerScope;
+    updatedAt: string;
+  },
+>(
+  records: Record<string, T>,
+  identity: PetPalMessageComposerLookupIdentity,
+): [string, T] | null => {
+  const matchingEntries = Object.entries(records).filter(([, record]) =>
+    matchesMessageComposerLookup(record, identity));
+  if (!matchingEntries.length) {
+    return null;
+  }
+
+  return matchingEntries.sort((left, right) =>
+    (toTimestamp(right[1].updatedAt) ?? 0) - (toTimestamp(left[1].updatedAt) ?? 0))[0] ?? null;
+};
+
+const getMessageComposerEntry = <
+  T extends {
+    orderId: string;
+    userId: string;
+    scope: PetPalMessageComposerScope;
+    updatedAt: string;
+  },
+>(
+  records: Record<string, T>,
+  identity: PetPalMessageComposerIdentity,
+): [string, T] | null => {
+  const lookupIdentity = resolveMessageComposerLookupIdentity(identity);
+  if (!lookupIdentity) {
+    return null;
+  }
+
+  if (!lookupIdentity.scope) {
+    return getLatestMessageComposerEntry(records, lookupIdentity);
+  }
+
+  const exactKey = buildPetPalMessageComposerStorageKey({
+    orderId: lookupIdentity.orderId,
+    userId: lookupIdentity.userId,
+    scope: lookupIdentity.scope,
+  });
+  const exactRecord = records[exactKey];
+  if (exactRecord && matchesMessageComposerLookup(exactRecord, lookupIdentity)) {
+    return [exactKey, exactRecord];
+  }
+
+  if (lookupIdentity.scope === 'shared') {
+    return null;
+  }
+
+  const sharedKey = buildPetPalMessageComposerStorageKey({
+    orderId: lookupIdentity.orderId,
+    userId: lookupIdentity.userId,
+    scope: 'shared',
+  });
+  const sharedRecord = records[sharedKey];
+  if (sharedRecord && matchesMessageComposerLookup(sharedRecord, {
+    ...lookupIdentity,
+    scope: 'shared',
+  })) {
+    return [sharedKey, sharedRecord];
+  }
+
+  return null;
+};
+
+const getMessageComposerKeysToClear = <
+  T extends {
+    orderId: string;
+    userId: string;
+    scope: PetPalMessageComposerScope;
+    updatedAt: string;
+  },
+>(
+  records: Record<string, T>,
+  identity: PetPalMessageComposerIdentity,
+) => {
+  const lookupIdentity = resolveMessageComposerLookupIdentity(identity);
+  if (!lookupIdentity) {
+    return [] as string[];
+  }
+
+  if (!lookupIdentity.scope) {
+    return Object.entries(records)
+      .filter(([, record]) => matchesMessageComposerLookup(record, lookupIdentity))
+      .map(([storageKey]) => storageKey);
+  }
+
+  const exactKey = buildPetPalMessageComposerStorageKey({
+    orderId: lookupIdentity.orderId,
+    userId: lookupIdentity.userId,
+    scope: lookupIdentity.scope,
+  });
+  const sharedKey = lookupIdentity.scope === 'shared'
+    ? null
+    : buildPetPalMessageComposerStorageKey({
+        orderId: lookupIdentity.orderId,
+        userId: lookupIdentity.userId,
+        scope: 'shared',
+      });
+
+  return [exactKey, sharedKey]
+    .filter((storageKey): storageKey is string => Boolean(storageKey && records[storageKey]))
+    .filter((storageKey, index, source) => source.indexOf(storageKey) === index);
+};
+
+const stripSharedMessageComposerRecord = <
+  T extends {
+    orderId: string;
+    userId: string;
+    scope: PetPalMessageComposerScope;
+  },
+>(
+  records: Record<string, T>,
+  identity: ResolvedPetPalMessageComposerIdentity,
+) => {
+  if (identity.scope === 'shared') {
+    return records;
+  }
+
+  const sharedKey = buildPetPalMessageComposerStorageKey({
+    orderId: identity.orderId,
+    userId: identity.userId,
+    scope: 'shared',
+  });
+  if (!records[sharedKey]) {
+    return records;
+  }
+
+  const nextRecords = { ...records };
+  delete nextRecords[sharedKey];
+  return nextRecords;
 };
 
 const toPublicPersistedSnapshot = (
   snapshot: PersistedPetPalMessageComposerRecords,
 ): PersistedPetPalMessageComposerSnapshot => ({
   drafts: Object.fromEntries(
-    Object.entries(snapshot.drafts).map(([orderId, draft]) => [
-      orderId,
+    Object.entries(snapshot.drafts).map(([storageKey, draft]) => [
+      storageKey,
       cloneMessageDraftState(draft),
     ]),
   ),
   recoveries: Object.fromEntries(
-    Object.entries(snapshot.recoveries).map(([orderId, recovery]) => [
-      orderId,
+    Object.entries(snapshot.recoveries).map(([storageKey, recovery]) => [
+      storageKey,
       {
         stage: recovery.stage,
         message: recovery.message,
@@ -310,25 +642,33 @@ const parsePersistedPetPalMessageComposerRecords = (
   const fallbackUpdatedAt = new Date(now).toISOString();
   const rawDrafts = isRecord(normalized.drafts) ? normalized.drafts : {};
   const drafts = Object.fromEntries(
-    Object.entries(rawDrafts).flatMap(([orderId, rawDraft]) => {
-      if (!orderId.trim()) {
+    Object.entries(rawDrafts).flatMap(([storageKey, rawDraft]) => {
+      const draft = toDraftRecord(storageKey, rawDraft, fallbackUpdatedAt);
+      if (!draft) {
         return [];
       }
 
-      const draft = toDraftRecord(rawDraft, fallbackUpdatedAt);
-      return draft ? [[orderId, draft] as const] : [];
+      return [[buildPetPalMessageComposerStorageKey({
+        orderId: draft.orderId,
+        userId: draft.userId,
+        scope: draft.scope,
+      }), draft] as const];
     }),
   );
 
   const rawRecoveries = isRecord(normalized.recoveries) ? normalized.recoveries : {};
   const recoveries = Object.fromEntries(
-    Object.entries(rawRecoveries).flatMap(([orderId, rawRecovery]) => {
-      if (!orderId.trim()) {
+    Object.entries(rawRecoveries).flatMap(([storageKey, rawRecovery]) => {
+      const recovery = toRecoveryRecord(storageKey, rawRecovery, fallbackUpdatedAt);
+      if (!recovery) {
         return [];
       }
 
-      const recovery = toRecoveryRecord(rawRecovery, fallbackUpdatedAt);
-      return recovery ? [[orderId, recovery] as const] : [];
+      return [[buildPetPalMessageComposerStorageKey({
+        orderId: recovery.orderId,
+        userId: recovery.userId,
+        scope: recovery.scope,
+      }), recovery] as const];
     }),
   );
 
@@ -410,73 +750,82 @@ function syncPersistedPetPalMessageComposerSnapshot() {
 
 syncPersistedPetPalMessageComposerSnapshot();
 
-export function hasPetPalMessageDraft(orderId: string) {
-  return Boolean(messageDrafts.value[orderId]);
+export function hasPetPalMessageDraft(identity: PetPalMessageComposerIdentity) {
+  return Boolean(getMessageComposerEntry(messageDrafts.value, identity));
 }
 
-export function restorePetPalMessageDraft(orderId: string) {
-  const draft = messageDrafts.value[orderId];
-  if (!draft) {
+export function restorePetPalMessageDraft(identity: PetPalMessageComposerIdentity) {
+  const draftEntry = getMessageComposerEntry(messageDrafts.value, identity);
+  if (!draftEntry) {
     return null;
   }
-  return cloneMessageDraftState(draft);
+  return cloneMessageDraftState(draftEntry[1]);
 }
 
-export function clearPetPalMessageDraft(orderId: string) {
-  if (!messageDrafts.value[orderId]) {
+export function clearPetPalMessageDraft(identity: PetPalMessageComposerIdentity) {
+  const keysToClear = getMessageComposerKeysToClear(messageDrafts.value, identity);
+  if (!keysToClear.length) {
     return;
   }
 
   const nextDrafts = { ...messageDrafts.value };
-  delete nextDrafts[orderId];
+  keysToClear.forEach((storageKey) => {
+    delete nextDrafts[storageKey];
+  });
   messageDrafts.value = nextDrafts;
   syncPersistedPetPalMessageComposerSnapshot();
 }
 
-export function getPetPalMessageComposerScope(orderId: string): PetPalMessageComposerScope | null {
-  return messageDrafts.value[orderId]?.scope
-    ?? messageRecoveries.value[orderId]?.scope
+export function getPetPalMessageComposerScope(identity: PetPalMessageComposerIdentity): PetPalMessageComposerScope | null {
+  return getMessageComposerEntry(messageDrafts.value, identity)?.[1].scope
+    ?? getMessageComposerEntry(messageRecoveries.value, identity)?.[1].scope
     ?? null;
 }
 
 export function persistPetPalMessageDraft(
-  orderId: string,
+  identity: PetPalMessageComposerIdentity,
   content: string,
   attachments: PetPalMessageDraftAttachment[],
-  scope?: PetPalMessageComposerScope,
 ) {
-  if (!orderId) {
+  const resolvedIdentity = resolveMessageComposerIdentity(
+    identity,
+    getPetPalMessageComposerScope(identity) ?? 'shared',
+  );
+  if (!resolvedIdentity) {
     return;
   }
 
   const nextAttachments = cloneMessageDraftAttachments(attachments);
   const hasDraft = content.trim().length > 0 || nextAttachments.length > 0;
   if (!hasDraft) {
-    clearPetPalMessageDraft(orderId);
+    clearPetPalMessageDraft(resolvedIdentity);
     return;
   }
 
   messageDrafts.value = {
-    ...messageDrafts.value,
-    [orderId]: {
+    ...stripSharedMessageComposerRecord(messageDrafts.value, resolvedIdentity),
+    [buildPetPalMessageComposerStorageKey(resolvedIdentity)]: {
+      orderId: resolvedIdentity.orderId,
+      userId: resolvedIdentity.userId,
       content,
       attachments: nextAttachments,
       updatedAt: new Date().toISOString(),
-      scope: scope ?? getPetPalMessageComposerScope(orderId) ?? 'shared',
+      scope: resolvedIdentity.scope,
     },
   };
   syncPersistedPetPalMessageComposerSnapshot();
 }
 
-export function hasPetPalMessageRecovery(orderId: string) {
-  return Boolean(messageRecoveries.value[orderId]);
+export function hasPetPalMessageRecovery(identity: PetPalMessageComposerIdentity) {
+  return Boolean(getMessageComposerEntry(messageRecoveries.value, identity));
 }
 
-export function getPetPalMessageRecovery(orderId: string) {
-  const recovery = messageRecoveries.value[orderId];
-  if (!recovery) {
+export function getPetPalMessageRecovery(identity: PetPalMessageComposerIdentity) {
+  const recoveryEntry = getMessageComposerEntry(messageRecoveries.value, identity);
+  if (!recoveryEntry) {
     return null;
   }
+  const recovery = recoveryEntry[1];
 
   return {
     stage: recovery.stage,
@@ -484,34 +833,42 @@ export function getPetPalMessageRecovery(orderId: string) {
   } satisfies PetPalMessageRecoveryState;
 }
 
-export function clearPetPalMessageRecovery(orderId: string) {
-  if (!messageRecoveries.value[orderId]) {
+export function clearPetPalMessageRecovery(identity: PetPalMessageComposerIdentity) {
+  const keysToClear = getMessageComposerKeysToClear(messageRecoveries.value, identity);
+  if (!keysToClear.length) {
     return;
   }
 
   const nextRecoveries = { ...messageRecoveries.value };
-  delete nextRecoveries[orderId];
+  keysToClear.forEach((storageKey) => {
+    delete nextRecoveries[storageKey];
+  });
   messageRecoveries.value = nextRecoveries;
   syncPersistedPetPalMessageComposerSnapshot();
 }
 
 export function setPetPalMessageRecovery(
-  orderId: string,
+  identity: PetPalMessageComposerIdentity,
   stage: PetPalMessageRecoveryStage,
   message: string,
-  scope?: PetPalMessageComposerScope,
 ) {
-  if (!orderId) {
+  const resolvedIdentity = resolveMessageComposerIdentity(
+    identity,
+    getPetPalMessageComposerScope(identity) ?? 'shared',
+  );
+  if (!resolvedIdentity) {
     return;
   }
 
   messageRecoveries.value = {
-    ...messageRecoveries.value,
-    [orderId]: {
+    ...stripSharedMessageComposerRecord(messageRecoveries.value, resolvedIdentity),
+    [buildPetPalMessageComposerStorageKey(resolvedIdentity)]: {
+      orderId: resolvedIdentity.orderId,
+      userId: resolvedIdentity.userId,
       stage,
       message,
       updatedAt: new Date().toISOString(),
-      scope: scope ?? getPetPalMessageComposerScope(orderId) ?? 'shared',
+      scope: resolvedIdentity.scope,
     },
   };
   syncPersistedPetPalMessageComposerSnapshot();

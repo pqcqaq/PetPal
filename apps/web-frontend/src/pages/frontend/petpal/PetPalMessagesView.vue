@@ -264,6 +264,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
+import { useAuthStore } from '@/stores/auth';
 import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
 import {
@@ -275,6 +276,7 @@ import {
   persistPetPalMessageDraft,
   restorePetPalMessageDraft,
   setPetPalMessageRecovery,
+  type PetPalMessageComposerIdentity,
   type PetPalMessageComposerScope,
   type PetPalMessageDraftAttachment,
 } from './message-composer-state';
@@ -321,6 +323,7 @@ const MAX_MESSAGE_ATTACHMENTS = 3;
 const MAX_MESSAGE_ATTACHMENT_SIZE = 8 * 1024 * 1024;
 const IMAGE_ATTACHMENT_URL_RE = /\.(png|jpe?g|gif|webp|bmp|svg)(?:$|[?#])/i;
 
+const auth = useAuthStore();
 const route = useRoute();
 const ownerOrders = ref<OrderRecord[]>([]);
 const caregiverOrders = ref<CaregiverOrderRecord[]>([]);
@@ -354,8 +357,12 @@ const conversations = computed<ConversationItem[]>(() => {
 const activeConversation = computed(() => conversations.value.find((item) => item.id === selectedOrderId.value) ?? conversations.value[0] ?? null);
 const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
 const composerBusy = computed(() => uploadingMessageAttachments.value || sendingMessage.value);
-const currentThreadRecovery = computed(() =>
-  activeConversation.value ? getPetPalMessageRecovery(activeConversation.value.id) : null);
+const currentThreadRecovery = computed(() => {
+  const identity = activeConversation.value
+    ? buildThreadIdentity(activeConversation.value.id, selectedThreadScope.value)
+    : null;
+  return identity ? getPetPalMessageRecovery(identity) : null;
+});
 const activeThreadUnreadCount = computed(() =>
   activeThread.value
     ? getPetPalConversationUnreadCount(activeThread.value, role.value)
@@ -437,12 +444,36 @@ function buildOrderDetailLink(orderId: string) {
   };
 }
 
+function buildThreadIdentity(
+  orderId: string,
+  scope?: PetPalMessageComposerScope,
+): PetPalMessageComposerIdentity | null {
+  const normalizedOrderId = orderId.trim();
+  const userId = auth.user?.id?.trim();
+  if (!normalizedOrderId || !userId) {
+    return null;
+  }
+
+  return scope
+    ? {
+        orderId: normalizedOrderId,
+        userId,
+        scope,
+      }
+    : {
+        orderId: normalizedOrderId,
+        userId,
+      };
+}
+
 function hasThreadDraft(orderId: string) {
-  return hasPetPalMessageDraft(orderId);
+  const identity = buildThreadIdentity(orderId, role.value);
+  return identity ? hasPetPalMessageDraft(identity) : false;
 }
 
 function hasThreadRecovery(orderId: string) {
-  return hasPetPalMessageRecovery(orderId);
+  const identity = buildThreadIdentity(orderId, role.value);
+  return identity ? hasPetPalMessageRecovery(identity) : false;
 }
 
 function resetComposer() {
@@ -455,22 +486,35 @@ function resetComposer() {
 }
 
 function clearThreadDraft(orderId: string) {
-  clearPetPalMessageDraft(orderId);
+  const identity = buildThreadIdentity(orderId, selectedThreadScope.value);
+  if (!identity) {
+    return;
+  }
+  clearPetPalMessageDraft(identity);
 }
 
 function clearThreadRecovery(orderId: string) {
-  clearPetPalMessageRecovery(orderId);
+  const identity = buildThreadIdentity(orderId, selectedThreadScope.value);
+  if (!identity) {
+    return;
+  }
+  clearPetPalMessageRecovery(identity);
 }
 
 function persistThreadDraft(
   orderId: string,
   scope: PetPalMessageComposerScope = selectedThreadScope.value,
 ) {
-  persistPetPalMessageDraft(orderId, messageContent.value, messageAttachments.value, scope);
+  const identity = buildThreadIdentity(orderId, scope);
+  if (!identity) {
+    return;
+  }
+  persistPetPalMessageDraft(identity, messageContent.value, messageAttachments.value);
 }
 
 function restoreThreadDraft(orderId: string) {
-  const draft = restorePetPalMessageDraft(orderId);
+  const identity = buildThreadIdentity(orderId, selectedThreadScope.value);
+  const draft = identity ? restorePetPalMessageDraft(identity) : null;
   messageContent.value = draft?.content ?? '';
   messageAttachments.value = draft?.attachments ?? [];
   messageUploadProgress.value = null;
@@ -748,7 +792,10 @@ async function handleMessageAttachmentChange(event: Event) {
     clearThreadRecovery(currentOrderId);
   } catch (error: unknown) {
     const message = `${getErrorMessage(error, '上传消息图片失败')}，已完成的图片仍会保留在当前草稿中。`;
-    setPetPalMessageRecovery(currentOrderId, 'upload', message, selectedThreadScope.value);
+    const identity = buildThreadIdentity(currentOrderId, selectedThreadScope.value);
+    if (identity) {
+      setPetPalMessageRecovery(identity, 'upload', message);
+    }
     ElMessage.error(message);
   } finally {
     uploadingMessageAttachments.value = false;
@@ -784,7 +831,10 @@ async function submitMessage() {
     ElMessage.success('消息已发送');
   } catch (error: unknown) {
     const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`;
-    setPetPalMessageRecovery(orderId, 'send', message, selectedThreadScope.value);
+    const identity = buildThreadIdentity(orderId, selectedThreadScope.value);
+    if (identity) {
+      setPetPalMessageRecovery(identity, 'send', message);
+    }
     ElMessage.error(message);
   } finally {
     sendingMessage.value = false;

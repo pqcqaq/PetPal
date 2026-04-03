@@ -165,7 +165,7 @@
               >
                 {{ currentMessageRecovery.stage === 'send' ? '重试发送' : '重新上传图片' }}
               </el-button>
-              <el-button link @click="clearPetPalMessageRecovery(order.id)">
+              <el-button link @click="clearCurrentMessageRecovery(order.id)">
                 清除提示
               </el-button>
             </template>
@@ -294,6 +294,7 @@ import {
   persistPetPalMessageDraft,
   restorePetPalMessageDraft,
   setPetPalMessageRecovery,
+  type PetPalMessageComposerIdentity,
   type PetPalMessageComposerScope,
   type PetPalMessageDraftAttachment,
 } from './message-composer-state';
@@ -492,7 +493,10 @@ const conversationUnreadCount = computed(() => {
 const canConfirmComplete = computed(() => isOwnerView.value && order.value?.orderStatus === 'SERVING');
 const messageAttachmentSlotsLeft = computed(() =>
   Math.max(0, MAX_MESSAGE_ATTACHMENTS - messageAttachments.value.length));
-const currentMessageRecovery = computed(() => orderId.value ? getPetPalMessageRecovery(orderId.value) : null);
+const currentMessageRecovery = computed(() => {
+  const identity = buildMessageComposerIdentity(orderId.value);
+  return identity ? getPetPalMessageRecovery(identity) : null;
+});
 
 const isLikelyImageAttachment = (url: string, mimeType?: string) =>
   mimeType?.startsWith('image/')
@@ -514,6 +518,28 @@ const formatMessageAttachmentSize = (size: number) => {
   return `${size} B`;
 };
 
+function buildMessageComposerIdentity(
+  currentOrderId: string,
+  scope?: PetPalMessageComposerScope,
+): PetPalMessageComposerIdentity | null {
+  const normalizedOrderId = currentOrderId.trim();
+  const userId = auth.user?.id?.trim();
+  if (!normalizedOrderId || !userId) {
+    return null;
+  }
+
+  return scope
+    ? {
+        orderId: normalizedOrderId,
+        userId,
+        scope,
+      }
+    : {
+        orderId: normalizedOrderId,
+        userId,
+      };
+}
+
 function resetComposer() {
   messageContent.value = '';
   messageAttachments.value = [];
@@ -524,13 +550,50 @@ function resetComposer() {
 }
 
 function restoreComposerState(currentOrderId: string) {
-  const draft = restorePetPalMessageDraft(currentOrderId);
+  const identity = buildMessageComposerIdentity(currentOrderId, messageComposerScope.value);
+  const draft = identity ? restorePetPalMessageDraft(identity) : null;
   messageContent.value = draft?.content ?? '';
   messageAttachments.value = draft?.attachments ?? [];
   messageUploadProgress.value = null;
   if (messageAttachmentInputRef.value) {
     messageAttachmentInputRef.value.value = '';
   }
+}
+
+function persistCurrentMessageDraft(
+  currentOrderId: string,
+  scope: PetPalMessageComposerScope = messageComposerScope.value,
+) {
+  const identity = buildMessageComposerIdentity(currentOrderId, scope);
+  if (!identity) {
+    return;
+  }
+
+  persistPetPalMessageDraft(identity, messageContent.value, messageAttachments.value);
+}
+
+function clearCurrentMessageDraft(
+  currentOrderId: string,
+  scope: PetPalMessageComposerScope = messageComposerScope.value,
+) {
+  const identity = buildMessageComposerIdentity(currentOrderId, scope);
+  if (!identity) {
+    return;
+  }
+
+  clearPetPalMessageDraft(identity);
+}
+
+function clearCurrentMessageRecovery(
+  currentOrderId: string,
+  scope: PetPalMessageComposerScope = messageComposerScope.value,
+) {
+  const identity = buildMessageComposerIdentity(currentOrderId, scope);
+  if (!identity) {
+    return;
+  }
+
+  clearPetPalMessageRecovery(identity);
 }
 
 async function scrollToRequestedTab() {
@@ -738,10 +801,13 @@ async function handleMessageAttachmentChange(event: Event) {
     }
 
     ElMessage.success(validFiles.length === 1 ? '消息图片已上传' : `已上传 ${validFiles.length} 张消息图片`);
-    clearPetPalMessageRecovery(order.value.id);
+    clearCurrentMessageRecovery(order.value.id);
   } catch (error: unknown) {
     const message = `${getErrorMessage(error, '上传消息图片失败')}，已完成的图片仍会保留在当前草稿中。`;
-    setPetPalMessageRecovery(order.value.id, 'upload', message, messageComposerScope.value);
+    const identity = buildMessageComposerIdentity(order.value.id, messageComposerScope.value);
+    if (identity) {
+      setPetPalMessageRecovery(identity, 'upload', message);
+    }
     ElMessage.error(message);
   } finally {
     uploadingMessageAttachments.value = false;
@@ -779,13 +845,16 @@ async function submitMessage() {
         updatedAt: result.updatedAt,
       },
     };
-    clearPetPalMessageDraft(order.value.id);
-    clearPetPalMessageRecovery(order.value.id);
+    clearCurrentMessageDraft(order.value.id);
+    clearCurrentMessageRecovery(order.value.id);
     resetComposer();
     ElMessage.success('消息已发送');
   } catch (error: unknown) {
     const message = `${getErrorMessage(error, '发送消息失败')}，当前输入和已上传图片都已保留。`;
-    setPetPalMessageRecovery(order.value.id, 'send', message, messageComposerScope.value);
+    const identity = buildMessageComposerIdentity(order.value.id, messageComposerScope.value);
+    if (identity) {
+      setPetPalMessageRecovery(identity, 'send', message);
+    }
     ElMessage.error(message);
   } finally {
     sendingMessage.value = false;
@@ -836,12 +905,7 @@ watch(
   messageContent,
   () => {
     if (orderId.value) {
-      persistPetPalMessageDraft(
-        orderId.value,
-        messageContent.value,
-        messageAttachments.value,
-        messageComposerScope.value,
-      );
+      persistCurrentMessageDraft(orderId.value, messageComposerScope.value);
     }
   },
 );
@@ -850,12 +914,7 @@ watch(
   messageAttachments,
   () => {
     if (orderId.value) {
-      persistPetPalMessageDraft(
-        orderId.value,
-        messageContent.value,
-        messageAttachments.value,
-        messageComposerScope.value,
-      );
+      persistCurrentMessageDraft(orderId.value, messageComposerScope.value);
     }
   },
   { deep: true },
@@ -868,12 +927,7 @@ watch(
       return;
     }
     if (previousValue) {
-      persistPetPalMessageDraft(
-        previousValue,
-        messageContent.value,
-        messageAttachments.value,
-        messageComposerScope.value,
-      );
+      persistCurrentMessageDraft(previousValue, messageComposerScope.value);
     }
     if (!value) {
       messageComposerScope.value = 'shared';
@@ -881,7 +935,8 @@ watch(
       return;
     }
     const routeScope = getPetPalDeskFocusRole(route.query);
-    messageComposerScope.value = getPetPalMessageComposerScope(value)
+    const identity = buildMessageComposerIdentity(value);
+    messageComposerScope.value = (identity ? getPetPalMessageComposerScope(identity) : null)
       ?? (routeScope ? routeScope : 'shared');
     restoreComposerState(value);
   },
