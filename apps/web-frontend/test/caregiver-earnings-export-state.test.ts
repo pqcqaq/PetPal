@@ -2,13 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   applyCaregiverEarningsExportFilterSnapshot,
+  buildCaregiverAllRiskExportSnapshot,
   buildCaregiverRiskOrderExportSnapshot,
   buildCaregiverRiskQueueExportSnapshot,
   buildCaregiverEarningsExportQuery,
   cloneCaregiverEarningsExportFilterSnapshot,
   createEmptyCaregiverEarningsExportFilterSnapshot,
   hasCaregiverEarningsExportFilters,
+  isCaregiverAllRiskExportSnapshot,
   parseCaregiverEarningsExportDateRange,
+  resolveCaregiverRiskQueueExportPreset,
   withCaregiverEarningsExportDateRange,
 } from '../src/pages/frontend/petpal/caregiver-earnings-export-state.ts';
 
@@ -156,4 +159,62 @@ test('builds caregiver risk queue export snapshots for common queue views', () =
     refundStatus: 'APPROVED',
     riskOnly: true,
   });
+});
+
+test('detects current caregiver risk queue export views without confusing other filters', () => {
+  const currentSnapshot = {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days' as const,
+    serviceType: 'BOARDING' as const,
+  };
+
+  const allRiskSnapshot = buildCaregiverAllRiskExportSnapshot(currentSnapshot);
+  assert.deepEqual(allRiskSnapshot, {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days',
+    riskOnly: true,
+  });
+  assert.equal(isCaregiverAllRiskExportSnapshot(allRiskSnapshot), true);
+  assert.equal(resolveCaregiverRiskQueueExportPreset(allRiskSnapshot), '');
+
+  const openComplaintSnapshot = buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'openComplaint');
+  assert.equal(resolveCaregiverRiskQueueExportPreset(openComplaintSnapshot), 'openComplaint');
+  assert.equal(isCaregiverAllRiskExportSnapshot(openComplaintSnapshot), false);
+
+  const platformResponsibilitySnapshot = buildCaregiverRiskQueueExportSnapshot(
+    currentSnapshot,
+    'platformResponsibility',
+  );
+  assert.equal(
+    resolveCaregiverRiskQueueExportPreset(platformResponsibilitySnapshot),
+    'platformResponsibility',
+  );
+
+  const refundAwaitingSettlementSnapshot = buildCaregiverRiskQueueExportSnapshot(
+    currentSnapshot,
+    'refundAwaitingSettlement',
+  );
+  assert.equal(
+    resolveCaregiverRiskQueueExportPreset(refundAwaitingSettlementSnapshot),
+    'refundAwaitingSettlement',
+  );
+
+  assert.equal(
+    resolveCaregiverRiskQueueExportPreset({
+      ...openComplaintSnapshot,
+      complaintKeyword: 'follow-up',
+    }),
+    '',
+  );
+  assert.equal(
+    isCaregiverAllRiskExportSnapshot({
+      ...allRiskSnapshot,
+      serviceType: 'BOARDING',
+    }),
+    false,
+  );
 });

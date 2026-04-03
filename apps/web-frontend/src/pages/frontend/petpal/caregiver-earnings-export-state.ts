@@ -51,6 +51,12 @@ export type CaregiverRiskQueueExportPreset =
   | 'platformResponsibility'
   | 'refundAwaitingSettlement';
 
+const caregiverRiskQueueExportPresets = [
+  'openComplaint',
+  'platformResponsibility',
+  'refundAwaitingSettlement',
+] as const satisfies readonly CaregiverRiskQueueExportPreset[];
+
 const caregiverEarningsExportSnapshot = definePetPalExportSnapshot<CaregiverEarningsExportFilterSnapshot>({
   startDate: '',
   endDate: '',
@@ -153,17 +159,33 @@ export const buildCaregiverRiskOrderExportSnapshot = (
   riskOnly: true,
 });
 
+export const buildCaregiverAllRiskExportSnapshot = (
+  currentSnapshot: CaregiverEarningsExportFilterSnapshot,
+): CaregiverEarningsExportFilterSnapshot => ({
+  ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+  startDate: currentSnapshot.startDate,
+  endDate: currentSnapshot.endDate,
+  datePreset: currentSnapshot.datePreset,
+  riskOnly: true,
+});
+
+const matchesCaregiverEarningsExportSnapshot = (
+  snapshot: CaregiverEarningsExportFilterSnapshot,
+  candidate: CaregiverEarningsExportFilterSnapshot,
+) => caregiverEarningsExportSnapshotKeys.every((key) => snapshot[key] === candidate[key]);
+
+export const isCaregiverAllRiskExportSnapshot = (
+  snapshot: CaregiverEarningsExportFilterSnapshot,
+) => matchesCaregiverEarningsExportSnapshot(
+  snapshot,
+  buildCaregiverAllRiskExportSnapshot(snapshot),
+);
+
 export const buildCaregiverRiskQueueExportSnapshot = (
   currentSnapshot: CaregiverEarningsExportFilterSnapshot,
   preset: CaregiverRiskQueueExportPreset,
 ): CaregiverEarningsExportFilterSnapshot => {
-  const baseSnapshot: CaregiverEarningsExportFilterSnapshot = {
-    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
-    startDate: currentSnapshot.startDate,
-    endDate: currentSnapshot.endDate,
-    datePreset: currentSnapshot.datePreset,
-    riskOnly: true,
-  };
+  const baseSnapshot = buildCaregiverAllRiskExportSnapshot(currentSnapshot);
 
   switch (preset) {
     case 'openComplaint':
@@ -182,4 +204,21 @@ export const buildCaregiverRiskQueueExportSnapshot = (
         refundStatus: 'APPROVED',
       };
   }
+};
+
+export const resolveCaregiverRiskQueueExportPreset = (
+  snapshot: CaregiverEarningsExportFilterSnapshot,
+): CaregiverRiskQueueExportPreset | '' => {
+  for (const preset of caregiverRiskQueueExportPresets) {
+    if (
+      matchesCaregiverEarningsExportSnapshot(
+        snapshot,
+        buildCaregiverRiskQueueExportSnapshot(snapshot, preset),
+      )
+    ) {
+      return preset;
+    }
+  }
+
+  return '';
 };

@@ -469,19 +469,48 @@
       />
 
       <div v-else>
-        <div v-if="riskQueueExportActions.length" class="petpal-note-row petpal-risk-shortcuts">
+        <div class="petpal-note-row petpal-risk-shortcuts">
           <span>快捷导出</span>
           <div class="petpal-risk-shortcuts__actions">
+            <el-button
+              link
+              :type="isAllRiskQueueExportView ? 'success' : 'primary'"
+              class="petpal-risk-shortcuts__button"
+              :class="{ 'is-active': isAllRiskQueueExportView }"
+              @click="applyAllRiskQueueExportPreset"
+            >
+              全部风险 {{ recentAftersalesOrders.length }} 笔
+            </el-button>
             <el-button
               v-for="action in riskQueueExportActions"
               :key="action.preset"
               link
-              type="primary"
+              :type="activeRiskQueueExportPreset === action.preset ? 'success' : 'primary'"
+              class="petpal-risk-shortcuts__button"
+              :class="{ 'is-active': activeRiskQueueExportPreset === action.preset }"
               @click="applyRiskQueueExportPreset(action.preset)"
             >
               {{ action.label }} {{ action.count }} 笔
             </el-button>
           </div>
+        </div>
+
+        <div v-if="currentRiskQueueExportView" class="petpal-note-row petpal-risk-current-view">
+          <span>当前风险视角</span>
+          <div class="petpal-risk-current-view__body">
+            <strong>
+              {{ currentRiskQueueExportView.label }} {{ currentRiskQueueExportView.count }} 笔
+            </strong>
+            <p>{{ currentRiskQueueExportView.description }}</p>
+          </div>
+          <el-button
+            v-if="!isAllRiskQueueExportView"
+            link
+            type="primary"
+            @click="applyAllRiskQueueExportPreset"
+          >
+            查看全部风险
+          </el-button>
         </div>
 
         <div class="petpal-sheet-list">
@@ -645,11 +674,14 @@ import {
 } from './export-filter-summary';
 import {
   applyCaregiverEarningsExportFilterSnapshot,
+  buildCaregiverAllRiskExportSnapshot,
   buildCaregiverRiskOrderExportSnapshot,
   buildCaregiverRiskQueueExportSnapshot,
   buildCaregiverEarningsExportQuery,
   cloneCaregiverEarningsExportFilterSnapshot,
   createEmptyCaregiverEarningsExportFilterSnapshot,
+  isCaregiverAllRiskExportSnapshot,
+  resolveCaregiverRiskQueueExportPreset,
   type CaregiverRiskQueueExportPreset,
   type CaregiverEarningsExportFilterSnapshot,
   type CaregiverEarningsExportTemplate,
@@ -1015,6 +1047,35 @@ const riskQueueExportActions = computed<
 
   return items.filter((item) => item.count > 0);
 });
+const activeRiskQueueExportPreset = computed(() => resolveCaregiverRiskQueueExportPreset(exportPageState));
+const isAllRiskQueueExportView = computed(() => isCaregiverAllRiskExportSnapshot(exportPageState));
+const currentRiskQueueExportView = computed<{
+  label: string;
+  count: number;
+  description: string;
+} | null>(() => {
+  if (activeRiskQueueExportPreset.value) {
+    const action = riskQueueExportActions.value.find(
+      (item) => item.preset === activeRiskQueueExportPreset.value,
+    );
+    const label = action?.label ?? getRiskQueueExportPresetLabel(activeRiskQueueExportPreset.value);
+    return {
+      label,
+      count: action?.count ?? 0,
+      description: `当前经营导出已对齐到${label}队列，可直接导出这一批同类风险明细。`,
+    };
+  }
+
+  if (isAllRiskQueueExportView.value) {
+    return {
+      label: '全部风险',
+      count: recentAftersalesOrders.value.length,
+      description: '当前经营导出已覆盖整个风险队列，可直接导出当前周期内的全部风险明细。',
+    };
+  }
+
+  return null;
+});
 const serviceRevenueMix = computed(
   () =>
     summary.value?.serviceRevenueMix.map((item) => ({
@@ -1316,8 +1377,26 @@ function applyRiskQueueExportPreset(preset: CaregiverRiskQueueExportPreset) {
       ? '待受理投诉'
       : preset === 'platformResponsibility'
         ? '平台责任'
-        : '待退款';
+      : '待退款';
   ElMessage.success(`已切到${label}导出条件，可直接导出当前队列里的同类风险明细。`);
+}
+
+function applyAllRiskQueueExportPreset() {
+  applyCaregiverEarningsExportFilterSnapshot(
+    exportPageState,
+    buildCaregiverAllRiskExportSnapshot(exportPageState),
+  );
+  ElMessage.success('已切到全部风险导出条件，可直接导出当前周期内的全部风险明细。');
+}
+
+function getRiskQueueExportPresetLabel(preset: CaregiverRiskQueueExportPreset) {
+  if (preset === 'openComplaint') {
+    return '待受理投诉';
+  }
+  if (preset === 'platformResponsibility') {
+    return '平台责任';
+  }
+  return '待退款';
 }
 
 const primaryAction = computed(() => {
@@ -1685,6 +1764,28 @@ onMounted(() => {
   justify-content: flex-end;
 }
 
+.petpal-risk-shortcuts__button.is-active {
+  font-weight: 700;
+}
+
+.petpal-risk-current-view {
+  align-items: flex-start;
+}
+
+.petpal-risk-current-view__body {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  text-align: right;
+}
+
+.petpal-risk-current-view__body p {
+  margin: 0;
+  color: #6b625a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .petpal-sheet-row.is-focused {
   margin-inline: -10px;
   padding-inline: 16px;
@@ -1727,6 +1828,11 @@ onMounted(() => {
 
   .petpal-risk-shortcuts__actions {
     justify-content: flex-start;
+  }
+
+  .petpal-risk-current-view__body {
+    justify-items: start;
+    text-align: left;
   }
 
   .petpal-note-row strong,
