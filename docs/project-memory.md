@@ -195,7 +195,7 @@ Last updated: 2026-04-04
 - 已包含登录 / 注册 / 首页 / 我的 / 权限相关接入位点
 - PetPal 照料者资质材料上传已对齐后端受管附件口径，当前会使用 `petpal-caregiver-qualification + caregiverProfile.id` 作为上传标签
 - PetPal 投诉证据上传已对齐订单范围附件口径，当前会使用 `petpal-order-complaint + orderId` 作为上传标签
-- PetPal 订单详情页的消息图片上传也已对齐订单范围附件口径，当前会使用 `petpal-order-message + orderId` 作为上传标签，并支持发送前预览与移除
+- PetPal App 订单详情页与跨订单消息中心的消息图片上传也已对齐订单范围附件口径，当前会使用 `petpal-order-message + orderId` 作为上传标签，并支持发送前预览、移除与线程内快捷回复
 
 ## 5. 关键架构原则
 
