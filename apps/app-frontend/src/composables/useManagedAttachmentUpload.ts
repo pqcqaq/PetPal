@@ -142,8 +142,14 @@ export function useManagedAttachmentUpload(options?: {
   const selectAndUploadAttachments = async (payload: {
     tag1?: string
     tag2?: string
+    maxCount?: number
   }): Promise<UploadResult[]> => {
-    const selected = await chooseImageFiles(maxCount)
+    const allowedCount = payload.maxCount && payload.maxCount > 0 ? payload.maxCount : maxCount
+    if (allowedCount <= 0) {
+      throw new Error('当前没有可用的上传名额')
+    }
+
+    const selected = await chooseImageFiles(allowedCount)
     const normalized = selected.filter(item => item.size <= maxSizeBytes)
 
     if (!normalized.length) {

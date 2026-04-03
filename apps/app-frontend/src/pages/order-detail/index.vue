@@ -16,6 +16,7 @@ import {
   markOrderMessagesRead,
   sendOrderMessage,
 } from '@/api/petpal'
+import { useManagedAttachmentUpload } from '@/composables/useManagedAttachmentUpload'
 import { useTokenStore, useUserStore } from '@/store'
 import PetpalEmpty from '../petpal/rebuild/petpal-empty.vue'
 import PetpalPage from '../petpal/rebuild/petpal-page.vue'
@@ -34,10 +35,19 @@ import {
 } from '../petpal/rebuild/shared'
 
 type DetailTab = 'overview' | 'chat' | 'service' | 'aftersales'
+type UploadedMessageAttachment = {
+  fileId: string
+  url: string
+  name: string
+  mimeType: string
+  size: number
+  uploadedAt: string
+}
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const { userInfo } = storeToRefs(userStore)
+const upload = useManagedAttachmentUpload({ maxCount: 3, maxSizeMb: 8 })
 
 const loading = ref(false)
 const actionLoading = ref(false)
@@ -48,12 +58,14 @@ const refundProgress = ref<OrderRefundProgressRecord | null>(null)
 const complaints = ref<ComplaintRecord[]>([])
 const conversation = ref<OrderConversationDetailRecord | null>(null)
 const messageText = ref('')
+const messageAttachments = ref<UploadedMessageAttachment[]>([])
 const serviceLogType = ref<ServiceLogType>('NOTE')
 const serviceLogNote = ref('')
 
 const isOwnerView = computed(() => Boolean(userInfo.value.id && order.value?.ownerId === userInfo.value.id))
 const roleLabel = computed(() => (isOwnerView.value ? '主人视角' : '照料者视角'))
 const conversationMessages = computed(() => conversation.value?.messages || [])
+const messageAttachmentSlotsLeft = computed(() => Math.max(0, 3 - messageAttachments.value.length))
 const currentStatusLabel = computed(() => order.value ? helpers.getOrderStatusLabel(order.value.orderStatus) : '')
 const recentTimeline = computed(() => order.value?.timeline.slice().reverse().slice(0, 6) || [])
 const visibleServiceLogs = computed(() => order.value?.serviceLogs.slice().reverse() || [])
@@ -142,15 +154,63 @@ function openReview() {
   openOrderReviewPage(order.value.id)
 }
 
+function previewImages(urls: string[], current?: string) {
+  if (!urls.length) {
+    return
+  }
+
+  uni.previewImage({
+    urls,
+    current: current || urls[0],
+  })
+}
+
+async function uploadMessageMaterials() {
+  if (!orderId.value) {
+    toast('缺少订单信息，暂时无法上传消息图片')
+    return
+  }
+  if (messageAttachmentSlotsLeft.value <= 0) {
+    toast('消息附件最多上传 3 张')
+    return
+  }
+
+  try {
+    const files = await upload.selectAndUploadAttachments({
+      tag1: 'petpal-order-message',
+      tag2: orderId.value,
+      maxCount: messageAttachmentSlotsLeft.value,
+    })
+    messageAttachments.value = [...messageAttachments.value, ...files]
+    toast('消息图片已上传', 'success')
+  }
+  catch (error: unknown) {
+    toast(getErrorMessage(error, '上传失败'))
+  }
+}
+
+function removeMessageAttachment(fileId: string) {
+  messageAttachments.value = messageAttachments.value.filter(item => item.fileId !== fileId)
+}
+
 async function handleSendMessage() {
   const content = messageText.value.trim()
-  if (!content || !order.value) {
+  const mediaUrls = messageAttachments.value.map(item => item.url)
+  if (!order.value) {
+    return
+  }
+  if (!content && !mediaUrls.length) {
+    toast('请先输入消息或上传图片')
     return
   }
 
   await withAction(async () => {
-    conversation.value = await sendOrderMessage(order.value!.id, { content })
+    conversation.value = await sendOrderMessage(order.value!.id, {
+      content: content || undefined,
+      mediaUrls,
+    })
     messageText.value = ''
+    messageAttachments.value = []
   }, '消息已发送')
 }
 
@@ -307,7 +367,18 @@ onPullDownRefresh(() => {
                 ]"
               >
                 <text class="detail-chat__meta">{{ item.senderRole }} · {{ helpers.formatDateTime(item.createdAt) }}</text>
-                <text class="detail-chat__content">{{ item.content || '发送了一条附件消息' }}</text>
+                <text v-if="item.content" class="detail-chat__content">{{ item.content }}</text>
+                <text v-else class="detail-chat__content">发送了一条附件消息</text>
+                <view v-if="item.mediaUrls.length" class="detail-chat__attachments">
+                  <image
+                    v-for="url in item.mediaUrls"
+                    :key="url"
+                    class="detail-chat__attachment-image"
+                    :src="url"
+                    mode="aspectFill"
+                    @click="previewImages(item.mediaUrls, url)"
+                  />
+                </view>
               </view>
             </view>
           </template>
@@ -316,8 +387,31 @@ onPullDownRefresh(() => {
 
         <PetpalSection title="发送消息" subtitle="消息发送动作单独放在这里，不和订单概览混在一起。">
           <view class="petpal-form">
+            <template v-if="messageAttachments.length">
+              <view class="detail-chat__composer-meta">
+                <text class="petpal-note">已上传 {{ messageAttachments.length }}/3 张，发送前可继续预览或移除。</text>
+              </view>
+              <view class="detail-chat__attachments">
+                <view v-for="item in messageAttachments" :key="item.fileId" class="detail-chat__composer-attachment">
+                  <image
+                    class="detail-chat__attachment-image"
+                    :src="item.url"
+                    mode="aspectFill"
+                    @click="previewImages(messageAttachments.map(current => current.url), item.url)"
+                  />
+                  <button class="petpal-btn petpal-btn--ghost detail-chat__remove-btn" hover-class="none" @click="removeMessageAttachment(item.fileId)">
+                    移除
+                  </button>
+                </view>
+              </view>
+            </template>
             <textarea v-model="messageText" class="petpal-textarea" :maxlength="280" placeholder="输入要沟通的内容" />
-            <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="handleSendMessage">发送消息</button>
+            <view class="petpal-action-row">
+              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="uploadMessageMaterials">
+                {{ upload.uploading ? '上传中...' : `上传图片${messageAttachmentSlotsLeft ? `（剩余 ${messageAttachmentSlotsLeft} 张）` : ''}` }}
+              </button>
+              <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="handleSendMessage">发送消息</button>
+            </view>
           </view>
         </PetpalSection>
       </template>
@@ -423,5 +517,31 @@ onPullDownRefresh(() => {
   color: var(--app-text);
   font-size: 24rpx;
   line-height: 1.68;
+}
+
+.detail-chat__attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
+}
+
+.detail-chat__attachment-image {
+  width: 172rpx;
+  height: 172rpx;
+  border-radius: 20rpx;
+  background: rgba(36, 84, 211, 0.08);
+}
+
+.detail-chat__composer-meta {
+  margin-bottom: 4rpx;
+}
+
+.detail-chat__composer-attachment {
+  display: grid;
+  gap: 10rpx;
+}
+
+.detail-chat__remove-btn {
+  min-width: 0;
 }
 </style>
