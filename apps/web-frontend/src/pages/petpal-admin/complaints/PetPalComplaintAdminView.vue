@@ -266,8 +266,13 @@
         </el-form-item>
         <el-form-item label="结案结果">
           <el-radio-group v-model="batchCloseForm.resultStatus">
-            <el-radio value="RESOLVED">已解决</el-radio>
-            <el-radio value="REJECTED">已驳回</el-radio>
+            <el-radio
+              v-for="item in complaintAdminCloseResultOptions"
+              :key="item.value"
+              :value="item.value"
+            >
+              {{ item.label }}
+            </el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="结案结论">
@@ -305,11 +310,12 @@
         <el-form label-position="top">
           <el-form-item label="处理动作">
             <el-select v-model="actionForm.actionType" style="width: 100%">
-              <el-option label="指派负责人" value="ASSIGN" />
-              <el-option label="补充调查" value="INVESTIGATE" />
-              <el-option label="联系用户" value="CALL_USER" />
-              <el-option label="处罚记录" value="PENALTY" />
-              <el-option label="结案" value="CLOSE" />
+              <el-option
+                v-for="item in complaintAdminActionOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
             </el-select>
           </el-form-item>
 
@@ -327,8 +333,13 @@
           <template v-if="actionForm.actionType === 'CLOSE'">
             <el-form-item label="结案结果">
               <el-radio-group v-model="actionForm.resultStatus">
-                <el-radio value="RESOLVED">已解决</el-radio>
-                <el-radio value="REJECTED">已驳回</el-radio>
+                <el-radio
+                  v-for="item in complaintAdminCloseResultOptions"
+                  :key="item.value"
+                  :value="item.value"
+                >
+                  {{ item.label }}
+                </el-radio>
               </el-radio-group>
             </el-form-item>
             <el-form-item label="结案结论">
@@ -385,12 +396,16 @@ import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { getErrorMessage } from '@/utils/errors';
 import {
+  complaintAdminActionOptions,
+  complaintAdminCloseResultOptions,
   complaintAdminSlaStatusOptions,
   complaintAdminStatusOptions,
   complaintAdminTargetRoleOptions,
   complaintAdminTypeOptions,
+  getComplaintAdminActionLabel,
   getComplaintAdminSlaStatusLabel,
   getComplaintAdminSlaTagType,
+  getComplaintAdminQuickAssignLabel,
   getComplaintAdminStatusLabel,
   getComplaintAdminStatusType,
   getComplaintAdminTargetRoleLabel,
@@ -527,24 +542,13 @@ const isSelectableComplaint = (complaint: ComplaintAdminRecord) => {
   return !isClosedComplaint(complaint);
 };
 
-const getActionLabel = (actionType: ComplaintAdminRecord['processLogs'][number]['actionType']) => {
-  const labels: Record<ComplaintAdminRecord['processLogs'][number]['actionType'], string> = {
-    OPEN: '发起投诉',
-    ASSIGN: '指派负责人',
-    INVESTIGATE: '补充调查',
-    CALL_USER: '联系用户',
-    PENALTY: '处罚记录',
-    CLOSE: '结案',
-  };
-  return labels[actionType] ?? actionType;
-};
-
 const getStatusLabel = getComplaintAdminStatusLabel;
 const getStatusType = getComplaintAdminStatusType;
 const getTypeLabel = getComplaintAdminTypeLabel;
 const getTargetRoleLabel = getComplaintAdminTargetRoleLabel;
 const getSlaStatusLabel = getComplaintAdminSlaStatusLabel;
 const getSlaTagType = getComplaintAdminSlaTagType;
+const getActionLabel = getComplaintAdminActionLabel;
 
 const formatDateTime = (value?: string | null) => {
   if (!value) {
@@ -572,9 +576,7 @@ const getSlaDeadlineHint = (deadlineAt: string, status: ComplaintAdminSlaStatus)
   return `截止 ${deadlineText}`;
 };
 
-const getQuickAssignLabel = (complaint: ComplaintAdminRecord) => {
-  return complaint.assignedAdminId ? '转给我' : '指派给我';
-};
+const getQuickAssignLabel = getComplaintAdminQuickAssignLabel;
 
 const canQuickAssignToMe = (complaint: ComplaintAdminRecord) => {
   return Boolean(currentAdminId.value)

@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  complaintAdminActionOptions,
+  complaintAdminCloseResultOptions,
   complaintAdminSlaStatusOptions,
   complaintAdminStatusOptions,
   complaintAdminTargetRoleOptions,
   complaintAdminTypeOptions,
+  getComplaintAdminActionLabel,
   getComplaintAdminSlaStatusLabel,
   getComplaintAdminSlaTagType,
+  getComplaintAdminQuickAssignLabel,
   getComplaintAdminStatusLabel,
   getComplaintAdminStatusType,
   getComplaintAdminTargetRoleLabel,
@@ -39,6 +43,19 @@ test('builds complaint admin filter options from shared PetPal definitions', () 
     { label: '即将超时', value: 'DUE_SOON' },
     { label: '已超时', value: 'OVERDUE' },
   ]);
+
+  assert.deepEqual(complaintAdminActionOptions, [
+    { label: '指派负责人', value: 'ASSIGN' },
+    { label: '补充调查', value: 'INVESTIGATE' },
+    { label: '联系用户', value: 'CALL_USER' },
+    { label: '处罚记录', value: 'PENALTY' },
+    { label: '结案', value: 'CLOSE' },
+  ]);
+
+  assert.deepEqual(complaintAdminCloseResultOptions, [
+    { label: '已解决', value: 'RESOLVED' },
+    { label: '已驳回', value: 'REJECTED' },
+  ]);
 });
 
 test('keeps complaint admin labels and tag types aligned with admin wording', () => {
@@ -48,4 +65,8 @@ test('keeps complaint admin labels and tag types aligned with admin wording', ()
   assert.equal(getComplaintAdminTargetRoleLabel('CAREGIVER'), '照料者');
   assert.equal(getComplaintAdminSlaStatusLabel('OVERDUE'), '已超时');
   assert.equal(getComplaintAdminSlaTagType('OVERDUE'), 'danger');
+  assert.equal(getComplaintAdminActionLabel('CLOSE'), '结案');
+  assert.equal(getComplaintAdminActionLabel('OPEN'), '发起投诉');
+  assert.equal(getComplaintAdminQuickAssignLabel({ assignedAdminId: 'admin-1' }), '转给我');
+  assert.equal(getComplaintAdminQuickAssignLabel({ assignedAdminId: null }), '指派给我');
 });

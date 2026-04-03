@@ -7874,6 +7874,49 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.206 2026-04-03（P3-M1 Slice 206）
+
+**概述**：上一轮已经把后台投诉页的筛选枚举和标签映射抽到独立 helper，但处理动作下拉、结案结果单选和处理进度 label 仍然保留在页面模板或脚本里，页面内部还是有第二层散落的投诉治理词汇。本轮继续把这些动作文案收口进同一模块，让后台投诉页的“筛选、展示、操作”三类枚举都由单一 helper 管理。
+
+已完成：
+
+- 后台投诉动作配置继续并入统一 helper：
+  - `apps/web-frontend/src/pages/petpal-admin/complaints/complaint-admin-options.ts`
+    - 新增 `complaintAdminActionOptions`，统一维护“指派负责人 / 补充调查 / 联系用户 / 处罚记录 / 结案”动作顺序与文案。
+    - 新增 `complaintAdminCloseResultOptions`，统一维护“已解决 / 已驳回”结案结果。
+    - 新增 `getComplaintAdminActionLabel` 与 `getComplaintAdminQuickAssignLabel`，统一处理进度日志和“指派给我 / 转给我”文案。
+  - `apps/web-frontend/src/pages/petpal-admin/complaints/PetPalComplaintAdminView.vue`
+    - 处理动作下拉、批量结案和单条结案的结果单选现已全部消费共享 action / close result options。
+    - 处理进度区和快捷指派按钮现已改为复用共享 label helper，页面脚本不再内联第二份动作映射。
+- 定向测试继续兜底：
+  - `apps/web-frontend/test/complaint-admin-options.test.ts`
+    - 补充处理动作、结案结果、进度标签和快捷指派文案断言，锁定后台投诉页的动作枚举行为。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\complaint-admin-options.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+  - 保留既有的大 chunk warning，本轮没有新增构建级风险。
+
+代码审计结论：
+
+- 本轮没有改后台投诉治理接口、批量操作语义或权限判断，只继续把页面内联的动作枚举定义迁入统一 helper。
+- 已确认后台投诉页现在连同筛选项、表格标签、处理动作和结案结果都共用同一配置源，后续增删治理动作时不必再同时翻模板和脚本多处常量。
+
+风险与缓解：
+
+- 风险：投诉治理页的统计卡片与少数按钮标题仍然保留页面内联文案，尚未和当前 helper 一起完全归档。
+- 缓解：下一轮如继续沿这条线推进，可只收口统计 / CTA 文案，不必再动已稳定的动作与筛选结构。
+
+下一步（1-3）：
+
+1. 继续盘点后台投诉页剩余的统计卡片和 CTA 文案，评估是否值得进一步抽成独立展示配置。
+2. 继续检查其他 PetPal 后台治理页是否仍有类似的内联业务枚举，可复用同样的收口模式。
+3. 在后台治理词汇基本稳定后，再继续推进最终验收向测试、审计收口与交付材料整理。
+
 ### 14.205 2026-04-03（P3-M1 Slice 205）
 
 **概述**：上一轮已经把投诉 SLA 风险预设补齐到收益页，但后台投诉治理页里同一批状态 / 类型 / 对象 / SLA 选项仍然是模板内联硬编码，前后台已经开始出现同一枚举多处维护的风险。本轮把后台投诉页的筛选选项和标签 helper 抽成独立模块，直接复用前台已经稳定下来的 PetPal 投诉枚举定义，同时保留后台当前值班文案，不改变治理页的操作语义。
