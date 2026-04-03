@@ -201,6 +201,10 @@ Last updated: 2026-04-04
   - Web / App 两端的 `message-composer-state.ts` 现在会在首次读取旧版匿名本地快照时，把同订单的草稿 / 恢复态迁移到当前登录用户 identity，而不是只停留在“能解析旧结构”。
   - 对于 slice 237 遗留的“有 `scope` 但没有 `userId`”匿名快照，迁移时会保留原作用域；对于更早只有 `shared` 的匿名快照，迁移时会按当前显式角色落到对应作用域。
   - `apps/web-frontend/test/petpal-message-composer-state.test.ts` 已补匿名 shared 快照迁移、匿名 scoped 快照迁移两组定向单测，继续兜底旧缓存升级链路。
+- 2026-04-04 已继续补旧匿名消息缓存短期清理：
+  - Web / App 两端的 `message-composer-state.ts` 现在都会把未命中的匿名旧快照视为短期过渡数据，仅保留 24 小时；已迁移到用户 identity 的消息草稿 / 恢复态仍按现有 7 天规则保留。
+  - 这样可以避免共享设备长期残留升级前的匿名消息草稿，同时不影响当前用户已经认领的线程恢复体验。
+  - `apps/web-frontend/test/petpal-message-composer-state.test.ts` 已补匿名旧快照与用户级快照的保留边界单测，继续兜底后续缓存淘汰规则演进。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

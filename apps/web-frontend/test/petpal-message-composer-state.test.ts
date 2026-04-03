@@ -282,6 +282,64 @@ test('drops stale persisted petpal message composer entries', () => {
   });
 });
 
+test('drops stale anonymous legacy snapshots earlier than user scoped entries', () => {
+  const snapshot = parsePersistedPetPalMessageComposerSnapshot({
+    drafts: {
+      [sharedKey('order-legacy')]: {
+        orderId: 'order-legacy',
+        userId: '',
+        content: 'legacy anonymous draft',
+        attachments: [],
+        updatedAt: '2026-04-07T00:00:00.000Z',
+        scope: 'shared',
+      },
+      [ownerKey('order-user', 'user-1')]: {
+        orderId: 'order-user',
+        userId: 'user-1',
+        content: 'user scoped draft',
+        attachments: [],
+        updatedAt: '2026-04-07T00:00:00.000Z',
+        scope: 'owner',
+      },
+    },
+    recoveries: {
+      [sharedKey('order-legacy')]: {
+        orderId: 'order-legacy',
+        userId: '',
+        stage: 'upload',
+        message: 'legacy anonymous recovery',
+        updatedAt: '2026-04-07T00:00:00.000Z',
+        scope: 'shared',
+      },
+      [ownerKey('order-user', 'user-1')]: {
+        orderId: 'order-user',
+        userId: 'user-1',
+        stage: 'send',
+        message: 'user scoped recovery',
+        updatedAt: '2026-04-07T00:00:00.000Z',
+        scope: 'owner',
+      },
+    },
+  }, {
+    now: Date.parse('2026-04-08T12:00:00.000Z'),
+  });
+
+  assert.deepEqual(snapshot, {
+    drafts: {
+      [ownerKey('order-user', 'user-1')]: {
+        content: 'user scoped draft',
+        attachments: [],
+      },
+    },
+    recoveries: {
+      [ownerKey('order-user', 'user-1')]: {
+        stage: 'send',
+        message: 'user scoped recovery',
+      },
+    },
+  });
+});
+
 test('keeps only the newest persisted petpal message composer threads per user and scope', () => {
   const drafts = Object.fromEntries(
     Array.from({ length: 14 }, (_, index) => [

@@ -69,6 +69,7 @@ const MESSAGE_COMPOSER_STORAGE_KEY_PREFIX = 'petpal-message-composer';
 const MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR = '::';
 const MAX_PERSISTED_THREADS = 12;
 const MAX_PERSISTED_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS = 24 * 60 * 60 * 1000;
 
 const createEmptyPersistedSnapshot = (): PersistedPetPalMessageComposerRecords => ({
   drafts: {},
@@ -360,7 +361,10 @@ const compactPersistedPetPalMessageComposerRecords = (
   snapshot: PersistedPetPalMessageComposerRecords,
   now = Date.now(),
 ): PersistedPetPalMessageComposerRecords => {
-  const identityTimestampsByBucket = new Map<string, Map<string, number>>();
+  const identityMetadataByBucket = new Map<string, Map<string, {
+    timestamp: number;
+    userId: string;
+  }>>();
   const collectTimestamp = (
     identity: ResolvedPetPalMessageComposerIdentity,
     updatedAt: string,
@@ -372,11 +376,17 @@ const compactPersistedPetPalMessageComposerRecords = (
 
     const bucketKey = `${identity.userId}${MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR}${identity.scope}`;
     const identityKey = buildPetPalMessageComposerStorageKey(identity);
-    const bucketTimestamps = identityTimestampsByBucket.get(bucketKey) ?? new Map<string, number>();
-    const previousTimestamp = bucketTimestamps.get(identityKey);
-    if (previousTimestamp === undefined || timestamp > previousTimestamp) {
-      bucketTimestamps.set(identityKey, timestamp);
-      identityTimestampsByBucket.set(bucketKey, bucketTimestamps);
+    const bucketMetadata = identityMetadataByBucket.get(bucketKey) ?? new Map<string, {
+      timestamp: number;
+      userId: string;
+    }>();
+    const previousMetadata = bucketMetadata.get(identityKey);
+    if (previousMetadata === undefined || timestamp > previousMetadata.timestamp) {
+      bucketMetadata.set(identityKey, {
+        timestamp,
+        userId: identity.userId,
+      });
+      identityMetadataByBucket.set(bucketKey, bucketMetadata);
     }
   };
 
@@ -396,12 +406,13 @@ const compactPersistedPetPalMessageComposerRecords = (
   });
 
   const retainedIdentityKeysByBucket = new Map(
-    Array.from(identityTimestampsByBucket.entries()).map(([bucketKey, identityTimestamps]) => [
+    Array.from(identityMetadataByBucket.entries()).map(([bucketKey, identityMetadata]) => [
       bucketKey,
       new Set(
-        Array.from(identityTimestamps.entries())
-          .filter(([, timestamp]) => now - timestamp <= MAX_PERSISTED_AGE_MS)
-          .sort((left, right) => right[1] - left[1])
+        Array.from(identityMetadata.entries())
+          .filter(([, metadata]) =>
+            now - metadata.timestamp <= (metadata.userId ? MAX_PERSISTED_AGE_MS : MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS))
+          .sort((left, right) => right[1].timestamp - left[1].timestamp)
           .slice(0, MAX_PERSISTED_THREADS)
           .map(([identityKey]) => identityKey),
       ),
