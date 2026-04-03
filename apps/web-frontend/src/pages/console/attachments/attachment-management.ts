@@ -137,6 +137,10 @@ export const resolveAttachmentReferenceKindLabel = (kind: MediaAssetReferenceRec
     return '订单投诉';
   }
 
+  if (kind === 'PETPAL_ORDER_MESSAGE') {
+    return '订单消息';
+  }
+
   if (kind === 'PETPAL_PENALTY_RECTIFY') {
     return '处罚整改';
   }

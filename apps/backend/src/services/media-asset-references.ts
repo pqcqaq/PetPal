@@ -84,6 +84,28 @@ const queryOrderComplaintReferences = async (assetIds: string[]) =>
       AND ma.id IN (${Prisma.join(assetIds)})
   `);
 
+const queryOrderMessageReferences = async (assetIds: string[]) =>
+  prismaRaw.$queryRaw<MediaAssetReferenceRow[]>(Prisma.sql`
+    SELECT DISTINCT
+      ma.id AS "assetId",
+      m.id AS "entityId",
+      om."orderNo" AS "title",
+      CONCAT('订单消息附件 · ', om."orderNo") AS "note"
+    FROM "OrderMessage" m
+    INNER JOIN "OrderConversation" oc
+      ON oc.id = m."conversationId"
+     AND oc."deleteAt" IS NULL
+    INNER JOIN "OrderMain" om
+      ON om.id = oc."orderId"
+     AND om."deleteAt" IS NULL
+    CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(m."mediaUrls", '[]'::jsonb)) AS media(url)
+    INNER JOIN "MediaAsset" ma
+      ON ma.url = media.url
+     AND ma."deleteAt" IS NULL
+    WHERE m."deleteAt" IS NULL
+      AND ma.id IN (${Prisma.join(assetIds)})
+  `);
+
 const toReferenceRecord = (
   kind: MediaAssetReferenceKind,
   row: MediaAssetReferenceRow,
@@ -102,9 +124,10 @@ export const resolveMediaAssetReferenceMap = async (assetIds: string[]) => {
     return referenceMap;
   }
 
-  const [caregiverRows, complaintRows, penaltyRows] = await Promise.all([
+  const [caregiverRows, complaintRows, messageRows, penaltyRows] = await Promise.all([
     queryCaregiverQualificationReferences(normalizedAssetIds),
     queryOrderComplaintReferences(normalizedAssetIds),
+    queryOrderMessageReferences(normalizedAssetIds),
     queryPenaltyRectifyReferences(normalizedAssetIds),
   ]);
 
@@ -121,6 +144,14 @@ export const resolveMediaAssetReferenceMap = async (assetIds: string[]) => {
       referenceMap,
       row.assetId,
       toReferenceRecord('PETPAL_ORDER_COMPLAINT', row),
+    );
+  });
+
+  messageRows.forEach((row) => {
+    appendReference(
+      referenceMap,
+      row.assetId,
+      toReferenceRecord('PETPAL_ORDER_MESSAGE', row),
     );
   });
 

@@ -279,6 +279,52 @@ const createComplaintReferenceScenario = async (input: {
   };
 };
 
+const createOrderMessageReferenceScenario = async (input: {
+  mediaUrl: string;
+  order?: {
+    orderId: string;
+    orderNo: string;
+    complainantId: string;
+  };
+}) => {
+  const { prisma } = context;
+  const order = input.order ?? await createComplaintOrderScenario();
+  const suffix = Date.now().toString(36);
+
+  const conversation = await prisma.orderConversation.create({
+    data: {
+      id: `conversation-message-attachment-reference-${suffix}`,
+      orderId: order.orderId,
+      ownerUnreadCount: 0,
+      caregiverUnreadCount: 1,
+      lastMessageAt: new Date('2026-04-04T09:00:00.000Z'),
+      lastMessagePreview: '[附件消息]',
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  const message = await prisma.orderMessage.create({
+    data: {
+      id: `message-attachment-reference-${suffix}`,
+      conversationId: conversation.id,
+      senderRole: 'OWNER',
+      senderUserId: order.complainantId,
+      content: null,
+      mediaUrls: [input.mediaUrl],
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return {
+    messageId: message.id,
+    orderNo: order.orderNo,
+  };
+};
+
 const waitForFileRemoval = async (filePath: string) => {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
@@ -564,6 +610,15 @@ describe('Attachment integration', () => {
       tag1,
       tag2: 'complaint-evidence',
     });
+    const messageUpload = await uploadManagedFileForTest(app, {
+      accessToken: adminSession.tokens.accessToken,
+      fileName: 'message-evidence.jpg',
+      contentType: 'image/jpeg',
+      content: 'message-evidence-content',
+      kind: 'attachment',
+      tag1,
+      tag2: 'order-message',
+    });
     const freeUpload = await uploadManagedFileForTest(app, {
       accessToken: adminSession.tokens.accessToken,
       fileName: 'free-attachment.txt',
@@ -576,6 +631,7 @@ describe('Attachment integration', () => {
 
     const qualificationMaterial = await loadManagedAttachmentMaterial(qualificationUpload.fileId);
     const complaintMaterial = await loadManagedAttachmentMaterial(complaintUpload.fileId);
+    const messageMaterial = await loadManagedAttachmentMaterial(messageUpload.fileId);
     const rectifyMaterial = await loadManagedAttachmentMaterial(penaltyUpload.fileId);
 
     const caregiverProfile = await context.prismaRaw.caregiverProfile.update({
@@ -597,6 +653,9 @@ describe('Attachment integration', () => {
     const complaintReference = await createComplaintReferenceScenario({
       evidenceUrl: complaintMaterial.url,
     });
+    const messageReference = await createOrderMessageReferenceScenario({
+      mediaUrl: messageMaterial.url,
+    });
 
     const listResponse = await request(app)
       .get('/api/attachments')
@@ -608,7 +667,7 @@ describe('Attachment integration', () => {
       .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
       .expect(200);
 
-    assert.equal(listResponse.body.data.meta.total, 4);
+    assert.equal(listResponse.body.data.meta.total, 5);
 
     const qualificationItem = listResponse.body.data.items.find(
       (item: { id: string }) => item.id === qualificationUpload.fileId,
@@ -619,6 +678,9 @@ describe('Attachment integration', () => {
     const complaintItem = listResponse.body.data.items.find(
       (item: { id: string }) => item.id === complaintUpload.fileId,
     );
+    const messageItem = listResponse.body.data.items.find(
+      (item: { id: string }) => item.id === messageUpload.fileId,
+    );
     const freeItem = listResponse.body.data.items.find(
       (item: { id: string }) => item.id === freeUpload.fileId,
     );
@@ -626,6 +688,7 @@ describe('Attachment integration', () => {
     assert.ok(qualificationItem);
     assert.ok(penaltyItem);
     assert.ok(complaintItem);
+    assert.ok(messageItem);
     assert.ok(freeItem);
     assert.equal(qualificationItem.referenceCount, 1);
     assert.equal(qualificationItem.references[0].kind, 'PETPAL_CAREGIVER_QUALIFICATION');
@@ -642,6 +705,11 @@ describe('Attachment integration', () => {
     assert.equal(complaintItem.references[0].entityId, complaintReference.complaintId);
     assert.match(complaintItem.references[0].note, /订单投诉证据/);
     assert.match(complaintItem.references[0].title, new RegExp(complaintReference.orderNo));
+    assert.equal(messageItem.referenceCount, 1);
+    assert.equal(messageItem.references[0].kind, 'PETPAL_ORDER_MESSAGE');
+    assert.equal(messageItem.references[0].entityId, messageReference.messageId);
+    assert.match(messageItem.references[0].note, /订单消息附件/);
+    assert.match(messageItem.references[0].title, new RegExp(messageReference.orderNo));
     assert.equal(freeItem.referenceCount, 0);
     assert.deepEqual(freeItem.references, []);
 
@@ -678,6 +746,14 @@ describe('Attachment integration', () => {
 
     assert.match(blockedComplaintDelete.body.message, /Attachment is still referenced by business records/);
     assert.match(blockedComplaintDelete.body.message, new RegExp(complaintReference.orderNo));
+
+    const blockedMessageDelete = await request(app)
+      .delete(`/api/attachments/${messageUpload.fileId}`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(400);
+
+    assert.match(blockedMessageDelete.body.message, /Attachment is still referenced by business records/);
+    assert.match(blockedMessageDelete.body.message, new RegExp(messageReference.orderNo));
   });
 
   it('cleans up stale unreferenced PetPal managed attachments without touching referenced or generic files', async () => {
@@ -698,6 +774,8 @@ describe('Attachment integration', () => {
 
     const orphanComplaintOrder = await createComplaintOrderScenario();
     const referencedComplaintOrder = await createComplaintOrderScenario();
+    const orphanMessageOrder = await createComplaintOrderScenario();
+    const referencedMessageOrder = await createComplaintOrderScenario();
 
     const orphanQualificationUpload = await uploadManagedFileForTest(app, {
       accessToken: managerSession.tokens.accessToken,
@@ -753,6 +831,24 @@ describe('Attachment integration', () => {
       tag1: 'petpal-order-complaint',
       tag2: referencedComplaintOrder.orderId,
     });
+    const orphanMessageUpload = await uploadManagedFileForTest(app, {
+      accessToken: ownerSession.tokens.accessToken,
+      fileName: 'stale-order-message.jpg',
+      contentType: 'image/jpeg',
+      content: 'stale-order-message-content',
+      kind: 'attachment',
+      tag1: 'petpal-order-message',
+      tag2: orphanMessageOrder.orderId,
+    });
+    const referencedMessageUpload = await uploadManagedFileForTest(app, {
+      accessToken: ownerSession.tokens.accessToken,
+      fileName: 'referenced-order-message.jpg',
+      contentType: 'image/jpeg',
+      content: 'referenced-order-message-content',
+      kind: 'attachment',
+      tag1: 'petpal-order-message',
+      tag2: referencedMessageOrder.orderId,
+    });
     const genericAttachmentUpload = await uploadManagedFileForTest(app, {
       accessToken: adminSession.tokens.accessToken,
       fileName: 'generic-attachment.txt',
@@ -774,6 +870,8 @@ describe('Attachment integration', () => {
             referencedPenaltyUpload.fileId,
             orphanComplaintUpload.fileId,
             referencedComplaintUpload.fileId,
+            orphanMessageUpload.fileId,
+            referencedMessageUpload.fileId,
             genericAttachmentUpload.fileId,
           ],
         },
@@ -785,6 +883,7 @@ describe('Attachment integration', () => {
 
     const referencedQualificationMaterial = await loadManagedAttachmentMaterial(referencedQualificationUpload.fileId);
     const referencedComplaintMaterial = await loadManagedAttachmentMaterial(referencedComplaintUpload.fileId);
+    const referencedMessageMaterial = await loadManagedAttachmentMaterial(referencedMessageUpload.fileId);
     const referencedPenaltyMaterial = await loadManagedAttachmentMaterial(referencedPenaltyUpload.fileId);
     await context.prismaRaw.caregiverProfile.update({
       where: {
@@ -803,9 +902,14 @@ describe('Attachment integration', () => {
       evidenceUrl: referencedComplaintMaterial.url,
       order: referencedComplaintOrder,
     });
+    await createOrderMessageReferenceScenario({
+      mediaUrl: referencedMessageMaterial.url,
+      order: referencedMessageOrder,
+    });
 
     const orphanQualificationPath = await resolveManagedUploadPath(orphanQualificationUpload.fileId);
     const orphanComplaintPath = await resolveManagedUploadPath(orphanComplaintUpload.fileId);
+    const orphanMessagePath = await resolveManagedUploadPath(orphanMessageUpload.fileId);
     const orphanPenaltyPath = await resolveManagedUploadPath(orphanPenaltyUpload.fileId);
     const genericAttachmentPath = await resolveManagedUploadPath(genericAttachmentUpload.fileId);
 
@@ -816,9 +920,9 @@ describe('Attachment integration', () => {
     });
 
     assert.deepEqual(cleanupResult, {
-      checked: 6,
-      deleted: 3,
-      keptReferenced: 3,
+      checked: 8,
+      deleted: 4,
+      keptReferenced: 4,
       blocked: 0,
     });
 
@@ -829,6 +933,7 @@ describe('Attachment integration', () => {
             orphanQualificationUpload.fileId,
             orphanPenaltyUpload.fileId,
             orphanComplaintUpload.fileId,
+            orphanMessageUpload.fileId,
           ],
         },
       },
@@ -838,10 +943,11 @@ describe('Attachment integration', () => {
       },
     });
 
-    assert.equal(deletedAssets.length, 3);
+    assert.equal(deletedAssets.length, 4);
     assert.ok(deletedAssets.every((item) => item.deleteAt !== null));
     await waitForFileRemoval(orphanQualificationPath);
     await waitForFileRemoval(orphanComplaintPath);
+    await waitForFileRemoval(orphanMessagePath);
     await waitForFileRemoval(orphanPenaltyPath);
 
     const referencedQualificationDetail = await request(app)
@@ -864,6 +970,13 @@ describe('Attachment integration', () => {
       .expect(200);
 
     assert.equal(referencedComplaintDetail.body.data.referenceCount, 1);
+
+    const referencedMessageDetail = await request(app)
+      .get(`/api/attachments/${referencedMessageUpload.fileId}`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(referencedMessageDetail.body.data.referenceCount, 1);
 
     const genericAttachment = await context.prismaRaw.mediaAsset.findUnique({
       where: {

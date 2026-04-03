@@ -47,6 +47,7 @@ export interface MediaAssetOwnerSummary {
 
 export type MediaAssetReferenceKind =
   | 'PETPAL_CAREGIVER_QUALIFICATION'
+  | 'PETPAL_ORDER_MESSAGE'
   | 'PETPAL_ORDER_COMPLAINT'
   | 'PETPAL_PENALTY_RECTIFY';
 

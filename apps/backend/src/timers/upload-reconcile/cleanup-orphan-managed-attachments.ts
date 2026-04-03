@@ -43,6 +43,9 @@ const listCleanupTargets = async (cutoff: Date, batchSize: number) =>
               tag1: 'petpal-order-complaint',
             },
             {
+              tag1: 'petpal-order-message',
+            },
+            {
               tag1: 'petpal-penalty',
               tag2: 'rectify',
             },

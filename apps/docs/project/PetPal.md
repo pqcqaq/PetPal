@@ -7882,6 +7882,61 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.227 2026-04-04（P3-M1 Slice 227）
+
+**概述**：上一轮已经把投诉证据纳入附件引用治理，但订单消息附件虽然已经有订单范围上传白名单，附件中心仍不知道这些 URL 正在被订单消息引用，上传清理定时器也不会清理长期未发送成功的消息附件。本轮继续沿同一套受管附件治理链路补齐“订单消息引用识别 + 孤儿清理”，避免消息附件成为治理盲区。
+
+已完成：
+
+- 共享附件引用类型扩展：
+  - `packages/api-common/src/types/files.ts`
+    - `MediaAssetReferenceKind` 新增 `PETPAL_ORDER_MESSAGE`，用于统一表达“订单消息附件”引用来源。
+- 后端附件引用扫描已纳入订单消息：
+  - `apps/backend/src/services/media-asset-references.ts`
+    - 新增订单消息附件引用扫描，按 `OrderMessage.mediaUrls` 中的 URL 反查 `MediaAsset.url`，把命中的受管附件回填为订单消息引用。
+    - 当前附件引用扫描已覆盖四类 PetPal 业务引用：
+      - `CaregiverProfile.qualificationMaterials`
+      - `OrderMessage.mediaUrls`
+      - `Complaint.evidenceUrls`
+      - `PenaltyRecord.rectifyEvidenceMaterials`
+- 孤儿业务附件回收已纳入订单消息：
+  - `apps/backend/src/timers/upload-reconcile/cleanup-orphan-managed-attachments.ts`
+    - 临时业务附件回收范围新增 `tag1 = petpal-order-message`。
+    - 旧但未被任何订单消息引用的消息附件现在会和资质/投诉/整改附件一起进入回收候选。
+- 控制台附件引用文案补齐：
+  - `apps/web-frontend/src/pages/console/attachments/attachment-management.ts`
+    - 新增 `PETPAL_ORDER_MESSAGE -> 订单消息` 文案映射，列表与详情的引用摘要不再回落到枚举值。
+- 定向集成测试补齐：
+  - `apps/backend/test/integration/attachments.test.ts`
+    - 新增“订单消息附件会出现在附件引用摘要里，且删除会被拦截”的覆盖。
+    - 孤儿清理用例已扩展到订单消息附件，验证“旧但未引用的消息附件会被清理、旧但已引用的不删”。
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test test/integration/attachments.test.ts` 通过。
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有改动订单消息创建协议面，`OrderMessage.mediaUrls` 仍沿用现有 URL 数组；变化只在附件治理层新增 URL 反查，因此不会影响消息发送、消息中心或订单详情的既有交互。
+- 已确认附件中心现在已能同时识别资质材料、订单消息附件、订单投诉证据和处罚整改材料；被订单消息引用的附件在列表、详情和删除动作上都会继续走同一套保护。
+- 已确认上传清理定时器现在会把 `petpal-order-message` 一并纳入候选，但只有“超过缓冲时间且未被任何订单消息引用”的附件才会删，不会误伤已发出的消息附件。
+
+风险与缓解：
+
+- 风险：订单消息附件引用识别当前依赖 `MediaAsset.url == OrderMessage.mediaUrls[*]` 的字符串匹配，若后续消息 URL 生成策略变化或消息数据被人工改写，可能导致引用识别失真。
+- 缓解：本轮先在不改协议面的前提下补齐现有闭环；后续若继续深化，可把订单消息附件升级为带 `fileId` 的受控附件快照，从根源上去掉 URL 匹配依赖。
+
+- 风险：当前主人侧附件治理已覆盖订单消息和投诉证据，但其他未来可能接入的业务附件类型仍需要逐项纳入统一引用扫描和临时回收范围。
+- 缓解：引用扫描和孤儿清理仍集中在单一服务内，后续新增业务附件时可继续沿现有模式做小步扩展，而不必重做附件中心或上传清理基础设施。
+
+下一步（1-3）：
+
+1. 继续评估是否把订单消息与投诉证据从 URL 数组升级为带 `fileId` 的受控附件快照，进一步收紧引用识别可靠性。
+2. 继续梳理主人侧或履约侧其他业务附件是否也需要补引用识别与孤儿回收。
+3. 继续按切片节奏推进局部改动、定向测试、本地提交和文档同步，不回到无边界大改。
+
 ### 14.226 2026-04-04（P3-M1 Slice 226）
 
 **概述**：上一轮已经把投诉证据上传切到订单范围治理，但投诉记录仍只保存 `evidenceUrls`，附件中心还不能识别这些投诉证据 URL 正在被业务使用，上传清理定时器也不会处理长期未被投诉记录引用的投诉附件。本轮继续沿既有附件治理链路补齐“投诉证据引用感知 + 孤儿清理”，在不推翻投诉模型的前提下把投诉附件纳入同一套治理闭环。
