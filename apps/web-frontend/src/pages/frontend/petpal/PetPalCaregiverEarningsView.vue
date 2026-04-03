@@ -429,6 +429,75 @@
     </PetPalDeskSection>
 
     <PetPalDeskSection
+      eyebrow="Risk"
+      title="售后风险订单"
+      description="风险比例只告诉你结果，这里直接列出最近进入退款或争议链路的订单。"
+    >
+      <template #actions>
+        <el-button
+          v-if="summaryState === 'error'"
+          :loading="sectionReloadingKey === 'summary'"
+          @click="retrySummary"
+        >
+          重试收益摘要
+        </el-button>
+        <el-button
+          v-else
+          :type="exportRiskOnly ? 'primary' : 'default'"
+          @click="toggleRiskOnlyExport"
+        >
+          {{ exportRiskOnly ? '当前仅导出风险单' : '仅导出风险单' }}
+        </el-button>
+        <RouterLink
+          v-if="summaryState !== 'error' && recentAftersalesOrders[0]"
+          :to="buildAftersalesOrderDetailLink(recentAftersalesOrders[0].id)"
+        >
+          看最近风险订单
+        </RouterLink>
+      </template>
+
+      <PetPalDeskEmpty
+        v-if="summaryState === 'error'"
+        title="售后风险订单暂未刷新完成"
+        description="可以先重试收益摘要，恢复后再继续定位争议和退款风险订单。"
+      />
+
+      <PetPalDeskEmpty
+        v-else-if="!recentAftersalesOrders.length"
+        title="当前没有售后风险订单"
+        description="当订单进入退款或争议链路后，这里会列出需要优先复盘的对象。"
+      />
+
+      <div v-else class="petpal-sheet-list">
+        <div
+          v-for="order in recentAftersalesOrders"
+          :key="order.id"
+          class="petpal-sheet-row"
+          :class="{ 'is-focused': order.id === highlightedOrderId }"
+        >
+          <div class="petpal-sheet-row__copy">
+            <h3 class="petpal-sheet-row__title">{{ order.orderNo }}</h3>
+            <p class="petpal-sheet-row__desc">
+              {{ getPetPalOrderStatusLabel(order.orderStatus) }} ·
+              {{ getPetPalServiceTypeLabel(order.serviceType) }} · {{ order.ownerNickname }}
+            </p>
+            <p class="petpal-sheet-row__desc">
+              已退 {{ formatPetPalMoney(order.amountRefunded) }} · 剩余净收入
+              {{ formatPetPalMoney(getOrderNetIncome(order)) }}
+            </p>
+            <p class="petpal-sheet-row__desc">
+              {{ formatPetPalRange(order.appointmentStart, order.appointmentEnd) }}
+            </p>
+          </div>
+          <div class="petpal-sheet-row__tail">
+            <span class="petpal-pill is-warning">{{ getPetPalOrderStatusLabel(order.orderStatus) }}</span>
+            <RouterLink :to="buildAftersalesOrderDetailLink(order.id)">查看售后</RouterLink>
+          </div>
+        </div>
+      </div>
+    </PetPalDeskSection>
+
+    <PetPalDeskSection
       eyebrow="Completed"
       title="最近完成的订单"
       description="履约已经结束的订单才会进入这里，方便复盘而不是再回履约动作。"
@@ -547,6 +616,7 @@ import {
   formatPetPalMoney,
   formatPetPalRange,
   getPetPalCaregiverAuditLabel,
+  getPetPalOrderStatusLabel,
   petPalComplaintTargetOptions,
   getPetPalServiceTypeLabel,
   petPalComplaintStatusOptions,
@@ -751,6 +821,16 @@ const exportRiskOnly = createPetPalFieldBinding<boolean>({
 const exportTemplates = computed(() => exportPageState.templates);
 const highlightedOrderId = computed(() => getPetPalQueryString(route.query, 'focusOrderId'));
 const latestActiveOrder = computed(() => summary.value?.latestActiveOrder ?? null);
+const recentAftersalesOrders = computed(() => {
+  const items = [...(summary.value?.recentAftersalesOrders ?? [])];
+  if (highlightedOrderId.value) {
+    const highlightedIndex = items.findIndex((item) => item.id === highlightedOrderId.value);
+    if (highlightedIndex > 0) {
+      items.unshift(items.splice(highlightedIndex, 1)[0]);
+    }
+  }
+  return items;
+});
 const recentCompletedOrders = computed(() => {
   const items = [...(summary.value?.recentCompletedOrders ?? [])];
   if (highlightedOrderId.value) {
@@ -1014,6 +1094,23 @@ function buildOrderDetailLink(orderId: string) {
   };
 }
 
+function buildAftersalesOrderDetailLink(orderId: string) {
+  return {
+    name: 'frontend-petpal-order-detail',
+    params: { id: orderId },
+    query: buildPetPalDeskHandoffQuery({
+      notice: '这笔订单已经从收益页进入售后区，可直接继续复盘退款和争议风险。',
+      focusOrderId: orderId,
+      focusRole: 'caregiver',
+      tab: 'aftersales',
+    }),
+  };
+}
+
+function toggleRiskOnlyExport() {
+  exportRiskOnly.value = !exportRiskOnly.value;
+}
+
 const primaryAction = computed(() => {
   if (latestActiveOrder.value) {
     return {
@@ -1022,6 +1119,13 @@ const primaryAction = computed(() => {
         '这里已经定位到当前最优先的一笔履约订单，可直接继续接单或签到。',
         latestActiveOrder.value.id,
       ),
+      tone: 'primary' as const,
+    };
+  }
+  if (recentAftersalesOrders.value[0]) {
+    return {
+      label: '先看售后风险订单',
+      to: buildAftersalesOrderDetailLink(recentAftersalesOrders.value[0].id),
       tone: 'primary' as const,
     };
   }
@@ -1059,6 +1163,8 @@ const heroActions = computed(() => [
   {
     label: latestActiveOrder.value
       ? '履约队列'
+      : recentAftersalesOrders.value[0]
+        ? '风险订单'
       : profile.value?.auditStatus !== 'APPROVED'
         ? '资料管理'
         : '服务管理',
@@ -1067,6 +1173,8 @@ const heroActions = computed(() => [
           '这里已经回到履约队列，可继续处理接单、签到或签退。',
           latestActiveOrder.value.id,
         )
+      : recentAftersalesOrders.value[0]
+        ? buildAftersalesOrderDetailLink(recentAftersalesOrders.value[0].id)
       : profile.value?.auditStatus !== 'APPROVED'
         ? buildProfileRoute('这里已经定位到照料者资料页，可继续补齐资料和审核材料。')
         : buildServicesRoute('这里已经定位到服务清单，可继续调整在售服务和价格。'),

@@ -1778,6 +1778,7 @@ export const petpalService = {
           totalServiceCount,
         },
         latestActiveOrder: null,
+        recentAftersalesOrders: [],
         recentCompletedOrders: [],
         serviceRevenueMix: [],
         trends: {
@@ -1817,6 +1818,7 @@ export const petpalService = {
       aftersalesRows,
       serviceRevenueRows,
       latestActiveOrder,
+      recentAftersalesOrders,
       recentCompletedOrders,
       completedTrendRows,
     ] = await Promise.all([
@@ -1870,6 +1872,19 @@ export const petpalService = {
             createdAt: 'desc',
           },
         ],
+      }),
+      prisma.orderMain.findMany({
+        where: aftersalesWhere,
+        select: caregiverEarningsOrderSelect,
+        orderBy: [
+          {
+            updatedAt: 'desc',
+          },
+          {
+            appointmentEnd: 'desc',
+          },
+        ],
+        take: 6,
       }),
       prisma.orderMain.findMany({
         where: completedWhere,
@@ -1943,6 +1958,7 @@ export const petpalService = {
       latestActiveOrder: latestActiveOrder
         ? toCaregiverEarningsOrderRecord(latestActiveOrder)
         : null,
+      recentAftersalesOrders: recentAftersalesOrders.map(toCaregiverEarningsOrderRecord),
       recentCompletedOrders: recentCompletedOrders.map(toCaregiverEarningsOrderRecord),
       serviceRevenueMix: serviceRevenueRows
         .map((row) => {

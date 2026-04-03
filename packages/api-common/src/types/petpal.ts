@@ -426,6 +426,7 @@ export interface CaregiverEarningsSummaryRecord {
     totalServiceCount: number;
   };
   latestActiveOrder: CaregiverEarningsOrderRecord | null;
+  recentAftersalesOrders: CaregiverEarningsOrderRecord[];
   recentCompletedOrders: CaregiverEarningsOrderRecord[];
   serviceRevenueMix: CaregiverServiceRevenueMixRecord[];
   trends: {

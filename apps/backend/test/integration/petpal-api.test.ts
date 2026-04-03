@@ -627,6 +627,7 @@ describe('PetPal API integration', () => {
     assert.equal(summaryResponse.body.data.totals.activeServiceCount, 0);
     assert.equal(summaryResponse.body.data.totals.totalServiceCount, 0);
     assert.equal(summaryResponse.body.data.latestActiveOrder, null);
+    assert.deepEqual(summaryResponse.body.data.recentAftersalesOrders, []);
     assert.deepEqual(summaryResponse.body.data.recentCompletedOrders, []);
     assert.deepEqual(summaryResponse.body.data.serviceRevenueMix, []);
     assert.equal(summaryResponse.body.data.trends.daily.length, 7);
@@ -842,7 +843,7 @@ describe('PetPal API integration', () => {
       },
     });
 
-    await prisma.orderMain.create({
+    const aftersalesOrder = await prisma.orderMain.create({
       data: {
         id: `order-earnings-aftersales-${suffix}`,
         orderNo: `PP-EARN-S-${Date.now() + 3}`,
@@ -910,6 +911,12 @@ describe('PetPal API integration', () => {
       ),
     );
     assert.equal(summaryResponse.body.data.latestActiveOrder.id, activeOrder.id);
+    assert.ok(
+      summaryResponse.body.data.recentAftersalesOrders.some(
+        (item: { id: string; orderNo: string }) =>
+          item.id === aftersalesOrder.id && item.orderNo === aftersalesOrder.orderNo,
+      ),
+    );
     assert.ok(
       summaryResponse.body.data.recentCompletedOrders.some(
         (item: { id: string; orderNo: string }) =>
