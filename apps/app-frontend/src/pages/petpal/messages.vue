@@ -33,6 +33,10 @@ type UploadedMessageAttachment = {
   size: number
   uploadedAt: string
 }
+type MessageDraftState = {
+  content: string
+  attachments: UploadedMessageAttachment[]
+}
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
@@ -52,6 +56,7 @@ const selectedOrderId = ref('')
 const conversation = ref<OrderConversationDetailRecord | null>(null)
 const messageText = ref('')
 const messageAttachments = ref<UploadedMessageAttachment[]>([])
+const messageDrafts = ref<Record<string, MessageDraftState>>({})
 
 let threadRequestVersion = 0
 
@@ -111,9 +116,23 @@ const messageAttachmentSlotsLeft = computed(() => Math.max(0, 3 - messageAttachm
 const uploadingMessageAttachments = computed(() => upload.uploading.value)
 const composerBusy = computed(() => upload.uploading.value || sendingMessage.value)
 
+const cloneDraftAttachments = (attachments: UploadedMessageAttachment[]) =>
+  attachments.map(item => ({
+    fileId: item.fileId,
+    url: item.url,
+    name: item.name,
+    mimeType: item.mimeType,
+    size: item.size,
+    uploadedAt: item.uploadedAt,
+  }))
+
 function resetComposer() {
   messageText.value = ''
   messageAttachments.value = []
+}
+
+function hasThreadDraft(orderId: string) {
+  return Boolean(messageDrafts.value[orderId])
 }
 
 function clearThreadState() {
@@ -122,6 +141,44 @@ function clearThreadState() {
   threadError.value = ''
   conversation.value = null
   resetComposer()
+}
+
+function clearThreadDraft(orderId: string) {
+  if (!messageDrafts.value[orderId]) {
+    return
+  }
+
+  const nextDrafts = { ...messageDrafts.value }
+  delete nextDrafts[orderId]
+  messageDrafts.value = nextDrafts
+}
+
+function persistThreadDraft(orderId: string) {
+  if (!orderId) {
+    return
+  }
+
+  const content = messageText.value
+  const attachments = cloneDraftAttachments(messageAttachments.value)
+  const hasDraft = content.trim().length > 0 || attachments.length > 0
+  if (!hasDraft) {
+    clearThreadDraft(orderId)
+    return
+  }
+
+  messageDrafts.value = {
+    ...messageDrafts.value,
+    [orderId]: {
+      content,
+      attachments,
+    },
+  }
+}
+
+function restoreThreadDraft(orderId: string) {
+  const draft = messageDrafts.value[orderId]
+  messageText.value = draft?.content || ''
+  messageAttachments.value = draft ? cloneDraftAttachments(draft.attachments) : []
 }
 
 function patchConversationSummary(orderId: string, nextConversation: OrderConversationRecord) {
@@ -329,6 +386,7 @@ async function handleSendMessage() {
     })
     conversation.value = nextConversation
     patchConversationSummary(currentThreadOrder.value.id, nextConversation)
+    clearThreadDraft(currentThreadOrder.value.id)
     resetComposer()
     toast('消息已发送', 'success')
   }
@@ -348,6 +406,18 @@ onPullDownRefresh(() => {
   void loadPage()
 })
 
+watch(messageText, () => {
+  if (currentThreadOrder.value?.id) {
+    persistThreadDraft(currentThreadOrder.value.id)
+  }
+})
+
+watch(messageAttachments, () => {
+  if (currentThreadOrder.value?.id) {
+    persistThreadDraft(currentThreadOrder.value.id)
+  }
+}, { deep: true })
+
 watch(role, () => {
   syncSelectedOrderId()
 })
@@ -361,12 +431,17 @@ watch(selectedOrderId, (value, previousValue) => {
     return
   }
 
+  if (previousValue) {
+    persistThreadDraft(previousValue)
+  }
+
   if (!value) {
     clearThreadState()
     return
   }
 
-  void loadThread(value, { resetComposer: true })
+  restoreThreadDraft(value)
+  void loadThread(value)
 })
 </script>
 
@@ -409,6 +484,7 @@ watch(selectedOrderId, (value, previousValue) => {
           <text class="petpal-banner__meta">{{ helpers.serviceTypeLabels[priorityRow.order.serviceType] }} · {{ helpers.getOrderStatusLabel(priorityRow.order.orderStatus) }}</text>
           <text class="petpal-note">{{ priorityRow.summary.preview }}</text>
           <text class="petpal-note">{{ priorityRow.summary.meta }}</text>
+          <text v-if="hasThreadDraft(priorityRow.order.id)" class="petpal-note">这条线程还有未发送草稿。</text>
         </view>
         <view class="petpal-action-row">
           <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openPriorityThread">打开线程</button>
@@ -445,6 +521,7 @@ watch(selectedOrderId, (value, previousValue) => {
             <text class="petpal-banner__meta">{{ helpers.serviceTypeLabels[currentThreadOrder.serviceType] }} · {{ helpers.getOrderStatusLabel(currentThreadOrder.orderStatus) }}</text>
             <text class="petpal-note">{{ currentThreadSummary?.preview }}</text>
             <text class="petpal-note">{{ currentThreadSummary?.meta }}</text>
+            <text v-if="hasThreadDraft(currentThreadOrder.id)" class="petpal-note">当前线程已有未发送草稿，切换会话后会继续保留。</text>
           </view>
           <view class="message-thread__stats">
             <view class="message-thread__stat">
@@ -583,7 +660,7 @@ watch(selectedOrderId, (value, previousValue) => {
             <view class="petpal-row__copy">
               <text class="petpal-row__title">{{ item.order.orderNo }}</text>
               <text class="petpal-row__meta">{{ item.summary.preview }}</text>
-              <text class="petpal-row__hint">{{ item.summary.meta }}</text>
+              <text class="petpal-row__hint">{{ hasThreadDraft(item.order.id) ? `${item.summary.meta} · 草稿待发` : item.summary.meta }}</text>
             </view>
             <text class="petpal-row__value">{{ item.summary.unread ? `${item.summary.unread} 未读` : '打开' }}</text>
           </button>

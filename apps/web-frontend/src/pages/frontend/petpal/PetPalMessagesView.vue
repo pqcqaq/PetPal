@@ -69,6 +69,7 @@
             </div>
             <div class="petpal-sheet-row__tail">
               <span class="petpal-pill" :class="threadUnread(item) ? 'is-danger' : ''">未读 {{ threadUnread(item) }}</span>
+              <span v-if="hasThreadDraft(item.id)" class="petpal-pill">草稿</span>
               <span class="petpal-muted">{{ formatPetPalConversationMeta(item.conversation, role, formatPetPalTime) }}</span>
             </div>
           </button>
@@ -101,6 +102,7 @@
           <div class="petpal-side-stack">
             <p class="petpal-sheet-row__desc">{{ formatPetPalConversationPreview(activeConversation.conversation) }}</p>
             <p class="petpal-sheet-row__desc">{{ formatPetPalConversationMeta(activeConversation.conversation, role, formatPetPalTime) }}</p>
+            <p v-if="hasThreadDraft(activeConversation.id)" class="petpal-sheet-row__desc">当前线程已有未发送草稿，切换会话后会继续保留。</p>
           </div>
 
           <div class="petpal-toolbar">
@@ -289,6 +291,11 @@ type ConversationSummary = {
   updatedAt: string;
 };
 
+type MessageDraftState = {
+  content: string;
+  attachments: DraftMessageAttachment[];
+};
+
 const MAX_MESSAGE_ATTACHMENTS = 3;
 const MAX_MESSAGE_ATTACHMENT_SIZE = 8 * 1024 * 1024;
 const IMAGE_ATTACHMENT_URL_RE = /\.(png|jpe?g|gif|webp|bmp|svg)(?:$|[?#])/i;
@@ -302,6 +309,7 @@ const activeThread = ref<OrderConversationDetailRecord | null>(null);
 const activeThreadState = ref<PetPalSectionLoadState>('idle');
 const messageContent = ref('');
 const messageAttachments = ref<DraftMessageAttachment[]>([]);
+const messageDrafts = ref<Record<string, MessageDraftState>>({});
 const uploadingMessageAttachments = ref(false);
 const messageUploadProgress = ref<number | null>(null);
 const sendingMessage = ref(false);
@@ -383,6 +391,15 @@ const formatMessageAttachmentSize = (size: number) => {
   return `${size} B`;
 };
 
+const cloneDraftAttachments = (attachments: DraftMessageAttachment[]) =>
+  attachments.map((item) => ({
+    fileId: item.fileId,
+    url: item.url,
+    name: item.name,
+    size: item.size,
+    mimeType: item.mimeType,
+  }));
+
 function buildRemindersLink(notice: string, focusRole: 'owner' | 'caregiver') {
   return {
     name: 'frontend-petpal-reminders',
@@ -406,9 +423,55 @@ function buildOrderDetailLink(orderId: string) {
   };
 }
 
+function hasThreadDraft(orderId: string) {
+  return Boolean(messageDrafts.value[orderId]);
+}
+
 function resetComposer() {
   messageContent.value = '';
   messageAttachments.value = [];
+  messageUploadProgress.value = null;
+  if (messageAttachmentInputRef.value) {
+    messageAttachmentInputRef.value.value = '';
+  }
+}
+
+function clearThreadDraft(orderId: string) {
+  if (!messageDrafts.value[orderId]) {
+    return;
+  }
+
+  const nextDrafts = { ...messageDrafts.value };
+  delete nextDrafts[orderId];
+  messageDrafts.value = nextDrafts;
+}
+
+function persistThreadDraft(orderId: string) {
+  if (!orderId) {
+    return;
+  }
+
+  const content = messageContent.value;
+  const attachments = cloneDraftAttachments(messageAttachments.value);
+  const hasDraft = content.trim().length > 0 || attachments.length > 0;
+  if (!hasDraft) {
+    clearThreadDraft(orderId);
+    return;
+  }
+
+  messageDrafts.value = {
+    ...messageDrafts.value,
+    [orderId]: {
+      content,
+      attachments,
+    },
+  };
+}
+
+function restoreThreadDraft(orderId: string) {
+  const draft = messageDrafts.value[orderId];
+  messageContent.value = draft?.content ?? '';
+  messageAttachments.value = draft ? cloneDraftAttachments(draft.attachments) : [];
   messageUploadProgress.value = null;
   if (messageAttachmentInputRef.value) {
     messageAttachmentInputRef.value.value = '';
@@ -507,7 +570,6 @@ async function loadActiveThread(orderId: string) {
   const requestVersion = ++activeThreadRequestVersion;
   activeThread.value = null;
   activeThreadState.value = 'idle';
-  resetComposer();
 
   try {
     const conversation = await api.petpal.orders.messages(orderId);
@@ -699,6 +761,7 @@ async function submitMessage() {
     activeThread.value = result;
     activeThreadState.value = 'ready';
     patchConversationSummary(orderId, result);
+    clearThreadDraft(orderId);
     resetComposer();
     ElMessage.success('消息已发送');
   } catch (error: unknown) {
@@ -721,10 +784,32 @@ watch(
 );
 
 watch(
+  messageContent,
+  () => {
+    if (activeConversation.value?.id) {
+      persistThreadDraft(activeConversation.value.id);
+    }
+  },
+);
+
+watch(
+  messageAttachments,
+  () => {
+    if (activeConversation.value?.id) {
+      persistThreadDraft(activeConversation.value.id);
+    }
+  },
+  { deep: true },
+);
+
+watch(
   () => activeConversation.value?.id || '',
   (orderId, previousOrderId) => {
     if (orderId === previousOrderId) {
       return;
+    }
+    if (previousOrderId) {
+      persistThreadDraft(previousOrderId);
     }
     if (!orderId) {
       activeThreadRequestVersion += 1;
@@ -733,6 +818,7 @@ watch(
       resetComposer();
       return;
     }
+    restoreThreadDraft(orderId);
     void loadActiveThread(orderId);
   },
   { immediate: true },
