@@ -11,6 +11,7 @@ import {
   toPetPalOptionalQueryValue,
   toPetPalOptionalTrimmedQueryText,
 } from './export-query-values';
+import { hasPetPalActiveFilters } from './export-filter-presence';
 
 export type OwnerTransactionExportFilterSnapshot = {
   startDate: string;
@@ -67,12 +68,12 @@ export const withOwnerTransactionExportDateRange = (
 
 export const hasOwnerTransactionExportFilters = (
   snapshot: OwnerTransactionExportFilterSnapshot,
-) => Boolean(
-  snapshot.startDate
-  || snapshot.endDate
-  || snapshot.serviceType
-  || snapshot.orderStatus
-  || snapshot.orderNoKeyword.trim(),
+) => hasPetPalActiveFilters(
+  snapshot.startDate,
+  snapshot.endDate,
+  snapshot.serviceType,
+  snapshot.orderStatus,
+  snapshot.orderNoKeyword,
 );
 
 export const buildOwnerTransactionExportQuery = (

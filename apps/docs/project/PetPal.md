@@ -7874,6 +7874,50 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.185 2026-04-03（P3-M1 Slice 185）
+
+**概述**：延续上一轮对 query 值归一化的共享化，本轮继续把三份导出状态模块里重复的 `has*Filters` 存在性判断抽成共享 helper，统一承接文本去空白后的存在性判断、布尔旗标判断和可扩展的数值判断，减少状态模块里的重复布尔拼接。
+
+已完成：
+
+- 提取共享 export filter presence helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/export-filter-presence.ts`
+    - 新增 `hasPetPalFilterValue`，统一承接单个导出筛选值是否“算作已填写”的判断。
+    - 新增 `hasPetPalActiveFilters`，统一承接一组导出筛选值的存在性判断。
+- 三份导出状态模块改走共享存在性 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/owner-refund-export-state.ts`
+  - `apps/web-frontend/src/pages/frontend/petpal/owner-transaction-export-state.ts`
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-earnings-export-state.ts`
+    - 三份 `has*Filters` 现已删除重复的 `Boolean(a || b || c ...)` 拼接，统一改走共享 helper。
+- 新增定向单测：
+  - `apps/web-frontend/test/petpal-export-filter-presence.test.ts`
+    - 覆盖单值存在性判断和多值集合存在性判断。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\petpal-export-filter-presence.test.ts ..\\web-frontend\\test\\owner-refund-export-state.test.ts ..\\web-frontend\\test\\owner-transaction-export-state.test.ts ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增导出字段、后端契约或页面交互，只继续收口 Web 前端导出状态层的存在性判断逻辑。
+- 已确认三份状态模块对文本筛选仍会先按 `trim()` 后再判定是否有效，对布尔旗标仍按真假判断，因此模板保存与导出前校验语义不变。
+- 已确认共享 helper 只负责 filter presence 判定，不接管 query 序列化、快照结构或页面字段集合。
+
+风险与缓解：
+
+- 风险：导出状态层已经逐步共享了 snapshot、query value 和 filter presence 三层 helper，但空快照默认值和字段清单仍按模块并行维护，后续继续抽象时仍需避免把不同业务字段边界抹平。
+- 缓解：下一轮继续优先评估空快照默认值和字段清单中是否只剩纯机械重复，只抽最小 helper，不强行统一业务语义。
+
+下一步（1-3）：
+
+1. 继续评估三份导出状态模块里的空快照默认值和字段清单，判断是否还能继续抽最小共享 helper。
+2. 继续评估收益页特有的 `datePreset` 是否只需保留在收益模块内，避免为共享而反向污染主人侧导出状态。
+3. 在导出状态层稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
 ### 14.184 2026-04-03（P3-M1 Slice 184）
 
 **概述**：延续上一轮对 snapshot clone/apply 的共享化，本轮继续把三份导出状态模块里重复的 query 值归一化规则抽成共享 helper，统一承接空串转 `undefined`、关键词 `trim()` 和布尔旗标只在为 `true` 时透传的逻辑，减少 query builder 里的机械重复。

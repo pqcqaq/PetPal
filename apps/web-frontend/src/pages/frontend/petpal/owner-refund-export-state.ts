@@ -19,6 +19,7 @@ import {
   toPetPalOptionalQueryValue,
   toPetPalOptionalTrimmedQueryText,
 } from './export-query-values';
+import { hasPetPalActiveFilters } from './export-filter-presence';
 
 export type OwnerRefundExportFilterSnapshot = {
   startDate: string;
@@ -84,16 +85,18 @@ export const withOwnerRefundExportDateRange = (
   value,
 );
 
-export const hasOwnerRefundExportFilters = (snapshot: OwnerRefundExportFilterSnapshot) => Boolean(
-  snapshot.startDate
-  || snapshot.endDate
-  || snapshot.refundType
-  || snapshot.refundStatus
-  || snapshot.complaintStatus
-  || snapshot.complaintType
-  || snapshot.complaintTargetRole
-  || snapshot.serviceType
-  || snapshot.orderNoKeyword.trim(),
+export const hasOwnerRefundExportFilters = (snapshot: OwnerRefundExportFilterSnapshot) => (
+  hasPetPalActiveFilters(
+    snapshot.startDate,
+    snapshot.endDate,
+    snapshot.refundType,
+    snapshot.refundStatus,
+    snapshot.complaintStatus,
+    snapshot.complaintType,
+    snapshot.complaintTargetRole,
+    snapshot.serviceType,
+    snapshot.orderNoKeyword,
+  )
 );
 
 export const buildOwnerRefundExportQuery = (

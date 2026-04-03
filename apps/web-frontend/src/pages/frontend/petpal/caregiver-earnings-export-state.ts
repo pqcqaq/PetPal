@@ -20,6 +20,7 @@ import {
   toPetPalOptionalTrimmedQueryText,
   toPetPalOptionalTrueFlag,
 } from './export-query-values';
+import { hasPetPalActiveFilters } from './export-filter-presence';
 
 export type EarningsExportDatePreset = '' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
 
@@ -102,19 +103,19 @@ export const withCaregiverEarningsExportDateRange = (
 
 export const hasCaregiverEarningsExportFilters = (
   snapshot: CaregiverEarningsExportFilterSnapshot,
-) => Boolean(
-  snapshot.startDate
-  || snapshot.endDate
-  || snapshot.serviceType
-  || snapshot.orderNoKeyword.trim()
-  || snapshot.refundType
-  || snapshot.refundStatus
-  || snapshot.refundReasonKeyword.trim()
-  || snapshot.complaintStatus
-  || snapshot.complaintType
-  || snapshot.complaintKeyword.trim()
-  || snapshot.complaintTargetRole
-  || snapshot.riskOnly,
+) => hasPetPalActiveFilters(
+  snapshot.startDate,
+  snapshot.endDate,
+  snapshot.serviceType,
+  snapshot.orderNoKeyword,
+  snapshot.refundType,
+  snapshot.refundStatus,
+  snapshot.refundReasonKeyword,
+  snapshot.complaintStatus,
+  snapshot.complaintType,
+  snapshot.complaintKeyword,
+  snapshot.complaintTargetRole,
+  snapshot.riskOnly,
 );
 
 export const buildCaregiverEarningsExportQuery = (
