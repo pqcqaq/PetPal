@@ -7882,6 +7882,61 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.226 2026-04-04（P3-M1 Slice 226）
+
+**概述**：上一轮已经把投诉证据上传切到订单范围治理，但投诉记录仍只保存 `evidenceUrls`，附件中心还不能识别这些投诉证据 URL 正在被业务使用，上传清理定时器也不会处理长期未被投诉记录引用的投诉附件。本轮继续沿既有附件治理链路补齐“投诉证据引用感知 + 孤儿清理”，在不推翻投诉模型的前提下把投诉附件纳入同一套治理闭环。
+
+已完成：
+
+- 共享附件引用类型扩展：
+  - `packages/api-common/src/types/files.ts`
+    - `MediaAssetReferenceKind` 新增 `PETPAL_ORDER_COMPLAINT`，用于统一表达“订单投诉证据”引用来源。
+- 后端附件引用扫描已纳入投诉证据：
+  - `apps/backend/src/services/media-asset-references.ts`
+    - 新增投诉证据引用扫描，按 `Complaint.evidenceUrls` 中的 URL 反查 `MediaAsset.url`，把命中的受管附件回填为订单投诉引用。
+    - 附件引用扫描现在覆盖三类 PetPal 业务引用：
+      - `CaregiverProfile.qualificationMaterials`
+      - `Complaint.evidenceUrls`
+      - `PenaltyRecord.rectifyEvidenceMaterials`
+    - 即便投诉记录当前仍未升级为 `fileId` 快照，附件中心也能通过 URL 匹配识别真实业务引用。
+- 孤儿业务附件回收已纳入投诉证据：
+  - `apps/backend/src/timers/upload-reconcile/cleanup-orphan-managed-attachments.ts`
+    - 临时业务附件回收范围新增 `tag1 = petpal-order-complaint`。
+    - 旧但未被任何投诉记录引用的投诉附件现在会和资质/整改附件一起进入回收候选。
+- 控制台附件引用文案补齐：
+  - `apps/web-frontend/src/pages/console/attachments/attachment-management.ts`
+    - 新增 `PETPAL_ORDER_COMPLAINT -> 订单投诉` 文案映射，列表与详情的引用摘要不再回落到枚举值。
+- 定向集成测试补齐：
+  - `apps/backend/test/integration/attachments.test.ts`
+    - 新增“投诉证据 URL 也会出现在附件引用摘要里，且删除会被拦截”的覆盖。
+    - 孤儿清理用例已扩展到投诉附件，验证“旧但未引用的投诉附件会被清理、旧但已引用的不删”。
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test test/integration/attachments.test.ts` 通过。
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有改动投诉记录 `evidenceUrls` 的协议面，只是在附件治理层把 URL 反查纳入引用扫描，因此不会影响现有投诉创建、结果页或后台投诉治理接口。
+- 已确认附件中心现在不只知道资质和整改材料，也能识别订单投诉证据附件；被投诉记录引用的附件在列表、详情和删除动作上都会继续走同一套保护。
+- 已确认上传清理定时器现在会把 `petpal-order-complaint` 一并纳入候选，但只有“超过缓冲时间且未被投诉记录引用”的附件才会删，不会误伤已提交的证据材料。
+
+风险与缓解：
+
+- 风险：投诉证据引用识别当前依赖 `MediaAsset.url == Complaint.evidenceUrls[*]` 的字符串匹配，若后续 URL 生成策略变化或投诉数据被人工改写，可能导致引用识别失真。
+- 缓解：本轮先在不改协议面的前提下补齐现有闭环；后续若继续深化，可把投诉证据升级为带 `fileId` 的受控附件快照，从根源上去掉 URL 匹配依赖。
+
+- 风险：投诉附件现已纳入孤儿清理，但订单消息附件仍未纳入同一类自动回收范围。
+- 缓解：当前已把回收候选继续集中在单一 cleanup 服务内，后续若确认消息附件也存在“先上传后放弃”的沉淀风险，可按同一方式继续扩展标签与引用规则。
+
+下一步（1-3）：
+
+1. 继续评估是否把投诉证据从 `evidenceUrls` 升级为带 `fileId` 的受控附件快照，进一步收紧引用识别可靠性。
+2. 继续梳理订单消息或其他主人侧业务附件是否也需要补引用识别与孤儿回收。
+3. 继续按切片节奏推进局部改动、定向测试、本地提交和文档同步，不回到无边界大改。
+
 ### 14.225 2026-04-04（P3-M1 Slice 225）
 
 **概述**：上一轮已经把移动端照料者资质材料上传切到后端治理标签，但 App 端投诉页的证据上传仍沿用 `tag1=petpal`、`tag2=complaint` 的旧通用口径，普通订单参与方也依然需要依赖通用 `file.upload` 才能走通这条链路。本轮继续把投诉证据上传收口到订单范围治理：后端新增 PetPal 投诉附件白名单，移动端投诉页同步改成按订单 ID 上传。

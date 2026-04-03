@@ -133,6 +133,10 @@ export const resolveAttachmentReferenceKindLabel = (kind: MediaAssetReferenceRec
     return '照料者资质';
   }
 
+  if (kind === 'PETPAL_ORDER_COMPLAINT') {
+    return '订单投诉';
+  }
+
   if (kind === 'PETPAL_PENALTY_RECTIFY') {
     return '处罚整改';
   }

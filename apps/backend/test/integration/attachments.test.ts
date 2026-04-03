@@ -175,6 +175,110 @@ const createPenaltyReferenceScenario = async (input: {
   };
 };
 
+const createComplaintOrderScenario = async () => {
+  const { app, prisma } = context;
+  const ownerSession = await loginAs(app, 'user', 'User123!');
+  const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
+  const pet = await prisma.petProfile.findFirst({
+    where: {
+      ownerId: ownerSession.user.id,
+    },
+    select: {
+      id: true,
+    },
+  });
+  const caregiverProfile = await prisma.caregiverProfile.findFirst({
+    where: {
+      userId: caregiverSession.user.id,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  assert.ok(pet);
+  assert.ok(caregiverProfile);
+
+  const suffix = Date.now().toString(36);
+  const requestRecord = await prisma.serviceRequest.create({
+    data: {
+      id: `req-complaint-attachment-reference-${suffix}`,
+      ownerId: ownerSession.user.id,
+      petId: pet.id,
+      serviceType: 'WALKING',
+      startTime: new Date('2026-04-03T11:00:00.000Z'),
+      endTime: new Date('2026-04-03T12:00:00.000Z'),
+      locationText: `杭州市滨江区投诉附件治理测试-${suffix}`,
+      budgetAmount: 76,
+      demandTags: ['complaint-attachment-governance', suffix],
+      status: 'MATCHED',
+      matchedCaregiverId: caregiverProfile.id,
+    },
+  });
+
+  const order = await prisma.orderMain.create({
+    data: {
+      id: `order-complaint-attachment-reference-${suffix}`,
+      orderNo: `PP-COMPLAINT-ATTACH-${Date.now()}`,
+      ownerId: ownerSession.user.id,
+      caregiverId: caregiverProfile.id,
+      serviceRequestId: requestRecord.id,
+      serviceType: 'WALKING',
+      appointmentStart: new Date('2026-04-03T11:00:00.000Z'),
+      appointmentEnd: new Date('2026-04-03T12:00:00.000Z'),
+      amountTotal: 76,
+      amountAdjusted: 0,
+      amountPaid: 76,
+      amountRefunded: 0,
+      orderStatus: 'DISPUTED',
+    },
+    select: {
+      id: true,
+      orderNo: true,
+      ownerId: true,
+    },
+  });
+
+  return {
+    orderId: order.id,
+    orderNo: order.orderNo,
+    complainantId: order.ownerId,
+  };
+};
+
+const createComplaintReferenceScenario = async (input: {
+  evidenceUrl: string;
+  order?: {
+    orderId: string;
+    orderNo: string;
+    complainantId: string;
+  };
+}) => {
+  const { prisma } = context;
+  const order = input.order ?? await createComplaintOrderScenario();
+
+  const complaint = await prisma.complaint.create({
+    data: {
+      id: `complaint-url-attachment-reference-${Date.now().toString(36)}`,
+      orderId: order.orderId,
+      complainantId: order.complainantId,
+      targetRole: 'CAREGIVER',
+      complaintType: 'SERVICE',
+      description: `投诉附件引用治理测试 ${Date.now().toString(36)}`,
+      evidenceUrls: [input.evidenceUrl],
+      status: 'PROCESSING',
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return {
+    complaintId: complaint.id,
+    orderNo: order.orderNo,
+  };
+};
+
 const waitForFileRemoval = async (filePath: string) => {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
@@ -451,6 +555,15 @@ describe('Attachment integration', () => {
       tag1,
       tag2: 'penalty-rectify',
     });
+    const complaintUpload = await uploadManagedFileForTest(app, {
+      accessToken: adminSession.tokens.accessToken,
+      fileName: 'complaint-evidence.jpg',
+      contentType: 'image/jpeg',
+      content: 'complaint-evidence-content',
+      kind: 'attachment',
+      tag1,
+      tag2: 'complaint-evidence',
+    });
     const freeUpload = await uploadManagedFileForTest(app, {
       accessToken: adminSession.tokens.accessToken,
       fileName: 'free-attachment.txt',
@@ -462,6 +575,7 @@ describe('Attachment integration', () => {
     });
 
     const qualificationMaterial = await loadManagedAttachmentMaterial(qualificationUpload.fileId);
+    const complaintMaterial = await loadManagedAttachmentMaterial(complaintUpload.fileId);
     const rectifyMaterial = await loadManagedAttachmentMaterial(penaltyUpload.fileId);
 
     const caregiverProfile = await context.prismaRaw.caregiverProfile.update({
@@ -480,6 +594,9 @@ describe('Attachment integration', () => {
       targetUserId: managerSession.user.id,
       rectifyMaterial,
     });
+    const complaintReference = await createComplaintReferenceScenario({
+      evidenceUrl: complaintMaterial.url,
+    });
 
     const listResponse = await request(app)
       .get('/api/attachments')
@@ -491,7 +608,7 @@ describe('Attachment integration', () => {
       .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
       .expect(200);
 
-    assert.equal(listResponse.body.data.meta.total, 3);
+    assert.equal(listResponse.body.data.meta.total, 4);
 
     const qualificationItem = listResponse.body.data.items.find(
       (item: { id: string }) => item.id === qualificationUpload.fileId,
@@ -499,12 +616,16 @@ describe('Attachment integration', () => {
     const penaltyItem = listResponse.body.data.items.find(
       (item: { id: string }) => item.id === penaltyUpload.fileId,
     );
+    const complaintItem = listResponse.body.data.items.find(
+      (item: { id: string }) => item.id === complaintUpload.fileId,
+    );
     const freeItem = listResponse.body.data.items.find(
       (item: { id: string }) => item.id === freeUpload.fileId,
     );
 
     assert.ok(qualificationItem);
     assert.ok(penaltyItem);
+    assert.ok(complaintItem);
     assert.ok(freeItem);
     assert.equal(qualificationItem.referenceCount, 1);
     assert.equal(qualificationItem.references[0].kind, 'PETPAL_CAREGIVER_QUALIFICATION');
@@ -516,6 +637,11 @@ describe('Attachment integration', () => {
     assert.equal(penaltyItem.references[0].entityId, penaltyReference.penaltyId);
     assert.match(penaltyItem.references[0].note, /处罚整改凭证/);
     assert.match(penaltyItem.references[0].title, new RegExp(penaltyReference.orderNo));
+    assert.equal(complaintItem.referenceCount, 1);
+    assert.equal(complaintItem.references[0].kind, 'PETPAL_ORDER_COMPLAINT');
+    assert.equal(complaintItem.references[0].entityId, complaintReference.complaintId);
+    assert.match(complaintItem.references[0].note, /订单投诉证据/);
+    assert.match(complaintItem.references[0].title, new RegExp(complaintReference.orderNo));
     assert.equal(freeItem.referenceCount, 0);
     assert.deepEqual(freeItem.references, []);
 
@@ -544,12 +670,21 @@ describe('Attachment integration', () => {
 
     assert.match(blockedPenaltyDelete.body.message, /Attachment is still referenced by business records/);
     assert.match(blockedPenaltyDelete.body.message, new RegExp(penaltyReference.orderNo));
+
+    const blockedComplaintDelete = await request(app)
+      .delete(`/api/attachments/${complaintUpload.fileId}`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(400);
+
+    assert.match(blockedComplaintDelete.body.message, /Attachment is still referenced by business records/);
+    assert.match(blockedComplaintDelete.body.message, new RegExp(complaintReference.orderNo));
   });
 
   it('cleans up stale unreferenced PetPal managed attachments without touching referenced or generic files', async () => {
     const { app } = context;
     const adminSession = await loginAs(app, 'admin@example.com', 'Admin123!');
     const managerSession = await loginAs(app, 'manager', 'Manager123!');
+    const ownerSession = await loginAs(app, 'user', 'User123!');
     const caregiverProfile = await context.prismaRaw.caregiverProfile.findUnique({
       where: {
         userId: managerSession.user.id,
@@ -560,6 +695,9 @@ describe('Attachment integration', () => {
     });
 
     assert.ok(caregiverProfile);
+
+    const orphanComplaintOrder = await createComplaintOrderScenario();
+    const referencedComplaintOrder = await createComplaintOrderScenario();
 
     const orphanQualificationUpload = await uploadManagedFileForTest(app, {
       accessToken: managerSession.tokens.accessToken,
@@ -597,6 +735,24 @@ describe('Attachment integration', () => {
       tag1: 'petpal-penalty',
       tag2: 'rectify',
     });
+    const orphanComplaintUpload = await uploadManagedFileForTest(app, {
+      accessToken: ownerSession.tokens.accessToken,
+      fileName: 'stale-complaint-evidence.jpg',
+      contentType: 'image/jpeg',
+      content: 'stale-complaint-evidence-content',
+      kind: 'attachment',
+      tag1: 'petpal-order-complaint',
+      tag2: orphanComplaintOrder.orderId,
+    });
+    const referencedComplaintUpload = await uploadManagedFileForTest(app, {
+      accessToken: ownerSession.tokens.accessToken,
+      fileName: 'referenced-complaint-evidence.jpg',
+      contentType: 'image/jpeg',
+      content: 'referenced-complaint-evidence-content',
+      kind: 'attachment',
+      tag1: 'petpal-order-complaint',
+      tag2: referencedComplaintOrder.orderId,
+    });
     const genericAttachmentUpload = await uploadManagedFileForTest(app, {
       accessToken: adminSession.tokens.accessToken,
       fileName: 'generic-attachment.txt',
@@ -616,6 +772,8 @@ describe('Attachment integration', () => {
             referencedQualificationUpload.fileId,
             orphanPenaltyUpload.fileId,
             referencedPenaltyUpload.fileId,
+            orphanComplaintUpload.fileId,
+            referencedComplaintUpload.fileId,
             genericAttachmentUpload.fileId,
           ],
         },
@@ -626,6 +784,7 @@ describe('Attachment integration', () => {
     });
 
     const referencedQualificationMaterial = await loadManagedAttachmentMaterial(referencedQualificationUpload.fileId);
+    const referencedComplaintMaterial = await loadManagedAttachmentMaterial(referencedComplaintUpload.fileId);
     const referencedPenaltyMaterial = await loadManagedAttachmentMaterial(referencedPenaltyUpload.fileId);
     await context.prismaRaw.caregiverProfile.update({
       where: {
@@ -640,8 +799,13 @@ describe('Attachment integration', () => {
       targetUserId: managerSession.user.id,
       rectifyMaterial: referencedPenaltyMaterial,
     });
+    await createComplaintReferenceScenario({
+      evidenceUrl: referencedComplaintMaterial.url,
+      order: referencedComplaintOrder,
+    });
 
     const orphanQualificationPath = await resolveManagedUploadPath(orphanQualificationUpload.fileId);
+    const orphanComplaintPath = await resolveManagedUploadPath(orphanComplaintUpload.fileId);
     const orphanPenaltyPath = await resolveManagedUploadPath(orphanPenaltyUpload.fileId);
     const genericAttachmentPath = await resolveManagedUploadPath(genericAttachmentUpload.fileId);
 
@@ -652,16 +816,20 @@ describe('Attachment integration', () => {
     });
 
     assert.deepEqual(cleanupResult, {
-      checked: 4,
-      deleted: 2,
-      keptReferenced: 2,
+      checked: 6,
+      deleted: 3,
+      keptReferenced: 3,
       blocked: 0,
     });
 
     const deletedAssets = await context.prismaRaw.mediaAsset.findMany({
       where: {
         id: {
-          in: [orphanQualificationUpload.fileId, orphanPenaltyUpload.fileId],
+          in: [
+            orphanQualificationUpload.fileId,
+            orphanPenaltyUpload.fileId,
+            orphanComplaintUpload.fileId,
+          ],
         },
       },
       select: {
@@ -670,9 +838,10 @@ describe('Attachment integration', () => {
       },
     });
 
-    assert.equal(deletedAssets.length, 2);
+    assert.equal(deletedAssets.length, 3);
     assert.ok(deletedAssets.every((item) => item.deleteAt !== null));
     await waitForFileRemoval(orphanQualificationPath);
+    await waitForFileRemoval(orphanComplaintPath);
     await waitForFileRemoval(orphanPenaltyPath);
 
     const referencedQualificationDetail = await request(app)
@@ -688,6 +857,13 @@ describe('Attachment integration', () => {
       .expect(200);
 
     assert.equal(referencedPenaltyDetail.body.data.referenceCount, 1);
+
+    const referencedComplaintDetail = await request(app)
+      .get(`/api/attachments/${referencedComplaintUpload.fileId}`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .expect(200);
+
+    assert.equal(referencedComplaintDetail.body.data.referenceCount, 1);
 
     const genericAttachment = await context.prismaRaw.mediaAsset.findUnique({
       where: {
