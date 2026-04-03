@@ -513,6 +513,9 @@
             <span class="petpal-pill" :class="getAftersalesStatusPillTone(order.orderStatus)">
               {{ getPetPalOrderStatusLabel(order.orderStatus) }}
             </span>
+            <el-button link type="primary" @click="applyRiskOrderExportPreset(order)">
+              导出同类风险
+            </el-button>
             <RouterLink :to="buildAftersalesOrderDetailLink(order.id)">查看售后</RouterLink>
           </div>
         </div>
@@ -625,6 +628,7 @@ import {
 } from './export-filter-summary';
 import {
   applyCaregiverEarningsExportFilterSnapshot,
+  buildCaregiverRiskOrderExportSnapshot,
   buildCaregiverEarningsExportQuery,
   cloneCaregiverEarningsExportFilterSnapshot,
   createEmptyCaregiverEarningsExportFilterSnapshot,
@@ -1231,6 +1235,26 @@ function buildAftersalesOrderDetailLink(orderId: string) {
 
 function toggleRiskOnlyExport() {
   exportRiskOnly.value = !exportRiskOnly.value;
+}
+
+function applyRiskOrderExportPreset(order: CaregiverAftersalesRiskOrderRecord) {
+  applyCaregiverEarningsExportFilterSnapshot(
+    exportPageState,
+    buildCaregiverRiskOrderExportSnapshot(exportPageState, order),
+  );
+
+  const reasons = [
+    getPetPalServiceTypeLabel(order.serviceType),
+    order.primaryComplaintStatus ? getPetPalComplaintStatusLabel(order.primaryComplaintStatus) : '',
+    order.primaryComplaintTargetRole
+      ? getPetPalComplaintTargetRoleLabel(order.primaryComplaintTargetRole)
+      : '',
+    order.latestRefundStatus ? getPetPalRefundStatusLabel(order.latestRefundStatus) : '',
+  ].filter(Boolean);
+
+  ElMessage.success(
+    `已切到${reasons.join(' / ') || '该风险订单'}导出条件，可直接导出同类风险明细。`,
+  );
 }
 
 const primaryAction = computed(() => {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   applyCaregiverEarningsExportFilterSnapshot,
+  buildCaregiverRiskOrderExportSnapshot,
   buildCaregiverEarningsExportQuery,
   cloneCaregiverEarningsExportFilterSnapshot,
   createEmptyCaregiverEarningsExportFilterSnapshot,
@@ -75,6 +76,40 @@ test('builds caregiver earnings export query payloads without leaking empty valu
     complaintStatus: 'PROCESSING',
     complaintType: undefined,
     complaintKeyword: 'follow up',
+    complaintTargetRole: 'CAREGIVER',
+    riskOnly: true,
+  });
+});
+
+test('builds caregiver risk order export snapshots while preserving the current date window', () => {
+  const currentSnapshot = {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days' as const,
+    orderNoKeyword: ' old-order ',
+    refundReasonKeyword: ' old-reason ',
+    complaintKeyword: ' old-complaint ',
+    riskOnly: false,
+  };
+
+  const nextSnapshot = buildCaregiverRiskOrderExportSnapshot(currentSnapshot, {
+    serviceType: 'BOARDING',
+    latestRefundStatus: 'APPROVED',
+    primaryComplaintStatus: 'OPEN',
+    primaryComplaintType: 'SERVICE',
+    primaryComplaintTargetRole: 'CAREGIVER',
+  });
+
+  assert.deepEqual(nextSnapshot, {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days',
+    serviceType: 'BOARDING',
+    refundStatus: 'APPROVED',
+    complaintStatus: 'OPEN',
+    complaintType: 'SERVICE',
     complaintTargetRole: 'CAREGIVER',
     riskOnly: true,
   });

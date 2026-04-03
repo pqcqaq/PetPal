@@ -1,4 +1,5 @@
 import type {
+  CaregiverAftersalesRiskOrderRecord,
   CaregiverEarningsExportQuery,
   ComplaintStatus,
   ComplaintTargetRole,
@@ -122,4 +123,27 @@ export const buildCaregiverEarningsExportQuery = (
   complaintKeyword: toPetPalOptionalTrimmedQueryText(snapshot.complaintKeyword),
   complaintTargetRole: toPetPalOptionalQueryValue(snapshot.complaintTargetRole),
   riskOnly: toPetPalOptionalTrueFlag(snapshot.riskOnly),
+});
+
+export const buildCaregiverRiskOrderExportSnapshot = (
+  currentSnapshot: CaregiverEarningsExportFilterSnapshot,
+  order: Pick<
+    CaregiverAftersalesRiskOrderRecord,
+    | 'serviceType'
+    | 'latestRefundStatus'
+    | 'primaryComplaintStatus'
+    | 'primaryComplaintType'
+    | 'primaryComplaintTargetRole'
+  >,
+): CaregiverEarningsExportFilterSnapshot => ({
+  ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+  startDate: currentSnapshot.startDate,
+  endDate: currentSnapshot.endDate,
+  datePreset: currentSnapshot.datePreset,
+  serviceType: order.serviceType,
+  refundStatus: order.latestRefundStatus ?? '',
+  complaintStatus: order.primaryComplaintStatus ?? '',
+  complaintType: order.primaryComplaintType ?? '',
+  complaintTargetRole: order.primaryComplaintTargetRole ?? '',
+  riskOnly: true,
 });
