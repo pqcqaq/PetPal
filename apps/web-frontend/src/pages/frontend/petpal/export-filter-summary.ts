@@ -55,6 +55,7 @@ export type CaregiverEarningsExportSummaryItemKey =
   | 'serviceType'
   | 'orderNoKeyword'
   | 'minRefundAmount'
+  | 'minComplaintCount'
   | 'refundType'
   | 'refundStatus'
   | 'refundReasonKeyword'
@@ -291,6 +292,13 @@ export const buildCaregiverEarningsExportSummaryItems = (
       value: `${formatPetPalMoney(snapshot.minRefundAmount)} 起`,
     });
   }
+  if (snapshot.minComplaintCount != null) {
+    items.push({
+      key: 'minComplaintCount',
+      label: '投诉门槛',
+      value: `${snapshot.minComplaintCount} 条起`,
+    });
+  }
   if (snapshot.refundType) {
     items.push({
       key: 'refundType',
@@ -371,6 +379,9 @@ export const clearCaregiverEarningsExportSummaryItem = (
       break;
     case 'minRefundAmount':
       nextSnapshot.minRefundAmount = null;
+      break;
+    case 'minComplaintCount':
+      nextSnapshot.minComplaintCount = null;
       break;
     case 'refundType':
       nextSnapshot.refundType = '';

@@ -267,6 +267,7 @@ type CaregiverEarningsExportFilters = {
   serviceType?: 'BOARDING' | 'WALKING' | 'FEEDING' | 'DOOR_VISIT';
   orderNoKeyword?: string;
   minRefundAmount?: number;
+  minComplaintCount?: number;
   refundType?: 'FULL' | 'PARTIAL';
   refundStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED';
   refundReasonKeyword?: string;
@@ -474,6 +475,10 @@ const normalizeCaregiverEarningsExportFilters = (
     minRefundAmount:
       typeof filters.minRefundAmount === 'number' && Number.isFinite(filters.minRefundAmount)
         ? Number(filters.minRefundAmount.toFixed(2))
+        : undefined,
+    minComplaintCount:
+      typeof filters.minComplaintCount === 'number' && Number.isFinite(filters.minComplaintCount)
+        ? Math.trunc(filters.minComplaintCount)
         : undefined,
     refundReasonKeyword: filters.refundReasonKeyword?.trim() || undefined,
     complaintKeyword: filters.complaintKeyword?.trim() || undefined,
@@ -846,6 +851,14 @@ type CaregiverAftersalesRiskOrderEntity = Prisma.OrderMainGetPayload<{
 const caregiverEarningsExportSelect = {
   ...caregiverEarningsOrderSelect,
   closedAt: true,
+  complaints: {
+    where: {
+      deleteAt: null,
+    },
+    select: {
+      id: true,
+    },
+  },
 } satisfies Prisma.OrderMainSelect;
 
 type CaregiverEarningsExportEntity = Prisma.OrderMainGetPayload<{
@@ -2307,7 +2320,12 @@ export const petpalService = {
       take: 5000,
     });
 
-    return orders.map(toCaregiverEarningsExportRow);
+    const filteredOrders =
+      normalizedFilters.minComplaintCount != null
+        ? orders.filter((order) => order.complaints.length >= normalizedFilters.minComplaintCount!)
+        : orders;
+
+    return filteredOrders.map(toCaregiverEarningsExportRow);
   },
 
   async createCaregiverService(

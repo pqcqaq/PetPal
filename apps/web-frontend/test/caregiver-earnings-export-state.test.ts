@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT,
+  CAREGIVER_REPEAT_COMPLAINT_COUNT,
   applyCaregiverEarningsExportFilterSnapshot,
   buildCaregiverAllRiskExportSnapshot,
   buildCaregiverRiskOrderExportSnapshot,
@@ -63,6 +64,7 @@ test('builds caregiver earnings export query payloads without leaking empty valu
     serviceType: 'WALKING' as const,
     orderNoKeyword: '  earning-order-9  ',
     minRefundAmount: 88,
+    minComplaintCount: 2,
     refundStatus: 'SUCCESS' as const,
     refundReasonKeyword: '  late arrival  ',
     complaintStatus: 'PROCESSING' as const,
@@ -77,6 +79,7 @@ test('builds caregiver earnings export query payloads without leaking empty valu
     serviceType: 'WALKING',
     orderNoKeyword: 'earning-order-9',
     minRefundAmount: 88,
+    minComplaintCount: 2,
     refundType: undefined,
     refundStatus: 'SUCCESS',
     refundReasonKeyword: 'late arrival',
@@ -131,6 +134,7 @@ test('builds caregiver risk queue export snapshots for common queue views', () =
     serviceType: 'BOARDING' as const,
     orderNoKeyword: ' old-order ',
     minRefundAmount: 66,
+    minComplaintCount: 3,
     refundReasonKeyword: ' old-reason ',
     complaintKeyword: ' old-complaint ',
     complaintType: 'SERVICE' as const,
@@ -191,6 +195,15 @@ test('builds caregiver risk queue export snapshots for common queue views', () =
     endDate: '2026-04-07T23:59:59.999Z',
     datePreset: 'last7days',
     minRefundAmount: CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT,
+    riskOnly: true,
+  });
+
+  assert.deepEqual(buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'repeatedComplaint'), {
+    ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+    startDate: '2026-04-01T00:00:00.000Z',
+    endDate: '2026-04-07T23:59:59.999Z',
+    datePreset: 'last7days',
+    minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
     riskOnly: true,
   });
 });
@@ -262,6 +275,15 @@ test('detects current caregiver risk queue export views without confusing other 
   assert.equal(
     resolveCaregiverRiskQueueExportPreset(highRefundExposureSnapshot),
     'highRefundExposure',
+  );
+
+  const repeatedComplaintSnapshot = buildCaregiverRiskQueueExportSnapshot(
+    currentSnapshot,
+    'repeatedComplaint',
+  );
+  assert.equal(
+    resolveCaregiverRiskQueueExportPreset(repeatedComplaintSnapshot),
+    'repeatedComplaint',
   );
 
   assert.equal(

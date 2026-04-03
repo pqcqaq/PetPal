@@ -7874,6 +7874,65 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.195 2026-04-03（P3-M1 Slice 195）
+
+**概述**：延续上一轮把“高退款暴露”正式做进经营导出的收口，本轮继续把另一个已在风险队列里存在、但还不能直接导出的高频信号补齐：重复投诉。照料者经营导出现在支持按最少投诉数过滤，收益页风险队列也同步增加“重复投诉”快捷视角，方便直接拉出需要重点复盘的多次争议订单。
+
+已完成：
+
+- 后端经营导出补最少投诉数：
+  - `packages/api-common/src/types/petpal.ts`
+    - `CaregiverEarningsExportQuery` 新增 `minComplaintCount`。
+  - `apps/backend/src/routes/petpal.ts`
+    - 照料者经营导出查询 schema 新增 `minComplaintCount` 校验。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 导出筛选新增 `minComplaintCount`。
+    - 经营导出查询现会额外读取订单投诉集合，并在导出前按“投诉数 >= 最少投诉数”做最终收窄。
+- 补后端定向集成测试：
+  - `apps/backend/test/integration/petpal-api.test.ts`
+    - 新增“最少投诉数”导出用例，验证 `minComplaintCount=2` 时：
+      - 只导出当前照料者名下的重复投诉订单
+      - 不会混入单次投诉、无投诉或其他照料者订单
+- Web 收益页补重复投诉视角：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-earnings-export-state.ts`
+    - 收益导出快照新增 `minComplaintCount`。
+    - 风险队列预设新增 `repeatedComplaint`，当前默认阈值为 `2` 条投诉。
+  - `apps/web-frontend/src/pages/frontend/petpal/export-filter-summary.ts`
+    - 当前导出条件摘要现可直接展示并清除“投诉门槛”。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 导出工具条新增“最少投诉数”筛选。
+    - 风险队列快捷导出新增“重复投诉”入口，并沿用当前风险视角高亮逻辑。
+- 补前端定向单测：
+  - `apps/web-frontend/test/caregiver-earnings-export-state.test.ts`
+    - 新增 `minComplaintCount` 查询构建断言。
+    - 新增 `repeatedComplaint` 预设与当前视角识别断言。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test --test-name-pattern "filters caregiver earnings export by minimum complaint count" test/integration/petpal-api.test.ts` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮继续沿上一轮的“最小契约扩展”策略推进，只新增了一个整数型投诉门槛字段，没有把经营导出扩成复杂的多条件规则引擎。
+- 已确认重复投诉视角直接复用风险队列现有的 `complaintCount` 业务语义，不会制造第二套“只在导出里存在”的投诉计数口径。
+- 已确认门槛筛选是在订单已按账号、状态、时间等基础条件收窄之后再执行，不会把其他照料者或非完成订单混入导出结果。
+
+风险与缓解：
+
+- 风险：当前重复投诉仍采用固定“至少 2 条”的快捷视角，虽然工具条允许提高门槛，但尚未补到“重复投诉 + 照料者责任”这类复合经营视角。
+- 缓解：下一轮如继续深化风险复盘，可优先评估是否围绕复合视角或超时未结案补更强的经营问题聚类，而不是继续单点新增阈值字段。
+
+下一步（1-3）：
+
+1. 继续评估是否补“重复投诉 + 照料者责任”或“超时未结案”这类更强的复合风险视角。
+2. 继续评估是否把投诉门槛和退款门槛组合沉淀成更通用的经营风险聚类 helper。
+3. 在收益复盘入口与风险聚类相对稳定后，再集中处理剩余验收向测试、审计收口与最终交付材料。
+
 ### 14.194 2026-04-03（P3-M1 Slice 194）
 
 **概述**：延续上一轮把风险队列快捷导出继续扩到更多现有视角的收口，本轮开始正式补“高退款暴露”这类需要真实金额门槛的经营复盘能力。照料者经营导出现在支持按最低退款金额过滤，收益页风险队列也同步增加“高退款暴露”快捷视角，不再只能围绕投诉状态和责任角色切换。

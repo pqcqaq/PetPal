@@ -3661,6 +3661,300 @@ describe('PetPal API integration', () => {
     assert.equal(complaintRoleFilteredRow.getCell(5).value, '杭州市滨江区导出-平台责任');
   });
 
+  it('filters caregiver earnings export by minimum complaint count', async () => {
+    const { app, prisma } = context;
+    const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
+    const ownerSession = await loginAs(app, 'user', 'User123!');
+    const adminSession = await loginAs(app, 'admin', 'Admin123!');
+
+    const caregiverProfileResponse = await request(app)
+      .get('/api/petpal/caregiver/profile')
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .expect(200);
+
+    await prisma.caregiverProfile.update({
+      where: {
+        id: caregiverProfileResponse.body.data.id,
+      },
+      data: {
+        auditStatus: 'APPROVED',
+      },
+    });
+
+    const ownerPet = await prisma.petProfile.findFirst({
+      where: {
+        ownerId: ownerSession.user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    assert.ok(ownerPet);
+
+    const suffix = Date.now().toString(36);
+    const repeatedComplaintRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-complaint-count-repeat-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-09T09:00:00.000Z'),
+        endTime: new Date('2026-04-09T12:00:00.000Z'),
+        locationText: '杭州市滨江区导出-重复投诉',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 218,
+        demandTags: ['export-complaint-count-repeat'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const singleComplaintRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-complaint-count-single-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-09T13:00:00.000Z'),
+        endTime: new Date('2026-04-09T16:00:00.000Z'),
+        locationText: '杭州市滨江区导出-单次投诉',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 188,
+        demandTags: ['export-complaint-count-single'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const safeRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-complaint-count-safe-${suffix}`,
+        ownerId: ownerSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-09T17:00:00.000Z'),
+        endTime: new Date('2026-04-09T20:00:00.000Z'),
+        locationText: '杭州市滨江区导出-无投诉',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 168,
+        demandTags: ['export-complaint-count-safe'],
+        status: 'MATCHED',
+        matchedCaregiverId: caregiverProfileResponse.body.data.id,
+      },
+    });
+
+    const existingForeignCaregiverProfile = await prisma.caregiverProfile.findFirst({
+      where: {
+        userId: adminSession.user.id,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const foreignCaregiverProfile =
+      existingForeignCaregiverProfile ??
+      (await prisma.caregiverProfile.create({
+        data: {
+          id: `caregiver-export-complaint-count-foreign-${suffix}`,
+          userId: adminSession.user.id,
+          experienceYears: 2,
+          serviceRadiusKm: 5,
+          serviceCity: '杭州',
+          auditStatus: 'APPROVED',
+        },
+        select: {
+          id: true,
+        },
+      }));
+
+    const foreignRequest = await prisma.serviceRequest.create({
+      data: {
+        id: `req-earn-export-complaint-count-foreign-${suffix}`,
+        ownerId: adminSession.user.id,
+        petId: ownerPet.id,
+        serviceType: 'BOARDING',
+        startTime: new Date('2026-04-09T10:00:00.000Z'),
+        endTime: new Date('2026-04-09T13:00:00.000Z'),
+        locationText: '杭州市滨江区导出-外部重复投诉',
+        locationLat: 30.206,
+        locationLng: 120.211,
+        budgetAmount: 228,
+        demandTags: ['export-complaint-count-foreign'],
+        status: 'MATCHED',
+        matchedCaregiverId: foreignCaregiverProfile.id,
+      },
+    });
+
+    const repeatedComplaintOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-complaint-count-repeat-${suffix}`,
+        orderNo: `PP-EARN-COMPLAINT-COUNT-REPEAT-${Date.now()}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: repeatedComplaintRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: repeatedComplaintRequest.startTime,
+        appointmentEnd: repeatedComplaintRequest.endTime,
+        amountTotal: 218,
+        amountAdjusted: 0,
+        amountPaid: 218,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-09T12:20:00.000Z'),
+      },
+    });
+
+    const singleComplaintOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-complaint-count-single-${suffix}`,
+        orderNo: `PP-EARN-COMPLAINT-COUNT-SINGLE-${Date.now() + 1}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: singleComplaintRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: singleComplaintRequest.startTime,
+        appointmentEnd: singleComplaintRequest.endTime,
+        amountTotal: 188,
+        amountAdjusted: 0,
+        amountPaid: 188,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-09T16:10:00.000Z'),
+      },
+    });
+
+    const safeOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-complaint-count-safe-${suffix}`,
+        orderNo: `PP-EARN-COMPLAINT-COUNT-SAFE-${Date.now() + 2}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: safeRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: safeRequest.startTime,
+        appointmentEnd: safeRequest.endTime,
+        amountTotal: 168,
+        amountAdjusted: 0,
+        amountPaid: 168,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-09T20:10:00.000Z'),
+      },
+    });
+
+    const foreignRepeatedComplaintOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earn-export-complaint-count-foreign-${suffix}`,
+        orderNo: `PP-EARN-COMPLAINT-COUNT-FOREIGN-${Date.now() + 3}`,
+        ownerId: adminSession.user.id,
+        caregiverId: foreignCaregiverProfile.id,
+        serviceRequestId: foreignRequest.id,
+        serviceType: 'BOARDING',
+        appointmentStart: foreignRequest.startTime,
+        appointmentEnd: foreignRequest.endTime,
+        amountTotal: 228,
+        amountAdjusted: 0,
+        amountPaid: 228,
+        amountRefunded: 0,
+        orderStatus: 'COMPLETED',
+        closedAt: new Date('2026-04-09T13:10:00.000Z'),
+      },
+    });
+
+    await prisma.complaint.createMany({
+      data: [
+        {
+          id: `complaint-export-count-repeat-1-${suffix}`,
+          orderId: repeatedComplaintOrder.id,
+          complainantId: ownerSession.user.id,
+          targetRole: 'CAREGIVER',
+          complaintType: 'SERVICE',
+          description: '重复投诉第一条',
+          status: 'OPEN',
+        },
+        {
+          id: `complaint-export-count-repeat-2-${suffix}`,
+          orderId: repeatedComplaintOrder.id,
+          complainantId: ownerSession.user.id,
+          targetRole: 'CAREGIVER',
+          complaintType: 'FEE',
+          description: '重复投诉第二条',
+          status: 'PROCESSING',
+        },
+        {
+          id: `complaint-export-count-single-${suffix}`,
+          orderId: singleComplaintOrder.id,
+          complainantId: ownerSession.user.id,
+          targetRole: 'CAREGIVER',
+          complaintType: 'SERVICE',
+          description: '单次投诉',
+          status: 'OPEN',
+        },
+        {
+          id: `complaint-export-count-foreign-1-${suffix}`,
+          orderId: foreignRepeatedComplaintOrder.id,
+          complainantId: adminSession.user.id,
+          targetRole: 'PLATFORM',
+          complaintType: 'SERVICE',
+          description: '外部重复投诉第一条',
+          status: 'OPEN',
+        },
+        {
+          id: `complaint-export-count-foreign-2-${suffix}`,
+          orderId: foreignRepeatedComplaintOrder.id,
+          complainantId: adminSession.user.id,
+          targetRole: 'PLATFORM',
+          complaintType: 'FEE',
+          description: '外部重复投诉第二条',
+          status: 'PROCESSING',
+        },
+        {
+          id: `complaint-export-count-foreign-3-${suffix}`,
+          orderId: foreignRepeatedComplaintOrder.id,
+          complainantId: adminSession.user.id,
+          targetRole: 'PLATFORM',
+          complaintType: 'OTHER',
+          description: '外部重复投诉第三条',
+          status: 'RESOLVED',
+        },
+      ],
+    });
+
+    const exportResponse = await request(app)
+      .get('/api/petpal/caregiver/earnings/export')
+      .query({
+        startDate: '2026-04-09T00:00:00.000Z',
+        endDate: '2026-04-10T00:00:00.000Z',
+        serviceType: 'BOARDING',
+        minComplaintCount: 2,
+      })
+      .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    const worksheet = await loadWorksheet(exportResponse.body as Buffer);
+    const exportedOrderNos = Array.from(
+      { length: Math.max(0, worksheet.rowCount - 1) },
+      (_, index) => String(worksheet.getRow(index + 2).getCell(1).value ?? ''),
+    ).filter(Boolean);
+
+    assert.deepEqual(exportedOrderNos, [repeatedComplaintOrder.orderNo]);
+    assert.ok(!exportedOrderNos.includes(singleComplaintOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(safeOrder.orderNo));
+    assert.ok(!exportedOrderNos.includes(foreignRepeatedComplaintOrder.orderNo));
+
+    const filteredRow = worksheet.getRow(2);
+    assert.equal(filteredRow.getCell(1).value, repeatedComplaintOrder.orderNo);
+    assert.equal(filteredRow.getCell(5).value, '杭州市滨江区导出-重复投诉');
+  });
+
   it('filters caregiver earnings export by complaint keyword', async () => {
     const { app, prisma } = context;
     const caregiverSession = await loginAs(app, 'manager', 'Manager123!');
