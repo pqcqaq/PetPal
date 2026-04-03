@@ -182,6 +182,10 @@ Last updated: 2026-04-04
   - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts`、`PetPalMessagesView.vue`、`OrderDetailView.vue` 现已共用按订单隔离的草稿 / 恢复态，消息中心与订单详情之间切换时不会丢失未发送文字、已上传图片和恢复提示。
   - `apps/app-frontend/src/pages/petpal/message-composer-state.ts`、`pages/petpal/messages.vue`、`pages/order-detail/index.vue` 也已对齐同一规则，移动端跨页面返回当前订单时仍可继续发送或补图。
   - 当前共享状态仍只保留在运行时内存中，刷新 Web 页面或重启 App 后不会自动恢复。
+- 2026-04-04 已继续补消息沟通状态本地持久化：
+  - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts` 现在会把按订单隔离的草稿 / 恢复态写入 `localStorage`，Web 刷新后仍能恢复到原订单的未发送内容。
+  - `apps/app-frontend/src/pages/petpal/message-composer-state.ts` 现在会把同一份状态写入 `uni` 本地存储，App 重新进入后仍能继续当前订单的补图或重发。
+  - `apps/web-frontend/test/petpal-message-composer-state.test.ts` 已补持久化快照解析的定向单测，用来兜底历史脏数据和非法恢复态过滤。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。
