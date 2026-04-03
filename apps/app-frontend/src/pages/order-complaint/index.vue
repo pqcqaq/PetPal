@@ -16,14 +16,24 @@ const submitting = ref(false)
 const order = ref<OrderDetailRecord | null>(null)
 const upload = useManagedAttachmentUpload({ maxCount: 3, maxSizeMb: 8 })
 
+type ComplaintEvidenceAttachment = {
+  fileId: string
+  url: string
+  name: string
+  mimeType: string
+  size: number
+  uploadedAt: string
+}
+
 const form = reactive({
   targetRole: 'CAREGIVER' as ComplaintTargetRole,
   complaintType: 'SERVICE' as ComplaintType,
   description: '',
-  evidenceUrls: [] as string[],
+  evidenceAttachments: [] as ComplaintEvidenceAttachment[],
 })
 
 const pageSubtitle = computed(() => order.value ? `${order.value.orderNo} · 投诉会进入独立结果页` : '提交投诉后将进入投诉结果页。')
+const evidenceSlotsLeft = computed(() => Math.max(0, 3 - form.evidenceAttachments.length))
 
 async function loadPage() {
   if (!tokenStore.hasLogin || loading.value || !orderId.value) {
@@ -51,8 +61,9 @@ async function uploadEvidence() {
     const files = await upload.selectAndUploadAttachments({
       tag1: 'petpal-order-complaint',
       tag2: orderId.value,
+      maxCount: evidenceSlotsLeft.value,
     })
-    form.evidenceUrls = [...form.evidenceUrls, ...files.map(item => item.url)]
+    form.evidenceAttachments = [...form.evidenceAttachments, ...files]
     toast('材料已上传', 'success')
   }
   catch (error: unknown) {
@@ -74,7 +85,7 @@ async function submitComplaint() {
       targetRole: form.targetRole,
       complaintType: form.complaintType,
       description: form.description.trim(),
-      evidenceUrls: form.evidenceUrls,
+      evidenceUrls: form.evidenceAttachments.map(item => item.url),
     })
     toast('投诉已提交', 'success')
     uni.redirectTo({ url: `${PETPAL_COMPLAINT_RESULT_PAGE}?orderId=${orderId.value}&complaintId=${complaint.id}` })
@@ -85,6 +96,27 @@ async function submitComplaint() {
   finally {
     submitting.value = false
   }
+}
+
+function formatEvidenceSize(size: number) {
+  if (!Number.isFinite(size) || size <= 0) {
+    return '大小未知'
+  }
+  if (size >= 1024 * 1024) {
+    return `${(size / 1024 / 1024).toFixed(1)} MB`
+  }
+  return `${Math.max(1, Math.round(size / 1024))} KB`
+}
+
+function removeEvidence(fileId: string) {
+  form.evidenceAttachments = form.evidenceAttachments.filter(item => item.fileId !== fileId)
+}
+
+function previewEvidence(url: string) {
+  uni.previewImage({
+    urls: form.evidenceAttachments.map(item => item.url),
+    current: url,
+  })
 }
 
 onLoad((options) => {
@@ -135,17 +167,19 @@ onLoad((options) => {
       </PetpalSection>
 
       <PetpalSection title="证据材料" subtitle="最多 3 张图，提交后会直接进入投诉结果页同步查看。">
-        <template v-if="form.evidenceUrls.length">
-          <view v-for="(item, index) in form.evidenceUrls" :key="item" class="petpal-sheet">
+        <template v-if="form.evidenceAttachments.length">
+          <view v-for="(item, index) in form.evidenceAttachments" :key="item.fileId" class="petpal-sheet">
             <text class="petpal-banner__eyebrow">Evidence {{ index + 1 }}</text>
-            <text class="petpal-note">{{ item }}</text>
+            <text class="petpal-banner__title">{{ item.name }}</text>
+            <text class="petpal-note">{{ formatEvidenceSize(item.size) }}</text>
             <view class="petpal-action-row">
-              <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="form.evidenceUrls = form.evidenceUrls.filter((_, currentIndex) => currentIndex !== index)">移除材料</button>
+              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="previewEvidence(item.url)">查看材料</button>
+              <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="removeEvidence(item.fileId)">移除材料</button>
             </view>
           </view>
         </template>
-        <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="uploadEvidence">
-          {{ upload.uploading ? '上传中...' : '上传截图或照片' }}
+        <button class="petpal-btn petpal-btn--secondary" hover-class="none" :disabled="evidenceSlotsLeft <= 0" @click="uploadEvidence">
+          {{ upload.uploading ? '上传中...' : `上传截图或照片${evidenceSlotsLeft > 0 ? `（剩余 ${evidenceSlotsLeft} 张）` : ''}` }}
         </button>
       </PetpalSection>
 

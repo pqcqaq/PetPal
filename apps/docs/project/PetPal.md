@@ -7882,6 +7882,49 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.243 2026-04-04（P3-M1 Slice 243）
+
+**概述**：上一轮已经把 App 投诉证据上传切到订单范围受管附件，但 Web 投诉结果工作台里仍保留手填 URL 的旧表单，双端投诉证据形态没有完全对齐。本轮继续沿“前端先管理受管附件快照、提交边界仍兼容既有投诉协议”的方向收口，把 Web / App 两端的投诉证据状态统一提升到带 `fileId` 的本地附件记录。
+
+已完成：
+
+- Web 端投诉结果工作台已对齐受管投诉附件上传：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOrderResultWorkbench.vue`
+    - 投诉表单里的“证据链接”手填文本域已移除，改成订单范围图片上传、缩略图预览、文件名/大小展示和按 `fileId` 移除。
+    - 上传现在直接走 `uploadAttachmentFile(...)`，并固定使用 `petpal-order-complaint + orderId` 标签，和 App 端投诉页保持同一治理口径。
+    - 页面本地状态新增 `ComplaintEvidenceAttachment`，先保留 `fileId`、`url`、`name`、`mimeType`、`size` 和 `uploadedAt`，提交投诉时再映射成既有 `evidenceUrls`。
+    - 上传期会禁用投诉提交，并补上“最多 3 张、单张不超过 8 MB、仅图片”的前端约束提示。
+- App 端投诉页已把本地证据状态升级为附件快照：
+  - `apps/app-frontend/src/pages/order-complaint/index.vue`
+    - 本地 `form.evidenceUrls` 已改成 `form.evidenceAttachments`，页面展示从纯 URL 文本切到文件名、大小、预览和按 `fileId` 移除。
+    - 受管上传结果现在原样保留在本地状态里，直到提交时才统一映射为 `evidenceUrls`，避免后续继续扩展附件治理时再回退到字符串数组。
+    - 上传按钮也已按剩余槽位控制 `maxCount` 和禁用态，和 Web 端保持一致的 3 张上限。
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend build` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有改 `packages/api-common`、后端投诉路由或投诉服务契约，Web / App 仍向既有投诉接口提交 `evidenceUrls?: string[]`。
+- 已确认 Web 端投诉结果页现在也会按订单范围上传证据，不再保留手填 URL 的旁路入口。
+- 已确认 App 端投诉页的本地证据状态已经和 Web 端对齐为“受管附件快照 -> 提交边界映射 URL”的模式，后续如果升级为 `fileId` 快照协议，迁移面会更小。
+
+风险与缓解：
+
+- 风险：当前投诉提交协议仍是 URL 数组，前端虽然已经保留 `fileId`，但最终提交时依然依赖 URL 持久化边界。
+- 缓解：这次先保持后端无破坏兼容；后续如需进一步强化治理，可以再把投诉 payload 升级为真正的 `fileId` 快照结构。
+
+- 风险：Web / App 两端的投诉附件状态结构已经接近，但还没有抽成共享 helper。
+- 缓解：当前两端上传接线和交互壳仍不同，先在切片内完成形态对齐；如果后续继续扩展投诉附件行为，再评估抽共享状态构建函数。
+
+下一步（1-3）：
+
+1. 继续评估是否把投诉接口从 `evidenceUrls` 升级为 `fileId` 快照协议，进一步减少附件引用漂移风险。
+2. 继续评估 Web / App 投诉证据状态是否值得抽共享 helper，避免后续再分别扩展大小/数量/预览规则。
+3. 继续按切片节奏推进局部改动、定向验证、本地提交和文档同步，不回到无边界大改。
+
 ### 14.242 2026-04-04（P3-M1 Slice 242）
 
 **概述**：上一轮已经把消息缓存 warmup 提前到启动阶段，但接线仍挂在双端 `main.ts`。这会让非 PetPal 场景也提前 import 消息状态模块，和“只在真实业务场景里启动业务状态”的收口方向不完全一致。本轮继续沿同一条缓存收口链路，把 warmup 从全局主入口收紧到“首次进入 PetPal 场景时才触发”。

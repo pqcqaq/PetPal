@@ -160,12 +160,58 @@
             <el-form-item label="投诉说明" class="petpal-span-12">
               <el-input v-model="complaintForm.description" type="textarea" :rows="4" maxlength="500" show-word-limit placeholder="请清楚描述本次争议情况" />
             </el-form-item>
-            <el-form-item label="证据链接" class="petpal-span-12">
-              <el-input v-model="complaintForm.evidenceUrlsText" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="可填写图片或文件链接，逗号分隔" />
+            <el-form-item label="证据材料" class="petpal-span-12">
+              <div class="petpal-complaint-evidence-stack">
+                <div v-if="complaintEvidenceAttachments.length" class="petpal-complaint-evidence-list">
+                  <div
+                    v-for="item in complaintEvidenceAttachments"
+                    :key="item.fileId"
+                    class="petpal-complaint-evidence-card"
+                  >
+                    <button
+                      type="button"
+                      class="petpal-message-attachment-preview"
+                      @click="openComplaintEvidence(item.url)"
+                    >
+                      <img :src="item.url" :alt="item.name" class="petpal-message-attachment-image">
+                    </button>
+                    <div class="petpal-message-draft-meta">
+                      <strong>{{ item.name }}</strong>
+                      <span>{{ formatComplaintEvidenceSize(item.size) }}</span>
+                    </div>
+                    <el-button
+                      class="petpal-message-draft-remove"
+                      link
+                      type="danger"
+                      @click="removeComplaintEvidence(item.fileId)"
+                    >
+                      移除
+                    </el-button>
+                  </div>
+                </div>
+                <input
+                  ref="complaintEvidenceInputRef"
+                  class="petpal-message-upload-input"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  @change="handleComplaintEvidenceChange"
+                >
+                <div class="petpal-message-upload-row">
+                  <el-button
+                    :loading="uploadingComplaintEvidence"
+                    :disabled="!order || complaintEvidenceSlotsLeft <= 0 || submittingComplaint"
+                    @click="triggerComplaintEvidenceInput"
+                  >
+                    {{ uploadingComplaintEvidence ? '上传中...' : `上传投诉截图${complaintEvidenceSlotsLeft > 0 ? `（剩余 ${complaintEvidenceSlotsLeft} 张）` : ''}` }}
+                  </el-button>
+                  <span class="petpal-sheet-row__desc">投诉证据会按当前订单范围上传，最多 3 张。</span>
+                </div>
+              </div>
             </el-form-item>
           </div>
           <div class="petpal-actions">
-            <el-button type="primary" :loading="submittingComplaint" @click="submitComplaint">提交投诉</el-button>
+            <el-button type="primary" :loading="submittingComplaint" :disabled="uploadingComplaintEvidence" @click="submitComplaint">提交投诉</el-button>
           </div>
         </div>
       </template>
@@ -221,6 +267,7 @@ import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { api } from '@/api/client';
 import ListExportButton from '@/components/download/ListExportButton.vue';
+import { uploadAttachmentFile } from '@/utils/direct-upload';
 import { getErrorMessage } from '@/utils/errors';
 import PetPalDeskEmpty from './rebuild/petpal-desk-empty.vue';
 import PetPalDeskNotice from './rebuild/petpal-desk-notice.vue';
@@ -243,7 +290,6 @@ import {
   getPetPalRefundProgressStageLabel,
   getPetPalServiceTypeLabel,
   isPetPalOutstandingOrder,
-  normalizePetPalTagText,
   petPalComplaintTargetOptions,
   petPalComplaintTypeOptions,
   petPalOwnerWorkspaceNav,
@@ -264,14 +310,28 @@ const refundProgress = ref<OrderRefundProgressRecord | null>(null);
 const paying = ref(false);
 const submittingComplaint = ref(false);
 const submittingReview = ref(false);
+const uploadingComplaintEvidence = ref(false);
 const payChannel = ref<OwnerPayChannel>('WECHAT_PAY');
+const complaintEvidenceInputRef = ref<HTMLInputElement | null>(null);
+
+type ComplaintEvidenceAttachment = {
+  fileId: string;
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+};
+
+const MAX_COMPLAINT_ATTACHMENTS = 3;
+const MAX_COMPLAINT_ATTACHMENT_SIZE = 8 * 1024 * 1024;
 
 const complaintForm = reactive({
   targetRole: 'CAREGIVER' as typeof petPalComplaintTargetOptions[number]['value'],
   complaintType: 'SERVICE' as typeof petPalComplaintTypeOptions[number]['value'],
   description: '',
-  evidenceUrlsText: '',
 });
+const complaintEvidenceAttachments = ref<ComplaintEvidenceAttachment[]>([]);
 
 const reviewForm = reactive({
   rating: 5,
@@ -310,6 +370,8 @@ const pageNotice = computed(() => buildPetPalPageNotice({
 }));
 
 const currentOrderId = computed(() => order.value?.id || orderId.value);
+const complaintEvidenceSlotsLeft = computed(() =>
+  Math.max(0, MAX_COMPLAINT_ATTACHMENTS - complaintEvidenceAttachments.value.length));
 
 const heroActions = computed(() => {
   if (!order.value) {
@@ -527,10 +589,10 @@ async function submitComplaint() {
       targetRole: complaintForm.targetRole,
       complaintType: complaintForm.complaintType,
       description: complaintForm.description.trim(),
-      evidenceUrls: normalizePetPalTagText(complaintForm.evidenceUrlsText),
+      evidenceUrls: complaintEvidenceAttachments.value.map((item) => item.url),
     });
     complaintForm.description = '';
-    complaintForm.evidenceUrlsText = '';
+    complaintEvidenceAttachments.value = [];
     await loadPage();
     ElMessage.success('投诉已提交');
   } catch (error: unknown) {
@@ -562,6 +624,83 @@ async function submitReview() {
     ElMessage.error(getErrorMessage(error, '提交评价失败'));
   } finally {
     submittingReview.value = false;
+  }
+}
+
+function formatComplaintEvidenceSize(size: number) {
+  if (!Number.isFinite(size) || size <= 0) {
+    return '大小未知';
+  }
+  if (size >= 1024 * 1024) {
+    return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  }
+  return `${Math.max(1, Math.round(size / 1024))} KB`;
+}
+
+function openComplaintEvidence(url: string) {
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function removeComplaintEvidence(fileId: string) {
+  complaintEvidenceAttachments.value = complaintEvidenceAttachments.value.filter((item) => item.fileId !== fileId);
+}
+
+function triggerComplaintEvidenceInput() {
+  complaintEvidenceInputRef.value?.click();
+}
+
+async function handleComplaintEvidenceChange(event: Event) {
+  const input = event.target as HTMLInputElement | null;
+  const selectedFiles = Array.from(input?.files ?? []);
+  if (input) {
+    input.value = '';
+  }
+
+  if (!order.value || !selectedFiles.length) {
+    return;
+  }
+
+  const limitedFiles = selectedFiles.slice(0, complaintEvidenceSlotsLeft.value);
+  if (selectedFiles.length > limitedFiles.length) {
+    ElMessage.warning(`一次最多还能添加 ${complaintEvidenceSlotsLeft.value} 张投诉截图`);
+  }
+
+  const validFiles = limitedFiles.filter((file) =>
+    (!file.type || file.type.startsWith('image/')) && file.size <= MAX_COMPLAINT_ATTACHMENT_SIZE);
+  if (validFiles.length < limitedFiles.length) {
+    ElMessage.warning('仅支持上传不超过 8 MB 的图片文件');
+  }
+
+  if (!validFiles.length) {
+    return;
+  }
+
+  uploadingComplaintEvidence.value = true;
+  try {
+    for (const file of validFiles) {
+      const uploaded = await uploadAttachmentFile(file, {
+        tag1: 'petpal-order-complaint',
+        tag2: order.value.id,
+      });
+
+      complaintEvidenceAttachments.value = [
+        ...complaintEvidenceAttachments.value,
+        {
+          fileId: uploaded.fileId,
+          url: uploaded.url,
+          name: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          size: file.size,
+          uploadedAt: new Date().toISOString(),
+        },
+      ];
+    }
+
+    ElMessage.success(validFiles.length === 1 ? '投诉截图已上传' : `已上传 ${validFiles.length} 张投诉截图`);
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '上传投诉截图失败'));
+  } finally {
+    uploadingComplaintEvidence.value = false;
   }
 }
 
@@ -598,5 +737,22 @@ onMounted(() => {
   color: #675d55;
   font-size: 13px;
   line-height: 1.7;
+}
+
+.petpal-complaint-evidence-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.petpal-complaint-evidence-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.petpal-complaint-evidence-card {
+  display: grid;
+  gap: 8px;
+  width: 136px;
 }
 </style>
