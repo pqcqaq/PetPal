@@ -57,7 +57,8 @@ export type CaregiverRiskQueueExportPreset =
   | 'platformResponsibility'
   | 'refundAwaitingSettlement'
   | 'highRefundExposure'
-  | 'repeatedComplaint';
+  | 'repeatedComplaint'
+  | 'repeatCaregiverComplaint';
 
 const caregiverRiskQueueExportPresets = [
   'openComplaint',
@@ -67,6 +68,7 @@ const caregiverRiskQueueExportPresets = [
   'refundAwaitingSettlement',
   'highRefundExposure',
   'repeatedComplaint',
+  'repeatCaregiverComplaint',
 ] as const satisfies readonly CaregiverRiskQueueExportPreset[];
 
 const caregiverEarningsExportSnapshot = definePetPalExportSnapshot<CaregiverEarningsExportFilterSnapshot>({
@@ -240,6 +242,12 @@ export const buildCaregiverRiskQueueExportSnapshot = (
       return {
         ...baseSnapshot,
         minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
+      };
+    case 'repeatCaregiverComplaint':
+      return {
+        ...baseSnapshot,
+        minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
+        complaintTargetRole: 'CAREGIVER',
       };
   }
 };

@@ -206,6 +206,19 @@ test('builds caregiver risk queue export snapshots for common queue views', () =
     minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
     riskOnly: true,
   });
+
+  assert.deepEqual(
+    buildCaregiverRiskQueueExportSnapshot(currentSnapshot, 'repeatCaregiverComplaint'),
+    {
+      ...createEmptyCaregiverEarningsExportFilterSnapshot(),
+      startDate: '2026-04-01T00:00:00.000Z',
+      endDate: '2026-04-07T23:59:59.999Z',
+      datePreset: 'last7days',
+      minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
+      complaintTargetRole: 'CAREGIVER',
+      riskOnly: true,
+    },
+  );
 });
 
 test('detects current caregiver risk queue export views without confusing other filters', () => {
@@ -284,6 +297,15 @@ test('detects current caregiver risk queue export views without confusing other 
   assert.equal(
     resolveCaregiverRiskQueueExportPreset(repeatedComplaintSnapshot),
     'repeatedComplaint',
+  );
+
+  const repeatCaregiverComplaintSnapshot = buildCaregiverRiskQueueExportSnapshot(
+    currentSnapshot,
+    'repeatCaregiverComplaint',
+  );
+  assert.equal(
+    resolveCaregiverRiskQueueExportPreset(repeatCaregiverComplaintSnapshot),
+    'repeatCaregiverComplaint',
   );
 
   assert.equal(

@@ -1081,6 +1081,7 @@ const riskQueueExportActions = computed<
     refundAwaitingSettlement: 0,
     highRefundExposure: 0,
     repeatedComplaint: 0,
+    repeatCaregiverComplaint: 0,
   } satisfies Record<CaregiverRiskQueueExportPreset, number>;
 
   for (const order of recentAftersalesOrders.value) {
@@ -1104,6 +1105,9 @@ const riskQueueExportActions = computed<
     }
     if (order.complaintCount >= CAREGIVER_REPEAT_COMPLAINT_COUNT) {
       counts.repeatedComplaint += 1;
+      if (order.primaryComplaintTargetRole === 'CAREGIVER') {
+        counts.repeatCaregiverComplaint += 1;
+      }
     }
   }
 
@@ -1138,6 +1142,11 @@ const riskQueueExportActions = computed<
       preset: 'repeatedComplaint',
       label: getRiskQueueExportPresetLabel('repeatedComplaint'),
       count: counts.repeatedComplaint,
+    },
+    {
+      preset: 'repeatCaregiverComplaint',
+      label: getRiskQueueExportPresetLabel('repeatCaregiverComplaint'),
+      count: counts.repeatCaregiverComplaint,
     },
   ];
 
@@ -1498,6 +1507,9 @@ function getRiskQueueExportPresetLabel(preset: CaregiverRiskQueueExportPreset) {
   }
   if (preset === 'repeatedComplaint') {
     return '重复投诉';
+  }
+  if (preset === 'repeatCaregiverComplaint') {
+    return '照料者重复投诉';
   }
   return '待退款';
 }

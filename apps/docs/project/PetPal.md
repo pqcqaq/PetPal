@@ -7874,6 +7874,49 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.196 2026-04-03（P3-M1 Slice 196）
+
+**概述**：延续上一轮把“重复投诉”正式做进经营导出的收口，本轮继续补一个不需要新增契约、但更贴近整改动作的复合视角：`重复投诉 + 照料者责任`。照料者收益页现在可以直接切到“照料者重复投诉”队列，快速导出需要优先自查和整改的重复争议订单。
+
+已完成：
+
+- 收益导出状态补复合风险预设：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-earnings-export-state.ts`
+    - 新增 `repeatCaregiverComplaint` 预设。
+    - 该预设直接复用现有 `minComplaintCount=2` 与 `complaintTargetRole='CAREGIVER'` 组合，不新增后端字段。
+- Web 收益页补复合风险快捷视角：
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverEarningsView.vue`
+    - 风险队列计数新增“照料者重复投诉”。
+    - 当前风险视角高亮、快捷导出动作和成功提示文案同步支持新预设。
+- 补前端定向单测：
+  - `apps/web-frontend/test/caregiver-earnings-export-state.test.ts`
+    - 新增 `repeatCaregiverComplaint` 快照构建与当前视角识别断言。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有扩后端导出契约，继续复用现有 `minComplaintCount` 和 `complaintTargetRole` 组合实现复合视角，变更面保持在前端状态与展示层。
+- 已确认复合视角仍保留当前日期窗口与 `datePreset`，不会因为切换风险队列而把观察周期重置。
+- 已确认“重复投诉”和“照料者责任”单独视角仍可继续识别，不会被复合视角覆盖或误判。
+
+风险与缓解：
+
+- 风险：当前复合视角仍依赖主导投诉责任角色，若后续要表达“多次投诉但责任未定”或“多方分摊责任”，现有单角色口径还不够细。
+- 缓解：下一轮如继续深化，可优先评估是否补“未定责重复投诉”或“超时未结案”这类真正需要新语义的风险视角，而不是继续堆前端标签。
+
+下一步（1-3）：
+
+1. 继续评估是否补“超时未结案”或“重复投诉但未定责”等更强的整改视角。
+2. 继续评估是否把风险队列计数与导出预设映射再抽成共享 helper，减少收益页内联逻辑。
+3. 在风险复盘入口相对稳定后，再集中补剩余验收向测试、审计收口与最终交付材料。
+
 ### 14.195 2026-04-03（P3-M1 Slice 195）
 
 **概述**：延续上一轮把“高退款暴露”正式做进经营导出的收口，本轮继续把另一个已在风险队列里存在、但还不能直接导出的高频信号补齐：重复投诉。照料者经营导出现在支持按最少投诉数过滤，收益页风险队列也同步增加“重复投诉”快捷视角，方便直接拉出需要重点复盘的多次争议订单。
