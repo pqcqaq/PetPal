@@ -23,10 +23,20 @@ import {
   toPetPalOptionalTrueFlag,
 } from './export-query-values';
 import { hasPetPalActiveFilters } from './export-filter-presence';
+import {
+  caregiverRiskQueueExportPresets,
+  getCaregiverRiskQueueExportPresetPatch,
+  CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT,
+  CAREGIVER_REPEAT_COMPLAINT_COUNT,
+  type CaregiverRiskQueueExportPreset,
+} from './caregiver-risk-queue-preset-config';
 
 export type EarningsExportDatePreset = '' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
-export const CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT = 100;
-export const CAREGIVER_REPEAT_COMPLAINT_COUNT = 2;
+export {
+  CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT,
+  CAREGIVER_REPEAT_COMPLAINT_COUNT,
+};
+export type { CaregiverRiskQueueExportPreset };
 
 export type CaregiverEarningsExportFilterSnapshot = {
   startDate: string;
@@ -49,29 +59,6 @@ export type CaregiverEarningsExportFilterSnapshot = {
 export type CaregiverEarningsExportTemplate = CaregiverEarningsExportFilterSnapshot & {
   name: string;
 };
-
-export type CaregiverRiskQueueExportPreset =
-  | 'openComplaint'
-  | 'openRepeatedComplaint'
-  | 'processingComplaint'
-  | 'caregiverResponsibility'
-  | 'platformResponsibility'
-  | 'refundAwaitingSettlement'
-  | 'highRefundExposure'
-  | 'repeatedComplaint'
-  | 'repeatCaregiverComplaint';
-
-const caregiverRiskQueueExportPresets = [
-  'openComplaint',
-  'openRepeatedComplaint',
-  'processingComplaint',
-  'caregiverResponsibility',
-  'platformResponsibility',
-  'refundAwaitingSettlement',
-  'highRefundExposure',
-  'repeatedComplaint',
-  'repeatCaregiverComplaint',
-] as const satisfies readonly CaregiverRiskQueueExportPreset[];
 
 const caregiverEarningsExportSnapshot = definePetPalExportSnapshot<CaregiverEarningsExportFilterSnapshot>({
   startDate: '',
@@ -208,56 +195,10 @@ export const buildCaregiverRiskQueueExportSnapshot = (
   preset: CaregiverRiskQueueExportPreset,
 ): CaregiverEarningsExportFilterSnapshot => {
   const baseSnapshot = buildCaregiverAllRiskExportSnapshot(currentSnapshot);
-
-  switch (preset) {
-    case 'openComplaint':
-      return {
-        ...baseSnapshot,
-        complaintStatus: 'OPEN',
-      };
-    case 'openRepeatedComplaint':
-      return {
-        ...baseSnapshot,
-        complaintStatus: 'OPEN',
-        minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
-      };
-    case 'processingComplaint':
-      return {
-        ...baseSnapshot,
-        complaintStatus: 'PROCESSING',
-      };
-    case 'caregiverResponsibility':
-      return {
-        ...baseSnapshot,
-        complaintTargetRole: 'CAREGIVER',
-      };
-    case 'platformResponsibility':
-      return {
-        ...baseSnapshot,
-        complaintTargetRole: 'PLATFORM',
-      };
-    case 'refundAwaitingSettlement':
-      return {
-        ...baseSnapshot,
-        refundStatus: 'APPROVED',
-      };
-    case 'highRefundExposure':
-      return {
-        ...baseSnapshot,
-        minRefundAmount: CAREGIVER_HIGH_REFUND_EXPOSURE_AMOUNT,
-      };
-    case 'repeatedComplaint':
-      return {
-        ...baseSnapshot,
-        minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
-      };
-    case 'repeatCaregiverComplaint':
-      return {
-        ...baseSnapshot,
-        minComplaintCount: CAREGIVER_REPEAT_COMPLAINT_COUNT,
-        complaintTargetRole: 'CAREGIVER',
-      };
-  }
+  return {
+    ...baseSnapshot,
+    ...getCaregiverRiskQueueExportPresetPatch(preset),
+  };
 };
 
 export const resolveCaregiverRiskQueueExportPreset = (

@@ -7874,6 +7874,54 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.199 2026-04-03（P3-M1 Slice 199）
+
+**概述**：延续上一轮把风险预设标签和队列计数抽成 helper 的收口，本轮继续把最后一层维护风险收掉：预设清单、预设标签、快照映射和风险单匹配规则全部收口到单一配置源。这样后续再补新的风险视角时，不需要同时改状态模块和 helper 模块两套定义。
+
+已完成：
+
+- 新增单一配置源：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-risk-queue-preset-config.ts`
+    - 集中维护风险预设列表、展示标签、快照 patch 和 `matchesOrder` 规则。
+    - 高退款暴露、重复投诉、待受理重复投诉、照料者重复投诉等复合视角现在都只在这一份配置中定义。
+- 状态模块改为消费配置源：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-earnings-export-state.ts`
+    - 风险预设类型与常量改为从配置源导入并转导出。
+    - `buildCaregiverRiskQueueExportSnapshot` 现在只负责套用基础风险快照和配置里的 patch，不再手写 `switch` 分支。
+- 风险导出 helper 改为消费配置源：
+  - `apps/web-frontend/src/pages/frontend/petpal/caregiver-risk-queue-export.ts`
+    - 风险快捷导出动作和标签都改为直接消费配置源。
+    - helper 不再单独维护预设顺序、标签和匹配逻辑。
+- 定向测试继续兜底：
+  - `apps/web-frontend/test/caregiver-earnings-export-state.test.ts`
+  - `apps/web-frontend/test/caregiver-risk-queue-export.test.ts`
+    - 当前继续从状态层和 helper 层双向覆盖风险预设快照、识别、顺序和计数口径。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test ..\\web-frontend\\test\\caregiver-earnings-export-state.test.ts ..\\web-frontend\\test\\caregiver-risk-queue-export.test.ts` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 本轮没有新增后端字段，也没有改变经营导出接口，变更面保持在 Web 前端的预设组织方式。
+- 已确认状态模块和 helper 模块不再分别维护一套风险预设定义，新增视角时只需要改一份配置。
+- 已确认现有单测仍能覆盖风险预设的快照映射、当前视角识别、动作顺序和复合计数，避免这次收口造成语义漂移。
+
+风险与缓解：
+
+- 风险：虽然预设元数据已经收口，但队列计数目前仍按每个预设逐条 `filter` 统计；若后续视角继续显著增加，可能要再做一次性能和结构收口。
+- 缓解：下一轮如继续深化，可优先评估是否把当前队列一次遍历聚合成通用 counter，再由配置源消费，而不是继续增加独立 `filter` 次数。
+
+下一步（1-3）：
+
+1. 继续评估是否把风险队列统计从“多次 filter”收口成“一次遍历聚合”的通用 counter。
+2. 继续评估是否补“超时未结案”这类真正需要后端时效语义支撑的新风险视角。
+3. 在风险复盘入口相对稳定后，再集中补剩余验收向测试、审计收口与最终交付材料。
+
 ### 14.198 2026-04-03（P3-M1 Slice 198）
 
 **概述**：延续上一轮继续补复合风险视角后的状态，本轮先不再增加新按钮，而是把收益页里已经明显膨胀的风险预设标签和队列计数逻辑做一次共享化收口。这样后续继续扩风险视角时，不必再回到页面里维护一大段 preset / label / count 分支。
