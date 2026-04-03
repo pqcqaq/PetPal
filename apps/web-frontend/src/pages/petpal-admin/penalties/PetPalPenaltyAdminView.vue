@@ -46,6 +46,19 @@
           />
         </el-select>
         <el-select
+          v-model="pageState.filters.rectifyReviewStatus"
+          clearable
+          placeholder="整改复核"
+          style="width: 150px"
+        >
+          <el-option
+            v-for="item in penaltyRectifyReviewStatusOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </el-select>
+        <el-select
           v-model="pageState.filters.appealStatus"
           clearable
           placeholder="申诉状态"
@@ -88,6 +101,19 @@
                   <a :href="url" target="_blank" rel="noreferrer">{{ url }}</a>
                 </li>
               </ul>
+            </div>
+            <div
+              v-if="scope.row.rectifyReviewStatus !== 'NOT_REQUIRED'"
+              class="penalty-expand__section"
+            >
+              <span class="penalty-expand__label">整改复核</span>
+              <p>{{ scope.row.rectifyReviewNote || getRectifyReviewHint(scope.row) }}</p>
+              <p class="penalty-expand__meta">
+                审核人：{{ scope.row.rectifyReviewedByNickname || '未记录' }}
+                <template v-if="scope.row.rectifyReviewedAt">
+                  · {{ formatDateTime(scope.row.rectifyReviewedAt) }}
+                </template>
+              </p>
             </div>
             <div v-if="scope.row.appealStatus !== 'NONE'" class="penalty-expand__section">
               <span class="penalty-expand__label">申诉原因</span>
@@ -132,9 +158,17 @@
       <el-table-column label="整改状态" min-width="150">
         <template #default="scope">
           <div class="penalty-rectify">
-            <el-tag :type="getRectifyStatusTagType(scope.row.rectifyStatus)">
-              {{ getRectifyStatusLabel(scope.row.rectifyStatus) }}
-            </el-tag>
+            <div class="penalty-rectify__tags">
+              <el-tag :type="getRectifyStatusTagType(scope.row.rectifyStatus)">
+                {{ getRectifyStatusLabel(scope.row.rectifyStatus) }}
+              </el-tag>
+              <el-tag
+                v-if="scope.row.rectifyReviewStatus !== 'NOT_REQUIRED'"
+                :type="getRectifyReviewStatusTagType(scope.row.rectifyReviewStatus)"
+              >
+                {{ getRectifyReviewStatusLabel(scope.row.rectifyReviewStatus) }}
+              </el-tag>
+            </div>
             <span>{{ getRectifyHint(scope.row) }}</span>
           </div>
         </template>
@@ -158,6 +192,24 @@
       <el-table-column label="操作" width="300" fixed="right">
         <template #default="scope">
           <el-space>
+            <el-button
+              v-if="scope.row.rectifyStatus === 'COMPLETED' && scope.row.rectifyReviewStatus === 'PENDING'"
+              v-permission="'petpal.penalty.manage'"
+              link
+              type="success"
+              @click="openRectifyReviewDialog(scope.row, 'APPROVED')"
+            >
+              通过整改
+            </el-button>
+            <el-button
+              v-if="scope.row.rectifyStatus === 'COMPLETED' && scope.row.rectifyReviewStatus === 'PENDING'"
+              v-permission="'petpal.penalty.manage'"
+              link
+              type="danger"
+              @click="openRectifyReviewDialog(scope.row, 'REJECTED')"
+            >
+              驳回整改
+            </el-button>
             <el-button
               v-if="scope.row.rectifyStatus === 'PENDING' && scope.row.appealStatus === 'NONE'"
               v-permission="'petpal.penalty.manage'"
@@ -278,6 +330,51 @@
     </el-dialog>
 
     <el-dialog
+      v-model="rectifyReviewDialogVisible"
+      title="复核整改材料"
+      width="560px"
+      :close-on-click-modal="!rectifyReviewSubmitting"
+      :close-on-press-escape="!rectifyReviewSubmitting"
+      @closed="resetRectifyReviewDialog"
+    >
+      <template v-if="activePenalty">
+        <div class="penalty-dialog__summary">
+          <h3>{{ activePenalty.orderNo }}</h3>
+          <p>{{ activePenalty.targetNickname || '平台侧对象' }} · {{ getTypeLabel(activePenalty.penaltyType) }}</p>
+        </div>
+
+        <el-form label-position="top">
+          <el-form-item label="复核结论">
+            <el-radio-group v-model="rectifyReviewForm.decision">
+              <el-radio
+                v-for="item in rectifyReviewDecisionOptions"
+                :key="item.value"
+                :value="item.value"
+              >
+                {{ item.label }}
+              </el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="复核意见">
+            <el-input
+              v-model="rectifyReviewForm.reviewNote"
+              type="textarea"
+              :rows="4"
+              maxlength="1000"
+              show-word-limit
+              placeholder="说明通过或驳回整改材料的依据"
+            />
+          </el-form-item>
+        </el-form>
+      </template>
+
+      <template #footer>
+        <el-button :disabled="rectifyReviewSubmitting" @click="rectifyReviewDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="rectifyReviewSubmitting" @click="submitRectifyReview">提交</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="appealDialogVisible"
       title="发起处罚申诉"
       width="560px"
@@ -365,6 +462,7 @@ import type {
   PenaltyAdminQuery,
   PenaltyAdminRecord,
   PenaltyAdminStats,
+  PenaltyRectifyReviewStatus,
   PenaltyRectifyStatus,
   PenaltySeverity,
   PenaltyType,
@@ -387,6 +485,8 @@ import {
   getPenaltyAppealStatusLabel,
   getPenaltyAppealStatusTagType,
   penaltyAppealStatusOptions,
+  getPenaltyRectifyReviewStatusLabel,
+  getPenaltyRectifyReviewStatusTagType,
   getPenaltyRectifyStatusLabel,
   getPenaltyRectifyStatusTagType,
   getPenaltySeverityLabel,
@@ -394,6 +494,7 @@ import {
   getPenaltyTargetRoleLabel,
   getPenaltyTypeLabel,
   penaltyAdminTargetRoleOptions,
+  penaltyRectifyReviewStatusOptions,
   penaltyRectifyStatusOptions,
   penaltySeverityOptions,
   penaltyTypeOptions,
@@ -411,6 +512,7 @@ type Filters = {
   penaltyType?: PenaltyType;
   severity?: PenaltySeverity;
   rectifyStatus?: PenaltyRectifyStatus;
+  rectifyReviewStatus?: PenaltyRectifyReviewStatus;
   appealStatus?: PenaltyAppealStatus;
   overdueOnly: boolean;
   keyword?: string;
@@ -436,6 +538,11 @@ type ReviewFormState = {
   reviewNote: string;
 };
 
+type RectifyReviewFormState = {
+  decision: Extract<PenaltyRectifyReviewStatus, 'APPROVED' | 'REJECTED'>;
+  reviewNote: string;
+};
+
 const rows = ref<PenaltyAdminRecord[]>([]);
 const summary = ref<PenaltyAdminStats | null>(null);
 const loading = ref(false);
@@ -445,6 +552,8 @@ const route = useRoute();
 const router = useRouter();
 const rectifyDialogVisible = ref(false);
 const rectifySubmitting = ref(false);
+const rectifyReviewDialogVisible = ref(false);
+const rectifyReviewSubmitting = ref(false);
 const appealDialogVisible = ref(false);
 const appealSubmitting = ref(false);
 const reviewDialogVisible = ref(false);
@@ -461,6 +570,11 @@ const reviewDecisionOptions = penaltyAppealStatusOptions.filter(
     item.value === 'APPROVED' || item.value === 'REJECTED',
 );
 
+const rectifyReviewDecisionOptions = penaltyRectifyReviewStatusOptions.filter(
+  (item): item is { label: string; value: 'APPROVED' | 'REJECTED' } =>
+    item.value === 'APPROVED' || item.value === 'REJECTED',
+);
+
 const { state: pageState, reset: resetPageState } = usePageState<State>('page:petpal:penalty-admin', {
   page: 1,
   filters: {
@@ -468,6 +582,7 @@ const { state: pageState, reset: resetPageState } = usePageState<State>('page:pe
     penaltyType: undefined,
     severity: undefined,
     rectifyStatus: undefined,
+    rectifyReviewStatus: undefined,
     appealStatus: undefined,
     overdueOnly: false,
     keyword: undefined,
@@ -489,11 +604,27 @@ const createEmptyReviewForm = (): ReviewFormState => ({
   reviewNote: '',
 });
 
+const createEmptyRectifyReviewForm = (): RectifyReviewFormState => ({
+  decision: 'APPROVED',
+  reviewNote: '',
+});
+
 const rectifyForm = reactive<RectifyFormState>(createEmptyRectifyForm());
+const rectifyReviewForm = reactive<RectifyReviewFormState>(createEmptyRectifyReviewForm());
 const appealForm = reactive<AppealFormState>(createEmptyAppealForm());
 const reviewForm = reactive<ReviewFormState>(createEmptyReviewForm());
 
-const routeFilterKeys = ['page', 'targetRole', 'penaltyType', 'severity', 'rectifyStatus', 'appealStatus', 'overdueOnly', 'keyword'] as const;
+const routeFilterKeys = [
+  'page',
+  'targetRole',
+  'penaltyType',
+  'severity',
+  'rectifyStatus',
+  'rectifyReviewStatus',
+  'appealStatus',
+  'overdueOnly',
+  'keyword',
+] as const;
 
 const getTargetRoleLabel = getPenaltyTargetRoleLabel;
 const getTypeLabel = getPenaltyTypeLabel;
@@ -501,6 +632,8 @@ const getSeverityLabel = getPenaltySeverityLabel;
 const getSeverityTagType = getPenaltySeverityTagType;
 const getRectifyStatusLabel = getPenaltyRectifyStatusLabel;
 const getRectifyStatusTagType = getPenaltyRectifyStatusTagType;
+const getRectifyReviewStatusLabel = getPenaltyRectifyReviewStatusLabel;
+const getRectifyReviewStatusTagType = getPenaltyRectifyReviewStatusTagType;
 const getAppealStatusLabel = getPenaltyAppealStatusLabel;
 const getAppealStatusTagType = getPenaltyAppealStatusTagType;
 
@@ -509,6 +642,8 @@ const stats = computed(() => [
   { label: '待整改', value: summary.value?.byRectifyStatus.PENDING ?? 0 },
   { label: '已完成', value: summary.value?.byRectifyStatus.COMPLETED ?? 0 },
   { label: '已豁免', value: summary.value?.byRectifyStatus.WAIVED ?? 0 },
+  { label: '待复核整改', value: summary.value?.byRectifyReviewStatus.PENDING ?? 0 },
+  { label: '整改已通过', value: summary.value?.byRectifyReviewStatus.APPROVED ?? 0 },
   { label: '待审核申诉', value: summary.value?.byAppealStatus.PENDING ?? 0 },
   { label: '申诉通过', value: summary.value?.byAppealStatus.APPROVED ?? 0 },
   { label: '高风险处罚', value: summary.value?.bySeverity.HIGH ?? 0 },
@@ -526,10 +661,34 @@ const formatDateTime = (value?: string | null) => {
 };
 
 const getRectifyHint = (record: PenaltyAdminRecord) => {
-  if (record.rectifyStatus !== 'PENDING') {
+  if (record.rectifyStatus === 'COMPLETED') {
+    if (record.rectifyReviewStatus === 'PENDING') {
+      return record.rectifiedAt
+        ? `材料提交于 ${formatDateTime(record.rectifiedAt)} · 待复核`
+        : '整改材料待复核';
+    }
+
+    if (record.rectifyReviewStatus === 'APPROVED') {
+      return record.rectifyReviewedAt
+        ? `复核通过 · ${formatDateTime(record.rectifyReviewedAt)}`
+        : '整改已通过复核';
+    }
+
     return record.rectifiedAt
       ? `处理时间 ${formatDateTime(record.rectifiedAt)}`
       : '已完成处理';
+  }
+
+  if (record.rectifyStatus === 'WAIVED') {
+    return record.rectifiedAt
+      ? `豁免时间 ${formatDateTime(record.rectifiedAt)}`
+      : '已豁免整改';
+  }
+
+  if (record.rectifyReviewStatus === 'REJECTED') {
+    return record.rectifyReviewedAt
+      ? `最近驳回 ${formatDateTime(record.rectifyReviewedAt)}`
+      : '整改材料已驳回';
   }
 
   if (!record.rectifyDueAt) {
@@ -563,6 +722,28 @@ const getAppealHint = (record: PenaltyAdminRecord) => {
     : '已完成审核';
 };
 
+const getRectifyReviewHint = (record: PenaltyAdminRecord) => {
+  if (record.rectifyReviewStatus === 'PENDING') {
+    return record.rectifiedAt
+      ? `整改材料提交于 ${formatDateTime(record.rectifiedAt)}，等待复核。`
+      : '整改材料待复核。';
+  }
+
+  if (record.rectifyReviewStatus === 'APPROVED') {
+    return record.rectifyReviewedAt
+      ? `整改材料已于 ${formatDateTime(record.rectifyReviewedAt)} 通过复核。`
+      : '整改材料已通过复核。';
+  }
+
+  if (record.rectifyReviewStatus === 'REJECTED') {
+    return record.rectifyReviewedAt
+      ? `整改材料已于 ${formatDateTime(record.rectifyReviewedAt)} 被驳回。`
+      : '整改材料已被驳回。';
+  }
+
+  return '当前整改无需复核。';
+};
+
 const parseEvidenceUrls = (input: string) =>
   Array.from(
     new Set(
@@ -590,6 +771,9 @@ const buildRouteQuery = () => {
   if (pageState.filters.rectifyStatus) {
     query.rectifyStatus = pageState.filters.rectifyStatus;
   }
+  if (pageState.filters.rectifyReviewStatus) {
+    query.rectifyReviewStatus = pageState.filters.rectifyReviewStatus;
+  }
   if (pageState.filters.appealStatus) {
     query.appealStatus = pageState.filters.appealStatus;
   }
@@ -613,6 +797,7 @@ const hydrateStateFromRoute = () => {
   const penaltyType = getSingleRouteQueryValue(route.query.penaltyType);
   const severity = getSingleRouteQueryValue(route.query.severity);
   const rectifyStatus = getSingleRouteQueryValue(route.query.rectifyStatus);
+  const rectifyReviewStatus = getSingleRouteQueryValue(route.query.rectifyReviewStatus);
   const appealStatus = getSingleRouteQueryValue(route.query.appealStatus);
   const overdueOnly = getSingleRouteQueryValue(route.query.overdueOnly);
 
@@ -629,6 +814,12 @@ const hydrateStateFromRoute = () => {
   pageState.filters.rectifyStatus = hasSelectOptionValue(penaltyRectifyStatusOptions, rectifyStatus)
     ? rectifyStatus
     : undefined;
+  pageState.filters.rectifyReviewStatus = hasSelectOptionValue(
+    penaltyRectifyReviewStatusOptions,
+    rectifyReviewStatus,
+  )
+    ? rectifyReviewStatus
+    : undefined;
   pageState.filters.appealStatus = hasSelectOptionValue(penaltyAppealStatusOptions, appealStatus)
     ? appealStatus
     : undefined;
@@ -643,6 +834,7 @@ const buildQuery = (): PenaltyAdminQuery => ({
   penaltyType: pageState.filters.penaltyType,
   severity: pageState.filters.severity,
   rectifyStatus: pageState.filters.rectifyStatus,
+  rectifyReviewStatus: pageState.filters.rectifyReviewStatus,
   appealStatus: pageState.filters.appealStatus,
   overdueOnly: pageState.filters.overdueOnly || undefined,
   keyword: pageState.filters.keyword?.trim() || undefined,
@@ -653,6 +845,7 @@ const buildStatsQuery = (): PenaltyAdminQuery => ({
   penaltyType: pageState.filters.penaltyType,
   severity: pageState.filters.severity,
   rectifyStatus: pageState.filters.rectifyStatus,
+  rectifyReviewStatus: pageState.filters.rectifyReviewStatus,
   appealStatus: pageState.filters.appealStatus,
   overdueOnly: pageState.filters.overdueOnly || undefined,
   keyword: pageState.filters.keyword?.trim() || undefined,
@@ -709,6 +902,11 @@ const resetRectifyDialog = () => {
   Object.assign(rectifyForm, createEmptyRectifyForm());
 };
 
+const resetRectifyReviewDialog = () => {
+  activePenalty.value = null;
+  Object.assign(rectifyReviewForm, createEmptyRectifyReviewForm());
+};
+
 const resetAppealDialog = () => {
   activePenalty.value = null;
   Object.assign(appealForm, createEmptyAppealForm());
@@ -726,8 +924,21 @@ const openRectifyDialog = (
   activePenalty.value = penalty;
   Object.assign(rectifyForm, createEmptyRectifyForm(), {
     rectifyStatus,
+    rectifyNote: penalty.rectifyNote || '',
+    rectifyEvidenceInput: penalty.rectifyEvidenceUrls.join('\n'),
   });
   rectifyDialogVisible.value = true;
+};
+
+const openRectifyReviewDialog = (
+  penalty: PenaltyAdminRecord,
+  decision: Extract<PenaltyRectifyReviewStatus, 'APPROVED' | 'REJECTED'>,
+) => {
+  activePenalty.value = penalty;
+  Object.assign(rectifyReviewForm, createEmptyRectifyReviewForm(), {
+    decision,
+  });
+  rectifyReviewDialogVisible.value = true;
 };
 
 const openAppealDialog = (penalty: PenaltyAdminRecord) => {
@@ -806,6 +1017,33 @@ const submitAppeal = async () => {
   }
 };
 
+const submitRectifyReview = async () => {
+  if (!activePenalty.value) {
+    return;
+  }
+
+  const reviewNote = rectifyReviewForm.reviewNote.trim();
+  if (!reviewNote) {
+    ElMessage.error('请填写复核意见');
+    return;
+  }
+
+  try {
+    rectifyReviewSubmitting.value = true;
+    await api.petpal.admin.reviewPenaltyRectify(activePenalty.value.id, {
+      decision: rectifyReviewForm.decision,
+      reviewNote,
+    });
+    rectifyReviewDialogVisible.value = false;
+    ElMessage.success('整改复核已更新');
+    await loadRows();
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error, '更新整改复核失败'));
+  } finally {
+    rectifyReviewSubmitting.value = false;
+  }
+};
+
 const submitReview = async () => {
   if (!activePenalty.value) {
     return;
@@ -864,6 +1102,12 @@ watch(
 .penalty-appeal span {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+
+.penalty-rectify__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .penalty-expand {

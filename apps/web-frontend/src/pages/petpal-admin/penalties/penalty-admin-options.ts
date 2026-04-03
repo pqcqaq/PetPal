@@ -1,6 +1,7 @@
 import type {
   ComplaintTargetRole,
   PenaltyAppealStatus,
+  PenaltyRectifyReviewStatus,
   PenaltyRectifyStatus,
   PenaltySeverity,
   PenaltyType,
@@ -44,6 +45,13 @@ export const penaltyAppealStatusOptions: Array<PenaltyOption<PenaltyAppealStatus
   { label: '已驳回', value: 'REJECTED' },
 ];
 
+export const penaltyRectifyReviewStatusOptions: Array<PenaltyOption<PenaltyRectifyReviewStatus>> = [
+  { label: '无需复核', value: 'NOT_REQUIRED' },
+  { label: '待复核', value: 'PENDING' },
+  { label: '已通过', value: 'APPROVED' },
+  { label: '已驳回', value: 'REJECTED' },
+];
+
 const findPenaltyOptionLabel = <T extends string>(
   options: Array<PenaltyOption<T>>,
   value: T,
@@ -63,6 +71,9 @@ export const getPenaltyRectifyStatusLabel = (value: PenaltyRectifyStatus) =>
 
 export const getPenaltyAppealStatusLabel = (value: PenaltyAppealStatus) =>
   findPenaltyOptionLabel(penaltyAppealStatusOptions, value);
+
+export const getPenaltyRectifyReviewStatusLabel = (value: PenaltyRectifyReviewStatus) =>
+  findPenaltyOptionLabel(penaltyRectifyReviewStatusOptions, value);
 
 export const getPenaltySeverityTagType = (
   value: PenaltySeverity,
@@ -91,6 +102,18 @@ export const getPenaltyAppealStatusTagType = (
 ): 'info' | 'warning' | 'success' | 'danger' => {
   const types: Record<PenaltyAppealStatus, 'info' | 'warning' | 'success' | 'danger'> = {
     NONE: 'info',
+    PENDING: 'warning',
+    APPROVED: 'success',
+    REJECTED: 'danger',
+  };
+  return types[value] ?? 'info';
+};
+
+export const getPenaltyRectifyReviewStatusTagType = (
+  value: PenaltyRectifyReviewStatus,
+): 'info' | 'warning' | 'success' | 'danger' => {
+  const types: Record<PenaltyRectifyReviewStatus, 'info' | 'warning' | 'success' | 'danger'> = {
+    NOT_REQUIRED: 'info',
     PENDING: 'warning',
     APPROVED: 'success',
     REJECTED: 'danger',

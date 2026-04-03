@@ -250,6 +250,13 @@ enum PenaltyRectifyStatus {
   WAIVED
 }
 
+enum PenaltyRectifyReviewStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum PenaltyAppealStatus {
   NONE
   PENDING

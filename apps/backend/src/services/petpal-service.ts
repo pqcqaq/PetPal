@@ -315,6 +315,7 @@ type PenaltyAdminScopeFilters = {
   penaltyType?: 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
   severity?: 'LOW' | 'MEDIUM' | 'HIGH';
   rectifyStatus?: 'PENDING' | 'COMPLETED' | 'WAIVED';
+  rectifyReviewStatus?: 'NOT_REQUIRED' | 'PENDING' | 'APPROVED' | 'REJECTED';
   appealStatus?: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
   overdueOnly?: boolean;
   keyword?: string;
@@ -326,6 +327,10 @@ type PenaltyAdminFilters = PenaltyAdminScopeFilters & {
 };
 
 type PenaltyRectifyStatusCounter = Record<'PENDING' | 'COMPLETED' | 'WAIVED', number>;
+type PenaltyRectifyReviewStatusCounter = Record<
+  'NOT_REQUIRED' | 'PENDING' | 'APPROVED' | 'REJECTED',
+  number
+>;
 type PenaltySeverityCounter = Record<'LOW' | 'MEDIUM' | 'HIGH', number>;
 type PenaltyAppealStatusCounter = Record<'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED', number>;
 
@@ -377,6 +382,13 @@ const createPenaltyRectifyStatusCounter = (): PenaltyRectifyStatusCounter => ({
   PENDING: 0,
   COMPLETED: 0,
   WAIVED: 0,
+});
+
+const createPenaltyRectifyReviewStatusCounter = (): PenaltyRectifyReviewStatusCounter => ({
+  NOT_REQUIRED: 0,
+  PENDING: 0,
+  APPROVED: 0,
+  REJECTED: 0,
 });
 
 const createPenaltySeverityCounter = (): PenaltySeverityCounter => ({
@@ -1569,6 +1581,12 @@ const penaltyAdminInclude = {
       nickname: true,
     },
   },
+  rectifyReviewer: {
+    select: {
+      id: true,
+      nickname: true,
+    },
+  },
   appealSubmitter: {
     select: {
       id: true,
@@ -1671,6 +1689,11 @@ const toPenaltyAdminRecord = (penalty: PenaltyAdminEntity) => ({
   rectifiedAt: penalty.rectifiedAt,
   rectifyNote: penalty.rectifyNote,
   rectifyEvidenceUrls: toStringArray(penalty.rectifyEvidenceUrls),
+  rectifyReviewStatus: penalty.rectifyReviewStatus,
+  rectifyReviewNote: penalty.rectifyReviewNote,
+  rectifyReviewedAt: penalty.rectifyReviewedAt,
+  rectifyReviewedById: penalty.rectifyReviewedById ?? null,
+  rectifyReviewedByNickname: penalty.rectifyReviewer?.nickname ?? null,
   appealStatus: penalty.appealStatus,
   appealReason: penalty.appealReason,
   appealSubmittedAt: penalty.appealSubmittedAt,
@@ -2048,6 +2071,7 @@ const buildPenaltyAdminWhere = (
     penaltyType: filters.penaltyType,
     severity: filters.severity,
     rectifyStatus: filters.rectifyStatus,
+    rectifyReviewStatus: filters.rectifyReviewStatus,
     appealStatus: filters.appealStatus,
     AND: filters.overdueOnly
       ? [
@@ -2073,6 +2097,11 @@ const buildPenaltyAdminWhere = (
           },
           {
             rectifyNote: {
+              contains: keyword,
+            },
+          },
+          {
+            rectifyReviewNote: {
               contains: keyword,
             },
           },
@@ -2109,6 +2138,13 @@ const buildPenaltyAdminWhere = (
           },
           {
             appealReviewer: {
+              nickname: {
+                contains: keyword,
+              },
+            },
+          },
+          {
+            rectifyReviewer: {
               nickname: {
                 contains: keyword,
               },
@@ -5414,10 +5450,17 @@ export const petpalService = {
     const baseWhere = buildPenaltyAdminWhere(baseFilters);
     const now = new Date();
     const dueSoonBoundary = new Date(now.getTime() + PENALTY_RECTIFY_WARNING_MS);
-    const [total, statusRows, appealRows, severityRows, dueSoonCount, overdueCount] = await Promise.all([
+    const [total, statusRows, reviewRows, appealRows, severityRows, dueSoonCount, overdueCount] = await Promise.all([
       prisma.penaltyRecord.count({ where: baseWhere }),
       prisma.penaltyRecord.groupBy({
         by: ['rectifyStatus'],
+        where: baseWhere,
+        _count: {
+          _all: true,
+        },
+      }),
+      prisma.penaltyRecord.groupBy({
+        by: ['rectifyReviewStatus'],
         where: baseWhere,
         _count: {
           _all: true,
@@ -5471,6 +5514,11 @@ export const petpalService = {
       byRectifyStatus[row.rectifyStatus] = row._count._all;
     });
 
+    const byRectifyReviewStatus = createPenaltyRectifyReviewStatusCounter();
+    reviewRows.forEach((row) => {
+      byRectifyReviewStatus[row.rectifyReviewStatus] = row._count._all;
+    });
+
     const byAppealStatus = createPenaltyAppealStatusCounter();
     appealRows.forEach((row) => {
       byAppealStatus[row.appealStatus] = row._count._all;
@@ -5484,6 +5532,7 @@ export const petpalService = {
     return {
       total,
       byRectifyStatus,
+      byRectifyReviewStatus,
       byAppealStatus,
       bySeverity,
       dueSoonCount,
@@ -5545,7 +5594,69 @@ export const petpalService = {
           rectifyEvidenceUrls.length > 0
             ? (rectifyEvidenceUrls as Prisma.InputJsonValue)
             : Prisma.DbNull,
+        rectifyReviewStatus:
+          payload.rectifyStatus === 'COMPLETED' ? 'PENDING' : 'NOT_REQUIRED',
+        rectifyReviewNote: null,
+        rectifyReviewedAt: null,
+        rectifyReviewedById: null,
         rectifiedAt: new Date(),
+      },
+      include: penaltyAdminInclude,
+    });
+
+    return toPenaltyAdminRecord(updated);
+  },
+
+  async reviewAdminPenaltyRectify(
+    penaltyId: string,
+    actorId: string,
+    payload: {
+      decision: 'APPROVED' | 'REJECTED';
+      reviewNote: string;
+    },
+  ) {
+    const existing = await prisma.penaltyRecord.findFirst({
+      where: {
+        id: penaltyId,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+        rectifyStatus: true,
+        rectifyReviewStatus: true,
+      },
+    });
+
+    if (!existing) {
+      throw notFound('Penalty record not found');
+    }
+
+    if (existing.rectifyStatus !== 'COMPLETED') {
+      throw badRequest('Only completed penalty rectifications can be reviewed');
+    }
+
+    if (existing.rectifyReviewStatus !== 'PENDING') {
+      throw badRequest('Penalty rectification is not pending review');
+    }
+
+    const reviewNote = payload.reviewNote.trim();
+    if (!reviewNote) {
+      throw badRequest('Penalty rectification review note is required');
+    }
+
+    const reviewedAt = new Date();
+    const updated = await prisma.penaltyRecord.update({
+      where: {
+        id: penaltyId,
+      },
+      data: {
+        updateId: actorId,
+        rectifyStatus: payload.decision === 'APPROVED' ? 'COMPLETED' : 'PENDING',
+        rectifyReviewStatus: payload.decision,
+        rectifyReviewNote: reviewNote,
+        rectifyReviewedAt: reviewedAt,
+        rectifyReviewedById: actorId,
+        rectifiedAt: payload.decision === 'APPROVED' ? reviewedAt : null,
       },
       include: penaltyAdminInclude,
     });
@@ -5664,6 +5775,11 @@ export const petpalService = {
               rectifyStatus: 'WAIVED' as const,
               rectifiedAt: reviewedAt,
               rectifyNote: existing.rectifyNote?.trim() || `申诉通过：${reviewNote}`,
+              rectifyEvidenceUrls: Prisma.DbNull,
+              rectifyReviewStatus: 'NOT_REQUIRED' as const,
+              rectifyReviewNote: null,
+              rectifyReviewedAt: null,
+              rectifyReviewedById: null,
             }
           : {}),
       },

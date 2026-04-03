@@ -162,7 +162,7 @@ const createPenaltyScenario = async () => {
 };
 
 describe('PetPal penalty admin integration', () => {
-  it('admin can create and rectify penalty records from complaint handling', async () => {
+  it('admin can submit and approve penalty rectification evidence', async () => {
     const { app, prisma, suffix, complaintId, caregiverUserId, caregiverNickname } =
       await createComplaintScenario();
     const adminSession = await loginAs(app, 'admin', 'Admin123!');
@@ -224,6 +224,12 @@ describe('PetPal penalty admin integration', () => {
         COMPLETED: 0,
         WAIVED: 0,
       },
+      byRectifyReviewStatus: {
+        NOT_REQUIRED: 1,
+        PENDING: 0,
+        APPROVED: 0,
+        REJECTED: 0,
+      },
       byAppealStatus: {
         NONE: 1,
         PENDING: 0,
@@ -268,11 +274,58 @@ describe('PetPal penalty admin integration', () => {
       .expect(200);
 
     assert.equal(rectifyResponse.body.data.rectifyStatus, 'COMPLETED');
+    assert.equal(rectifyResponse.body.data.rectifyReviewStatus, 'PENDING');
     assert.equal(rectifyResponse.body.data.rectifyNote, '已补交服务影像并完成内部复盘。');
     assert.deepEqual(rectifyResponse.body.data.rectifyEvidenceUrls, [
       'https://example.com/evidence/rectify-video',
       'https://example.com/evidence/rectify-report',
     ]);
+    assert.equal(rectifyResponse.body.data.rectifyReviewNote, null);
+    assert.equal(rectifyResponse.body.data.rectifyReviewedAt, null);
+
+    const pendingReviewListResponse = await request(app)
+      .get('/api/petpal/admin/penalties')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .query({
+        page: 1,
+        pageSize: 10,
+        rectifyReviewStatus: 'PENDING',
+        keyword: suffix,
+      })
+      .expect(200);
+
+    assert.equal(pendingReviewListResponse.body.data.pagination.total, 1);
+    assert.equal(pendingReviewListResponse.body.data.items[0].id, penaltyId);
+    assert.equal(pendingReviewListResponse.body.data.items[0].rectifyReviewStatus, 'PENDING');
+
+    const reviewResponse = await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/rectify/review`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        decision: 'APPROVED',
+        reviewNote: '整改材料齐全，复核通过。',
+      })
+      .expect(200);
+
+    assert.equal(reviewResponse.body.data.rectifyStatus, 'COMPLETED');
+    assert.equal(reviewResponse.body.data.rectifyReviewStatus, 'APPROVED');
+    assert.equal(reviewResponse.body.data.rectifyReviewedById, adminSession.user.id);
+    assert.equal(reviewResponse.body.data.rectifyReviewNote, '整改材料齐全，复核通过。');
+
+    const reviewedStatsResponse = await request(app)
+      .get('/api/petpal/admin/penalties/stats')
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .query({
+        keyword: suffix,
+      })
+      .expect(200);
+
+    assert.deepEqual(reviewedStatsResponse.body.data.byRectifyReviewStatus, {
+      NOT_REQUIRED: 0,
+      PENDING: 0,
+      APPROVED: 1,
+      REJECTED: 0,
+    });
 
     const penaltyRecord = await prisma.penaltyRecord.findFirst({
       where: {
@@ -282,6 +335,10 @@ describe('PetPal penalty admin integration', () => {
         rectifyStatus: true,
         rectifyNote: true,
         rectifyEvidenceUrls: true,
+        rectifyReviewStatus: true,
+        rectifyReviewNote: true,
+        rectifyReviewedAt: true,
+        rectifyReviewedById: true,
         rectifiedAt: true,
         updateId: true,
       },
@@ -289,12 +346,16 @@ describe('PetPal penalty admin integration', () => {
 
     assert.ok(penaltyRecord);
     assert.equal(penaltyRecord.rectifyStatus, 'COMPLETED');
+    assert.equal(penaltyRecord.rectifyReviewStatus, 'APPROVED');
     assert.equal(penaltyRecord.rectifyNote, '已补交服务影像并完成内部复盘。');
+    assert.equal(penaltyRecord.rectifyReviewNote, '整改材料齐全，复核通过。');
+    assert.equal(penaltyRecord.rectifyReviewedById, adminSession.user.id);
     assert.deepEqual(penaltyRecord.rectifyEvidenceUrls, [
       'https://example.com/evidence/rectify-video',
       'https://example.com/evidence/rectify-report',
     ]);
     assert.ok(penaltyRecord.rectifiedAt);
+    assert.ok(penaltyRecord.rectifyReviewedAt);
     assert.equal(penaltyRecord.updateId, adminSession.user.id);
   });
 
@@ -320,6 +381,7 @@ describe('PetPal penalty admin integration', () => {
       .expect(200);
 
     assert.equal(waiveResponse.body.data.rectifyStatus, 'WAIVED');
+    assert.equal(waiveResponse.body.data.rectifyReviewStatus, 'NOT_REQUIRED');
     assert.deepEqual(waiveResponse.body.data.rectifyEvidenceUrls, []);
 
     const penaltyRecord = await prisma.penaltyRecord.findFirst({
@@ -335,6 +397,99 @@ describe('PetPal penalty admin integration', () => {
     assert.ok(penaltyRecord);
     assert.equal(penaltyRecord.rectifyStatus, 'WAIVED');
     assert.equal(penaltyRecord.rectifyEvidenceUrls, null);
+  });
+
+  it('can reject rectification review and allow resubmission', async () => {
+    const { app, prisma, adminSession, penaltyId } = await createPenaltyScenario();
+
+    await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/rectify/review`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        decision: 'REJECTED',
+        reviewNote: '尚未提交整改材料',
+      })
+      .expect(400);
+
+    await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/rectify`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        rectifyStatus: 'COMPLETED',
+        rectifyNote: '已先补交第一版整改材料。',
+        rectifyEvidenceUrls: ['https://example.com/evidence/rectify-first-pass'],
+      })
+      .expect(200);
+
+    const rejectReviewResponse = await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/rectify/review`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        decision: 'REJECTED',
+        reviewNote: '缺少完整服务轨迹，请重新补件。',
+      })
+      .expect(200);
+
+    assert.equal(rejectReviewResponse.body.data.rectifyStatus, 'PENDING');
+    assert.equal(rejectReviewResponse.body.data.rectifyReviewStatus, 'REJECTED');
+    assert.equal(rejectReviewResponse.body.data.rectifyReviewNote, '缺少完整服务轨迹，请重新补件。');
+    assert.deepEqual(rejectReviewResponse.body.data.rectifyEvidenceUrls, [
+      'https://example.com/evidence/rectify-first-pass',
+    ]);
+
+    await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/rectify/review`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        decision: 'APPROVED',
+        reviewNote: '重复审核',
+      })
+      .expect(400);
+
+    const resubmitResponse = await request(app)
+      .post(`/api/petpal/admin/penalties/${penaltyId}/rectify`)
+      .set('Authorization', `Bearer ${adminSession.tokens.accessToken}`)
+      .send({
+        rectifyStatus: 'COMPLETED',
+        rectifyNote: '已补交第二版整改材料并附上完整服务轨迹。',
+        rectifyEvidenceUrls: [
+          'https://example.com/evidence/rectify-second-pass',
+          'https://example.com/evidence/rectify-track-log',
+        ],
+      })
+      .expect(200);
+
+    assert.equal(resubmitResponse.body.data.rectifyStatus, 'COMPLETED');
+    assert.equal(resubmitResponse.body.data.rectifyReviewStatus, 'PENDING');
+    assert.equal(resubmitResponse.body.data.rectifyReviewNote, null);
+    assert.equal(resubmitResponse.body.data.rectifyReviewedAt, null);
+    assert.deepEqual(resubmitResponse.body.data.rectifyEvidenceUrls, [
+      'https://example.com/evidence/rectify-second-pass',
+      'https://example.com/evidence/rectify-track-log',
+    ]);
+
+    const penaltyRecord = await prisma.penaltyRecord.findFirst({
+      where: {
+        id: penaltyId,
+      },
+      select: {
+        rectifyStatus: true,
+        rectifyReviewStatus: true,
+        rectifyReviewNote: true,
+        rectifyReviewedAt: true,
+        rectifyEvidenceUrls: true,
+      },
+    });
+
+    assert.ok(penaltyRecord);
+    assert.equal(penaltyRecord.rectifyStatus, 'COMPLETED');
+    assert.equal(penaltyRecord.rectifyReviewStatus, 'PENDING');
+    assert.equal(penaltyRecord.rectifyReviewNote, null);
+    assert.equal(penaltyRecord.rectifyReviewedAt, null);
+    assert.deepEqual(penaltyRecord.rectifyEvidenceUrls, [
+      'https://example.com/evidence/rectify-second-pass',
+      'https://example.com/evidence/rectify-track-log',
+    ]);
   });
 
   it('admin can submit and approve penalty appeals', async () => {
@@ -393,6 +548,7 @@ describe('PetPal penalty admin integration', () => {
 
     assert.equal(reviewResponse.body.data.appealStatus, 'APPROVED');
     assert.equal(reviewResponse.body.data.rectifyStatus, 'WAIVED');
+    assert.equal(reviewResponse.body.data.rectifyReviewStatus, 'NOT_REQUIRED');
     assert.equal(reviewResponse.body.data.appealReviewedById, adminSession.user.id);
     assert.equal(reviewResponse.body.data.appealReviewNote, '补充证据不足以支撑原处罚，改为豁免。');
 
@@ -403,6 +559,7 @@ describe('PetPal penalty admin integration', () => {
       select: {
         appealStatus: true,
         rectifyStatus: true,
+        rectifyReviewStatus: true,
         rectifyNote: true,
         appealReviewedAt: true,
       },
@@ -411,6 +568,7 @@ describe('PetPal penalty admin integration', () => {
     assert.ok(penaltyRecord);
     assert.equal(penaltyRecord.appealStatus, 'APPROVED');
     assert.equal(penaltyRecord.rectifyStatus, 'WAIVED');
+    assert.equal(penaltyRecord.rectifyReviewStatus, 'NOT_REQUIRED');
     assert.equal(penaltyRecord.rectifyNote, '申诉通过：补充证据不足以支撑原处罚，改为豁免。');
     assert.ok(penaltyRecord.appealReviewedAt);
   });

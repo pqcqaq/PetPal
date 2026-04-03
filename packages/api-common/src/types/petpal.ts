@@ -68,6 +68,7 @@ export type ComplaintActionType =
 export type PenaltyType = 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
 export type PenaltySeverity = 'LOW' | 'MEDIUM' | 'HIGH';
 export type PenaltyRectifyStatus = 'PENDING' | 'COMPLETED' | 'WAIVED';
+export type PenaltyRectifyReviewStatus = 'NOT_REQUIRED' | 'PENDING' | 'APPROVED' | 'REJECTED';
 export type PenaltyAppealStatus = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
 export type PlatformRuleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
@@ -342,6 +343,11 @@ export interface PenaltyAdminRecord {
   rectifiedAt: string | null;
   rectifyNote: string | null;
   rectifyEvidenceUrls: string[];
+  rectifyReviewStatus: PenaltyRectifyReviewStatus;
+  rectifyReviewNote: string | null;
+  rectifyReviewedAt: string | null;
+  rectifyReviewedById: string | null;
+  rectifyReviewedByNickname: string | null;
   appealStatus: PenaltyAppealStatus;
   appealReason: string | null;
   appealSubmittedAt: string | null;
@@ -616,6 +622,7 @@ export interface PenaltyAdminQuery {
   penaltyType?: PenaltyType;
   severity?: PenaltySeverity;
   rectifyStatus?: PenaltyRectifyStatus;
+  rectifyReviewStatus?: PenaltyRectifyReviewStatus;
   appealStatus?: PenaltyAppealStatus;
   overdueOnly?: boolean;
   keyword?: string;
@@ -624,6 +631,7 @@ export interface PenaltyAdminQuery {
 export interface PenaltyAdminStats {
   total: number;
   byRectifyStatus: Record<PenaltyRectifyStatus, number>;
+  byRectifyReviewStatus: Record<PenaltyRectifyReviewStatus, number>;
   byAppealStatus: Record<PenaltyAppealStatus, number>;
   bySeverity: Record<PenaltySeverity, number>;
   dueSoonCount: number;
@@ -652,6 +660,11 @@ export interface SubmitPenaltyAppealPayload {
 
 export interface ReviewPenaltyAppealPayload {
   decision: Extract<PenaltyAppealStatus, 'APPROVED' | 'REJECTED'>;
+  reviewNote: string;
+}
+
+export interface ReviewPenaltyRectifyPayload {
+  decision: Extract<PenaltyRectifyReviewStatus, 'APPROVED' | 'REJECTED'>;
   reviewNote: string;
 }
 

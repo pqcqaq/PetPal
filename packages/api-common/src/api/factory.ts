@@ -87,6 +87,7 @@ import type {
   MatchCaregiverQuery,
   ManageComplaintPayload,
   ReviewPenaltyAppealPayload,
+  ReviewPenaltyRectifyPayload,
   RectifyPenaltyPayload,
   BatchAssignComplaintsPayload,
   BatchAssignComplaintsResult,
@@ -673,6 +674,12 @@ export const createApiFactory = (options: ClientOptions) => {
         reviewPenaltyAppeal: (penaltyId: string, payload: ReviewPenaltyAppealPayload) =>
           client.request<PenaltyAdminRecord>({
             url: `/petpal/admin/penalties/${penaltyId}/appeal/review`,
+            method: 'POST',
+            data: payload,
+          }),
+        reviewPenaltyRectify: (penaltyId: string, payload: ReviewPenaltyRectifyPayload) =>
+          client.request<PenaltyAdminRecord>({
+            url: `/petpal/admin/penalties/${penaltyId}/rectify/review`,
             method: 'POST',
             data: payload,
           }),

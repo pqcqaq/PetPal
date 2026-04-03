@@ -267,6 +267,7 @@ const adminComplaintBatchCloseSchema = z.object({
 const penaltyTypeEnum = z.enum(['WARNING', 'SERVICE_RESTRICTION', 'ACCOUNT_SUSPENSION', 'OTHER']);
 const penaltySeverityEnum = z.enum(['LOW', 'MEDIUM', 'HIGH']);
 const penaltyRectifyStatusEnum = z.enum(['PENDING', 'COMPLETED', 'WAIVED']);
+const penaltyRectifyReviewStatusEnum = z.enum(['NOT_REQUIRED', 'PENDING', 'APPROVED', 'REJECTED']);
 const penaltyAppealStatusEnum = z.enum(['NONE', 'PENDING', 'APPROVED', 'REJECTED']);
 
 const adminPenaltyQuerySchema = z.object({
@@ -276,6 +277,7 @@ const adminPenaltyQuerySchema = z.object({
   penaltyType: penaltyTypeEnum.optional(),
   severity: penaltySeverityEnum.optional(),
   rectifyStatus: penaltyRectifyStatusEnum.optional(),
+  rectifyReviewStatus: penaltyRectifyReviewStatusEnum.optional(),
   appealStatus: penaltyAppealStatusEnum.optional(),
   overdueOnly: optionalBooleanQuerySchema,
   keyword: z.string().trim().max(100).optional(),
@@ -297,6 +299,11 @@ const adminPenaltyAppealSchema = z.object({
 });
 
 const adminPenaltyAppealReviewSchema = z.object({
+  decision: z.enum(['APPROVED', 'REJECTED']),
+  reviewNote: z.string().trim().min(1).max(1000),
+});
+
+const adminPenaltyRectifyReviewSchema = z.object({
   decision: z.enum(['APPROVED', 'REJECTED']),
   reviewNote: z.string().trim().min(1).max(1000),
 });
@@ -1303,6 +1310,7 @@ petpalRouter.get(
       penaltyType: query.penaltyType,
       severity: query.severity,
       rectifyStatus: query.rectifyStatus,
+      rectifyReviewStatus: query.rectifyReviewStatus,
       appealStatus: query.appealStatus,
       overdueOnly: query.overdueOnly,
       keyword: query.keyword,
@@ -1321,6 +1329,7 @@ petpalRouter.get(
       penaltyType: query.penaltyType,
       severity: query.severity,
       rectifyStatus: query.rectifyStatus,
+      rectifyReviewStatus: query.rectifyReviewStatus,
       appealStatus: query.appealStatus,
       overdueOnly: query.overdueOnly,
       keyword: query.keyword,
@@ -1367,6 +1376,21 @@ petpalRouter.post(
       payload,
     );
     return ok(res, penalty, 'Penalty appeal reviewed');
+  }),
+);
+
+petpalRouter.post(
+  '/admin/penalties/:id/rectify/review',
+  requirePermission('petpal.penalty.manage'),
+  asyncHandler(async (req, res) => {
+    const auth = req.auth!;
+    const payload = adminPenaltyRectifyReviewSchema.parse(req.body ?? {});
+    const penalty = await petpalService.reviewAdminPenaltyRectify(
+      String(req.params.id),
+      auth.id,
+      payload,
+    );
+    return ok(res, penalty, 'Penalty rectification reviewed');
   }),
 );
 
