@@ -165,7 +165,7 @@ export function useManagedAttachmentUpload(options?: {
         })
 
         if (plan.parts.length !== 1) {
-          throw new Error('当前仅支持上传单文件资质图片，请压缩后重试')
+          throw new Error('当前仅支持上传单张图片，请压缩后重试')
         }
 
         await uploadPartByUni(plan.parts[0], item.filePath)

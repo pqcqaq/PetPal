@@ -42,8 +42,16 @@ async function loadPage() {
 }
 
 async function uploadEvidence() {
+  if (!orderId.value) {
+    toast('缺少订单信息，暂时无法上传投诉材料')
+    return
+  }
+
   try {
-    const files = await upload.selectAndUploadAttachments({ tag1: 'petpal', tag2: 'complaint' })
+    const files = await upload.selectAndUploadAttachments({
+      tag1: 'petpal-order-complaint',
+      tag2: orderId.value,
+    })
     form.evidenceUrls = [...form.evidenceUrls, ...files.map(item => item.url)]
     toast('材料已上传', 'success')
   }
