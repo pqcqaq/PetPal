@@ -5,7 +5,7 @@
         <p class="petpal-admin-hub__eyebrow">PetPal Admin</p>
         <h1>先处理当前最紧急的治理事项</h1>
         <p>
-          当前值班账号是 {{ currentAdminDisplayName }}。后台入口不再承担信息展示，只保留摘要、优先队列和直接处理动作。
+          当前值班账号是 {{ currentAdminDisplayName }}。后台入口不再承担信息展示，只保留摘要、优先队列和直接处理动作，并把规则治理和运营信号收进同一条后台链路。
         </p>
       </div>
 

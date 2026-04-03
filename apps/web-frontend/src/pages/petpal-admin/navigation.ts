@@ -24,6 +24,14 @@ export const petpalAdminNavItems: PetPalAdminNavItem[] = [
     permission: 'petpal.complaint.manage',
   },
   {
+    title: '平台规则',
+    caption: 'Rules',
+    description: '维护服务标准草稿、发布版本和生效时间。',
+    to: '/petpal-admin/rules',
+    icon: 'i-carbon-book',
+    permission: 'petpal.rule.read',
+  },
+  {
     title: '照料者审核',
     caption: 'Caregiver Audit',
     description: '审核照料者资质、查看审核状态与处理进度。',

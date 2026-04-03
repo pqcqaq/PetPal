@@ -7,6 +7,8 @@ export const petpalAdminPermissions = [
   'petpal.caregiver.audit',
   'petpal.callback-audit.read',
   'petpal.callback-alert.read',
+  'petpal.rule.read',
+  'petpal.rule.publish',
 ] as const;
 
 export const hasPetPalAdminAccess = (permissions: string[]) => (

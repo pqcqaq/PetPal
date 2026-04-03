@@ -65,6 +65,7 @@ export type ComplaintActionType =
   | 'CALL_USER'
   | 'PENALTY'
   | 'CLOSE';
+export type PlatformRuleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
 type AmountValue = number | string;
 
@@ -532,6 +533,54 @@ export interface ComplaintAdminStats {
 
 export interface ComplaintAdminPage {
   items: ComplaintAdminRecord[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface PlatformRuleRecord {
+  id: string;
+  ruleCode: string;
+  ruleName: string;
+  ruleVersion: string;
+  contentMd: string;
+  effectiveAt: string;
+  status: PlatformRuleStatus;
+  creatorId: string | null;
+  creatorNickname: string | null;
+  updaterId: string | null;
+  updaterNickname: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlatformRuleAdminQuery {
+  page?: number;
+  pageSize?: number;
+  status?: PlatformRuleStatus;
+  keyword?: string;
+}
+
+export interface UpsertPlatformRulePayload {
+  ruleCode: string;
+  ruleName: string;
+  ruleVersion: string;
+  contentMd: string;
+  effectiveAt: string;
+}
+
+export interface PlatformRuleAdminStats {
+  total: number;
+  byStatus: Record<PlatformRuleStatus, number>;
+  currentEffectiveCount: number;
+  upcomingPublishedCount: number;
+}
+
+export interface PlatformRuleAdminPage {
+  items: PlatformRuleRecord[];
   pagination: {
     page: number;
     pageSize: number;

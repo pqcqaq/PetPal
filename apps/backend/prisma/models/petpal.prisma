@@ -307,6 +307,28 @@ model ComplaintProcessLog {
   @@index([deleteAt])
 }
 
+model PlatformRule {
+  id          String             @id
+  createId    String?
+  updateId    String?
+  ruleCode    String
+  ruleName    String
+  ruleVersion String
+  contentMd   String
+  effectiveAt DateTime
+  status      PlatformRuleStatus @default(DRAFT)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deleteAt    DateTime?
+  creator     User?              @relation("PetPalPlatformRuleCreator", fields: [createId], references: [id], onDelete: SetNull)
+  updater     User?              @relation("PetPalPlatformRuleUpdater", fields: [updateId], references: [id], onDelete: SetNull)
+
+  @@unique([ruleCode, ruleVersion])
+  @@index([ruleCode])
+  @@index([status, effectiveAt])
+  @@index([deleteAt])
+}
+
 model PaymentRecord {
   id             String       @id
   createId       String?

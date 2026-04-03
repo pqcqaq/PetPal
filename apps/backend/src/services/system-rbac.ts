@@ -268,6 +268,28 @@ const defaultMenuTree: SystemMenuSeedNode[] = [
         sortOrder: 55,
         permissionCode: 'petpal.complaint.read',
       },
+      {
+        code: 'petpal-platform-rules',
+        type: 'PAGE',
+        title: '宠托帮平台规则',
+        caption: 'PetPal Rules',
+        description: '维护平台服务标准版本、草稿和生效时间。',
+        icon: 'i-carbon-book',
+        path: '/petpal/rules',
+        viewKey: 'petpal-platform-rules',
+        sortOrder: 60,
+        permissionCode: 'petpal.rule.read',
+        children: [
+          {
+            code: 'petpal-platform-rules-publish',
+            type: 'ACTION',
+            title: '发布平台规则',
+            icon: 'i-carbon-send-alt',
+            sortOrder: 10,
+            permissionCode: 'petpal.rule.publish',
+          },
+        ],
+      },
     ],
   },
   {

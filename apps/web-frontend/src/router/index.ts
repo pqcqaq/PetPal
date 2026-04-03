@@ -204,7 +204,7 @@ const routes = [
         meta: {
           requiresAuth: true,
           title: '宠托帮后台直达工作台',
-          description: '跳过菜单树，直接访问 PetPal 投诉、审核与回调治理工作区。',
+          description: '跳过菜单树，直接访问 PetPal 投诉、规则、审核与回调治理工作区。',
         },
       },
       {
@@ -216,6 +216,17 @@ const routes = [
           permission: 'petpal.complaint.manage',
           title: '投诉工单',
           description: '集中处理投诉分派、批量结案与 SLA 风险工单。',
+        },
+      },
+      {
+        path: 'rules',
+        name: 'petpal-admin-rules',
+        component: () => import('@/pages/petpal-admin/PetPalPlatformRulesRouteView.vue'),
+        meta: {
+          requiresAuth: true,
+          permission: 'petpal.rule.read',
+          title: '平台规则',
+          description: '维护服务标准草稿、发布版本和生效时间。',
         },
       },
       {

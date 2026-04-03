@@ -4,6 +4,7 @@ import type {
   ComplaintAdminStats,
   PetPalAdminOperationsMetrics,
   PetPalAdminOverviewScope,
+  PlatformRuleAdminStats,
 } from '@rbac/api-common';
 import { prisma } from '../lib/prisma';
 import { Prisma, PrismaClient } from '../lib/prisma-generated';
@@ -307,6 +308,18 @@ type ComplaintAdminFilters = ComplaintAdminScopeFilters & {
 
 type ComplaintStatusCounter = Record<'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED', number>;
 
+type PlatformRuleScopeFilters = {
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  keyword?: string;
+};
+
+type PlatformRuleFilters = PlatformRuleScopeFilters & {
+  page: number;
+  pageSize: number;
+};
+
+type PlatformRuleStatusCounter = Record<'DRAFT' | 'PUBLISHED' | 'ARCHIVED', number>;
+
 const OWNER_TRANSACTION_EXPORT_DEFAULT_DAYS = 365;
 const OWNER_TRANSACTION_EXPORT_MAX_DAYS = 366;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -318,6 +331,12 @@ const COMPLAINT_SLA_LIMIT_MS = env.PETPAL_COMPLAINT_SLA_LIMIT_HOURS * HOUR_IN_MS
 const COMPLAINT_SLA_WARNING_MS = env.PETPAL_COMPLAINT_SLA_WARNING_HOURS * HOUR_IN_MS;
 const COMPLAINT_SLA_DUE_SOON_AGE_MS = COMPLAINT_SLA_LIMIT_MS - COMPLAINT_SLA_WARNING_MS;
 const ACTIVE_COMPLAINT_STATUSES = ['OPEN', 'PROCESSING'] as const;
+
+const createPlatformRuleStatusCounter = (): PlatformRuleStatusCounter => ({
+  DRAFT: 0,
+  PUBLISHED: 0,
+  ARCHIVED: 0,
+});
 
 type CaregiverEarningsTrendBucketSeed = {
   label: string;
@@ -1510,6 +1529,82 @@ const toComplaintAdminRecord = (complaint: ComplaintAdminEntity) => ({
   caregiverNickname: complaint.order.caregiver.user.nickname,
   ...getComplaintAdminSlaMeta(complaint),
 });
+
+const platformRuleAdminInclude = {
+  creator: {
+    select: {
+      id: true,
+      nickname: true,
+    },
+  },
+  updater: {
+    select: {
+      id: true,
+      nickname: true,
+    },
+  },
+} satisfies Prisma.PlatformRuleInclude;
+
+type PlatformRuleAdminEntity = Prisma.PlatformRuleGetPayload<{
+  include: typeof platformRuleAdminInclude;
+}>;
+
+const toPlatformRuleRecord = (rule: PlatformRuleAdminEntity) => ({
+  id: rule.id,
+  ruleCode: rule.ruleCode,
+  ruleName: rule.ruleName,
+  ruleVersion: rule.ruleVersion,
+  contentMd: rule.contentMd,
+  effectiveAt: rule.effectiveAt,
+  status: rule.status,
+  creatorId: rule.createId ?? null,
+  creatorNickname: rule.creator?.nickname ?? null,
+  updaterId: rule.updateId ?? null,
+  updaterNickname: rule.updater?.nickname ?? null,
+  createdAt: rule.createdAt,
+  updatedAt: rule.updatedAt,
+});
+
+const normalizePlatformRuleCode = (value: string) => value.trim().toUpperCase();
+
+const buildPlatformRuleWhere = (
+  filters: PlatformRuleScopeFilters,
+): Prisma.PlatformRuleWhereInput => {
+  const keyword = filters.keyword?.trim();
+
+  return {
+    deleteAt: null,
+    status: filters.status,
+    OR: keyword
+      ? [
+          {
+            ruleCode: {
+              contains: keyword,
+              mode: 'insensitive',
+            },
+          },
+          {
+            ruleName: {
+              contains: keyword,
+              mode: 'insensitive',
+            },
+          },
+          {
+            ruleVersion: {
+              contains: keyword,
+              mode: 'insensitive',
+            },
+          },
+          {
+            contentMd: {
+              contains: keyword,
+              mode: 'insensitive',
+            },
+          },
+        ]
+      : undefined,
+  };
+};
 
 const loadOrderComplaintsByOrderId = async (
   client: Prisma.TransactionClient | PrismaClient,
@@ -4127,6 +4222,300 @@ export const petpalService = {
         totalPages: Math.ceil(total / filters.pageSize),
       },
     };
+  },
+
+  async queryAdminPlatformRules(filters: PlatformRuleFilters) {
+    const where = buildPlatformRuleWhere(filters);
+    const [total, rules] = await Promise.all([
+      prisma.platformRule.count({ where }),
+      prisma.platformRule.findMany({
+        where,
+        include: platformRuleAdminInclude,
+        orderBy: [
+          {
+            updatedAt: 'desc',
+          },
+          {
+            effectiveAt: 'desc',
+          },
+        ],
+        skip: (filters.page - 1) * filters.pageSize,
+        take: filters.pageSize,
+      }),
+    ]);
+
+    return {
+      items: rules.map(toPlatformRuleRecord),
+      pagination: {
+        page: filters.page,
+        pageSize: filters.pageSize,
+        total,
+        totalPages: Math.ceil(total / filters.pageSize),
+      },
+    };
+  },
+
+  async queryAdminPlatformRuleStats(
+    filters: PlatformRuleScopeFilters = {},
+  ): Promise<PlatformRuleAdminStats> {
+    const now = new Date();
+    const where = buildPlatformRuleWhere(filters);
+    const [total, statusRows, currentEffectiveCount, upcomingPublishedCount] = await Promise.all([
+      prisma.platformRule.count({ where }),
+      prisma.platformRule.groupBy({
+        by: ['status'],
+        where,
+        _count: {
+          _all: true,
+        },
+      }),
+      prisma.platformRule.count({
+        where: {
+          AND: [
+            where,
+            {
+              status: 'PUBLISHED',
+              effectiveAt: {
+                lte: now,
+              },
+            },
+          ],
+        },
+      }),
+      prisma.platformRule.count({
+        where: {
+          AND: [
+            where,
+            {
+              status: 'PUBLISHED',
+              effectiveAt: {
+                gt: now,
+              },
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const byStatus = createPlatformRuleStatusCounter();
+    statusRows.forEach((row) => {
+      byStatus[row.status] = row._count._all;
+    });
+
+    return {
+      total,
+      byStatus,
+      currentEffectiveCount,
+      upcomingPublishedCount,
+    };
+  },
+
+  async createAdminPlatformRule(
+    actorId: string,
+    payload: {
+      ruleCode: string;
+      ruleName: string;
+      ruleVersion: string;
+      contentMd: string;
+      effectiveAt: Date;
+    },
+  ) {
+    const ruleCode = normalizePlatformRuleCode(payload.ruleCode);
+    const ruleName = payload.ruleName.trim();
+    const ruleVersion = payload.ruleVersion.trim();
+    const contentMd = payload.contentMd.trim();
+
+    if (!ruleName) {
+      throw badRequest('Platform rule name is required');
+    }
+
+    if (!ruleVersion) {
+      throw badRequest('Platform rule version is required');
+    }
+
+    if (!contentMd) {
+      throw badRequest('Platform rule content is required');
+    }
+
+    const duplicated = await prisma.platformRule.findFirst({
+      where: {
+        ruleCode,
+        ruleVersion,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (duplicated) {
+      throw badRequest('Platform rule version already exists');
+    }
+
+    const created = await prisma.platformRule.create({
+      data: withSnowflakeId({
+        createId: actorId,
+        updateId: actorId,
+        ruleCode,
+        ruleName,
+        ruleVersion,
+        contentMd,
+        effectiveAt: payload.effectiveAt,
+        status: 'DRAFT',
+      }),
+      include: platformRuleAdminInclude,
+    });
+
+    return toPlatformRuleRecord(created);
+  },
+
+  async updateAdminPlatformRule(
+    ruleId: string,
+    actorId: string,
+    payload: {
+      ruleCode: string;
+      ruleName: string;
+      ruleVersion: string;
+      contentMd: string;
+      effectiveAt: Date;
+    },
+  ) {
+    const existing = await prisma.platformRule.findFirst({
+      where: {
+        id: ruleId,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (!existing) {
+      throw notFound('Platform rule not found');
+    }
+
+    if (existing.status !== 'DRAFT') {
+      throw badRequest('Only draft platform rules can be edited');
+    }
+
+    const ruleCode = normalizePlatformRuleCode(payload.ruleCode);
+    const ruleName = payload.ruleName.trim();
+    const ruleVersion = payload.ruleVersion.trim();
+    const contentMd = payload.contentMd.trim();
+
+    if (!ruleName) {
+      throw badRequest('Platform rule name is required');
+    }
+
+    if (!ruleVersion) {
+      throw badRequest('Platform rule version is required');
+    }
+
+    if (!contentMd) {
+      throw badRequest('Platform rule content is required');
+    }
+
+    const duplicated = await prisma.platformRule.findFirst({
+      where: {
+        id: {
+          not: ruleId,
+        },
+        ruleCode,
+        ruleVersion,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (duplicated) {
+      throw badRequest('Platform rule version already exists');
+    }
+
+    const updated = await prisma.platformRule.update({
+      where: {
+        id: ruleId,
+      },
+      data: {
+        updateId: actorId,
+        ruleCode,
+        ruleName,
+        ruleVersion,
+        contentMd,
+        effectiveAt: payload.effectiveAt,
+      },
+      include: platformRuleAdminInclude,
+    });
+
+    return toPlatformRuleRecord(updated);
+  },
+
+  async publishAdminPlatformRule(ruleId: string, actorId: string) {
+    const existing = await prisma.platformRule.findFirst({
+      where: {
+        id: ruleId,
+        deleteAt: null,
+      },
+      include: platformRuleAdminInclude,
+    });
+
+    if (!existing) {
+      throw notFound('Platform rule not found');
+    }
+
+    if (existing.status === 'ARCHIVED') {
+      throw badRequest('Archived platform rule cannot be published');
+    }
+
+    if (existing.status === 'PUBLISHED') {
+      return toPlatformRuleRecord(existing);
+    }
+
+    const updated = await prisma.platformRule.update({
+      where: {
+        id: ruleId,
+      },
+      data: {
+        updateId: actorId,
+        status: 'PUBLISHED',
+      },
+      include: platformRuleAdminInclude,
+    });
+
+    return toPlatformRuleRecord(updated);
+  },
+
+  async archiveAdminPlatformRule(ruleId: string, actorId: string) {
+    const existing = await prisma.platformRule.findFirst({
+      where: {
+        id: ruleId,
+        deleteAt: null,
+      },
+      include: platformRuleAdminInclude,
+    });
+
+    if (!existing) {
+      throw notFound('Platform rule not found');
+    }
+
+    if (existing.status === 'ARCHIVED') {
+      return toPlatformRuleRecord(existing);
+    }
+
+    const updated = await prisma.platformRule.update({
+      where: {
+        id: ruleId,
+      },
+      data: {
+        updateId: actorId,
+        status: 'ARCHIVED',
+      },
+      include: platformRuleAdminInclude,
+    });
+
+    return toPlatformRuleRecord(updated);
   },
 
   async queryAdminComplaintStats(filters: ComplaintAdminScopeFilters, actorId: string) {

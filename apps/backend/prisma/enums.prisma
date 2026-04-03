@@ -224,3 +224,9 @@ enum ComplaintActionType {
   PENALTY
   CLOSE
 }
+
+enum PlatformRuleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}

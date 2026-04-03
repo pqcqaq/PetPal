@@ -40,6 +40,11 @@ import type {
   ComplaintAdminPage,
   ComplaintAdminQuery,
   ComplaintAdminStats,
+  PlatformRuleAdminPage,
+  PlatformRuleAdminQuery,
+  PlatformRuleAdminStats,
+  PlatformRuleRecord,
+  UpsertPlatformRulePayload,
   BatchCloseComplaintsPayload,
   BatchCloseComplaintsResult,
   ComplaintRecord,
@@ -601,6 +606,38 @@ export const createApiFactory = (options: ClientOptions) => {
           client.request<ComplaintAdminPage>({
             url: '/petpal/admin/complaints',
             params: query as unknown as QueryParams,
+          }),
+        rules: (query?: PlatformRuleAdminQuery) =>
+          client.request<PlatformRuleAdminPage>({
+            url: '/petpal/admin/rules',
+            params: query as unknown as QueryParams,
+          }),
+        ruleStats: (query?: PlatformRuleAdminQuery) =>
+          client.request<PlatformRuleAdminStats>({
+            url: '/petpal/admin/rules/stats',
+            params: query as unknown as QueryParams,
+          }),
+        createRule: (payload: UpsertPlatformRulePayload) =>
+          client.request<PlatformRuleRecord>({
+            url: '/petpal/admin/rules',
+            method: 'POST',
+            data: payload,
+          }),
+        updateRule: (ruleId: string, payload: UpsertPlatformRulePayload) =>
+          client.request<PlatformRuleRecord>({
+            url: `/petpal/admin/rules/${ruleId}`,
+            method: 'PUT',
+            data: payload,
+          }),
+        publishRule: (ruleId: string) =>
+          client.request<PlatformRuleRecord>({
+            url: `/petpal/admin/rules/${ruleId}/publish`,
+            method: 'POST',
+          }),
+        archiveRule: (ruleId: string) =>
+          client.request<PlatformRuleRecord>({
+            url: `/petpal/admin/rules/${ruleId}/archive`,
+            method: 'POST',
           }),
         complaintStats: (query?: ComplaintAdminQuery) =>
           client.request<ComplaintAdminStats>({

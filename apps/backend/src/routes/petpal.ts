@@ -257,6 +257,28 @@ const adminComplaintBatchCloseSchema = z.object({
   resultSummary: z.string().trim().min(1).max(1000),
 });
 
+const platformRuleStatusEnum = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
+
+const platformRuleQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(100).optional(),
+  status: platformRuleStatusEnum.optional(),
+  keyword: z.string().trim().max(100).optional(),
+});
+
+const platformRuleStatsQuerySchema = platformRuleQuerySchema.omit({
+  page: true,
+  pageSize: true,
+});
+
+const platformRulePayloadSchema = z.object({
+  ruleCode: z.string().trim().min(2).max(50).regex(/^[A-Za-z0-9_-]+$/),
+  ruleName: z.string().trim().min(1).max(100),
+  ruleVersion: z.string().trim().min(1).max(20),
+  contentMd: z.string().trim().min(1).max(20000),
+  effectiveAt: z.coerce.date(),
+});
+
 const paymentCallbackSchema = z.object({
   payNo: z.string().trim().min(1),
   channelTxnId: z.string().trim().min(1),
@@ -904,11 +926,90 @@ petpalRouter.get(
     'petpal.callback-audit.read',
     'petpal.callback-alert.read',
     'petpal.callback-alert.retry',
+    'petpal.rule.read',
+    'petpal.rule.publish',
   ),
   asyncHandler(async (req, res) => {
     const auth = req.auth!;
     const result = await petpalService.queryAdminOverview(auth.id, auth.permissions);
     return ok(res, result, 'PetPal admin overview');
+  }),
+);
+
+petpalRouter.get(
+  '/admin/rules',
+  requirePermission('petpal.rule.read'),
+  asyncHandler(async (req, res) => {
+    const { page, pageSize } = parsePagination(req.query);
+    const query = platformRuleQuerySchema.parse({
+      ...req.query,
+      page,
+      pageSize,
+    });
+
+    const result = await petpalService.queryAdminPlatformRules({
+      page: query.page ?? page,
+      pageSize: query.pageSize ?? pageSize,
+      status: query.status,
+      keyword: query.keyword,
+    });
+
+    return ok(res, result, 'Platform rule list');
+  }),
+);
+
+petpalRouter.get(
+  '/admin/rules/stats',
+  requirePermission('petpal.rule.read'),
+  asyncHandler(async (req, res) => {
+    const query = platformRuleStatsQuerySchema.parse(req.query ?? {});
+    const result = await petpalService.queryAdminPlatformRuleStats({
+      status: query.status,
+      keyword: query.keyword,
+    });
+    return ok(res, result, 'Platform rule stats');
+  }),
+);
+
+petpalRouter.post(
+  '/admin/rules',
+  requirePermission('petpal.rule.publish'),
+  asyncHandler(async (req, res) => {
+    const auth = req.auth!;
+    const payload = platformRulePayloadSchema.parse(req.body ?? {});
+    const result = await petpalService.createAdminPlatformRule(auth.id, payload);
+    return ok(res, result, 'Platform rule created');
+  }),
+);
+
+petpalRouter.put(
+  '/admin/rules/:id',
+  requirePermission('petpal.rule.publish'),
+  asyncHandler(async (req, res) => {
+    const auth = req.auth!;
+    const payload = platformRulePayloadSchema.parse(req.body ?? {});
+    const result = await petpalService.updateAdminPlatformRule(String(req.params.id), auth.id, payload);
+    return ok(res, result, 'Platform rule updated');
+  }),
+);
+
+petpalRouter.post(
+  '/admin/rules/:id/publish',
+  requirePermission('petpal.rule.publish'),
+  asyncHandler(async (req, res) => {
+    const auth = req.auth!;
+    const result = await petpalService.publishAdminPlatformRule(String(req.params.id), auth.id);
+    return ok(res, result, 'Platform rule published');
+  }),
+);
+
+petpalRouter.post(
+  '/admin/rules/:id/archive',
+  requirePermission('petpal.rule.publish'),
+  asyncHandler(async (req, res) => {
+    const auth = req.auth!;
+    const result = await petpalService.archiveAdminPlatformRule(String(req.params.id), auth.id);
+    return ok(res, result, 'Platform rule archived');
   }),
 );
 

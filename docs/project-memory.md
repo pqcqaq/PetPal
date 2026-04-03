@@ -1,6 +1,6 @@
 # Project Memory
 
-Last updated: 2026-03-29
+Last updated: 2026-04-03
 
 ## 1. 项目定位
 
@@ -14,6 +14,7 @@ Last updated: 2026-03-29
 - 保持官方结构的 Uni 客户端接入位点
 - 跨端共享的 API 请求与类型边界
 - 具备审计、软删除、策略认证和后台 timer 的基础设施
+- 当前主线业务已经明确收口到 PetPal，根级 `/petpal-admin/*` 正在承接平台治理工作区而不是继续停留在通用模板控制台。
 
 ## 2. 固定边界
 
@@ -99,6 +100,7 @@ Last updated: 2026-03-29
   - realtime channel
   - avatar upload
   - upload reconcile timer
+  - PetPal 后台治理接口，已覆盖总览、投诉、照料者审核、回调审计 / 告警与平台规则草稿 / 发布 / 归档
 
 ### 4.2 认证模型
 
@@ -168,6 +170,9 @@ Last updated: 2026-03-29
   - 审计日志
   - 权限来源分析
   - 实时协作
+- `pages/petpal-admin`
+  - 根级 PetPal 治理工作区
+  - 已承载总览、投诉治理、照料者审核、回调审计 / 告警与平台规则管理
 
 当前特性：
 

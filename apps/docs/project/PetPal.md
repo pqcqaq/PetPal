@@ -526,17 +526,24 @@ erDiagram
 
 #### 表：platform_rule
 
-| 字段         | 类型         | 约束       | 说明                     |
-| ------------ | ------------ | ---------- | ------------------------ |
-| id           | uuid         | PK         | 规则主键                 |
-| rule_code    | varchar(50)  | unique     | 规则编码                 |
-| rule_name    | varchar(100) | not null   | 规则名称                 |
-| rule_version | varchar(20)  | not null   | 版本号                   |
-| content_md   | text         | not null   | 规则内容                 |
-| effective_at | timestamptz  | not null   | 生效时间                 |
-| status       | varchar(20)  | index      | draft/published/archived |
-| created_by   | uuid         | FK user.id | 创建人                   |
-| created_at   | timestamptz  | not null   | 创建时间                 |
+| 字段         | 类型         | 约束                              | 说明                               |
+| ------------ | ------------ | --------------------------------- | ---------------------------------- |
+| id           | uuid         | PK                                | 规则主键                           |
+| rule_code    | varchar(50)  | index                             | 规则编码，同一编码允许存在多版本   |
+| rule_name    | varchar(100) | not null                          | 规则名称                           |
+| rule_version | varchar(20)  | not null，unique with `rule_code` | 版本号                             |
+| content_md   | text         | not null                          | 规则正文（Markdown）               |
+| effective_at | timestamptz  | not null                          | 计划生效时间                       |
+| status       | varchar(20)  | index                             | draft/published/archived           |
+| created_by   | uuid         | FK user.id                        | 创建人                             |
+| updated_by   | uuid         | FK user.id，nullable              | 最近更新人                         |
+| created_at   | timestamptz  | not null                          | 创建时间                           |
+| updated_at   | timestamptz  | not null                          | 更新时间                           |
+
+补充约束说明：
+
+- 平台规则当前采用 `(rule_code, rule_version)` 组合唯一，不再要求 `rule_code` 单字段唯一。
+- 规则发布动作只把状态切到 `published`，不会自动归档旧版本；历史版本是否归档由管理员手动执行。
 
 #### 表：operation_audit_log
 
@@ -1070,7 +1077,7 @@ flowchart TB
 | 消息与回传   | 订单会话、图文消息、过程媒体、未读数                                               | 基本完成，跨订单聚合、提醒中心和通知中心已完成，仍缺系统主动通知 | P2         |
 | 支付与退款   | 多次支付、补差价、部分退款、回调审计、对账                                         | 核心已完成                                                       | P4         |
 | 评价与投诉   | 评价、标签、投诉、处理日志、仲裁结论                                               | 基本完成，售后中心、帮助体系和通知收口已落地，仍缺更主动触达     | P2         |
-| 管理治理     | 审核台、纠纷处理、违规处罚、规则发布、指标看板                                     | 部分完成                                                         | P4         |
+| 管理治理     | 审核台、纠纷处理、违规处罚、规则发布、指标看板                                     | 规则发布基础闭环与首页基础经营指标已完成，违规处罚与深度看板仍待补齐 | P4         |
 | 可观测与审计 | request_id 串联、关键动作审计、导出留痕                                            | 部分完成                                                         | P5         |
 
 ### 13.5 P1-M2：接单履约闭环
@@ -1437,7 +1444,7 @@ flowchart TD
 | 履约链路       | 基本完成 | 接单、签到、服务日志、签退、确认完成已落地到后端、Web 和 App；超时治理与收益联动仍未补齐                                           |
 | 支付与退款     | 基本完成 | 支付/退款记录、回调审计、退款进度、导出能力已具备                                                                                  |
 | 评价与投诉     | 基本完成 | Web 端已支持评价、投诉、售后时间线；App 端也已具备订单详情提交、独立售后中心、帮助体系、提醒与通知收口能力，但仍缺更主动的系统触达 |
-| 管理后台       | 基本完成 | 根级 `/petpal-admin/*` 已承载投诉、照料者审核、回调审计、告警队列；处罚、规则发布、运营看板仍未补齐                                |
+| 管理后台       | 基本完成 | 根级 `/petpal-admin/*` 已承载投诉、照料者审核、回调审计、告警队列、规则治理；违规处罚与更深运营看板仍未补齐                      |
 | 消息与在线沟通 | 基本完成 | 订单详情会话、附件回传、跨订单消息中心、未读态、提醒中心、通知中心和 Web/App 摘要已落地；仍缺系统级主动提醒、推送与后台触达        |
 | 收益与数据分析 | 部分完成 | App 已补收益与表现页，可基于订单聚合看净收入、评分和售后风险；后端专门统计接口与平台运营指标仍未完整实现                           |
 | 文档与答辩材料 | 部分完成 | 计划、进度日志和实现历史持续更新中，但完整验收脚本、截图、演示素材尚未收齐                                                         |
@@ -1454,7 +1461,7 @@ flowchart TD
 1. `app-frontend` 已形成真实可用的 PetPal 主应用骨架，帮助中心、账户支持、提醒中心、通知中心、起步向导和应用内主动催办信号已落地，但系统级主动触达与更深的动态引导仍未收口。
 2. Web 前台仍存在超级页面承载过多逻辑的问题，主人 / 照料者前台尚未按路由充分拆分。
 3. 提醒中心与通知中心已落地，但真正的系统主动提醒、推送和更强的售后/消息到达能力仍未完成。
-4. 健康记录、资质材料、收益分析、规则发布、违规处罚、运营看板仍缺完整前后端闭环。
+4. 健康记录、资质材料、收益分析纵深、违规处罚和更深的运营看板仍缺完整前后端闭环；规则发布已补齐草稿 / 发布 / 归档基础闭环。
 5. 统一验收层尚未收口，前端定向验证、人工验收脚本、论文素材还不够完整。
 
 当前工作区进行中但尚未完成交付的内容：
@@ -1488,7 +1495,7 @@ flowchart TD
    - 图文过程沟通
    - 未读数与消息提醒
 2. 补齐健康记录、资质材料、收益分析和平台运营指标。
-3. 补齐后台“规则发布 / 违规处罚 / 运营看板”能力，完成从工单治理到平台治理的升级。
+3. 继续补齐后台“违规处罚 / 运营看板深化”能力，并在已落地的规则治理基础上完成从工单治理到平台治理的升级。
 
 #### 第三优先级：验收收口
 
@@ -7873,6 +7880,94 @@ flowchart TD
 1. 继续评估主人交易导出、主人退款导出和照料者收益导出之间可共享的快照基础 helper，减少三个状态模块的平行实现。
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
+### 14.215 2026-04-03（P3-M1 Slice 215）
+
+**概述**：上一轮已经把根级后台首页的经营信号补到位，但“平台规则发布”仍停留在文档要求，没有真正形成可操作的后台页和独立权限。本轮继续沿根级 `/petpal-admin` 治理工作区补齐规则治理，落地版本化规则模型、草稿/发布/归档接口、独立权限码和直接可进入的规则管理页，让平台治理从“看概览”进入“能发规则”。
+
+已完成：
+
+- 平台规则数据模型与共享契约落地：
+  - `apps/backend/prisma/enums.prisma`
+    - 新增 `PlatformRuleStatus`，统一 `DRAFT / PUBLISHED / ARCHIVED` 三态。
+  - `apps/backend/prisma/models/petpal.prisma`
+    - 新增 `PlatformRule` 模型，包含规则编码、名称、版本、正文、计划生效时间、状态和审计字段。
+    - 当前唯一性约束为 `@@unique([ruleCode, ruleVersion])`，明确支持同一规则编码的多版本并存。
+  - `apps/backend/prisma/models/auth.prisma`
+    - 为规则创建人 / 更新人补上 `User` 反向关联。
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增平台规则状态、列表查询、分页结果、统计结果与创建/更新载荷类型。
+  - `packages/api-common/src/api/factory.ts`
+    - 新增 `api.petpal.admin.rules()`、`ruleStats()`、`createRule()`、`updateRule()`、`publishRule()`、`archiveRule()`。
+- 后端规则治理接口与权限落地：
+  - `apps/backend/src/constants/system-permissions.ts`
+    - 新增 `petpal.rule.read` 与 `petpal.rule.publish`，把“看规则”和“发规则”拆成独立权限。
+  - `apps/backend/src/services/system-rbac.ts`
+    - PetPal 后台菜单种子已补规则管理节点和发布动作子节点。
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增：
+      - `GET /api/petpal/admin/rules`
+      - `GET /api/petpal/admin/rules/stats`
+      - `POST /api/petpal/admin/rules`
+      - `PUT /api/petpal/admin/rules/:id`
+      - `POST /api/petpal/admin/rules/:id/publish`
+      - `POST /api/petpal/admin/rules/:id/archive`
+    - `/api/petpal/admin/overview` 的进入权限已补 `petpal.rule.read` / `petpal.rule.publish`，仅具备规则治理权限的管理员也能进入根级后台。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 补齐规则列表、统计、创建、更新、发布、归档服务。
+    - 当前发布语义只负责把状态切到 `PUBLISHED`，不会自动归档旧版本。
+- 根级后台规则页落地：
+  - `apps/web-frontend/src/utils/admin-entry.ts`
+    - PetPal 后台默认落点判断已纳入规则权限，规则治理账号不再被挡在后台外。
+  - `apps/web-frontend/src/pages/petpal-admin/navigation.ts`
+  - `apps/web-frontend/src/router/index.ts`
+    - 新增 `/petpal-admin/rules` 根级后台路由和导航入口。
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalAdminHubView.vue`
+    - 首页文案已补规则治理信号，与投诉、审核、回调治理一起呈现平台治理工作区。
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalPlatformRulesRouteView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/rules/PetPalPlatformRulesView.vue`
+  - `apps/web-frontend/src/pages/petpal-admin/rules/platform-rule-options.ts`
+  - `apps/web-frontend/src/pages/console/petpal/PlatformRulesView.vue`
+    - 新增规则列表、统计卡、创建/编辑弹窗、发布/归档动作和旧入口兼容页。
+- 定向测试与文档同步：
+  - `apps/backend/test/integration/petpal-platform-rules.test.ts`
+    - 新增平台规则定向集成测试，覆盖创建、更新、发布、归档和权限行为。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+    - `README.md`
+    - `docs/development-guidelines.md`
+
+验证结果：
+
+- `pnpm -C apps/backend prisma:generate` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test test/integration/petpal-platform-rules.test.ts` 通过。
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+  - 仍保留既有的大 chunk warning，本轮没有新增新的构建告警。
+
+代码审计结论：
+
+- 本轮已经把“规则发布”从文档项补成真实数据模型、后端接口、权限码和根级后台页面，但“违规处罚 / 整改跟踪”仍未开始落地，平台治理闭环尚未全部完成。
+- 已确认平台规则当前采用 `(ruleCode, ruleVersion)` 组合唯一，避免同一规则编码发布新版本时被单字段唯一约束阻断。
+- 已确认“发布”与“生效”仍是两个维度：`publish` 只切状态，`effectiveAt` 负责时间语义，历史版本是否归档需要管理员明确执行。
+- 已确认只具备规则权限的管理员也能进入 `/petpal-admin` 和 `/petpal-admin/rules`，不会再因为首页权限守卫只认投诉/审核/回调类权限而被拦住。
+
+风险与缓解：
+
+- 风险：当前规则治理只覆盖规则文本和版本管理，还没有把处罚模板、整改要求、申诉闭环或规则差异对比一起落地。
+- 缓解：下一轮优先补违规处罚与整改跟踪，把“规则发布”真正接到“规则执行”链路上，而不是继续停留在静态制度管理。
+
+- 风险：当前允许同一 `ruleCode` 存在多个 `PUBLISHED` 版本，是否需要进一步限制“同编码仅一个已发布版本”仍待业务确认。
+- 缓解：本轮先保留最小可用版本治理能力，后续如业务确认需要“唯一有效版本”语义，再补自动归档或发布前校验规则。
+
+下一步（1-3）：
+
+1. 继续补违规处罚、整改进度和申诉链路，让规则治理从“发布制度”推进到“执行制度”。
+2. 继续增强平台治理纵深能力，例如规则版本差异、当前生效版本判定、治理导出或更细的运营筛选。
+3. 继续按切片节奏补定向测试、提交历史和验收材料，不回退到无边界全量验证。
 
 ### 14.214 2026-04-03（P3-M1 Slice 214）
 
