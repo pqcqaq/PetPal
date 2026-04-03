@@ -786,6 +786,12 @@ describe('PetPal API integration', () => {
       new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
       new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
     );
+    const priorityAftersalesRequest = await createRequest(
+      'priority-aftersales',
+      'WALKING',
+      new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    );
 
     const recentCompletedOrder = await prisma.orderMain.create({
       data: {
@@ -862,6 +868,65 @@ describe('PetPal API integration', () => {
       },
     });
 
+    const priorityAftersalesOrder = await prisma.orderMain.create({
+      data: {
+        id: `order-earnings-priority-aftersales-${suffix}`,
+        orderNo: `PP-EARN-P-${Date.now() + 4}`,
+        ownerId: ownerSession.user.id,
+        caregiverId: caregiverProfileResponse.body.data.id,
+        serviceRequestId: priorityAftersalesRequest.id,
+        serviceType: 'WALKING',
+        appointmentStart: priorityAftersalesRequest.startTime,
+        appointmentEnd: priorityAftersalesRequest.endTime,
+        amountTotal: 100,
+        amountAdjusted: 0,
+        amountPaid: 100,
+        amountRefunded: 0,
+        orderStatus: 'DISPUTED',
+        closedAt: new Date(),
+      },
+    });
+
+    await prisma.refundRecord.create({
+      data: {
+        id: `refund-earnings-aftersales-${suffix}`,
+        orderId: aftersalesOrder.id,
+        refundNo: `REF-EARN-S-${Date.now()}`,
+        applyUserId: ownerSession.user.id,
+        refundType: 'PARTIAL',
+        refundReason: '提前结束，需要退回部分金额',
+        refundAmount: 40,
+        refundStatus: 'SUCCESS',
+        reviewedAt: new Date('2026-04-03T10:00:00.000Z'),
+      },
+    });
+
+    await prisma.complaint.create({
+      data: {
+        id: `complaint-earnings-aftersales-${suffix}`,
+        orderId: aftersalesOrder.id,
+        complainantId: ownerSession.user.id,
+        targetRole: 'PLATFORM',
+        complaintType: 'FEE',
+        description: '需要平台确认退款结算明细',
+        status: 'RESOLVED',
+        resultSummary: '已补充退款结算说明',
+        closedAt: new Date('2026-04-03T10:30:00.000Z'),
+      },
+    });
+
+    await prisma.complaint.create({
+      data: {
+        id: `complaint-earnings-priority-aftersales-${suffix}`,
+        orderId: priorityAftersalesOrder.id,
+        complainantId: ownerSession.user.id,
+        targetRole: 'CAREGIVER',
+        complaintType: 'SERVICE',
+        description: '服务过程与约定不一致，需要优先核查',
+        status: 'OPEN',
+      },
+    });
+
     const summaryResponse = await request(app)
       .get('/api/petpal/caregiver/earnings-summary')
       .set('Authorization', `Bearer ${caregiverSession.tokens.accessToken}`)
@@ -897,8 +962,8 @@ describe('PetPal API integration', () => {
     );
     assert.equal(totals.completedOrderCount - baselineTotals.completedOrderCount, 2);
     assert.equal(totals.activeOrderCount - baselineTotals.activeOrderCount, 1);
-    assert.equal(totals.aftersalesOrderCount - baselineTotals.aftersalesOrderCount, 1);
-    assert.equal(Number(totals.refundExposure) - Number(baselineTotals.refundExposure), 110);
+    assert.equal(totals.aftersalesOrderCount - baselineTotals.aftersalesOrderCount, 2);
+    assert.equal(Number(totals.refundExposure) - Number(baselineTotals.refundExposure), 210);
     assert.equal(totals.totalServiceCount - baselineTotals.totalServiceCount, 2);
     assert.equal(totals.activeServiceCount - baselineTotals.activeServiceCount, 1);
     assert.equal(
@@ -911,12 +976,30 @@ describe('PetPal API integration', () => {
       ),
     );
     assert.equal(summaryResponse.body.data.latestActiveOrder.id, activeOrder.id);
-    assert.ok(
-      summaryResponse.body.data.recentAftersalesOrders.some(
-        (item: { id: string; orderNo: string }) =>
-          item.id === aftersalesOrder.id && item.orderNo === aftersalesOrder.orderNo,
-      ),
+    assert.equal(
+      summaryResponse.body.data.recentAftersalesOrders[0].id,
+      priorityAftersalesOrder.id,
     );
+    assert.equal(summaryResponse.body.data.recentAftersalesOrders[0].primaryComplaintStatus, 'OPEN');
+    assert.equal(
+      summaryResponse.body.data.recentAftersalesOrders[0].primaryComplaintTargetRole,
+      'CAREGIVER',
+    );
+    assert.equal(
+      summaryResponse.body.data.recentAftersalesOrders[0].primaryComplaintType,
+      'SERVICE',
+    );
+    assert.equal(summaryResponse.body.data.recentAftersalesOrders[0].complaintCount, 1);
+    assert.equal(summaryResponse.body.data.recentAftersalesOrders[0].latestRefundStatus, null);
+    const refundRiskOrder = summaryResponse.body.data.recentAftersalesOrders.find(
+      (item: { id: string }) => item.id === aftersalesOrder.id,
+    );
+    assert.ok(refundRiskOrder);
+    assert.equal(refundRiskOrder.latestRefundStatus, 'SUCCESS');
+    assert.equal(Number(refundRiskOrder.latestRefundAmount), 40);
+    assert.equal(refundRiskOrder.primaryComplaintStatus, 'RESOLVED');
+    assert.equal(refundRiskOrder.primaryComplaintTargetRole, 'PLATFORM');
+    assert.equal(refundRiskOrder.primaryComplaintType, 'FEE');
     assert.ok(
       summaryResponse.body.data.recentCompletedOrders.some(
         (item: { id: string; orderNo: string }) =>

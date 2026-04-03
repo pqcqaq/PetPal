@@ -190,6 +190,27 @@ export const getPetPalRefundTypeLabel = (type: RefundType) => ({
   PARTIAL: '部分退款',
 }[type] ?? type);
 
+export const getPetPalRefundStatusLabel = (status: RefundStatus) => ({
+  PENDING: '待审核',
+  APPROVED: '待退款',
+  REJECTED: '已驳回',
+  SUCCESS: '退款成功',
+  FAILED: '退款失败',
+}[status] ?? status);
+
+export const getPetPalRefundStatusType = (
+  status: RefundStatus,
+): 'primary' | 'success' | 'warning' | 'info' | 'danger' => {
+  const map: Record<RefundStatus, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
+    PENDING: 'warning',
+    APPROVED: 'primary',
+    REJECTED: 'info',
+    SUCCESS: 'success',
+    FAILED: 'danger',
+  };
+  return map[status];
+};
+
 export const getPetPalRefundProgressStageLabel = (stage: OrderRefundProgressRecord['stage']) => ({
   NONE: '暂无退款',
   PENDING_REVIEW: '待审核',

@@ -431,7 +431,7 @@
     <PetPalDeskSection
       eyebrow="Risk"
       title="售后风险订单"
-      description="风险比例只告诉你结果，这里直接列出最近进入退款或争议链路的订单。"
+      description="风险比例只告诉你结果，这里按争议状态、未结案投诉、退款阶段和退款金额排出最近需要复盘的队列。"
     >
       <template #actions>
         <el-button
@@ -482,7 +482,27 @@
               {{ getPetPalServiceTypeLabel(order.serviceType) }} · {{ order.ownerNickname }}
             </p>
             <p class="petpal-sheet-row__desc">
-              已退 {{ formatPetPalMoney(order.amountRefunded) }} · 剩余净收入
+              {{ getAftersalesRiskSummary(order) }}
+            </p>
+            <div
+              v-if="order.complaintCount || order.latestRefundStatus"
+              class="petpal-pill-row petpal-sheet-row__signals"
+            >
+              <span
+                v-for="pill in getAftersalesRiskPills(order)"
+                :key="`${order.id}-${pill.label}`"
+                class="petpal-pill"
+                :class="pill.tone"
+              >
+                {{ pill.label }}
+              </span>
+            </div>
+            <p class="petpal-sheet-row__desc">
+              已退 {{ formatPetPalMoney(order.amountRefunded) }}
+              <template v-if="order.latestRefundAmount != null">
+                · 最近退款 {{ formatPetPalMoney(order.latestRefundAmount) }}
+              </template>
+              · 剩余净收入
               {{ formatPetPalMoney(getOrderNetIncome(order)) }}
             </p>
             <p class="petpal-sheet-row__desc">
@@ -490,7 +510,9 @@
             </p>
           </div>
           <div class="petpal-sheet-row__tail">
-            <span class="petpal-pill is-warning">{{ getPetPalOrderStatusLabel(order.orderStatus) }}</span>
+            <span class="petpal-pill" :class="getAftersalesStatusPillTone(order.orderStatus)">
+              {{ getPetPalOrderStatusLabel(order.orderStatus) }}
+            </span>
             <RouterLink :to="buildAftersalesOrderDetailLink(order.id)">查看售后</RouterLink>
           </div>
         </div>
@@ -561,6 +583,7 @@ import type {
   ComplaintStatus,
   RefundType,
   RefundStatus,
+  CaregiverAftersalesRiskOrderRecord,
   CaregiverEarningsOrderRecord,
   CaregiverEarningsSummaryRecord,
 } from '@rbac/api-common';
@@ -616,7 +639,12 @@ import {
   formatPetPalMoney,
   formatPetPalRange,
   getPetPalCaregiverAuditLabel,
+  getPetPalComplaintStatusLabel,
+  getPetPalComplaintTargetRoleLabel,
+  getPetPalComplaintTypeLabel,
   getPetPalOrderStatusLabel,
+  getPetPalRefundStatusLabel,
+  getPetPalRefundStatusType,
   petPalComplaintTargetOptions,
   getPetPalServiceTypeLabel,
   petPalComplaintStatusOptions,
@@ -683,6 +711,100 @@ const formatPercent = (value: number) =>
 const getOrderNetIncome = (
   order: Pick<CaregiverEarningsOrderRecord, 'amountPaid' | 'amountRefunded'>,
 ) => Math.max(toAmount(order.amountPaid) - toAmount(order.amountRefunded), 0);
+type PetPalSignalPillTone = '' | 'is-accent' | 'is-success' | 'is-warning' | 'is-danger';
+
+const mapSignalTypeToPillTone = (
+  tone: 'primary' | 'success' | 'warning' | 'info' | 'danger',
+): PetPalSignalPillTone => {
+  if (tone === 'primary') {
+    return 'is-accent';
+  }
+  if (tone === 'success') {
+    return 'is-success';
+  }
+  if (tone === 'warning') {
+    return 'is-warning';
+  }
+  if (tone === 'danger') {
+    return 'is-danger';
+  }
+  return '';
+};
+const getAftersalesStatusPillTone = (
+  status: CaregiverAftersalesRiskOrderRecord['orderStatus'],
+): PetPalSignalPillTone => {
+  if (status === 'DISPUTED') {
+    return 'is-danger';
+  }
+  if (status === 'REFUNDED') {
+    return 'is-success';
+  }
+  return 'is-warning';
+};
+const getAftersalesRiskPills = (order: CaregiverAftersalesRiskOrderRecord) => {
+  const pills: Array<{ label: string; tone: PetPalSignalPillTone }> = [];
+
+  if (order.primaryComplaintStatus) {
+    pills.push({
+      label: `投诉${getPetPalComplaintStatusLabel(order.primaryComplaintStatus)}`,
+      tone: mapSignalTypeToPillTone(
+        order.primaryComplaintStatus === 'OPEN'
+          ? 'danger'
+          : order.primaryComplaintStatus === 'PROCESSING'
+            ? 'warning'
+            : 'info',
+      ),
+    });
+  }
+  if (order.primaryComplaintType) {
+    pills.push({
+      label: getPetPalComplaintTypeLabel(order.primaryComplaintType),
+      tone: '',
+    });
+  }
+  if (order.primaryComplaintTargetRole) {
+    pills.push({
+      label: `责任${getPetPalComplaintTargetRoleLabel(order.primaryComplaintTargetRole)}`,
+      tone: order.primaryComplaintTargetRole === 'CAREGIVER' ? 'is-danger' : 'is-accent',
+    });
+  }
+  if (order.complaintCount) {
+    pills.push({
+      label: `投诉 ${order.complaintCount} 条`,
+      tone: order.complaintCount > 1 ? 'is-warning' : '',
+    });
+  }
+  if (order.latestRefundStatus) {
+    pills.push({
+      label: getPetPalRefundStatusLabel(order.latestRefundStatus),
+      tone: mapSignalTypeToPillTone(getPetPalRefundStatusType(order.latestRefundStatus)),
+    });
+  }
+
+  return pills;
+};
+const getAftersalesRiskSummary = (order: CaregiverAftersalesRiskOrderRecord) => {
+  const parts: string[] = [];
+
+  if (order.primaryComplaintStatus) {
+    parts.push(`主要投诉：${getPetPalComplaintStatusLabel(order.primaryComplaintStatus)}`);
+  }
+  if (order.primaryComplaintType) {
+    parts.push(getPetPalComplaintTypeLabel(order.primaryComplaintType));
+  }
+  if (order.primaryComplaintTargetRole) {
+    parts.push(`责任 ${getPetPalComplaintTargetRoleLabel(order.primaryComplaintTargetRole)}`);
+  }
+  if (order.latestRefundStatus) {
+    const refundSummary =
+      order.latestRefundAmount != null
+        ? `最近退款：${getPetPalRefundStatusLabel(order.latestRefundStatus)} ${formatPetPalMoney(order.latestRefundAmount)}`
+        : `最近退款：${getPetPalRefundStatusLabel(order.latestRefundStatus)}`;
+    parts.push(refundSummary);
+  }
+
+  return parts.join(' · ') || '订单已进入售后链路，建议尽快复盘退款和投诉进度。';
+};
 const getTrendBarWidth = (value: number | string, maxRevenue: number) => {
   const revenue = toAmount(value);
   if (!maxRevenue || revenue <= 0) {
@@ -1459,6 +1581,10 @@ onMounted(() => {
   height: 6px;
   border-radius: 999px;
   background: linear-gradient(90deg, #dfa65b 0%, #8ab071 100%);
+}
+
+.petpal-sheet-row__signals {
+  margin-top: -2px;
 }
 
 .petpal-sheet-row.is-focused {

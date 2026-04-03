@@ -383,6 +383,15 @@ export interface CaregiverEarningsOrderRecord {
   locationText: string | null;
 }
 
+export interface CaregiverAftersalesRiskOrderRecord extends CaregiverEarningsOrderRecord {
+  latestRefundStatus: RefundStatus | null;
+  latestRefundAmount: AmountValue | null;
+  complaintCount: number;
+  primaryComplaintStatus: ComplaintStatus | null;
+  primaryComplaintTargetRole: ComplaintTargetRole | null;
+  primaryComplaintType: ComplaintType | null;
+}
+
 export interface CaregiverEarningsExportRow extends CaregiverEarningsOrderRecord {
   netIncome: AmountValue;
   closedAt: string | null;
@@ -426,7 +435,7 @@ export interface CaregiverEarningsSummaryRecord {
     totalServiceCount: number;
   };
   latestActiveOrder: CaregiverEarningsOrderRecord | null;
-  recentAftersalesOrders: CaregiverEarningsOrderRecord[];
+  recentAftersalesOrders: CaregiverAftersalesRiskOrderRecord[];
   recentCompletedOrders: CaregiverEarningsOrderRecord[];
   serviceRevenueMix: CaregiverServiceRevenueMixRecord[];
   trends: {

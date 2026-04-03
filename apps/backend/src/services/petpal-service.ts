@@ -784,6 +784,60 @@ type CaregiverEarningsOrderEntity = Prisma.OrderMainGetPayload<{
   select: typeof caregiverEarningsOrderSelect;
 }>;
 
+const caregiverAftersalesRiskRefundSelect = {
+  refundStatus: true,
+  refundAmount: true,
+  createdAt: true,
+} satisfies Prisma.RefundRecordSelect;
+
+type CaregiverAftersalesRiskRefundEntity = Prisma.RefundRecordGetPayload<{
+  select: typeof caregiverAftersalesRiskRefundSelect;
+}>;
+
+const caregiverAftersalesRiskComplaintSelect = {
+  status: true,
+  targetRole: true,
+  complaintType: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.ComplaintSelect;
+
+type CaregiverAftersalesRiskComplaintEntity = Prisma.ComplaintGetPayload<{
+  select: typeof caregiverAftersalesRiskComplaintSelect;
+}>;
+
+const caregiverAftersalesRiskOrderSelect = {
+  ...caregiverEarningsOrderSelect,
+  updatedAt: true,
+  refunds: {
+    where: {
+      deleteAt: null,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    select: caregiverAftersalesRiskRefundSelect,
+  },
+  complaints: {
+    where: {
+      deleteAt: null,
+    },
+    orderBy: [
+      {
+        updatedAt: 'desc',
+      },
+      {
+        createdAt: 'desc',
+      },
+    ],
+    select: caregiverAftersalesRiskComplaintSelect,
+  },
+} satisfies Prisma.OrderMainSelect;
+
+type CaregiverAftersalesRiskOrderEntity = Prisma.OrderMainGetPayload<{
+  select: typeof caregiverAftersalesRiskOrderSelect;
+}>;
+
 const caregiverEarningsExportSelect = {
   ...caregiverEarningsOrderSelect,
   closedAt: true,
@@ -806,6 +860,126 @@ const toCaregiverEarningsOrderRecord = (order: CaregiverEarningsOrderEntity) => 
   petName: order.serviceRequest?.pet?.name ?? null,
   locationText: order.serviceRequest?.locationText ?? null,
 });
+
+const getCaregiverAftersalesOrderStatusPriority = (
+  status:
+    | 'PENDING_ACCEPT'
+    | 'ACCEPTED'
+    | 'SERVING'
+    | 'COMPLETED'
+    | 'CANCELLED'
+    | 'DISPUTED'
+    | 'PARTIAL_REFUNDED'
+    | 'REFUNDED',
+) => {
+  if (status === 'DISPUTED') {
+    return 3;
+  }
+  if (status === 'PARTIAL_REFUNDED') {
+    return 2;
+  }
+  if (status === 'REFUNDED') {
+    return 1;
+  }
+  return 0;
+};
+
+const caregiverAftersalesComplaintPriority: Record<
+  'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED',
+  number
+> = {
+  OPEN: 4,
+  PROCESSING: 3,
+  RESOLVED: 2,
+  REJECTED: 1,
+};
+
+const caregiverAftersalesRefundPriority: Record<
+  'PENDING' | 'APPROVED' | 'REJECTED' | 'SUCCESS' | 'FAILED',
+  number
+> = {
+  APPROVED: 5,
+  PENDING: 4,
+  FAILED: 3,
+  SUCCESS: 2,
+  REJECTED: 1,
+};
+
+const compareDateDesc = (left: Date | null | undefined, right: Date | null | undefined) =>
+  (right?.getTime() ?? 0) - (left?.getTime() ?? 0);
+
+const compareNumberDesc = (left: number | null | undefined, right: number | null | undefined) =>
+  (right ?? 0) - (left ?? 0);
+
+const getPrimaryCaregiverAftersalesComplaint = (
+  complaints: CaregiverAftersalesRiskComplaintEntity[],
+) =>
+  [...complaints].sort((left, right) => {
+    const priorityDiff =
+      caregiverAftersalesComplaintPriority[right.status] -
+      caregiverAftersalesComplaintPriority[left.status];
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+    return compareDateDesc(left.updatedAt, right.updatedAt);
+  })[0] ?? null;
+
+const compareCaregiverAftersalesRiskOrder = (
+  left: CaregiverAftersalesRiskOrderEntity,
+  right: CaregiverAftersalesRiskOrderEntity,
+) => {
+  const orderStatusDiff =
+    getCaregiverAftersalesOrderStatusPriority(right.orderStatus) -
+    getCaregiverAftersalesOrderStatusPriority(left.orderStatus);
+  if (orderStatusDiff !== 0) {
+    return orderStatusDiff;
+  }
+
+  const leftPrimaryComplaint = getPrimaryCaregiverAftersalesComplaint(left.complaints);
+  const rightPrimaryComplaint = getPrimaryCaregiverAftersalesComplaint(right.complaints);
+  const complaintDiff =
+    (rightPrimaryComplaint
+      ? caregiverAftersalesComplaintPriority[rightPrimaryComplaint.status]
+      : 0) -
+    (leftPrimaryComplaint ? caregiverAftersalesComplaintPriority[leftPrimaryComplaint.status] : 0);
+  if (complaintDiff !== 0) {
+    return complaintDiff;
+  }
+
+  const leftLatestRefund = left.refunds[0] ?? null;
+  const rightLatestRefund = right.refunds[0] ?? null;
+  const refundDiff =
+    (rightLatestRefund ? caregiverAftersalesRefundPriority[rightLatestRefund.refundStatus] : 0) -
+    (leftLatestRefund ? caregiverAftersalesRefundPriority[leftLatestRefund.refundStatus] : 0);
+  if (refundDiff !== 0) {
+    return refundDiff;
+  }
+
+  const refundAmountDiff = compareNumberDesc(
+    leftLatestRefund ? toNumber(leftLatestRefund.refundAmount) : toNumber(left.amountRefunded),
+    rightLatestRefund ? toNumber(rightLatestRefund.refundAmount) : toNumber(right.amountRefunded),
+  );
+  if (refundAmountDiff !== 0) {
+    return refundAmountDiff;
+  }
+
+  return compareDateDesc(left.updatedAt, right.updatedAt);
+};
+
+const toCaregiverAftersalesRiskOrderRecord = (order: CaregiverAftersalesRiskOrderEntity) => {
+  const primaryComplaint = getPrimaryCaregiverAftersalesComplaint(order.complaints);
+  const latestRefund = order.refunds[0] ?? null;
+
+  return {
+    ...toCaregiverEarningsOrderRecord(order),
+    latestRefundStatus: latestRefund?.refundStatus ?? null,
+    latestRefundAmount: latestRefund ? toNumber(latestRefund.refundAmount) : null,
+    complaintCount: order.complaints.length,
+    primaryComplaintStatus: primaryComplaint?.status ?? null,
+    primaryComplaintTargetRole: primaryComplaint?.targetRole ?? null,
+    primaryComplaintType: primaryComplaint?.complaintType ?? null,
+  };
+};
 
 const toCaregiverEarningsExportRow = (
   order: CaregiverEarningsExportEntity,
@@ -1815,10 +1989,9 @@ export const petpalService = {
       completedAggregate,
       recentThirtyDayAggregate,
       activeOrderCount,
-      aftersalesRows,
+      aftersalesRiskOrders,
       serviceRevenueRows,
       latestActiveOrder,
-      recentAftersalesOrders,
       recentCompletedOrders,
       completedTrendRows,
     ] = await Promise.all([
@@ -1845,10 +2018,7 @@ export const petpalService = {
       prisma.orderMain.count({ where: activeWhere }),
       prisma.orderMain.findMany({
         where: aftersalesWhere,
-        select: {
-          amountPaid: true,
-          amountRefunded: true,
-        },
+        select: caregiverAftersalesRiskOrderSelect,
       }),
       prisma.orderMain.groupBy({
         by: ['serviceType'],
@@ -1872,19 +2042,6 @@ export const petpalService = {
             createdAt: 'desc',
           },
         ],
-      }),
-      prisma.orderMain.findMany({
-        where: aftersalesWhere,
-        select: caregiverEarningsOrderSelect,
-        orderBy: [
-          {
-            updatedAt: 'desc',
-          },
-          {
-            appointmentEnd: 'desc',
-          },
-        ],
-        take: 6,
       }),
       prisma.orderMain.findMany({
         where: completedWhere,
@@ -1922,17 +2079,20 @@ export const petpalService = {
       recentThirtyDayAggregate._sum.amountPaid,
       recentThirtyDayAggregate._sum.amountRefunded,
     );
-    const refundExposure = aftersalesRows.reduce(
+    const refundExposure = aftersalesRiskOrders.reduce(
       (sum, row) => sum + calcNetIncome(row.amountPaid, row.amountRefunded),
       0,
     );
-    const aftersalesOrderCount = aftersalesRows.length;
+    const aftersalesOrderCount = aftersalesRiskOrders.length;
     const averageTicket =
       completedOrderCount > 0 ? Number((totalIncome / completedOrderCount).toFixed(2)) : 0;
     const aftersalesRiskRate =
       completedOrderCount + aftersalesOrderCount > 0
         ? Number((aftersalesOrderCount / (completedOrderCount + aftersalesOrderCount)).toFixed(4))
         : 0;
+    const recentAftersalesOrders = [...aftersalesRiskOrders]
+      .sort(compareCaregiverAftersalesRiskOrder)
+      .slice(0, 6);
 
     for (const row of completedTrendRows) {
       const revenue = calcNetIncome(row.amountPaid, row.amountRefunded);
@@ -1958,7 +2118,7 @@ export const petpalService = {
       latestActiveOrder: latestActiveOrder
         ? toCaregiverEarningsOrderRecord(latestActiveOrder)
         : null,
-      recentAftersalesOrders: recentAftersalesOrders.map(toCaregiverEarningsOrderRecord),
+      recentAftersalesOrders: recentAftersalesOrders.map(toCaregiverAftersalesRiskOrderRecord),
       recentCompletedOrders: recentCompletedOrders.map(toCaregiverEarningsOrderRecord),
       serviceRevenueMix: serviceRevenueRows
         .map((row) => {
