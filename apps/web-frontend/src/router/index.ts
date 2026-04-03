@@ -4,6 +4,7 @@ import { useMenuStore } from '@/stores/menus';
 import { useWorkbenchStore } from '@/stores/workbench';
 import { beginRouteProgress, endRouteProgress } from '@/utils/app-progress';
 import {
+  canAccessRouteByPermissionMeta,
   CONSOLE_NAMESPACE,
   hasPetPalAdminAccess,
   PETPAL_ADMIN_NAMESPACE,
@@ -204,7 +205,7 @@ const routes = [
         meta: {
           requiresAuth: true,
           title: '宠托帮后台直达工作台',
-          description: '跳过菜单树，直接访问 PetPal 投诉、规则、审核与回调治理工作区。',
+          description: '跳过菜单树，直接访问 PetPal 投诉、处罚、规则、审核与回调治理工作区。',
         },
       },
       {
@@ -216,6 +217,17 @@ const routes = [
           permission: 'petpal.complaint.manage',
           title: '投诉工单',
           description: '集中处理投诉分派、批量结案与 SLA 风险工单。',
+        },
+      },
+      {
+        path: 'penalties',
+        name: 'petpal-admin-penalties',
+        component: () => import('@/pages/petpal-admin/PetPalPenaltyAdminRouteView.vue'),
+        meta: {
+          requiresAuth: true,
+          permissionAny: ['petpal.penalty.read', 'petpal.penalty.manage'],
+          title: '违规处罚',
+          description: '跟踪处罚记录、整改状态与逾期整改事项。',
         },
       },
       {
@@ -365,7 +377,7 @@ router.beforeEach(async (to) => {
     return preferredAdminEntry;
   }
 
-  if (typeof to.meta.permission === 'string' && !auth.hasPermission(to.meta.permission)) {
+  if (!canAccessRouteByPermissionMeta(auth.permissions, to.meta)) {
     return preferredAdminEntry;
   }
 

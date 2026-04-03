@@ -131,6 +131,34 @@
                 </div>
               </div>
             </div>
+            <div v-if="scope.row.penalties.length" class="complaint-expand__section">
+              <span class="complaint-expand__label">处罚记录</span>
+              <div class="complaint-penalties">
+                <div
+                  v-for="penalty in scope.row.penalties"
+                  :key="penalty.id"
+                  class="complaint-penalties__item"
+                >
+                  <div class="complaint-penalties__meta">
+                    <el-tag :type="getPenaltySeverityTagType(penalty.severity)">
+                      {{ getPenaltySeverityLabel(penalty.severity) }}
+                    </el-tag>
+                    <strong>{{ getPenaltyTypeLabel(penalty.penaltyType) }}</strong>
+                    <el-tag :type="getPenaltyRectifyStatusTagType(penalty.rectifyStatus)">
+                      {{ getPenaltyRectifyStatusLabel(penalty.rectifyStatus) }}
+                    </el-tag>
+                  </div>
+                  <p>{{ penalty.actionSummary }}</p>
+                  <span>
+                    {{ penalty.targetNickname || '平台侧对象' }}
+                    <template v-if="penalty.rectifyDueAt">
+                      · 截止 {{ formatDateTime(penalty.rectifyDueAt) }}
+                    </template>
+                  </span>
+                  <p v-if="penalty.rectifyNote">{{ penalty.rectifyNote }}</p>
+                </div>
+              </div>
+            </div>
             <div v-if="scope.row.resultSummary" class="complaint-expand__section">
               <span class="complaint-expand__label">结案结论</span>
               <p>{{ scope.row.resultSummary }}</p>
@@ -311,7 +339,7 @@
           <el-form-item label="处理动作">
             <el-select v-model="actionForm.actionType" style="width: 100%">
               <el-option
-                v-for="item in complaintAdminActionOptions"
+                v-for="item in availableActionOptions"
                 :key="item.value"
                 :label="item.label"
                 :value="item.value"
@@ -330,7 +358,61 @@
             </el-select>
           </el-form-item>
 
-          <template v-if="actionForm.actionType === 'CLOSE'">
+          <template v-if="actionForm.actionType === 'PENALTY'">
+            <div class="complaint-action-grid">
+              <el-form-item label="处罚类型">
+                <el-select v-model="actionForm.penaltyType" style="width: 100%">
+                  <el-option
+                    v-for="item in penaltyTypeOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="严重等级">
+                <el-select v-model="actionForm.penaltySeverity" style="width: 100%">
+                  <el-option
+                    v-for="item in penaltySeverityOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+              </el-form-item>
+            </div>
+            <el-form-item label="处罚措施">
+              <el-input
+                v-model="actionForm.penaltyActionSummary"
+                type="textarea"
+                :rows="3"
+                maxlength="1000"
+                show-word-limit
+                placeholder="例如 限制接单 7 天并要求补交完整服务记录"
+              />
+            </el-form-item>
+            <el-form-item label="处罚原因">
+              <el-input
+                v-model="actionForm.penaltyReason"
+                type="textarea"
+                :rows="3"
+                maxlength="1000"
+                show-word-limit
+                placeholder="说明为何触发处罚以及责任认定依据"
+              />
+            </el-form-item>
+            <el-form-item label="整改截止时间">
+              <el-date-picker
+                v-model="actionForm.rectifyDueAt"
+                type="datetime"
+                clearable
+                placeholder="可选：设置整改截止时间"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </template>
+
+          <template v-else-if="actionForm.actionType === 'CLOSE'">
             <el-form-item label="结案结果">
               <el-radio-group v-model="actionForm.resultStatus">
                 <el-radio
@@ -386,6 +468,8 @@ import type {
   ComplaintTargetRole,
   ComplaintType,
   ManageComplaintPayload,
+  PenaltySeverity,
+  PenaltyType,
   UserRecord,
 } from '@rbac/api-common';
 import { ElMessage, type TableInstance } from 'element-plus';
@@ -411,6 +495,15 @@ import {
   getComplaintAdminTargetRoleLabel,
   getComplaintAdminTypeLabel,
 } from './complaint-admin-options';
+import {
+  getPenaltyRectifyStatusLabel as getPenaltyRectifyStatusLabelFromOptions,
+  getPenaltyRectifyStatusTagType as getPenaltyRectifyStatusTagTypeFromOptions,
+  getPenaltySeverityLabel as getPenaltySeverityLabelFromOptions,
+  getPenaltySeverityTagType as getPenaltySeverityTagTypeFromOptions,
+  getPenaltyTypeLabel as getPenaltyTypeLabelFromOptions,
+  penaltySeverityOptions,
+  penaltyTypeOptions,
+} from '../penalties/penalty-admin-options';
 import {
   buildRouteQuerySnapshot,
   getSingleRouteQueryValue,
@@ -448,6 +541,11 @@ type ActionForm = {
   note: string;
   resultStatus: 'RESOLVED' | 'REJECTED';
   resultSummary: string;
+  penaltyType?: PenaltyType;
+  penaltySeverity?: PenaltySeverity;
+  penaltyReason: string;
+  penaltyActionSummary: string;
+  rectifyDueAt: Date | null;
 };
 
 const pageSize = 10;
@@ -504,6 +602,11 @@ const createEmptyActionForm = (): ActionForm => ({
   note: '',
   resultStatus: 'RESOLVED',
   resultSummary: '',
+  penaltyType: 'WARNING',
+  penaltySeverity: 'LOW',
+  penaltyReason: '',
+  penaltyActionSummary: '',
+  rectifyDueAt: null,
 });
 
 const actionForm = reactive<ActionForm>(createEmptyActionForm());
@@ -517,6 +620,13 @@ const batchCloseForm = reactive({
 });
 const currentAdminId = computed(() => auth.user?.id ?? '');
 const currentAdminNickname = computed(() => auth.user?.nickname ?? '当前管理员');
+const availableActionOptions = computed(() =>
+  complaintAdminActionOptions.filter((item) =>
+    item.value === 'PENALTY'
+      ? auth.permissions.includes('petpal.penalty.manage')
+      : true,
+  ),
+);
 const isMineFilterActive = computed(() =>
   Boolean(currentAdminId.value)
   && !pageState.filters.unassignedOnly
@@ -557,6 +667,11 @@ const getTargetRoleLabel = getComplaintAdminTargetRoleLabel;
 const getSlaStatusLabel = getComplaintAdminSlaStatusLabel;
 const getSlaTagType = getComplaintAdminSlaTagType;
 const getActionLabel = getComplaintAdminActionLabel;
+const getPenaltyTypeLabel = getPenaltyTypeLabelFromOptions;
+const getPenaltySeverityLabel = getPenaltySeverityLabelFromOptions;
+const getPenaltySeverityTagType = getPenaltySeverityTagTypeFromOptions;
+const getPenaltyRectifyStatusLabel = getPenaltyRectifyStatusLabelFromOptions;
+const getPenaltyRectifyStatusTagType = getPenaltyRectifyStatusTagTypeFromOptions;
 
 const formatDateTime = (value?: string | null) => {
   if (!value) {
@@ -923,6 +1038,30 @@ const submitAction = async () => {
     }
     payload.assigneeId = actionForm.assigneeId;
     payload.note = actionForm.note.trim() || undefined;
+  } else if (actionForm.actionType === 'PENALTY') {
+    const penaltyReason = actionForm.penaltyReason.trim();
+    const penaltyActionSummary = actionForm.penaltyActionSummary.trim();
+    if (!actionForm.penaltyType) {
+      ElMessage.error('请选择处罚类型');
+      return;
+    }
+    if (!actionForm.penaltySeverity) {
+      ElMessage.error('请选择严重等级');
+      return;
+    }
+    if (!penaltyActionSummary) {
+      ElMessage.error('请填写处罚措施');
+      return;
+    }
+    if (!penaltyReason) {
+      ElMessage.error('请填写处罚原因');
+      return;
+    }
+    payload.penaltyType = actionForm.penaltyType;
+    payload.penaltySeverity = actionForm.penaltySeverity;
+    payload.penaltyReason = penaltyReason;
+    payload.penaltyActionSummary = penaltyActionSummary;
+    payload.rectifyDueAt = actionForm.rectifyDueAt?.toISOString();
   } else if (actionForm.actionType === 'CLOSE') {
     const resultSummary = actionForm.resultSummary.trim();
     if (!resultSummary) {
@@ -1010,6 +1149,37 @@ watch(
   word-break: break-all;
 }
 
+.complaint-penalties {
+  display: grid;
+  gap: 10px;
+}
+
+.complaint-penalties__item {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #e4e7ec;
+  background: #f8fafc;
+}
+
+.complaint-penalties__item p,
+.complaint-penalties__item span {
+  margin: 0;
+}
+
+.complaint-penalties__item span {
+  color: #667085;
+  font-size: 13px;
+}
+
+.complaint-penalties__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .complaint-progress {
   display: grid;
   gap: 10px;
@@ -1051,6 +1221,12 @@ watch(
   color: #667085;
 }
 
+.complaint-action-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .complaint-batch-summary {
   padding: 12px 14px;
   border-radius: 12px;
@@ -1063,6 +1239,12 @@ watch(
 .complaint-sla {
   display: grid;
   gap: 6px;
+}
+
+@media (max-width: 720px) {
+  .complaint-action-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .complaint-sla span,

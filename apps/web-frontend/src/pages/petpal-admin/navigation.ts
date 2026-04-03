@@ -5,6 +5,7 @@ export type PetPalAdminNavItem = {
   to: string;
   icon: string;
   permission?: string;
+  permissionsAny?: string[];
 };
 
 export const petpalAdminNavItems: PetPalAdminNavItem[] = [
@@ -30,6 +31,14 @@ export const petpalAdminNavItems: PetPalAdminNavItem[] = [
     to: '/petpal-admin/rules',
     icon: 'i-carbon-book',
     permission: 'petpal.rule.read',
+  },
+  {
+    title: '违规处罚',
+    caption: 'Penalties',
+    description: '跟踪处罚记录、整改状态和逾期整改事项。',
+    to: '/petpal-admin/penalties',
+    icon: 'i-carbon-rule',
+    permissionsAny: ['petpal.penalty.read', 'petpal.penalty.manage'],
   },
   {
     title: '照料者审核',
@@ -59,5 +68,8 @@ export const petpalAdminNavItems: PetPalAdminNavItem[] = [
 
 export const canAccessPetPalAdminNavItem = (
   permissions: string[],
-  item: Pick<PetPalAdminNavItem, 'permission'>,
-) => !item.permission || permissions.includes(item.permission);
+  item: Pick<PetPalAdminNavItem, 'permission' | 'permissionsAny'>,
+) => (
+  (!item.permission || permissions.includes(item.permission))
+  && (!item.permissionsAny?.length || item.permissionsAny.some((permission) => permissions.includes(permission)))
+);

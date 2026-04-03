@@ -1077,7 +1077,7 @@ flowchart TB
 | 消息与回传   | 订单会话、图文消息、过程媒体、未读数                                               | 基本完成，跨订单聚合、提醒中心和通知中心已完成，仍缺系统主动通知 | P2         |
 | 支付与退款   | 多次支付、补差价、部分退款、回调审计、对账                                         | 核心已完成                                                       | P4         |
 | 评价与投诉   | 评价、标签、投诉、处理日志、仲裁结论                                               | 基本完成，售后中心、帮助体系和通知收口已落地，仍缺更主动触达     | P2         |
-| 管理治理     | 审核台、纠纷处理、违规处罚、规则发布、指标看板                                     | 规则发布基础闭环与首页基础经营指标已完成，违规处罚与深度看板仍待补齐 | P4         |
+| 管理治理     | 审核台、纠纷处理、违规处罚、规则发布、指标看板                                     | 规则发布、违规处罚与整改跟踪基础闭环已完成，深度看板与申诉链路仍待补齐 | P4         |
 | 可观测与审计 | request_id 串联、关键动作审计、导出留痕                                            | 部分完成                                                         | P5         |
 
 ### 13.5 P1-M2：接单履约闭环
@@ -1444,7 +1444,7 @@ flowchart TD
 | 履约链路       | 基本完成 | 接单、签到、服务日志、签退、确认完成已落地到后端、Web 和 App；超时治理与收益联动仍未补齐                                           |
 | 支付与退款     | 基本完成 | 支付/退款记录、回调审计、退款进度、导出能力已具备                                                                                  |
 | 评价与投诉     | 基本完成 | Web 端已支持评价、投诉、售后时间线；App 端也已具备订单详情提交、独立售后中心、帮助体系、提醒与通知收口能力，但仍缺更主动的系统触达 |
-| 管理后台       | 基本完成 | 根级 `/petpal-admin/*` 已承载投诉、照料者审核、回调审计、告警队列、规则治理；违规处罚与更深运营看板仍未补齐                      |
+| 管理后台       | 基本完成 | 根级 `/petpal-admin/*` 已承载投诉、违规处罚、照料者审核、回调审计、告警队列、规则治理；更深运营看板与处罚申诉仍未补齐            |
 | 消息与在线沟通 | 基本完成 | 订单详情会话、附件回传、跨订单消息中心、未读态、提醒中心、通知中心和 Web/App 摘要已落地；仍缺系统级主动提醒、推送与后台触达        |
 | 收益与数据分析 | 部分完成 | App 已补收益与表现页，可基于订单聚合看净收入、评分和售后风险；后端专门统计接口与平台运营指标仍未完整实现                           |
 | 文档与答辩材料 | 部分完成 | 计划、进度日志和实现历史持续更新中，但完整验收脚本、截图、演示素材尚未收齐                                                         |
@@ -1461,7 +1461,7 @@ flowchart TD
 1. `app-frontend` 已形成真实可用的 PetPal 主应用骨架，帮助中心、账户支持、提醒中心、通知中心、起步向导和应用内主动催办信号已落地，但系统级主动触达与更深的动态引导仍未收口。
 2. Web 前台仍存在超级页面承载过多逻辑的问题，主人 / 照料者前台尚未按路由充分拆分。
 3. 提醒中心与通知中心已落地，但真正的系统主动提醒、推送和更强的售后/消息到达能力仍未完成。
-4. 健康记录、资质材料、收益分析纵深、违规处罚和更深的运营看板仍缺完整前后端闭环；规则发布已补齐草稿 / 发布 / 归档基础闭环。
+4. 健康记录、资质材料、收益分析纵深、处罚申诉链路和更深的运营看板仍缺完整前后端闭环；规则发布与处罚整改已补齐基础闭环。
 5. 统一验收层尚未收口，前端定向验证、人工验收脚本、论文素材还不够完整。
 
 当前工作区进行中但尚未完成交付的内容：
@@ -1495,7 +1495,7 @@ flowchart TD
    - 图文过程沟通
    - 未读数与消息提醒
 2. 补齐健康记录、资质材料、收益分析和平台运营指标。
-3. 继续补齐后台“违规处罚 / 运营看板深化”能力，并在已落地的规则治理基础上完成从工单治理到平台治理的升级。
+3. 继续补齐后台“处罚申诉 / 运营看板深化”能力，并在已落地的规则治理与处罚整改基础上完成从工单治理到平台治理的升级。
 
 #### 第三优先级：验收收口
 
@@ -7880,6 +7880,88 @@ flowchart TD
 1. 继续评估主人交易导出、主人退款导出和照料者收益导出之间可共享的快照基础 helper，减少三个状态模块的平行实现。
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
+
+### 14.216 2026-04-03（P3-M1 Slice 216）
+
+**概述**：上一轮已经把平台规则发布真正落到根级后台，但“规则执行”仍停留在投诉工单后的人工约定，没有形成独立处罚记录和整改跟踪。本轮继续沿根级 `/petpal-admin` 治理工作区补齐违规处罚执行层，新增处罚记录模型、投诉联动处罚动作、整改状态流转与独立处罚工作台，让规则治理从“能发规则”推进到“能执行规则”。
+
+已完成：
+
+- 处罚数据模型与共享契约落地：
+  - `apps/backend/prisma/enums.prisma`
+    - 新增 `PenaltyType`、`PenaltySeverity`、`PenaltyRectifyStatus`。
+  - `apps/backend/prisma/models/petpal.prisma`
+    - 新增 `PenaltyRecord`，并把处罚记录挂到 `Complaint` 与 `OrderMain`。
+  - `apps/backend/prisma/models/auth.prisma`
+    - 为处罚目标人、创建人、更新人补上 `User` 反向关联。
+  - `apps/backend/prisma/migrations/20260403235500_add_petpal_penalty_records/migration.sql`
+    - 新增处罚记录迁移。
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增处罚列表、统计、整改载荷与管理端返回类型。
+  - `packages/api-common/src/api/factory.ts`
+    - 新增 `api.petpal.admin.penalties()`、`penaltyStats()`、`rectifyPenalty()`。
+- 后端处罚治理接口与权限落地：
+  - `apps/backend/src/constants/system-permissions.ts`
+    - 新增 `petpal.penalty.read` 与 `petpal.penalty.manage`，把“看处罚”和“管处罚”拆成独立权限。
+  - `apps/backend/src/services/system-rbac.ts`
+    - PetPal 根级后台新增处罚工作台菜单与整改动作节点。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 投诉处理动作 `PENALTY` 现会在事务内生成处罚记录、补投诉处理日志，并提供处罚列表、统计与整改流转服务。
+  - `apps/backend/src/routes/petpal.ts`
+    - 新增：
+      - `GET /api/petpal/admin/penalties`
+      - `GET /api/petpal/admin/penalties/stats`
+      - `POST /api/petpal/admin/penalties/:id/rectify`
+    - 投诉处罚动作现要求同时具备 `petpal.complaint.manage` 与 `petpal.penalty.manage`。
+    - 处罚列表 / 统计页统一支持 `petpal.penalty.read` 或 `petpal.penalty.manage` 任一权限进入，避免入口可见但列表 403。
+- 根级后台处罚页落地：
+  - `apps/web-frontend/src/utils/admin-entry.ts`
+    - PetPal 后台默认落点与路由守卫已支持 `permissionAny`，处罚工作台可被读权限或管权限账号进入。
+  - `apps/web-frontend/src/pages/petpal-admin/navigation.ts`
+  - `apps/web-frontend/src/router/index.ts`
+    - 新增 `/petpal-admin/penalties` 根级后台路由和导航入口，并改成读/管任一权限放行。
+  - `apps/web-frontend/src/pages/petpal-admin/PetPalAdminHubView.vue`
+    - 首页文案已补处罚治理信号，与投诉、规则、审核和回调治理一起呈现平台执行层。
+  - `apps/web-frontend/src/pages/petpal-admin/complaints/PetPalComplaintAdminView.vue`
+    - 投诉处理弹窗已补处罚类型、严重级别、处罚原因、动作摘要与整改截止时间输入，并展示投诉关联处罚记录。
+  - `apps/web-frontend/src/pages/petpal-admin/penalties/PetPalPenaltyAdminView.vue`
+    - 新增处罚列表、整改状态筛选、逾期视图和整改完成 / 豁免动作。
+- 定向测试与文档同步：
+  - `apps/backend/test/integration/petpal-penalty-admin.test.ts`
+    - 新增处罚定向集成测试，覆盖投诉生成处罚、处罚统计、整改流转、处罚权限拆分，以及 manage-only 账号访问处罚列表 / 统计的行为。
+  - 文档已同步：
+    - `README.md`
+    - `docs/project-memory.md`
+    - `docs/development-guidelines.md`
+    - `docs/implementation-history.md`
+    - `apps/docs/project/PetPal.md`
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test test/integration/petpal-penalty-admin.test.ts` 通过。
+- `pnpm --filter @rbac/backend lint` 通过。
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend build` 通过。
+
+代码审计结论：
+
+- 已确认本轮把“违规处罚”从投诉工单附带说明补成真实数据模型、后端接口、独立权限码和根级后台页面，规则治理开始具备最小执行闭环。
+- 已确认处罚创建当前刻意收口为“投诉处理动作触发”，没有额外开放独立新增处罚 API，避免在本轮把边界扩散到处罚模板、独立立案或申诉流程。
+- 已确认处罚页读权限与管权限账号都能进入后台和处罚工作台，不会出现默认落点可进但导航 / 路由 / 列表接口仍被单一读权限拦住的权限割裂。
+
+风险与缓解：
+
+- 风险：当前处罚执行已落地，但处罚模板、整改材料回传、申诉流转与规则差异对比仍未补齐。
+- 缓解：下一轮优先补处罚申诉 / 模板化治理，继续把“规则发布 + 处罚执行”推进成更完整的平台治理闭环。
+
+- 风险：处罚当前只支持从投诉动作生成，尚未覆盖主动巡检、批量处罚或更细的规则触发器。
+- 缓解：本轮先保留最小可用执行链路，后续如业务确认需要更主动的治理入口，再在现有处罚记录模型上扩展触发来源。
+
+下一步（1-3）：
+
+1. 继续补处罚申诉、整改材料回传和处罚模板，让处罚执行不只停留在记录与状态流转。
+2. 继续增强平台治理纵深能力，例如更细的运营筛选、趋势钻取、城市 / 服务类型拆分和治理导出。
+3. 继续按切片节奏补定向测试、提交历史和验收材料，不回退到无边界全量验证。
 
 ### 14.215 2026-04-03（P3-M1 Slice 215）
 

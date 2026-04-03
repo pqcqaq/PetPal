@@ -52,6 +52,7 @@ const auditedModelNames = new Set([
   'OrderMain',
   'OrderTimeline',
   'ServiceLog',
+  'PenaltyRecord',
   'PlatformRule',
   'PaymentRecord',
   'RefundRecord',

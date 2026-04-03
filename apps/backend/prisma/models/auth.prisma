@@ -32,6 +32,9 @@ model User {
   petpalComplaintLogs ComplaintProcessLog[] @relation("PetPalComplaintOperator")
   createdPetpalPlatformRules PlatformRule[] @relation("PetPalPlatformRuleCreator")
   updatedPetpalPlatformRules PlatformRule[] @relation("PetPalPlatformRuleUpdater")
+  petpalPenaltyTargets PenaltyRecord[] @relation("PetPalPenaltyTarget")
+  createdPetpalPenaltyRecords PenaltyRecord[] @relation("PetPalPenaltyCreator")
+  updatedPetpalPenaltyRecords PenaltyRecord[] @relation("PetPalPenaltyUpdater")
 
   @@index([deleteAt])
 }

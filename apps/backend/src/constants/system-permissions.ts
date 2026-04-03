@@ -16,6 +16,8 @@ export const systemPermissionCatalog: readonly SystemPermissionSeed[] = [
   { module: 'petpal', code: 'petpal.caregiver.audit', name: '审核宠托帮照料者资质', action: 'audit' },
   { module: 'petpal', code: 'petpal.complaint.read', name: '查看宠托帮投诉工单', action: 'read' },
   { module: 'petpal', code: 'petpal.complaint.manage', name: '处理宠托帮投诉工单', action: 'manage' },
+  { module: 'petpal', code: 'petpal.penalty.read', name: '查看宠托帮违规处罚', action: 'read' },
+  { module: 'petpal', code: 'petpal.penalty.manage', name: '处理宠托帮违规处罚', action: 'manage' },
   { module: 'petpal', code: 'petpal.rule.read', name: '查看宠托帮平台规则', action: 'read' },
   { module: 'petpal', code: 'petpal.rule.publish', name: '发布宠托帮平台规则', action: 'publish' },
   { module: 'menu', code: 'menu.read', name: '查看菜单管理', action: 'read' },

@@ -7,6 +7,7 @@ import { createExcelExportHandler, createTimestampedExcelFileName } from '../uti
 import { petpalService } from '../services/petpal-service';
 import { verifyPetpalCallbackAuth } from '../services/petpal-callback-auth';
 import { getRequestId } from '../utils/request-context';
+import { forbidden } from '../utils/errors';
 
 const orderStatusEnum = z.enum([
   'PENDING_ACCEPT',
@@ -243,6 +244,11 @@ const adminComplaintActionSchema = z.object({
   note: z.string().trim().max(1000).optional(),
   resultStatus: z.enum(['RESOLVED', 'REJECTED']).optional(),
   resultSummary: z.string().trim().max(1000).optional(),
+  penaltyType: z.enum(['WARNING', 'SERVICE_RESTRICTION', 'ACCOUNT_SUSPENSION', 'OTHER']).optional(),
+  penaltySeverity: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
+  penaltyReason: z.string().trim().max(1000).optional(),
+  penaltyActionSummary: z.string().trim().max(1000).optional(),
+  rectifyDueAt: z.coerce.date().optional(),
 });
 
 const adminComplaintBatchAssignSchema = z.object({
@@ -255,6 +261,31 @@ const adminComplaintBatchCloseSchema = z.object({
   complaintIds: z.array(z.string().trim().min(1).max(64)).min(1).max(50),
   resultStatus: z.enum(['RESOLVED', 'REJECTED']),
   resultSummary: z.string().trim().min(1).max(1000),
+});
+
+const penaltyTypeEnum = z.enum(['WARNING', 'SERVICE_RESTRICTION', 'ACCOUNT_SUSPENSION', 'OTHER']);
+const penaltySeverityEnum = z.enum(['LOW', 'MEDIUM', 'HIGH']);
+const penaltyRectifyStatusEnum = z.enum(['PENDING', 'COMPLETED', 'WAIVED']);
+
+const adminPenaltyQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(100).optional(),
+  targetRole: z.enum(['CAREGIVER', 'PLATFORM']).optional(),
+  penaltyType: penaltyTypeEnum.optional(),
+  severity: penaltySeverityEnum.optional(),
+  rectifyStatus: penaltyRectifyStatusEnum.optional(),
+  overdueOnly: optionalBooleanQuerySchema,
+  keyword: z.string().trim().max(100).optional(),
+});
+
+const adminPenaltyStatsQuerySchema = adminPenaltyQuerySchema.omit({
+  page: true,
+  pageSize: true,
+});
+
+const adminPenaltyRectifySchema = z.object({
+  rectifyStatus: z.enum(['COMPLETED', 'WAIVED']),
+  rectifyNote: z.string().trim().min(1).max(1000),
 });
 
 const platformRuleStatusEnum = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
@@ -922,6 +953,8 @@ petpalRouter.get(
   requireAnyPermission(
     'petpal.complaint.read',
     'petpal.complaint.manage',
+    'petpal.penalty.read',
+    'petpal.penalty.manage',
     'petpal.caregiver.audit',
     'petpal.callback-audit.read',
     'petpal.callback-alert.read',
@@ -1093,6 +1126,9 @@ petpalRouter.post(
   asyncHandler(async (req, res) => {
     const auth = req.auth!;
     const payload = adminComplaintActionSchema.parse(req.body ?? {});
+    if (payload.actionType === 'PENALTY' && !auth.permissions.includes('petpal.penalty.manage')) {
+      throw forbidden('Missing permission: petpal.penalty.manage');
+    }
     const complaint = await petpalService.handleAdminComplaint(
       String(req.params.id),
       auth.id,
@@ -1121,6 +1157,59 @@ petpalRouter.post(
     const payload = adminComplaintBatchCloseSchema.parse(req.body ?? {});
     const result = await petpalService.batchCloseAdminComplaints(auth.id, payload);
     return ok(res, result, 'Complaints batch closed');
+  }),
+);
+
+petpalRouter.get(
+  '/admin/penalties',
+  requireAnyPermission('petpal.penalty.read', 'petpal.penalty.manage'),
+  asyncHandler(async (req, res) => {
+    const { page, pageSize } = parsePagination(req.query);
+    const query = adminPenaltyQuerySchema.parse({
+      ...req.query,
+      page,
+      pageSize,
+    });
+
+    const result = await petpalService.queryAdminPenalties({
+      page: query.page ?? page,
+      pageSize: query.pageSize ?? pageSize,
+      targetRole: query.targetRole,
+      penaltyType: query.penaltyType,
+      severity: query.severity,
+      rectifyStatus: query.rectifyStatus,
+      overdueOnly: query.overdueOnly,
+      keyword: query.keyword,
+    });
+    return ok(res, result, 'Penalty admin list');
+  }),
+);
+
+petpalRouter.get(
+  '/admin/penalties/stats',
+  requireAnyPermission('petpal.penalty.read', 'petpal.penalty.manage'),
+  asyncHandler(async (req, res) => {
+    const query = adminPenaltyStatsQuerySchema.parse(req.query ?? {});
+    const result = await petpalService.queryAdminPenaltyStats({
+      targetRole: query.targetRole,
+      penaltyType: query.penaltyType,
+      severity: query.severity,
+      rectifyStatus: query.rectifyStatus,
+      overdueOnly: query.overdueOnly,
+      keyword: query.keyword,
+    });
+    return ok(res, result, 'Penalty admin stats');
+  }),
+);
+
+petpalRouter.post(
+  '/admin/penalties/:id/rectify',
+  requirePermission('petpal.penalty.manage'),
+  asyncHandler(async (req, res) => {
+    const auth = req.auth!;
+    const payload = adminPenaltyRectifySchema.parse(req.body ?? {});
+    const penalty = await petpalService.rectifyAdminPenalty(String(req.params.id), auth.id, payload);
+    return ok(res, penalty, 'Penalty updated');
   }),
 );
 

@@ -40,6 +40,10 @@ import type {
   ComplaintAdminPage,
   ComplaintAdminQuery,
   ComplaintAdminStats,
+  PenaltyAdminPage,
+  PenaltyAdminQuery,
+  PenaltyAdminRecord,
+  PenaltyAdminStats,
   PlatformRuleAdminPage,
   PlatformRuleAdminQuery,
   PlatformRuleAdminStats,
@@ -76,6 +80,7 @@ import type {
   CreateServiceRequestPayload,
   MatchCaregiverQuery,
   ManageComplaintPayload,
+  RectifyPenaltyPayload,
   BatchAssignComplaintsPayload,
   BatchAssignComplaintsResult,
   MatchedCaregiverPage,
@@ -606,6 +611,22 @@ export const createApiFactory = (options: ClientOptions) => {
           client.request<ComplaintAdminPage>({
             url: '/petpal/admin/complaints',
             params: query as unknown as QueryParams,
+          }),
+        penalties: (query?: PenaltyAdminQuery) =>
+          client.request<PenaltyAdminPage>({
+            url: '/petpal/admin/penalties',
+            params: query as unknown as QueryParams,
+          }),
+        penaltyStats: (query?: PenaltyAdminQuery) =>
+          client.request<PenaltyAdminStats>({
+            url: '/petpal/admin/penalties/stats',
+            params: query as unknown as QueryParams,
+          }),
+        rectifyPenalty: (penaltyId: string, payload: RectifyPenaltyPayload) =>
+          client.request<PenaltyAdminRecord>({
+            url: `/petpal/admin/penalties/${penaltyId}/rectify`,
+            method: 'POST',
+            data: payload,
           }),
         rules: (query?: PlatformRuleAdminQuery) =>
           client.request<PlatformRuleAdminPage>({

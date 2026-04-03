@@ -230,3 +230,22 @@ enum PlatformRuleStatus {
   PUBLISHED
   ARCHIVED
 }
+
+enum PenaltyType {
+  WARNING
+  SERVICE_RESTRICTION
+  ACCOUNT_SUSPENSION
+  OTHER
+}
+
+enum PenaltySeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum PenaltyRectifyStatus {
+  PENDING
+  COMPLETED
+  WAIVED
+}

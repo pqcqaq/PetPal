@@ -65,6 +65,9 @@ export type ComplaintActionType =
   | 'CALL_USER'
   | 'PENALTY'
   | 'CLOSE';
+export type PenaltyType = 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
+export type PenaltySeverity = 'LOW' | 'MEDIUM' | 'HIGH';
+export type PenaltyRectifyStatus = 'PENDING' | 'COMPLETED' | 'WAIVED';
 export type PlatformRuleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
 type AmountValue = number | string;
@@ -317,6 +320,32 @@ export interface ComplaintAdminRecord extends ComplaintRecord {
   caregiverNickname: string;
   slaStatus: ComplaintAdminSlaStatus | null;
   slaDeadlineAt: string | null;
+  penalties: PenaltyAdminRecord[];
+}
+
+export interface PenaltyAdminRecord {
+  id: string;
+  complaintId: string;
+  orderId: string;
+  orderNo: string;
+  targetRole: ComplaintTargetRole;
+  targetUserId: string | null;
+  targetNickname: string | null;
+  complaintType: ComplaintType;
+  penaltyType: PenaltyType;
+  severity: PenaltySeverity;
+  reason: string;
+  actionSummary: string;
+  rectifyStatus: PenaltyRectifyStatus;
+  rectifyDueAt: string | null;
+  rectifiedAt: string | null;
+  rectifyNote: string | null;
+  creatorId: string | null;
+  creatorNickname: string | null;
+  updaterId: string | null;
+  updaterNickname: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface OrderRecord {
@@ -493,6 +522,11 @@ export interface ManageComplaintPayload {
   note?: string;
   resultStatus?: Extract<ComplaintStatus, 'RESOLVED' | 'REJECTED'>;
   resultSummary?: string;
+  penaltyType?: PenaltyType;
+  penaltySeverity?: PenaltySeverity;
+  penaltyReason?: string;
+  penaltyActionSummary?: string;
+  rectifyDueAt?: string;
 }
 
 export interface BatchAssignComplaintsPayload {
@@ -539,6 +573,40 @@ export interface ComplaintAdminPage {
     total: number;
     totalPages: number;
   };
+}
+
+export interface PenaltyAdminQuery {
+  page?: number;
+  pageSize?: number;
+  targetRole?: ComplaintTargetRole;
+  penaltyType?: PenaltyType;
+  severity?: PenaltySeverity;
+  rectifyStatus?: PenaltyRectifyStatus;
+  overdueOnly?: boolean;
+  keyword?: string;
+}
+
+export interface PenaltyAdminStats {
+  total: number;
+  byRectifyStatus: Record<PenaltyRectifyStatus, number>;
+  bySeverity: Record<PenaltySeverity, number>;
+  dueSoonCount: number;
+  overdueCount: number;
+}
+
+export interface PenaltyAdminPage {
+  items: PenaltyAdminRecord[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface RectifyPenaltyPayload {
+  rectifyStatus: Exclude<PenaltyRectifyStatus, 'PENDING'>;
+  rectifyNote: string;
 }
 
 export interface PlatformRuleRecord {

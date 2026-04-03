@@ -11,6 +11,7 @@ import { useMenuStore } from '@/stores/menus';
 import { useWorkbenchStore } from '@/stores/workbench';
 import { pinia } from '@/stores';
 import {
+  canAccessRouteByPermissionMeta,
   CONSOLE_NAMESPACE,
   hasPetPalAdminAccess,
   PETPAL_ADMIN_NAMESPACE,
@@ -72,7 +73,7 @@ export const installAdminRealtimeSync = (router: Router) => {
         return;
       }
 
-      if (typeof currentRoute.meta.permission === 'string' && !auth.hasPermission(currentRoute.meta.permission)) {
+      if (!canAccessRouteByPermissionMeta(auth.permissions, currentRoute.meta)) {
         await router.replace(preferredAdminEntry);
       }
       return;
@@ -91,7 +92,7 @@ export const installAdminRealtimeSync = (router: Router) => {
       return;
     }
 
-    if (typeof currentRoute.meta.permission === 'string' && !auth.hasPermission(currentRoute.meta.permission)) {
+    if (!canAccessRouteByPermissionMeta(auth.permissions, currentRoute.meta)) {
       await router.replace(preferredAdminEntry);
     }
   };

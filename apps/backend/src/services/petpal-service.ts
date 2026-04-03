@@ -2,6 +2,7 @@ import type {
   CallbackAlertOutboxStats,
   CallbackAuditStats,
   ComplaintAdminStats,
+  PenaltyAdminStats,
   PetPalAdminOperationsMetrics,
   PetPalAdminOverviewScope,
   PlatformRuleAdminStats,
@@ -308,6 +309,23 @@ type ComplaintAdminFilters = ComplaintAdminScopeFilters & {
 
 type ComplaintStatusCounter = Record<'OPEN' | 'PROCESSING' | 'RESOLVED' | 'REJECTED', number>;
 
+type PenaltyAdminScopeFilters = {
+  targetRole?: 'CAREGIVER' | 'PLATFORM';
+  penaltyType?: 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
+  severity?: 'LOW' | 'MEDIUM' | 'HIGH';
+  rectifyStatus?: 'PENDING' | 'COMPLETED' | 'WAIVED';
+  overdueOnly?: boolean;
+  keyword?: string;
+};
+
+type PenaltyAdminFilters = PenaltyAdminScopeFilters & {
+  page: number;
+  pageSize: number;
+};
+
+type PenaltyRectifyStatusCounter = Record<'PENDING' | 'COMPLETED' | 'WAIVED', number>;
+type PenaltySeverityCounter = Record<'LOW' | 'MEDIUM' | 'HIGH', number>;
+
 type PlatformRuleScopeFilters = {
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   keyword?: string;
@@ -330,12 +348,25 @@ const CAREGIVER_EARNINGS_MONTHLY_BUCKET_COUNT = 6;
 const COMPLAINT_SLA_LIMIT_MS = env.PETPAL_COMPLAINT_SLA_LIMIT_HOURS * HOUR_IN_MS;
 const COMPLAINT_SLA_WARNING_MS = env.PETPAL_COMPLAINT_SLA_WARNING_HOURS * HOUR_IN_MS;
 const COMPLAINT_SLA_DUE_SOON_AGE_MS = COMPLAINT_SLA_LIMIT_MS - COMPLAINT_SLA_WARNING_MS;
+const PENALTY_RECTIFY_WARNING_MS = 48 * HOUR_IN_MS;
 const ACTIVE_COMPLAINT_STATUSES = ['OPEN', 'PROCESSING'] as const;
 
 const createPlatformRuleStatusCounter = (): PlatformRuleStatusCounter => ({
   DRAFT: 0,
   PUBLISHED: 0,
   ARCHIVED: 0,
+});
+
+const createPenaltyRectifyStatusCounter = (): PenaltyRectifyStatusCounter => ({
+  PENDING: 0,
+  COMPLETED: 0,
+  WAIVED: 0,
+});
+
+const createPenaltySeverityCounter = (): PenaltySeverityCounter => ({
+  LOW: 0,
+  MEDIUM: 0,
+  HIGH: 0,
 });
 
 type CaregiverEarningsTrendBucketSeed = {
@@ -1247,6 +1278,20 @@ const appendComplaintProcessLog = async (
     }),
   });
 
+const buildPenaltyProcessLogNote = (payload: {
+  penaltyType: 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
+  severity: 'LOW' | 'MEDIUM' | 'HIGH';
+  reason: string;
+  actionSummary: string;
+  rectifyDueAt?: Date;
+}) => [
+  `处罚类型：${payload.penaltyType}`,
+  `严重等级：${payload.severity}`,
+  `处罚措施：${payload.actionSummary}`,
+  `处罚原因：${payload.reason}`,
+  payload.rectifyDueAt ? `整改截止：${payload.rectifyDueAt.toISOString()}` : null,
+].filter(Boolean).join('；');
+
 const normalizeReviewTags = (tags?: string[]) =>
   [...new Set((tags ?? []).map((item) => item.trim()).filter(Boolean))].slice(0, 8);
 
@@ -1462,8 +1507,55 @@ type ComplaintEntity = Prisma.ComplaintGetPayload<{
   include: typeof complaintInclude;
 }>;
 
+const penaltyAdminInclude = {
+  order: {
+    select: {
+      id: true,
+      orderNo: true,
+    },
+  },
+  complaint: {
+    select: {
+      id: true,
+      complaintType: true,
+      description: true,
+    },
+  },
+  targetUser: {
+    select: {
+      id: true,
+      nickname: true,
+    },
+  },
+  creator: {
+    select: {
+      id: true,
+      nickname: true,
+    },
+  },
+  updater: {
+    select: {
+      id: true,
+      nickname: true,
+    },
+  },
+} satisfies Prisma.PenaltyRecordInclude;
+
+type PenaltyAdminEntity = Prisma.PenaltyRecordGetPayload<{
+  include: typeof penaltyAdminInclude;
+}>;
+
 const complaintAdminInclude = {
   ...complaintInclude,
+  penalties: {
+    where: {
+      deleteAt: null,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    include: penaltyAdminInclude,
+  },
   order: {
     select: {
       id: true,
@@ -1519,6 +1611,31 @@ const toComplaintRecord = (complaint: ComplaintEntity) => ({
   })),
 });
 
+const toPenaltyAdminRecord = (penalty: PenaltyAdminEntity) => ({
+  id: penalty.id,
+  complaintId: penalty.complaintId,
+  orderId: penalty.orderId,
+  orderNo: penalty.order.orderNo,
+  targetRole: penalty.targetRole,
+  targetUserId: penalty.targetUserId,
+  targetNickname: penalty.targetUser?.nickname ?? null,
+  complaintType: penalty.complaint.complaintType,
+  penaltyType: penalty.penaltyType,
+  severity: penalty.severity,
+  reason: penalty.reason,
+  actionSummary: penalty.actionSummary,
+  rectifyStatus: penalty.rectifyStatus,
+  rectifyDueAt: penalty.rectifyDueAt,
+  rectifiedAt: penalty.rectifiedAt,
+  rectifyNote: penalty.rectifyNote,
+  creatorId: penalty.createId ?? null,
+  creatorNickname: penalty.creator?.nickname ?? null,
+  updaterId: penalty.updateId ?? null,
+  updaterNickname: penalty.updater?.nickname ?? null,
+  createdAt: penalty.createdAt,
+  updatedAt: penalty.updatedAt,
+});
+
 const toComplaintAdminRecord = (complaint: ComplaintAdminEntity) => ({
   ...toComplaintRecord(complaint),
   orderNo: complaint.order.orderNo,
@@ -1528,6 +1645,7 @@ const toComplaintAdminRecord = (complaint: ComplaintAdminEntity) => ({
   caregiverId: complaint.order.caregiverId,
   caregiverNickname: complaint.order.caregiver.user.nickname,
   ...getComplaintAdminSlaMeta(complaint),
+  penalties: complaint.penalties.map(toPenaltyAdminRecord),
 });
 
 const platformRuleAdminInclude = {
@@ -1761,6 +1879,79 @@ const toComplaintAdminStatsBaseFilters = (
   keyword: filters.keyword,
 });
 
+const buildPenaltyAdminWhere = (
+  filters: PenaltyAdminScopeFilters,
+): Prisma.PenaltyRecordWhereInput => {
+  const keyword = filters.keyword?.trim();
+
+  return {
+    deleteAt: null,
+    targetRole: filters.targetRole,
+    penaltyType: filters.penaltyType,
+    severity: filters.severity,
+    rectifyStatus: filters.rectifyStatus,
+    AND: filters.overdueOnly
+      ? [
+          {
+            rectifyStatus: 'PENDING',
+            rectifyDueAt: {
+              lt: new Date(),
+            },
+          },
+        ]
+      : undefined,
+    OR: keyword
+      ? [
+          {
+            reason: {
+              contains: keyword,
+            },
+          },
+          {
+            actionSummary: {
+              contains: keyword,
+            },
+          },
+          {
+            rectifyNote: {
+              contains: keyword,
+            },
+          },
+          {
+            order: {
+              orderNo: {
+                contains: keyword,
+              },
+            },
+          },
+          {
+            targetUser: {
+              nickname: {
+                contains: keyword,
+              },
+            },
+          },
+          {
+            complaint: {
+              description: {
+                contains: keyword,
+              },
+            },
+          },
+        ]
+      : undefined,
+  };
+};
+
+const toPenaltyAdminStatsBaseFilters = (
+  filters: PenaltyAdminScopeFilters,
+): PenaltyAdminScopeFilters => ({
+  targetRole: filters.targetRole,
+  penaltyType: filters.penaltyType,
+  severity: filters.severity,
+  keyword: filters.keyword,
+});
+
 const loadAdminComplaintById = async (
   client: Prisma.TransactionClient | PrismaClient,
   complaintId: string,
@@ -1771,6 +1962,18 @@ const loadAdminComplaintById = async (
       deleteAt: null,
     },
     include: complaintAdminInclude,
+  });
+
+const loadAdminPenaltyById = async (
+  client: Prisma.TransactionClient | PrismaClient,
+  penaltyId: string,
+) =>
+  client.penaltyRecord.findFirst({
+    where: {
+      id: penaltyId,
+      deleteAt: null,
+    },
+    include: penaltyAdminInclude,
   });
 
 const loadComplaintAdminAssignee = async (
@@ -1878,6 +2081,39 @@ const closeComplaintInTransaction = async (
     note: resultSummary,
   });
 };
+
+const createPenaltyInTransaction = async (
+  tx: Prisma.TransactionClient,
+  payload: {
+    complaintId: string;
+    orderId: string;
+    actorId: string;
+    targetRole: 'CAREGIVER' | 'PLATFORM';
+    targetUserId?: string | null;
+    penaltyType: 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
+    severity: 'LOW' | 'MEDIUM' | 'HIGH';
+    reason: string;
+    actionSummary: string;
+    rectifyDueAt?: Date;
+  },
+) =>
+  tx.penaltyRecord.create({
+    data: withSnowflakeId({
+      createId: payload.actorId,
+      updateId: payload.actorId,
+      complaintId: payload.complaintId,
+      orderId: payload.orderId,
+      targetRole: payload.targetRole,
+      targetUserId: payload.targetUserId ?? null,
+      penaltyType: payload.penaltyType,
+      severity: payload.severity,
+      reason: payload.reason.trim(),
+      actionSummary: payload.actionSummary.trim(),
+      rectifyStatus: 'PENDING',
+      rectifyDueAt: payload.rectifyDueAt,
+    }),
+    include: penaltyAdminInclude,
+  });
 
 const buildOwnerRefundProgress = (order: {
   amountPaid: Prisma.Decimal | number;
@@ -4224,6 +4460,37 @@ export const petpalService = {
     };
   },
 
+  async queryAdminPenalties(filters: PenaltyAdminFilters) {
+    const where = buildPenaltyAdminWhere(filters);
+    const [total, penalties] = await Promise.all([
+      prisma.penaltyRecord.count({ where }),
+      prisma.penaltyRecord.findMany({
+        where,
+        include: penaltyAdminInclude,
+        orderBy: [
+          {
+            rectifyDueAt: 'asc',
+          },
+          {
+            createdAt: 'desc',
+          },
+        ],
+        skip: (filters.page - 1) * filters.pageSize,
+        take: filters.pageSize,
+      }),
+    ]);
+
+    return {
+      items: penalties.map(toPenaltyAdminRecord),
+      pagination: {
+        page: filters.page,
+        pageSize: filters.pageSize,
+        total,
+        totalPages: Math.ceil(total / filters.pageSize),
+      },
+    };
+  },
+
   async queryAdminPlatformRules(filters: PlatformRuleFilters) {
     const where = buildPlatformRuleWhere(filters);
     const [total, rules] = await Promise.all([
@@ -4609,6 +4876,123 @@ export const petpalService = {
     };
   },
 
+  async queryAdminPenaltyStats(filters: PenaltyAdminScopeFilters): Promise<PenaltyAdminStats> {
+    const baseFilters = toPenaltyAdminStatsBaseFilters(filters);
+    const baseWhere = buildPenaltyAdminWhere(baseFilters);
+    const now = new Date();
+    const dueSoonBoundary = new Date(now.getTime() + PENALTY_RECTIFY_WARNING_MS);
+    const [total, statusRows, severityRows, dueSoonCount, overdueCount] = await Promise.all([
+      prisma.penaltyRecord.count({ where: baseWhere }),
+      prisma.penaltyRecord.groupBy({
+        by: ['rectifyStatus'],
+        where: baseWhere,
+        _count: {
+          _all: true,
+        },
+      }),
+      prisma.penaltyRecord.groupBy({
+        by: ['severity'],
+        where: baseWhere,
+        _count: {
+          _all: true,
+        },
+      }),
+      prisma.penaltyRecord.count({
+        where: {
+          AND: [
+            baseWhere,
+            {
+              rectifyStatus: 'PENDING',
+              rectifyDueAt: {
+                gte: now,
+                lte: dueSoonBoundary,
+              },
+            },
+          ],
+        },
+      }),
+      prisma.penaltyRecord.count({
+        where: {
+          AND: [
+            baseWhere,
+            {
+              rectifyStatus: 'PENDING',
+              rectifyDueAt: {
+                lt: now,
+              },
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const byRectifyStatus = createPenaltyRectifyStatusCounter();
+    statusRows.forEach((row) => {
+      byRectifyStatus[row.rectifyStatus] = row._count._all;
+    });
+
+    const bySeverity = createPenaltySeverityCounter();
+    severityRows.forEach((row) => {
+      bySeverity[row.severity] = row._count._all;
+    });
+
+    return {
+      total,
+      byRectifyStatus,
+      bySeverity,
+      dueSoonCount,
+      overdueCount,
+    };
+  },
+
+  async rectifyAdminPenalty(
+    penaltyId: string,
+    actorId: string,
+    payload: {
+      rectifyStatus: 'COMPLETED' | 'WAIVED';
+      rectifyNote: string;
+    },
+  ) {
+    const existing = await prisma.penaltyRecord.findFirst({
+      where: {
+        id: penaltyId,
+        deleteAt: null,
+      },
+      select: {
+        id: true,
+        rectifyStatus: true,
+      },
+    });
+
+    if (!existing) {
+      throw notFound('Penalty record not found');
+    }
+
+    if (existing.rectifyStatus !== 'PENDING') {
+      throw badRequest('Penalty record has already been completed');
+    }
+
+    const rectifyNote = payload.rectifyNote.trim();
+    if (!rectifyNote) {
+      throw badRequest('Penalty rectify note is required');
+    }
+
+    const updated = await prisma.penaltyRecord.update({
+      where: {
+        id: penaltyId,
+      },
+      data: {
+        updateId: actorId,
+        rectifyStatus: payload.rectifyStatus,
+        rectifyNote,
+        rectifiedAt: new Date(),
+      },
+      include: penaltyAdminInclude,
+    });
+
+    return toPenaltyAdminRecord(updated);
+  },
+
   async batchAssignAdminComplaints(
     actorId: string,
     payload: {
@@ -4769,6 +5153,11 @@ export const petpalService = {
       note?: string;
       resultStatus?: 'RESOLVED' | 'REJECTED';
       resultSummary?: string;
+      penaltyType?: 'WARNING' | 'SERVICE_RESTRICTION' | 'ACCOUNT_SUSPENSION' | 'OTHER';
+      penaltySeverity?: 'LOW' | 'MEDIUM' | 'HIGH';
+      penaltyReason?: string;
+      penaltyActionSummary?: string;
+      rectifyDueAt?: Date;
     },
   ) {
     return runSerializableTransaction(async (tx) => {
@@ -4779,8 +5168,19 @@ export const petpalService = {
         },
         select: {
           id: true,
+          orderId: true,
           status: true,
           assignedAdminId: true,
+          targetRole: true,
+          order: {
+            select: {
+              caregiver: {
+                select: {
+                  userId: true,
+                },
+              },
+            },
+          },
         },
       });
 
@@ -4821,6 +5221,66 @@ export const petpalService = {
           assignedAdminId: complaint.assignedAdminId,
           resultStatus,
           resultSummary,
+        });
+      } else if (payload.actionType === 'PENALTY') {
+        const penaltyType = payload.penaltyType;
+        const penaltySeverity = payload.penaltySeverity;
+        const penaltyReason = payload.penaltyReason?.trim();
+        const penaltyActionSummary = payload.penaltyActionSummary?.trim();
+
+        if (!penaltyType) {
+          throw badRequest('Penalty type is required');
+        }
+
+        if (!penaltySeverity) {
+          throw badRequest('Penalty severity is required');
+        }
+
+        if (!penaltyReason) {
+          throw badRequest('Penalty reason is required');
+        }
+
+        if (!penaltyActionSummary) {
+          throw badRequest('Penalty action summary is required');
+        }
+
+        await tx.complaint.update({
+          where: {
+            id: complaint.id,
+          },
+          data: {
+            status: 'PROCESSING',
+            assignedAdminId: complaint.assignedAdminId ?? actorId,
+          },
+        });
+
+        const penalty = await createPenaltyInTransaction(tx, {
+          complaintId: complaint.id,
+          orderId: complaint.orderId,
+          actorId,
+          targetRole: complaint.targetRole,
+          targetUserId:
+            complaint.targetRole === 'CAREGIVER'
+              ? complaint.order.caregiver.userId
+              : null,
+          penaltyType,
+          severity: penaltySeverity,
+          reason: penaltyReason,
+          actionSummary: penaltyActionSummary,
+          rectifyDueAt: payload.rectifyDueAt,
+        });
+
+        await appendComplaintProcessLog(tx, {
+          complaintId: complaint.id,
+          actionType: 'PENALTY',
+          operatorId: actorId,
+          note: buildPenaltyProcessLogNote({
+            penaltyType: penalty.penaltyType,
+            severity: penalty.severity,
+            reason: penalty.reason,
+            actionSummary: penalty.actionSummary,
+            rectifyDueAt: penalty.rectifyDueAt ?? undefined,
+          }),
         });
       } else {
         const note = payload.note?.trim();

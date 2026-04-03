@@ -290,6 +290,28 @@ const defaultMenuTree: SystemMenuSeedNode[] = [
           },
         ],
       },
+      {
+        code: 'petpal-penalties',
+        type: 'PAGE',
+        title: '宠托帮违规处罚',
+        caption: 'PetPal Penalties',
+        description: '跟踪处罚记录、整改状态与逾期整改事项。',
+        icon: 'i-carbon-rule',
+        path: '/petpal/penalties',
+        viewKey: 'petpal-penalty-admin',
+        sortOrder: 65,
+        permissionCode: 'petpal.penalty.read',
+        children: [
+          {
+            code: 'petpal-penalties-manage',
+            type: 'ACTION',
+            title: '处理违规处罚',
+            icon: 'i-carbon-task',
+            sortOrder: 10,
+            permissionCode: 'petpal.penalty.manage',
+          },
+        ],
+      },
     ],
   },
   {

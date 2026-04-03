@@ -12,6 +12,7 @@ export async function seedDatabase(prisma: PrismaClient) {
     TRUNCATE TABLE
       "CallbackAlertReplayLog",
       "CallbackAlertOutbox",
+      "PenaltyRecord",
       "PlatformRule",
       "RefundRecord",
       "PaymentRecord",
