@@ -9,9 +9,10 @@ import {
   createPersistedPetPalMessageComposerParseOptions,
   createEmptyPersistedPetPalMessageComposerRecords,
   getPetPalMessageComposerEntryWithLegacyAdoption,
+  getPetPalMessageComposerScopeWithLegacyAdoption,
   parsePersistedPetPalMessageComposerRecords as parseSharedPersistedPetPalMessageComposerRecords,
   parsePersistedPetPalMessageComposerSnapshot as parseSharedPersistedPetPalMessageComposerSnapshot,
-  resolvePetPalMessageComposerIdentity,
+  resolvePetPalMessageComposerRuntimeIdentity,
   type PetPalMessageComposerIdentity as SharedPetPalMessageComposerIdentity,
   type PetPalMessageComposerScope as SharedPetPalMessageComposerScope,
   type PetPalMessageComposerVersionedRecord,
@@ -206,6 +207,26 @@ const getMessageComposerEntryForIdentity = <
   return resolved.entry;
 };
 
+const applyResolvedMessageComposerRecords = (
+  resolved: {
+    drafts: Record<string, PersistedPetPalMessageDraftRecord>;
+    recoveries: Record<string, PersistedPetPalMessageRecoveryRecord>;
+  },
+) => {
+  let didChange = false;
+  if (resolved.drafts !== messageDrafts.value) {
+    messageDrafts.value = resolved.drafts;
+    didChange = true;
+  }
+  if (resolved.recoveries !== messageRecoveries.value) {
+    messageRecoveries.value = resolved.recoveries;
+    didChange = true;
+  }
+  if (didChange) {
+    syncPersistedPetPalMessageComposerSnapshot();
+  }
+};
+
 export function hasPetPalMessageDraft(identity: PetPalMessageComposerIdentity) {
   return Boolean(getMessageComposerEntryForIdentity(messageDrafts, identity));
 }
@@ -229,9 +250,13 @@ export function clearPetPalMessageDraft(identity: PetPalMessageComposerIdentity)
 }
 
 export function getPetPalMessageComposerScope(identity: PetPalMessageComposerIdentity): PetPalMessageComposerScope | null {
-  return getMessageComposerEntryForIdentity(messageDrafts, identity)?.[1].scope
-    ?? getMessageComposerEntryForIdentity(messageRecoveries, identity)?.[1].scope
-    ?? null;
+  const resolved = getPetPalMessageComposerScopeWithLegacyAdoption(
+    messageDrafts.value,
+    messageRecoveries.value,
+    identity,
+  );
+  applyResolvedMessageComposerRecords(resolved);
+  return resolved.scope;
 }
 
 export function persistPetPalMessageDraft(
@@ -239,10 +264,13 @@ export function persistPetPalMessageDraft(
   content: string,
   attachments: PetPalMessageDraftAttachment[],
 ) {
-  const resolvedIdentity = resolvePetPalMessageComposerIdentity(
+  const resolvedRuntime = resolvePetPalMessageComposerRuntimeIdentity(
+    messageDrafts.value,
+    messageRecoveries.value,
     identity,
-    getPetPalMessageComposerScope(identity) ?? 'shared',
   );
+  applyResolvedMessageComposerRecords(resolvedRuntime);
+  const resolvedIdentity = resolvedRuntime.resolvedIdentity;
   if (!resolvedIdentity) {
     return;
   }
@@ -293,10 +321,13 @@ export function setPetPalMessageRecovery(
   stage: PetPalMessageRecoveryStage,
   message: string,
 ) {
-  const resolvedIdentity = resolvePetPalMessageComposerIdentity(
+  const resolvedRuntime = resolvePetPalMessageComposerRuntimeIdentity(
+    messageDrafts.value,
+    messageRecoveries.value,
     identity,
-    getPetPalMessageComposerScope(identity) ?? 'shared',
   );
+  applyResolvedMessageComposerRecords(resolvedRuntime);
+  const resolvedIdentity = resolvedRuntime.resolvedIdentity;
   if (!resolvedIdentity) {
     return;
   }

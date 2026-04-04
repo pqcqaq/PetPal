@@ -16,6 +16,7 @@ import {
   getPetPalMessageComposerEntry,
   getPetPalMessageComposerEntryWithLegacyAdoption,
   getPetPalMessageComposerKeysToClear,
+  getPetPalMessageComposerScopeWithLegacyAdoption,
   parsePetPalMessageDraftState,
   parsePersistedPetPalMessageComposerSnapshot,
   parsePetPalMessageComposerStorageKey,
@@ -40,6 +41,7 @@ import {
   PETPAL_SERVICE_LOG_ATTACHMENT_TAG,
   resolvePersistedPetPalMessageComposerIdentity,
   resolvePetPalMessageComposerIdentity,
+  resolvePetPalMessageComposerRuntimeIdentity,
   toPublicPersistedPetPalMessageComposerSnapshot,
   upsertPersistedPetPalMessageDraftRecord,
   upsertPersistedPetPalMessageRecoveryRecord,
@@ -462,6 +464,77 @@ test('upserts and clears persisted petpal message composer records predictably',
       attachments: [],
     },
   }, ownerIdentity), {});
+});
+
+test('resolves petpal message composer scope and runtime identity with legacy adoption', () => {
+  const sharedLegacyDrafts = {
+    [buildPetPalMessageComposerStorageKey({
+      orderId: 'order-runtime',
+      userId: '',
+      scope: 'shared',
+    })]: {
+      orderId: 'order-runtime',
+      userId: '',
+      scope: 'shared',
+      updatedAt: '2026-04-04T09:00:00.000Z',
+      content: 'legacy runtime draft',
+      attachments: [],
+    },
+  };
+
+  const scopeResolved = getPetPalMessageComposerScopeWithLegacyAdoption(
+    {},
+    {
+      [buildPetPalMessageComposerStorageKey({
+        orderId: 'order-runtime-2',
+        userId: '',
+        scope: 'caregiver',
+      })]: {
+        orderId: 'order-runtime-2',
+        userId: '',
+        scope: 'caregiver',
+        updatedAt: '2026-04-04T09:30:00.000Z',
+        stage: 'send',
+        message: 'legacy runtime recovery',
+      },
+    },
+    {
+      orderId: 'order-runtime-2',
+      userId: 'user-2',
+      scope: 'caregiver',
+    },
+  );
+  assert.equal(scopeResolved.scope, 'caregiver');
+
+  const runtimeResolved = resolvePetPalMessageComposerRuntimeIdentity(
+    sharedLegacyDrafts,
+    {},
+    {
+      orderId: 'order-runtime',
+      userId: 'user-1',
+      scope: 'owner',
+    },
+  );
+
+  assert.deepEqual(runtimeResolved.resolvedIdentity, {
+    orderId: 'order-runtime',
+    userId: 'user-1',
+    scope: 'owner',
+  });
+  assert.deepEqual(runtimeResolved.drafts, {
+    [buildPetPalMessageComposerStorageKey({
+      orderId: 'order-runtime',
+      userId: 'user-1',
+      scope: 'owner',
+    })]: {
+      orderId: 'order-runtime',
+      userId: 'user-1',
+      scope: 'owner',
+      updatedAt: '2026-04-04T09:00:00.000Z',
+      content: 'legacy runtime draft',
+      attachments: [],
+    },
+  });
 });
 
 test('creates, compacts and exposes persisted petpal message composer snapshots', () => {

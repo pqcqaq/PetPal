@@ -262,6 +262,10 @@ Last updated: 2026-04-04
   - `packages/api-common/src/helpers/petpal-message-composer.ts` 已新增消息草稿/恢复态 record 清理 helper，以及 scoped upsert draft/recovery record helper。
   - Web / App 两端的 `message-composer-state.ts` 现在都会直接复用同一套“按 identity 清理记录”和“写入 scoped record 时自动去掉 shared 记录”的纯 mutation 流程，不再各自维护第二份对象更新逻辑。
   - `apps/web-frontend/test/petpal-shared.test.ts` 已补 mutation helper 直测，现有 Web 消息状态回归测试继续通过。
+- 2026-04-04 已继续收口消息草稿 scope/runtime identity helper：
+  - `packages/api-common/src/helpers/petpal-message-composer.ts` 已新增当前 scope 解析 helper 和运行时 identity 解析 helper，并继续兼容 legacy shared 记录认领。
+  - Web / App 两端的 `message-composer-state.ts` 现在都会直接复用同一套“先基于 drafts/recoveries 解析当前 scope，再解析运行时 identity”的流程，不再各自维护第二份 scope/identity 拼装逻辑。
+  - `apps/web-frontend/test/petpal-shared.test.ts` 已补 scope/runtime identity helper 直测，现有 Web 消息状态回归测试继续通过。
 - 2026-04-04 已继续对齐 Web 照料者资质上传：
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverProfileView.vue` 已从手填材料名称 / URL 改成受管资质附件上传，上传时会绑定当前照料者档案 ID 和 `petpal-caregiver-qualification` 标签。
   - 页面现在会直接展示材料大小 / 日期，并支持查看 / 移除；首次上传前如果档案还没生成 ID，会先提示保存一次基础资料。

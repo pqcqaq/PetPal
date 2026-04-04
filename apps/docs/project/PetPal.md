@@ -7883,6 +7883,59 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.260 2026-04-04（P3-M1 Slice 260）
+
+**概述**：上一轮已经把 record 清理和 scoped upsert mutation 下沉到共享层，但 Web / App 两份 `message-composer-state.ts` 里仍各自保留了“先根据 drafts/recoveries 解析当前 scope，再按 scope 解析运行时 identity”的流程。本轮继续沿同一条收口线，把这批 scope/runtime identity helper 也提升到 `@rbac/api-common`，继续减少双端状态模块里的纯状态解析重复。
+
+已完成：
+
+- 共享 scope/runtime identity helper 已继续落到 `api-common`：
+  - `packages/api-common/src/helpers/petpal-message-composer.ts`
+    - 新增 `getPetPalMessageComposerScopeWithLegacyAdoption(...)`。
+    - 新增 `resolvePetPalMessageComposerRuntimeIdentity(...)`。
+    - 共享层现在会统一处理“按 drafts/recoveries 解析当前 scope，并在需要时先认领 legacy shared 记录，再产出运行时 resolved identity”这段纯流程。
+- Web / App 消息状态模块已切到共享 scope/runtime identity helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts`
+    - `getPetPalMessageComposerScope(...)` 现在直接消费共享 scope helper。
+    - `persistPetPalMessageDraft(...)` 与 `setPetPalMessageRecovery(...)` 现在直接消费共享 runtime identity helper，本地不再手写 `resolvePetPalMessageComposerIdentity(..., currentScope)`。
+  - `apps/app-frontend/src/pages/petpal/message-composer-state.ts`
+    - App 端同一批 scope/runtime identity 流程也已切到共享 helper，不再维护第二份近似实现。
+- 定向测试与文档同步：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补 scope/runtime identity helper 直测，锁住 recovery scope 继承和 legacy shared 草稿认领后的 runtime identity 行为。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-message-composer-state.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改消息发送协议、消息草稿缓存规则或双端存储介质，只继续收口 scope/runtime identity 纯 helper。
+- 已确认 Web / App 两端现在都会复用同一套当前 scope 解析和运行时 identity 解析流程，消息状态模块的纯状态解析重复继续下降。
+- 已确认状态写回与存储同步仍保留在端侧，没有把副作用错误抽进共享层。
+
+风险与缓解：
+
+- 风险：当前消息状态模块剩余的重复越来越靠近存储 API 和副作用时机，继续强行共享的收益会继续下降。
+- 缓解：本轮先收完 scope/runtime identity 纯逻辑；下一轮会优先重新评估是否继续在这条线上推进，还是切到其它更高收益的 PetPal 模块。
+
+- 风险：共享 helper 现在承接了更多 scope 继承与 legacy 认领语义，后续如果要改 scope 优先级，会同时影响 Web / App。
+- 缓解：本轮已补共享 helper 直测和现有 Web 消息状态回归测试，后续如要改规则，仍可先在共享测试里锁住目标行为再推进。
+
+下一步（1-3）：
+
+1. 重新评估消息状态模块剩余重复的收益，避免继续在存储 glue 上过度抽象。
+2. 继续检查 PetPal 其它状态模块里是否有类似“纯状态解析重复但副作用仍可留端侧”的收口机会。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.259 2026-04-04（P3-M1 Slice 259）
 
 **概述**：上一轮已经把 entry + legacy adoption 流程下沉到共享层，但 Web / App 两份 `message-composer-state.ts` 里仍各自保留了 record 清理和 scoped upsert 的对象更新逻辑。本轮继续沿同一条收口线，把这批 mutation helper 也提升到 `@rbac/api-common`，继续减少双端状态模块里剩余的纯对象拼装代码。

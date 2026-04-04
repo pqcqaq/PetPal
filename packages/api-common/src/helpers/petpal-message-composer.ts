@@ -359,6 +359,35 @@ export const getPetPalMessageComposerEntryWithLegacyAdoption = <
   };
 };
 
+export const getPetPalMessageComposerScopeWithLegacyAdoption = (
+  drafts: Record<string, PersistedPetPalMessageDraftRecord>,
+  recoveries: Record<string, PersistedPetPalMessageRecoveryRecord>,
+  identity: PetPalMessageComposerIdentity,
+) => {
+  const resolvedDrafts = getPetPalMessageComposerEntryWithLegacyAdoption(drafts, identity);
+  const resolvedRecoveries = getPetPalMessageComposerEntryWithLegacyAdoption(recoveries, identity);
+
+  return {
+    drafts: resolvedDrafts.records,
+    recoveries: resolvedRecoveries.records,
+    scope: resolvedDrafts.entry?.[1].scope ?? resolvedRecoveries.entry?.[1].scope ?? null,
+  };
+};
+
+export const resolvePetPalMessageComposerRuntimeIdentity = (
+  drafts: Record<string, PersistedPetPalMessageDraftRecord>,
+  recoveries: Record<string, PersistedPetPalMessageRecoveryRecord>,
+  identity: PetPalMessageComposerIdentity,
+  fallbackScope: PetPalMessageComposerScope = 'shared',
+) => {
+  const resolvedScope = getPetPalMessageComposerScopeWithLegacyAdoption(drafts, recoveries, identity);
+
+  return {
+    ...resolvedScope,
+    resolvedIdentity: resolvePetPalMessageComposerIdentity(identity, resolvedScope.scope ?? fallbackScope),
+  };
+};
+
 export const getPetPalMessageComposerKeysToClear = <
   T extends PetPalMessageComposerVersionedRecord,
 >(
