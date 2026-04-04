@@ -8,7 +8,18 @@ import PetpalEmpty from './rebuild/petpal-empty.vue'
 import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
 import PetpalSegmented from './rebuild/petpal-segmented.vue'
-import { consumePetPalOrdersPageContext, describeConversation, describeOrder, getOwnerOrderFilterForOrder, openLoginPage, openOrderDetailPage, openPetPalAftersalesPage, PETPAL_CHECKOUT_PAGE, stopPullDown } from './rebuild/shared'
+import {
+  type PetPalOrderDetailEntryReason,
+  consumePetPalOrdersPageContext,
+  describeConversation,
+  describeOrder,
+  getOwnerOrderFilterForOrder,
+  openLoginPage,
+  openOrderDetailPage,
+  openPetPalAftersalesPage,
+  PETPAL_CHECKOUT_PAGE,
+  stopPullDown,
+} from './rebuild/shared'
 
 type FilterValue = 'ALL' | 'ACTIVE' | 'COMPLETED' | 'AFTERSALES'
 
@@ -16,6 +27,7 @@ const tokenStore = useTokenStore()
 const loading = ref(false)
 const filter = ref<FilterValue>('ALL')
 const focusOrderId = ref('')
+const detailReason = ref<PetPalOrderDetailEntryReason | ''>('')
 const orders = ref<OrderRecord[]>([])
 
 const filterOptions = computed(() => {
@@ -55,6 +67,7 @@ async function loadPage() {
       filter.value = context.filter
     }
     focusOrderId.value = context?.focusOrderId || ''
+    detailReason.value = context?.detailReason || ''
   }
   finally {
     loading.value = false
@@ -67,7 +80,12 @@ function openAftersales(order: OrderRecord) {
     mode: 'navigate',
     focusOrderId: order.id,
     filter: order.orderStatus === 'DISPUTED' ? 'COMPLAINT' : 'REFUND',
+    ...(order.id === focusOrderId.value && detailReason.value ? { detailReason: detailReason.value } : {}),
   })
+}
+
+function getDetailReason(orderId: string) {
+  return orderId === focusOrderId.value ? (detailReason.value || undefined) : undefined
 }
 
 function openPay(orderId: string) {
@@ -106,7 +124,7 @@ onPullDownRefresh(() => {
       <PetpalSection :title="filter === 'AFTERSALES' ? '售后相关订单' : '订单列表'" :subtitle="focusOrderId ? '已把你刚关注的订单顶到前面。' : '查看、支付、沟通分别进入对应页面。'">
         <template v-if="visibleOrders.length">
           <view v-for="item in visibleOrders" :key="item.id" class="petpal-stack">
-            <button class="petpal-row-btn" hover-class="none" @click="openOrderDetailPage(item.id, 'overview', 'orders')">
+            <button class="petpal-row-btn" hover-class="none" @click="openOrderDetailPage(item.id, 'overview', 'orders', getDetailReason(item.id))">
               <view class="petpal-row__copy">
                 <text class="petpal-row__title">{{ item.orderNo }}</text>
                 <text class="petpal-row__meta">{{ describeOrder(item) }}</text>
@@ -115,8 +133,8 @@ onPullDownRefresh(() => {
               <text class="petpal-row__value">{{ describeConversation(item, 'owner').unread ? `${describeConversation(item, 'owner').unread} 未读` : '详情' }}</text>
             </button>
             <view class="petpal-action-row">
-              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(item.id, 'overview', 'orders')">查看</button>
-              <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="openOrderDetailPage(item.id, 'chat', 'orders')">沟通</button>
+              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(item.id, 'overview', 'orders', getDetailReason(item.id))">查看</button>
+              <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="openOrderDetailPage(item.id, 'chat', 'orders', getDetailReason(item.id))">沟通</button>
               <button
                 v-if="item.orderStatus === 'PENDING_ACCEPT'"
                 class="petpal-btn petpal-btn--primary"

@@ -41,6 +41,7 @@ function returnToOrders() {
   openPetPalOrdersPage({
     filter: getOwnerOrderFilterForOrder(order.value),
     focusOrderId: order.value.id,
+    detailReason: 'payment-followup',
   })
 }
 

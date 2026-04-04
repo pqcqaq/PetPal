@@ -10,6 +10,7 @@ import PetpalSection from './rebuild/petpal-section.vue'
 import PetpalSegmented from './rebuild/petpal-segmented.vue'
 import {
   type AftersalesFilter,
+  type PetPalOrderDetailEntryReason,
   consumePetPalAftersalesPageContext,
   describeOrder,
   helpers,
@@ -28,6 +29,7 @@ const tokenStore = useTokenStore()
 const loading = ref(false)
 const filter = ref<FilterValue>('ALL')
 const focusOrderId = ref('')
+const detailReason = ref<PetPalOrderDetailEntryReason | ''>('')
 const orders = ref<OrderRecord[]>([])
 
 function hasRefundSignal(order: OrderRecord) {
@@ -84,6 +86,7 @@ async function loadPage() {
       filter.value = context.filter
     }
     focusOrderId.value = context?.focusOrderId || ''
+    detailReason.value = context?.detailReason || ''
   }
   finally {
     loading.value = false
@@ -97,6 +100,10 @@ function openRefund(orderId: string) {
 
 function openComplaint(orderId: string) {
   uni.navigateTo({ url: `${PETPAL_COMPLAINT_RESULT_PAGE}?orderId=${orderId}` })
+}
+
+function getDetailReason(orderId: string) {
+  return orderId === focusOrderId.value ? (detailReason.value || undefined) : undefined
 }
 
 onShow(() => {
@@ -157,7 +164,7 @@ onPullDownRefresh(() => {
             <text class="petpal-banner__meta">{{ describeOrder(item) }}</text>
             <text class="petpal-note">已退款 {{ helpers.formatMoney(item.amountRefunded) }} · 退款记录 {{ item.refunds.length }}</text>
             <view class="petpal-action-row">
-              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(item.id, 'aftersales', 'aftersales')">订单售后</button>
+              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(item.id, 'aftersales', 'aftersales', getDetailReason(item.id))">订单售后</button>
               <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="openRefund(item.id)">退款进度</button>
               <button class="petpal-btn petpal-btn--danger" hover-class="none" @click="openComplaint(item.id)">投诉结果</button>
             </view>

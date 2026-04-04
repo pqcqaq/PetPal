@@ -923,11 +923,13 @@ test('stashes and consumes app petpal page context for focused return flows', ()
     openPetPalOrdersPage({
       filter: 'COMPLETED',
       focusOrderId: ' order-1 ',
+      detailReason: 'payment-followup',
     });
     assert.deepEqual(navigationCalls[0], { kind: 'switchTab', url: PETPAL_ORDERS_PAGE });
     assert.deepEqual(consumePetPalOrdersPageContext(), {
       filter: 'COMPLETED',
       focusOrderId: 'order-1',
+      detailReason: 'payment-followup',
     });
     assert.equal(consumePetPalOrdersPageContext(), null);
 
@@ -935,11 +937,13 @@ test('stashes and consumes app petpal page context for focused return flows', ()
       mode: 'navigate',
       filter: 'COMPLAINT',
       focusOrderId: ' order-2 ',
+      detailReason: 'complaint-followup',
     });
     assert.deepEqual(navigationCalls[1], { kind: 'navigateTo', url: PETPAL_AFTERSALES_PAGE });
     assert.deepEqual(consumePetPalAftersalesPageContext(), {
       filter: 'COMPLAINT',
       focusOrderId: 'order-2',
+      detailReason: 'complaint-followup',
     });
     assert.equal(consumePetPalAftersalesPageContext(), null);
 
@@ -948,12 +952,14 @@ test('stashes and consumes app petpal page context for focused return flows', ()
       role: 'caregiver',
       filter: 'UNREAD',
       focusOrderId: ' order-3 ',
+      detailReason: 'unread-messages',
     });
     assert.deepEqual(navigationCalls[2], { kind: 'switchTab', url: PETPAL_MESSAGES_PAGE });
     assert.deepEqual(consumePetPalMessagesPageContext(), {
       role: 'caregiver',
       filter: 'UNREAD',
       focusOrderId: 'order-3',
+      detailReason: 'unread-messages',
     });
     assert.equal(consumePetPalMessagesPageContext(), null);
 

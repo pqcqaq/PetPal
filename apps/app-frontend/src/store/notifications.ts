@@ -258,8 +258,9 @@ function buildNotificationItems(payload: {
       actionOrderId: topOwnerUnreadOrder?.id,
       actionRole: 'owner',
       actionMessagesFilter: 'UNREAD',
+      ...(topOwnerUnreadOrder?.id ? { actionOrderReason: 'unread-messages' as const } : {}),
       ...(ownerUnreadOrders.length === 1 && topOwnerUnreadOrder?.id
-        ? { actionOrderTab: 'chat' as const, actionOrderReason: 'unread-messages' as const }
+        ? { actionOrderTab: 'chat' as const }
         : {}),
       sortAt: ownerUnreadLatestAt ? dayjs(ownerUnreadLatestAt).valueOf() : 3,
       updatedAtKey: `owner-unread:${ownerUnreadCount}:${ownerUnreadLatestAt || 'none'}`,
@@ -283,8 +284,9 @@ function buildNotificationItems(payload: {
       actionMode: 'redirect',
       actionOrderId: topOwnerAftersalesOrder?.id,
       actionAftersalesFilter: 'HIGH',
+      ...(topOwnerAftersalesOrder?.id ? { actionOrderReason: 'aftersales-followup' as const } : {}),
       ...(ownerAftersalesOrders.length === 1 && topOwnerAftersalesOrder?.id
-        ? { actionOrderTab: 'aftersales' as const, actionOrderReason: 'aftersales-followup' as const }
+        ? { actionOrderTab: 'aftersales' as const }
         : {}),
       sortAt: latestAftersalesAt ? dayjs(latestAftersalesAt).valueOf() : 4,
       updatedAtKey: `owner-aftersales:${ownerAftersalesOrders.length}:${latestAftersalesAt || 'none'}`,
@@ -418,8 +420,9 @@ function buildNotificationItems(payload: {
       actionOrderId: topCaregiverUnreadOrder?.id,
       actionRole: 'caregiver',
       actionMessagesFilter: 'UNREAD',
+      ...(topCaregiverUnreadOrder?.id ? { actionOrderReason: 'unread-messages' as const } : {}),
       ...(caregiverUnreadOrders.length === 1 && topCaregiverUnreadOrder?.id
-        ? { actionOrderTab: 'chat' as const, actionOrderReason: 'unread-messages' as const }
+        ? { actionOrderTab: 'chat' as const }
         : {}),
       sortAt: caregiverUnreadLatestAt ? dayjs(caregiverUnreadLatestAt).valueOf() : 9,
       updatedAtKey: `caregiver-unread:${caregiverUnreadCount}:${caregiverUnreadLatestAt || 'none'}`,
@@ -469,6 +472,7 @@ export function openAppNotificationAction(item: Pick<
       ...(item.actionRole ? { role: item.actionRole } : {}),
       ...(item.actionMessagesFilter ? { filter: item.actionMessagesFilter } : {}),
       ...(item.actionOrderId ? { focusOrderId: item.actionOrderId } : {}),
+      ...(item.actionOrderReason ? { detailReason: item.actionOrderReason } : {}),
     })
     return
   }
@@ -478,6 +482,7 @@ export function openAppNotificationAction(item: Pick<
       mode: item.actionMode,
       ...(item.actionAftersalesFilter ? { filter: item.actionAftersalesFilter } : {}),
       ...(item.actionOrderId ? { focusOrderId: item.actionOrderId } : {}),
+      ...(item.actionOrderReason ? { detailReason: item.actionOrderReason } : {}),
     })
     return
   }

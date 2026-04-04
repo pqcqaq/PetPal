@@ -58,6 +58,7 @@ function returnToAftersales() {
       : complaintCount.value > 0
         ? 'COMPLAINT'
         : 'REFUND',
+    detailReason: 'refund-followup',
   })
 }
 

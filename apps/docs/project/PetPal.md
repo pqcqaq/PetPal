@@ -14308,3 +14308,59 @@ flowchart TD
 1. 继续评估剩余聚合待办和高频辅助入口里哪些动作也适合补 `reason`。
 2. 继续补通知 / 提醒 / 结果页到订单详情之间更细的动态 notice，让动作提示和当前分栏更一致。
 3. 在动态 reason 链稳定后，再继续补系统级主动提醒、推送触达和更多验收向测试。
+
+### 14.126 2026-04-04（P3-M1 Slice 275）
+
+**概述**：继续推进 App 动态 notice 收口，本轮把 `reason` 从通知和结果页继续透传到订单 / 售后 / 消息中心，避免用户先回中间页再进详情时丢失上一跳的动作语义。
+
+已完成：
+
+- 扩展中间页 page-context：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - `PetPalOrdersPageContext`、`PetPalAftersalesPageContext`、`PetPalMessagesPageContext` 已新增 `detailReason`。
+    - 相关 `stash / consume` 逻辑已同步支持 `detailReason` 的暂存与消费。
+- 结果页回中间页开始写入 reason：
+  - `apps/app-frontend/src/pages/petpal/payment-result.vue`
+  - `apps/app-frontend/src/pages/petpal/review-result.vue`
+    - 回订单列表时已开始写入 `payment-followup / review-followup`。
+  - `apps/app-frontend/src/pages/petpal/refund-result.vue`
+  - `apps/app-frontend/src/pages/petpal/complaint-result.vue`
+    - 回售后中心时已开始写入 `refund-followup / complaint-followup`。
+- 通知进入中间页时开始透传 reason：
+  - `apps/app-frontend/src/store/notifications.ts`
+    - 未读沟通通知进入消息中心时会附带 `unread-messages`。
+    - 售后待跟进通知进入售后中心时会附带 `aftersales-followup`。
+    - `openAppNotificationAction(...)` 打开消息中心 / 售后中心时，已开始把 `actionOrderReason` 写入 `detailReason`。
+- 中间页再次进入详情时不再丢 reason：
+  - `apps/app-frontend/src/pages/petpal/orders.vue`
+  - `apps/app-frontend/src/pages/petpal/aftersales.vue`
+  - `apps/app-frontend/src/pages/petpal/messages.vue`
+    - 打开当前焦点订单详情时，已开始继续透传 `detailReason`。
+    - 只有与当前 `focusOrderId` 对应的那笔焦点订单会继承 reason，其余普通列表项保持原行为。
+- 回归测试继续覆盖：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已把 orders / aftersales / messages 三类 page context 的 `detailReason` 回归断言补齐，继续兜底中间页透传链不会退化。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，全部改动仍停留在 App page-context、结果页回流、中间页详情打开逻辑和共享回归测试。
+- 已确认只有当前焦点订单会继续透传 `detailReason`，不会把上一跳的动作提示错误带到列表中的其他订单。
+- 已确认结果页 / 通知 -> 中间页 -> 订单详情这条链现在能够连续保留动态 reason，不再只在第一跳直达详情时才有动作说明。
+
+风险与缓解：
+
+- 风险：当前 owner 侧和消息中心的中间页 reason 透传已收口，但照料者履约队列等尚未引入同一套 page-context，剩余少量聚合入口仍可能停留在较粗的来源说明层级。
+- 缓解：下一轮继续优先评估照料者履约队列和其它聚合入口是否值得补 page-context，而不是一次性把所有队列都硬接入。
+
+下一步（1-3）：
+
+1. 继续评估照料者履约队列和其它高频聚合入口是否也适合补 page-context 与 `reason`。
+2. 继续补通知 / 提醒 / 结果页 / 中间页到订单详情之间更细的动态 notice，让动作提示和当前分栏更一致。
+3. 在中间页透传链稳定后，再继续补系统级主动提醒、推送触达和更多验收向测试。

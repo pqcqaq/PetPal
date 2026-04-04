@@ -32,6 +32,7 @@ import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
 import PetpalSegmented from './rebuild/petpal-segmented.vue'
 import {
+  type PetPalOrderDetailEntryReason,
   consumePetPalMessagesPageContext,
   describeConversation,
   getErrorMessage,
@@ -65,6 +66,7 @@ const sendingMessage = ref(false)
 const role = ref<RoleValue>('owner')
 const filter = ref<FilterValue>('UNREAD')
 const focusOrderId = ref('')
+const detailReason = ref<PetPalOrderDetailEntryReason | ''>('')
 const ownerOrders = ref<OrderRecord[]>([])
 const caregiverOrders = ref<CaregiverOrderRecord[]>([])
 const selectedOrderId = ref('')
@@ -314,6 +316,7 @@ async function loadPage() {
       filter.value = context.filter
     }
     focusOrderId.value = context?.focusOrderId || ''
+    detailReason.value = context?.detailReason || ''
 
     if (!nextCaregiverEnabled && role.value === 'caregiver') {
       role.value = 'owner'
@@ -353,7 +356,12 @@ function openSelectedOrder() {
   if (!currentThreadOrder.value) {
     return
   }
-  openOrderDetailPage(currentThreadOrder.value.id, 'chat', 'messages')
+  openOrderDetailPage(
+    currentThreadOrder.value.id,
+    'chat',
+    'messages',
+    currentThreadOrder.value.id === focusOrderId.value ? (detailReason.value || undefined) : undefined,
+  )
 }
 
 function previewImages(urls: string[], current?: string) {
@@ -569,7 +577,13 @@ watch(selectedOrderId, (value, previousValue) => {
         </view>
         <view class="petpal-action-row">
           <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openPriorityThread">打开线程</button>
-          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(priorityRow.order.id, 'chat', 'messages')">看订单</button>
+          <button
+            class="petpal-btn petpal-btn--secondary"
+            hover-class="none"
+            @click="openOrderDetailPage(priorityRow.order.id, 'chat', 'messages', priorityRow.order.id === focusOrderId ? (detailReason || undefined) : undefined)"
+          >
+            看订单
+          </button>
         </view>
       </PetpalSection>
 

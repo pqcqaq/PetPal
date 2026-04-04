@@ -333,6 +333,11 @@ Last updated: 2026-04-04
   - `apps/app-frontend/src/store/notifications.ts` 已开始为单笔未读沟通、即将开始订单、售后跟进、待接单和履约中订单写入更细的 `actionOrderReason`。
   - `apps/app-frontend/src/pages/petpal/payment-result.vue`、`refund-result.vue`、`complaint-result.vue`、`review-result.vue` 进入订单详情时也已开始补 `payment / refund / complaint / review` 这类 followup reason。
   - `apps/app-frontend/src/pages/order-detail/index.vue` 已根据 `reason` 渲染“现在先做什么”的动态提示；`apps/web-frontend/test/petpal-shared.test.ts` 也已继续补 `reason` 的 page-context 回归断言。
+- 2026-04-04 已继续透传 App 中间页 detail reason：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts` 的 `orders / aftersales / messages` page context 已继续补 `detailReason`，支持中间页承接上一跳的动作原因。
+  - `apps/app-frontend/src/pages/petpal/payment-result.vue`、`review-result.vue`、`refund-result.vue`、`complaint-result.vue` 回订单 / 售后中心时，已开始写入对应的 followup reason。
+  - `apps/app-frontend/src/store/notifications.ts` 进入消息中心和售后中心时，也会把 `actionOrderReason` 写成 `detailReason`，供中间页继续透传。
+  - `apps/app-frontend/src/pages/petpal/orders.vue`、`aftersales.vue`、`messages.vue` 打开焦点订单详情时，已继续把 `detailReason` 带回详情页；`apps/web-frontend/test/petpal-shared.test.ts` 也已把 orders / aftersales / messages 三类 page context 的 `detailReason` 回归断言补齐。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

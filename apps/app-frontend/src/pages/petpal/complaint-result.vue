@@ -63,6 +63,7 @@ function returnToAftersales() {
     filter: activeComplaint.value.status === 'PROCESSING' || activeComplaint.value.status === 'OPEN'
       ? 'HIGH'
       : 'COMPLAINT',
+    detailReason: 'complaint-followup',
   })
 }
 </script>

@@ -90,17 +90,20 @@ export type PetPalOrderDetailEntryReason = 'upcoming-order' | 'unread-messages' 
 export interface PetPalOrdersPageContext {
   filter?: OwnerOrderFilter
   focusOrderId?: string
+  detailReason?: PetPalOrderDetailEntryReason
 }
 
 export interface PetPalAftersalesPageContext {
   filter?: AftersalesFilter
   focusOrderId?: string
+  detailReason?: PetPalOrderDetailEntryReason
 }
 
 export interface PetPalMessagesPageContext {
   role?: ConversationRole
   filter?: MessagesFilter
   focusOrderId?: string
+  detailReason?: PetPalOrderDetailEntryReason
 }
 
 export interface PetPalRemindersPageContext {
@@ -284,12 +287,13 @@ function stashPetPalPageContext(
   const hasTab = 'tab' in context && typeof context.tab === 'string' && context.tab.length > 0
   const hasSource = 'source' in context && typeof context.source === 'string' && context.source.length > 0
   const hasReason = 'reason' in context && typeof context.reason === 'string' && context.reason.length > 0
+  const hasDetailReason = 'detailReason' in context && typeof context.detailReason === 'string' && context.detailReason.length > 0
   const focusOrderId = 'focusOrderId' in context ? normalizePageContextId(context.focusOrderId) : ''
   const focusNotificationId = 'focusNotificationId' in context ? normalizePageContextId(context.focusNotificationId) : ''
   const orderId = 'orderId' in context ? normalizePageContextId(context.orderId) : ''
   const key = getPetPalPageContextStorageKey(page)
 
-  if (!hasFilter && !hasRole && !hasScope && !hasTab && !hasSource && !hasReason && !focusOrderId && !focusNotificationId && !orderId) {
+  if (!hasFilter && !hasRole && !hasScope && !hasTab && !hasSource && !hasReason && !hasDetailReason && !focusOrderId && !focusNotificationId && !orderId) {
     uni.removeStorageSync(key)
     return
   }
@@ -301,6 +305,7 @@ function stashPetPalPageContext(
     ...(hasTab ? { tab: context.tab } : {}),
     ...(hasSource ? { source: context.source } : {}),
     ...(hasReason ? { reason: context.reason } : {}),
+    ...(hasDetailReason ? { detailReason: context.detailReason } : {}),
     ...(focusOrderId ? { focusOrderId } : {}),
     ...(focusNotificationId ? { focusNotificationId } : {}),
     ...(orderId ? { orderId } : {}),
@@ -319,14 +324,18 @@ export function consumePetPalOrdersPageContext(): PetPalOrdersPageContext | null
   const record = rawValue as Record<string, unknown>
   const filter = isOwnerOrderFilter(record.filter as string) ? record.filter as OwnerOrderFilter : undefined
   const focusOrderId = normalizePageContextId(record.focusOrderId) || undefined
+  const detailReason = isPetPalOrderDetailEntryReason(record.detailReason as string)
+    ? record.detailReason as PetPalOrderDetailEntryReason
+    : undefined
 
-  if (!filter && !focusOrderId) {
+  if (!filter && !focusOrderId && !detailReason) {
     return null
   }
 
   return {
     ...(filter ? { filter } : {}),
     ...(focusOrderId ? { focusOrderId } : {}),
+    ...(detailReason ? { detailReason } : {}),
   }
 }
 
@@ -342,14 +351,18 @@ export function consumePetPalAftersalesPageContext(): PetPalAftersalesPageContex
   const record = rawValue as Record<string, unknown>
   const filter = isAftersalesFilter(record.filter as string) ? record.filter as AftersalesFilter : undefined
   const focusOrderId = normalizePageContextId(record.focusOrderId) || undefined
+  const detailReason = isPetPalOrderDetailEntryReason(record.detailReason as string)
+    ? record.detailReason as PetPalOrderDetailEntryReason
+    : undefined
 
-  if (!filter && !focusOrderId) {
+  if (!filter && !focusOrderId && !detailReason) {
     return null
   }
 
   return {
     ...(filter ? { filter } : {}),
     ...(focusOrderId ? { focusOrderId } : {}),
+    ...(detailReason ? { detailReason } : {}),
   }
 }
 
@@ -366,8 +379,11 @@ export function consumePetPalMessagesPageContext(): PetPalMessagesPageContext | 
   const role = record.role === 'owner' || record.role === 'caregiver' ? record.role : undefined
   const filter = isMessagesFilter(record.filter as string) ? record.filter as MessagesFilter : undefined
   const focusOrderId = normalizePageContextId(record.focusOrderId) || undefined
+  const detailReason = isPetPalOrderDetailEntryReason(record.detailReason as string)
+    ? record.detailReason as PetPalOrderDetailEntryReason
+    : undefined
 
-  if (!role && !filter && !focusOrderId) {
+  if (!role && !filter && !focusOrderId && !detailReason) {
     return null
   }
 
@@ -375,6 +391,7 @@ export function consumePetPalMessagesPageContext(): PetPalMessagesPageContext | 
     ...(role ? { role } : {}),
     ...(filter ? { filter } : {}),
     ...(focusOrderId ? { focusOrderId } : {}),
+    ...(detailReason ? { detailReason } : {}),
   }
 }
 
