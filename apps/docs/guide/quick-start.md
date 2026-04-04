@@ -116,6 +116,10 @@ pnpm dev
 pnpm --filter @rbac/api-common dev
 ```
 
+`apps/app-frontend` 的 Vite 开发配置现在会把 `@rbac/api-common` 直接解析到工作区源码，并排除依赖预构建，避免新增导出被旧的 `.vite/deps/@rbac_api-common.js` 缓存卡住。
+
+但 App 端类型检查和其他包发布仍依赖 `packages/api-common/dist`，所以只要你改了共享类型或导出面，仍然建议保留上面的 watch。
+
 文档站单独启动：
 
 ```bash

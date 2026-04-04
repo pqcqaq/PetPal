@@ -47,6 +47,8 @@ export default defineConfig(({ command, mode }) => {
 
   const { UNI_PLATFORM, SKIP_OPEN_DEVTOOLS } = process.env
   console.log('UNI_PLATFORM -> ', UNI_PLATFORM) // 得到 mp-weixin, h5, app 等
+  const workspaceRoot = path.resolve(process.cwd(), '../..')
+  const apiCommonSourceEntry = path.resolve(workspaceRoot, 'packages/api-common/src/index.ts')
 
   const env = loadEnv(mode, path.resolve(process.cwd(), 'env'))
   const {
@@ -179,11 +181,18 @@ export default defineConfig(({ command, mode }) => {
 
     resolve: {
       alias: {
+        '@rbac/api-common': apiCommonSourceEntry,
         '@': path.join(process.cwd(), './src'),
         '@img': path.join(process.cwd(), './src/static/images'),
       },
     },
+    optimizeDeps: {
+      exclude: ['@rbac/api-common'],
+    },
     server: {
+      fs: {
+        allow: [workspaceRoot],
+      },
       host: '0.0.0.0',
       hmr: true,
       port: Number.parseInt(VITE_APP_PORT, 10),
