@@ -14,6 +14,8 @@ import {
   createManagedAttachmentRecord,
   createManagedAttachmentRecordFromMediaAsset,
   formatPetPalAmount,
+  formatPetPalConversationMeta,
+  formatPetPalConversationPreview,
   formatPetPalDate,
   formatPetPalMoney,
   formatPetPalRange,
@@ -109,6 +111,33 @@ test('exposes stable petpal amount, time and conversation display helpers', () =
     createdAt: '2026-04-04T09:00:00',
     updatedAt: '2026-04-04T09:08:00',
   }, 'caregiver'), 5);
+  assert.equal(formatPetPalConversationPreview({
+    id: 'conversation-2',
+    orderId: 'order-2',
+    ownerUnreadCount: 0,
+    caregiverUnreadCount: 0,
+    lastMessageAt: null,
+    lastMessagePreview: null,
+    createdAt: '2026-04-04T09:00:00',
+    updatedAt: '2026-04-04T09:08:00',
+  }, {
+    recentMessageFallbackText: 'recent',
+    emptyText: 'empty',
+  }), 'empty');
+  assert.equal(formatPetPalConversationMeta({
+    id: 'conversation-3',
+    orderId: 'order-3',
+    ownerUnreadCount: 1,
+    caregiverUnreadCount: 0,
+    lastMessageAt: '2026-04-04T09:08:00',
+    lastMessagePreview: 'hi',
+    createdAt: '2026-04-04T09:00:00',
+    updatedAt: '2026-04-04T09:08:00',
+  }, {
+    role: 'owner',
+    formatTime: (value) => value.slice(11, 16),
+    emptyText: 'empty',
+  }), '09:08 · 1 条未读');
 });
 
 test('exposes stable message and caregiver attachment governance constants for shared uploads', () => {

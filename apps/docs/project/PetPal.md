@@ -7883,6 +7883,59 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.262 2026-04-04（P3-M1 Slice 262）
+
+**概述**：上一轮已经把金额、日期/时间和未读数这批基础展示逻辑提升到共享层，但 Web `shared.ts` 和 App `owner-shared.ts` 里仍各自保留了一份结构几乎相同的会话预览与 meta 文本拼装。本轮继续沿“只抽纯展示 helper、不抽端侧 copy 语义”的原则，把这两段 preview/meta 逻辑也提升到 `@rbac/api-common`，让双端只保留各自的文案差异和时间格式化器。
+
+已完成：
+
+- 共享会话展示 helper 已继续落到 `api-common`：
+  - `packages/api-common/src/helpers/petpal-display.ts`
+    - 新增 `formatPetPalConversationPreview(...)`。
+    - 新增 `formatPetPalConversationMeta(...)`。
+    - 共享层现在会统一处理“优先显示最近文本预览，否则按最近消息时间回退文案，再按未读数拼接 meta”这段纯展示流程。
+- Web / App 已切到共享会话展示 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - `formatPetPalConversationPreview(...)` 已改为复用共享 preview helper。
+    - `formatPetPalConversationMeta(...)` 已改为复用共享 meta helper，Web 端继续保留“暂无沟通记录”等文案语义。
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - `getConversationPreview(...)` 与 `getConversationHint(...)` 已改为复用共享 preview/meta helper。
+    - App 端继续保留“最近同步了一条附件或简短消息”“已读完”等移动端文案语义。
+- 定向测试与文档同步：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补共享 preview/meta helper 的可配置断言，锁住空会话、最近消息时间和未读数拼接的共享口径。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改消息状态持久化、页面结构或导航流程，只继续收口跨端纯展示 helper。
+- 已确认 Web / App 两端现在都会复用同一套 preview/meta 组装逻辑，但各自的产品文案差异仍保留在端侧调用点。
+- 已确认本轮没有把 `dayjs`、路由或本地存储之类的端侧依赖抽进 `api-common`，共享层仍保持纯函数边界。
+
+风险与缓解：
+
+- 风险：虽然 preview/meta 逻辑已经共享，但双端文案差异仍真实存在，后续如果继续强推完全统一，可能会误伤 Web / App 的语义细节。
+- 缓解：本轮继续只共享“结构化拼装逻辑”，通过参数注入 copy 与时间格式化器，不把端侧语义差异抹平。
+
+- 风险：会话 meta 现在开始成为跨端共享口径，后续若调整“空会话 / 已读完 / 未读数”展示规则，会同时影响 Web / App。
+- 缓解：本轮已补可配置 helper 直测，后续如要调整规则，先在共享测试里锁定预期输出再推进。
+
+下一步（1-3）：
+
+1. 继续检查 Web `shared.ts` 与 App `owner-shared.ts` 中是否还有完全同构、且能通过参数保留端侧语义差异的展示 helper 值得继续共享。
+2. 如果展示层剩余纯函数收益继续下降，就回到消息状态模块，评估是否还有必要继续收口少量存储 glue。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.261 2026-04-04（P3-M1 Slice 261）
 
 **概述**：消息状态链路已经逐步收口到只剩端侧存储 glue，本轮切到更高收益的跨端展示 helper 收口：先把 Web `shared.ts` 和 App `owner-shared.ts` 里已经同构的金额、日期/时间/区间格式化以及订单会话未读数计算提升到 `@rbac/api-common`，继续只做纯函数共享，不碰页面结构和端侧文案差异。

@@ -22,6 +22,43 @@ export const getPetPalConversationUnreadCount = (
   return role === 'owner' ? conversation.ownerUnreadCount : conversation.caregiverUnreadCount;
 };
 
+export const formatPetPalConversationPreview = (
+  conversation: OrderConversationRecord | null | undefined,
+  options: {
+    recentMessageFallbackText: string;
+    emptyText: string;
+  },
+) => {
+  const preview = conversation?.lastMessagePreview?.trim();
+  if (preview) {
+    return preview;
+  }
+
+  if (conversation?.lastMessageAt) {
+    return options.recentMessageFallbackText;
+  }
+
+  return options.emptyText;
+};
+
+export const formatPetPalConversationMeta = (
+  conversation: OrderConversationRecord | null | undefined,
+  options: {
+    role: PetPalConversationRole;
+    formatTime: (value: string) => string;
+    emptyText: string;
+    readText?: string;
+  },
+) => {
+  const unreadCount = getPetPalConversationUnreadCount(conversation, options.role);
+  const unreadText = unreadCount > 0 ? `${unreadCount} 条未读` : options.readText ?? '已读完';
+  if (conversation?.lastMessageAt) {
+    return `${options.formatTime(conversation.lastMessageAt)} · ${unreadText}`;
+  }
+
+  return unreadCount > 0 ? unreadText : options.emptyText;
+};
+
 export const formatPetPalAmount = (value: number | string | null | undefined) => {
   const amount = Number(value ?? 0);
   return Number.isFinite(amount) ? amount.toFixed(2) : '0.00';

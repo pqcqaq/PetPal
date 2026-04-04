@@ -1,5 +1,7 @@
 import {
   formatPetPalAmount as formatSharedPetPalAmount,
+  formatPetPalConversationMeta as formatSharedPetPalConversationMeta,
+  formatPetPalConversationPreview as formatSharedPetPalConversationPreview,
   formatPetPalDate as formatSharedPetPalDate,
   formatPetPalRange as formatSharedPetPalRange,
   formatPetPalTime as formatSharedPetPalTime,
@@ -529,26 +531,21 @@ export function getConversationUnreadCount(
 }
 
 export function getConversationPreview(conversation: OrderConversationRecord | null | undefined) {
-  const preview = conversation?.lastMessagePreview?.trim()
-  if (preview) {
-    return preview
-  }
-  if (conversation?.lastMessageAt) {
-    return '最近同步了一条附件或简短消息'
-  }
-  return '暂未开始订单沟通'
+  return formatSharedPetPalConversationPreview(conversation, {
+    recentMessageFallbackText: '最近同步了一条附件或简短消息',
+    emptyText: '暂未开始订单沟通',
+  })
 }
 
 export function getConversationHint(
   conversation: OrderConversationRecord | null | undefined,
   role: ConversationRole,
 ) {
-  const unreadCount = getConversationUnreadCount(conversation, role)
-  const unreadText = unreadCount > 0 ? `${unreadCount} 条未读` : '已读完'
-  if (conversation?.lastMessageAt) {
-    return `${formatDateTime(conversation.lastMessageAt)} · ${unreadText}`
-  }
-  return unreadText
+  return formatSharedPetPalConversationMeta(conversation, {
+    role,
+    formatTime: formatDateTime,
+    emptyText: '已读完',
+  })
 }
 
 export function getServiceLogTypeLabel(logType: ServiceLogType) {
