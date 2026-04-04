@@ -8,9 +8,11 @@ import {
   formatPetPalDate as formatSharedPetPalDate,
   getPetPalOrderStatusLabel as getSharedPetPalOrderStatusLabel,
   getPetPalOwnerOrderFilter as getSharedPetPalOwnerOrderFilter,
+  getPetPalOrderTone as getSharedPetPalOrderTone,
   getPetPalRefundProgressStageHint as getSharedPetPalRefundProgressStageHint,
   getPetPalRefundProgressStageLabel as getSharedPetPalRefundProgressStageLabel,
   formatPetPalRange as formatSharedPetPalRange,
+  getPetPalServiceLogTypeLabel as getSharedPetPalServiceLogTypeLabel,
   formatPetPalTime as formatSharedPetPalTime,
   getPetPalConversationUnreadCount as getSharedPetPalConversationUnreadCount,
   formatPetPalTagSummary as formatSharedPetPalTagSummary,
@@ -466,10 +468,7 @@ export function getCaregiverAuditHint(status: CaregiverAuditStatus | null | unde
 }
 
 export function getOrderTone(status: OrderStatus) {
-  if (status === 'COMPLETED') return 'success'
-  if (status === 'SERVING' || status === 'ACCEPTED') return 'warning'
-  if (status === 'DISPUTED' || status === 'PARTIAL_REFUNDED' || status === 'REFUNDED') return 'danger'
-  return 'neutral'
+  return getSharedPetPalOrderTone(status)
 }
 
 export function getConversationUnreadCount(
@@ -498,16 +497,7 @@ export function getConversationHint(
 }
 
 export function getServiceLogTypeLabel(logType: ServiceLogType) {
-  const labels: Record<ServiceLogType, string> = {
-    CHECK_IN: '签到记录',
-    FEED: '喂养记录',
-    WALK: '遛宠记录',
-    PLAY: '互动陪伴',
-    HEALTH: '健康观察',
-    CHECK_OUT: '签退记录',
-    NOTE: '服务备注',
-  }
-  return labels[logType] || logType
+  return getSharedPetPalServiceLogTypeLabel(logType)
 }
 
 export function isOrderAftersalesTracked(

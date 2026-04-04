@@ -7883,6 +7883,61 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.266 2026-04-04（P3-M1 Slice 266）
+
+**概述**：上一轮已经把 tag 文本 helper 收口到共享层，但 Web `shared.ts`、App `owner-shared.ts` 和 `rebuild/shared.ts` 里仍各自保留了一些基础展示映射，包括 `ServiceLogType` 的中文标签和订单 tone 判断。本轮继续沿“只抽纯展示 helper、不碰页面交互”的原则，把这两类 helper 提升到 `@rbac/api-common`，让双端只保留各自的 note 文案和页面组合逻辑。
+
+已完成：
+
+- 共享服务记录标签与订单 tone helper 已继续落到 `api-common`：
+  - `packages/api-common/src/helpers/petpal-display.ts`
+    - 新增 `getPetPalServiceLogTypeLabel(...)`。
+    - 新增 `getPetPalOrderTone(...)`。
+    - 共享层现在会统一处理服务记录类型中文标签以及订单状态到 `success / warning / danger / neutral` 的 tone 映射。
+- Web / App 已切到共享 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - `petPalServiceLogOptions` 已改为复用共享 `ServiceLogType` 标签 helper 生成 label。
+    - Web 端继续保留各自的服务记录 note 文案，不把说明文案抽进共享层。
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - `getServiceLogTypeLabel(...)` 与 `getOrderTone(...)` 已改为复用共享 helper。
+  - `apps/app-frontend/src/pages/petpal/rebuild/shared.ts`
+    - `serviceLogOptions` 已改为通过共享标签 helper 生成 label。
+    - `getOrderToneClass(...)` 已改为复用 `owner-shared.ts` 暴露的共享 tone helper，不再手写第二份状态映射。
+- 定向测试与文档同步：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补服务记录标签和订单 tone helper 的稳定性断言，锁住共享展示口径。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改页面结构、提交流程或状态存储，只继续收口跨端纯展示 helper。
+- 已确认 Web / App 两端现在都会复用同一套服务记录标签和订单 tone 映射，但各自的服务记录 note 文案仍保留在端侧调用点。
+- 已确认本轮没有把 UI 样式类名、页面说明文案或其它端侧依赖错误抽进 `api-common`，共享层仍保持纯函数边界。
+
+风险与缓解：
+
+- 风险：订单 tone 映射已经集中到共享层，后续若调整状态到视觉 tone 的对应关系，会同时影响 App 的多处状态着色。
+- 缓解：本轮已补共享 helper 直测，后续如要调整映射，先在共享测试里锁住目标行为再推进。
+
+- 风险：剩余还能继续共享的展示 helper 已经越来越碎，继续硬拆可能会让参数复杂度上升而收益下降。
+- 缓解：本轮之后优先重新评估共享展示层剩余收益，必要时回到消息状态或业务页面闭环做下一块更高价值的开发。
+
+下一步（1-3）：
+
+1. 继续评估 Web / App 共享入口里是否还存在少量高收益、低风险的纯函数重复。
+2. 如果展示层剩余收益继续下降，就回到消息状态模块或订单闭环页面，选择下一块更有价值的业务收口点。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.265 2026-04-04（P3-M1 Slice 265）
 
 **概述**：上一轮已经把订单过滤 predicate 收口到共享层，但 Web `shared.ts` 和 App `owner-shared.ts` 里仍各自保留了一批近似的 tag 文本 helper，包括“把输入文本拆成 tags”“把 tags 拼成展示文本”“把标签数组压成摘要”。本轮继续沿“只抽纯文本处理 helper、保留端侧差异参数”的原则，把这批 tag 文本 helper 提升到 `@rbac/api-common`，同时保留 Web 的 `/` 分隔策略和 App 的去重策略。

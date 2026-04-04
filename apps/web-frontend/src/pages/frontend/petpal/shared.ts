@@ -11,6 +11,7 @@ import {
   getPetPalRefundProgressStageHint as getSharedPetPalRefundProgressStageHint,
   getPetPalRefundProgressStageLabel as getSharedPetPalRefundProgressStageLabel,
   formatPetPalRange,
+  getPetPalServiceLogTypeLabel as getSharedPetPalServiceLogTypeLabel,
   formatPetPalTime,
   getPetPalConversationUnreadCount,
   splitPetPalTagText as splitSharedPetPalTagText,
@@ -142,13 +143,13 @@ export const petPalOrderStatusOptions: Array<{ label: string; value: OrderStatus
 ];
 
 export const petPalServiceLogOptions: Array<{ label: string; value: ServiceLogType; note: string }> = [
-  { label: '签到', value: 'CHECK_IN', note: '到达后快速留痕' },
-  { label: '喂养', value: 'FEED', note: '记录进食和饮水' },
-  { label: '遛宠', value: 'WALK', note: '记录外出和活动' },
-  { label: '陪伴', value: 'PLAY', note: '记录互动和安抚' },
-  { label: '健康', value: 'HEALTH', note: '记录观察结果' },
-  { label: '签退', value: 'CHECK_OUT', note: '记录服务结束' },
-  { label: '备注', value: 'NOTE', note: '补充其他说明' },
+  { label: getSharedPetPalServiceLogTypeLabel('CHECK_IN'), value: 'CHECK_IN', note: '到达后快速留痕' },
+  { label: getSharedPetPalServiceLogTypeLabel('FEED'), value: 'FEED', note: '记录进食和饮水' },
+  { label: getSharedPetPalServiceLogTypeLabel('WALK'), value: 'WALK', note: '记录外出和活动' },
+  { label: getSharedPetPalServiceLogTypeLabel('PLAY'), value: 'PLAY', note: '记录互动和安抚' },
+  { label: getSharedPetPalServiceLogTypeLabel('HEALTH'), value: 'HEALTH', note: '记录观察结果' },
+  { label: getSharedPetPalServiceLogTypeLabel('CHECK_OUT'), value: 'CHECK_OUT', note: '记录服务结束' },
+  { label: getSharedPetPalServiceLogTypeLabel('NOTE'), value: 'NOTE', note: '补充其他说明' },
 ];
 
 export const getPetPalOrderStatusLabel = getSharedPetPalOrderStatusLabel;

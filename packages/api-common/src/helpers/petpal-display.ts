@@ -5,6 +5,7 @@ import type {
   OrderConversationRecord,
   OrderStatus,
   RefundProgressStage,
+  ServiceLogType,
   ServiceRequestStatus,
 } from '../types/petpal';
 
@@ -250,3 +251,32 @@ export const formatPetPalTagSummary = (
     emptyText?: string;
   },
 ) => (tags?.length ? joinPetPalTagText(tags, options?.separator ?? ' / ') : options?.emptyText ?? '暂无偏好标签');
+
+const petPalServiceLogTypeLabels: Record<ServiceLogType, string> = {
+  CHECK_IN: '签到记录',
+  FEED: '喂养记录',
+  WALK: '遛宠记录',
+  PLAY: '互动陪伴',
+  HEALTH: '健康观察',
+  CHECK_OUT: '签退记录',
+  NOTE: '服务备注',
+};
+
+export const getPetPalServiceLogTypeLabel = (logType: ServiceLogType) =>
+  petPalServiceLogTypeLabels[logType] ?? logType;
+
+export const getPetPalOrderTone = (status: OrderStatus): 'success' | 'warning' | 'danger' | 'neutral' => {
+  if (status === 'COMPLETED') {
+    return 'success';
+  }
+
+  if (status === 'SERVING' || status === 'ACCEPTED') {
+    return 'warning';
+  }
+
+  if (isPetPalAftersalesStatus(status)) {
+    return 'danger';
+  }
+
+  return 'neutral';
+};

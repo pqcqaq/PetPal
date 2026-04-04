@@ -30,6 +30,7 @@ import {
   getConversationHint,
   getConversationPreview,
   getConversationUnreadCount,
+  getOrderTone,
   getOrderStatusLabel,
   getRefundProgressStageHint,
   getRefundProgressStageLabel,
@@ -91,13 +92,13 @@ export const complaintTypeOptions: Array<{ label: string, value: ComplaintType }
 ]
 
 export const serviceLogOptions: Array<{ label: string, value: ServiceLogType, note: string }> = [
-  { label: '签到', value: 'CHECK_IN', note: '到达后快速记录' },
-  { label: '喂养', value: 'FEED', note: '饮食和水量' },
-  { label: '遛宠', value: 'WALK', note: '外出与排便情况' },
-  { label: '陪伴', value: 'PLAY', note: '互动和安抚' },
-  { label: '健康', value: 'HEALTH', note: '精神与观察结果' },
-  { label: '签退', value: 'CHECK_OUT', note: '服务结束交接' },
-  { label: '备注', value: 'NOTE', note: '其他补充说明' },
+  { label: getServiceLogTypeLabel('CHECK_IN'), value: 'CHECK_IN', note: '到达后快速记录' },
+  { label: getServiceLogTypeLabel('FEED'), value: 'FEED', note: '饮食和水量' },
+  { label: getServiceLogTypeLabel('WALK'), value: 'WALK', note: '外出与排便情况' },
+  { label: getServiceLogTypeLabel('PLAY'), value: 'PLAY', note: '互动和安抚' },
+  { label: getServiceLogTypeLabel('HEALTH'), value: 'HEALTH', note: '精神与观察结果' },
+  { label: getServiceLogTypeLabel('CHECK_OUT'), value: 'CHECK_OUT', note: '服务结束交接' },
+  { label: getServiceLogTypeLabel('NOTE'), value: 'NOTE', note: '其他补充说明' },
 ]
 
 export function getErrorMessage(error: unknown, fallback = '操作失败') {
@@ -277,10 +278,7 @@ export function getComplaintTone(status: ComplaintRecord['status']): ResultTone 
 }
 
 export function getOrderToneClass(status: OrderRecord['orderStatus']) {
-  if (status === 'COMPLETED') return 'success'
-  if (status === 'SERVING' || status === 'ACCEPTED') return 'warning'
-  if (status === 'DISPUTED' || status === 'PARTIAL_REFUNDED' || status === 'REFUNDED') return 'danger'
-  return 'neutral'
+  return getOrderTone(status)
 }
 
 export function toggleTagValue(current: string[], value: string) {
