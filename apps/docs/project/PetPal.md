@@ -7883,6 +7883,57 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.258 2026-04-04（P3-M1 Slice 258）
+
+**概述**：上一轮已经把 persisted snapshot 的默认 retention 策略和 options helper 下沉到共享层，但 Web / App 两份 `message-composer-state.ts` 里仍各自保留了“先读当前 entry、必要时认领 legacy 共享记录、再重读 entry”的流程。本轮继续沿同一条收口线，把这段 entry + legacy adoption 纯流程也提升到 `@rbac/api-common`，继续减少双端状态模块里的重复状态解析逻辑。
+
+已完成：
+
+- 共享 entry adoption helper 已继续落到 `api-common`：
+  - `packages/api-common/src/helpers/petpal-message-composer.ts`
+    - 新增 `getPetPalMessageComposerEntryWithLegacyAdoption(...)`。
+    - 共享层现在会统一处理“先读当前 identity 的 entry，若未命中则尝试认领 legacy 共享记录，再返回最新 entry 与 next records”这段纯流程。
+- Web / App 消息状态模块已切到共享 entry adoption helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts`
+    - 本地 `getMessageComposerEntryForIdentity(...)` 现在直接消费共享 helper，只在 helper 返回 `records` 变化时负责写回本地状态与本地存储。
+  - `apps/app-frontend/src/pages/petpal/message-composer-state.ts`
+    - App 端同一段 entry + legacy adoption 流程也已切到共享 helper，不再维护第二份近似实现。
+- 定向测试与文档同步：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补共享 entry adoption helper 直测，锁住 legacy shared 草稿被认领后返回最新 scoped entry 的行为。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-message-composer-state.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改消息发送协议、消息草稿缓存裁剪规则或双端存储介质，只继续收口 entry + legacy adoption 纯流程。
+- 已确认 Web / App 两端现在都会复用同一套“entry 查询 + legacy adoption”流程，消息状态模块的纯逻辑重复继续下降。
+- 已确认共享 helper 仍只负责返回 `entry` 和 `records`，状态写回与存储同步依旧保留在端侧，没有把副作用错误抽进共享层。
+
+风险与缓解：
+
+- 风险：当前双端消息状态模块里剩余的重复基本都开始和存储读写、副作用时机强绑定，继续硬抽的收益会快速下降。
+- 缓解：本轮继续只抽纯流程；下一轮会重新评估是否还值得沿消息状态链路继续收口，还是转向其它更高收益的 PetPal 状态模块。
+
+- 风险：共享 helper 现在承接了更多 legacy 缓存升级语义，后续如果要改认领优先级，会同时影响 Web / App。
+- 缓解：本轮已补共享层直测和现有 Web 端消息状态回归测试，后续如要改认领逻辑，仍可先在共享测试里锁住目标行为再推进。
+
+下一步（1-3）：
+
+1. 重新评估消息状态模块里剩余重复的性价比，避免为了极小的去重继续侵入端侧存储差异。
+2. 继续检查 PetPal 其它前端状态模块里是否有类似“纯流程重复但副作用仍可留端侧”的收口机会。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.257 2026-04-04（P3-M1 Slice 257）
 
 **概述**：上一轮已经把 persisted snapshot 的 parse/adopt scaffolding 下沉到共享层，但 Web / App 两份 `message-composer-state.ts` 里仍各自保留了 retention 默认值、compaction 选项和 parse 选项组装。本轮继续沿同一条收口线，把这批持久化策略默认值和选项工厂也提升到 `@rbac/api-common`，继续避免双端策略口径漂移。

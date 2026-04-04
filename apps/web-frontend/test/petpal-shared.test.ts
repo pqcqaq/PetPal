@@ -13,6 +13,7 @@ import {
   createManagedAttachmentRecord,
   createManagedAttachmentRecordFromMediaAsset,
   getPetPalMessageComposerEntry,
+  getPetPalMessageComposerEntryWithLegacyAdoption,
   getPetPalMessageComposerKeysToClear,
   parsePetPalMessageDraftState,
   parsePersistedPetPalMessageComposerSnapshot,
@@ -325,6 +326,60 @@ test('adopts legacy message composer records and clears scoped keys predictably'
     }).sort(),
     [ownerKey, sharedKey].sort(),
   );
+});
+
+test('resolves petpal message composer entries with legacy adoption when needed', () => {
+  const legacySharedKey = buildPetPalMessageComposerStorageKey({
+    orderId: 'order-legacy-entry',
+    userId: '',
+    scope: 'shared',
+  });
+  const records = {
+    [legacySharedKey]: {
+      orderId: 'order-legacy-entry',
+      userId: '',
+      scope: 'shared',
+      updatedAt: '2026-04-04T09:00:00.000Z',
+      content: 'legacy draft',
+      attachments: [],
+    },
+  };
+
+  const resolved = getPetPalMessageComposerEntryWithLegacyAdoption(records, {
+    orderId: 'order-legacy-entry',
+    userId: 'user-1',
+    scope: 'owner',
+  });
+
+  assert.deepEqual(resolved.entry, [
+    buildPetPalMessageComposerStorageKey({
+      orderId: 'order-legacy-entry',
+      userId: 'user-1',
+      scope: 'owner',
+    }),
+    {
+      orderId: 'order-legacy-entry',
+      userId: 'user-1',
+      scope: 'owner',
+      updatedAt: '2026-04-04T09:00:00.000Z',
+      content: 'legacy draft',
+      attachments: [],
+    },
+  ]);
+  assert.deepEqual(resolved.records, {
+    [buildPetPalMessageComposerStorageKey({
+      orderId: 'order-legacy-entry',
+      userId: 'user-1',
+      scope: 'owner',
+    })]: {
+      orderId: 'order-legacy-entry',
+      userId: 'user-1',
+      scope: 'owner',
+      updatedAt: '2026-04-04T09:00:00.000Z',
+      content: 'legacy draft',
+      attachments: [],
+    },
+  });
 });
 
 test('creates, compacts and exposes persisted petpal message composer snapshots', () => {

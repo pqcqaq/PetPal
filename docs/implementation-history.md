@@ -254,6 +254,10 @@ Last updated: 2026-04-04
   - `packages/api-common/src/helpers/petpal-message-composer.ts` 已新增 persisted snapshot retention 默认值常量，以及 compaction / parse 选项工厂。
   - Web / App 两端的 `message-composer-state.ts` 现在都会直接复用同一套默认 `12` 线程、`7` 天保留、`24` 小时匿名过渡保留策略，不再各自手写常量和选项组装。
   - `apps/web-frontend/test/petpal-shared.test.ts` 已补默认策略常量与选项工厂稳定性断言，继续兜底双端共享口径不会漂移。
+- 2026-04-04 已继续收口消息草稿 entry 认领 helper：
+  - `packages/api-common/src/helpers/petpal-message-composer.ts` 已新增“读取当前 identity 下的 entry，并在需要时先认领 legacy 共享记录”的共享 helper。
+  - Web / App 两端的 `message-composer-state.ts` 现在都会直接复用同一套“先查当前 entry、必要时认领 legacy 记录、再回读 entry”的流程，不再各自复制这段状态解析逻辑。
+  - `apps/web-frontend/test/petpal-shared.test.ts` 已补共享 entry adoption helper 直测，现有 Web 消息状态回归测试继续通过。
 - 2026-04-04 已继续对齐 Web 照料者资质上传：
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverProfileView.vue` 已从手填材料名称 / URL 改成受管资质附件上传，上传时会绑定当前照料者档案 ID 和 `petpal-caregiver-qualification` 标签。
   - 页面现在会直接展示材料大小 / 日期，并支持查看 / 移除；首次上传前如果档案还没生成 ID，会先提示保存一次基础资料。

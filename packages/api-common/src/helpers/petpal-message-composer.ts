@@ -328,6 +328,37 @@ export const adoptLegacyPetPalMessageComposerRecordsForIdentity = <
   return nextRecords;
 };
 
+export const getPetPalMessageComposerEntryWithLegacyAdoption = <
+  T extends PetPalMessageComposerVersionedRecord,
+>(
+  records: Record<string, T>,
+  identity: PetPalMessageComposerIdentity,
+): {
+  entry: [string, T] | null;
+  records: Record<string, T>;
+} => {
+  const currentEntry = getPetPalMessageComposerEntry(records, identity);
+  if (currentEntry) {
+    return {
+      entry: currentEntry,
+      records,
+    };
+  }
+
+  const adoptedRecords = adoptLegacyPetPalMessageComposerRecordsForIdentity(records, identity);
+  if (adoptedRecords === records) {
+    return {
+      entry: null,
+      records,
+    };
+  }
+
+  return {
+    entry: getPetPalMessageComposerEntry(adoptedRecords, identity),
+    records: adoptedRecords,
+  };
+};
+
 export const getPetPalMessageComposerKeysToClear = <
   T extends PetPalMessageComposerVersionedRecord,
 >(

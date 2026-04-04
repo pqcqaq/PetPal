@@ -1,6 +1,5 @@
 import {
   adoptLegacyPetPalMessageComposerSnapshot as adoptSharedPetPalMessageComposerSnapshot,
-  adoptLegacyPetPalMessageComposerRecordsForIdentity,
   buildPetPalMessageComposerStorageKey as buildSharedPetPalMessageComposerStorageKey,
   cloneManagedAttachmentRecords,
   clonePetPalMessageDraftState as cloneSharedPetPalMessageDraftState,
@@ -8,7 +7,7 @@ import {
   createPersistedPetPalMessageComposerCompactionOptions,
   createPersistedPetPalMessageComposerParseOptions,
   createEmptyPersistedPetPalMessageComposerRecords,
-  getPetPalMessageComposerEntry,
+  getPetPalMessageComposerEntryWithLegacyAdoption,
   getPetPalMessageComposerKeysToClear,
   parsePersistedPetPalMessageComposerRecords as parseSharedPersistedPetPalMessageComposerRecords,
   parsePersistedPetPalMessageComposerSnapshot as parseSharedPersistedPetPalMessageComposerSnapshot,
@@ -198,19 +197,12 @@ const getMessageComposerEntryForIdentity = <
   },
   identity: PetPalMessageComposerIdentity,
 ): [string, T] | null => {
-  const currentEntry = getPetPalMessageComposerEntry(recordsRef.value, identity);
-  if (currentEntry) {
-    return currentEntry;
+  const resolved = getPetPalMessageComposerEntryWithLegacyAdoption(recordsRef.value, identity);
+  if (resolved.records !== recordsRef.value) {
+    recordsRef.value = resolved.records;
+    syncPersistedPetPalMessageComposerSnapshot();
   }
-
-  const adoptedRecords = adoptLegacyPetPalMessageComposerRecordsForIdentity(recordsRef.value, identity);
-  if (adoptedRecords === recordsRef.value) {
-    return null;
-  }
-
-  recordsRef.value = adoptedRecords;
-  syncPersistedPetPalMessageComposerSnapshot();
-  return getPetPalMessageComposerEntry(recordsRef.value, identity);
+  return resolved.entry;
 };
 
 export function hasPetPalMessageDraft(identity: PetPalMessageComposerIdentity) {
