@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  adoptLegacyPetPalMessageComposerSnapshot,
   adoptLegacyPetPalMessageComposerRecordsForIdentity,
   buildPetPalMessageComposerStorageKey,
   cloneManagedAttachmentRecords,
@@ -12,6 +13,7 @@ import {
   getPetPalMessageComposerEntry,
   getPetPalMessageComposerKeysToClear,
   parsePetPalMessageDraftState,
+  parsePersistedPetPalMessageComposerSnapshot,
   parsePetPalMessageComposerStorageKey,
   parseManagedAttachmentRecord,
   parsePetPalMessageRecoveryState,
@@ -367,6 +369,132 @@ test('creates, compacts and exposes persisted petpal message composer snapshots'
       })]: {
         stage: 'send',
         message: 'retry',
+      },
+    },
+  });
+});
+
+test('parses persisted petpal message composer snapshots with optional draft upload fallback', () => {
+  const rawValue = JSON.stringify({
+    drafts: {
+      'order-legacy': {
+        attachments: [
+          {
+            fileId: 'file-legacy',
+            url: 'https://cdn.example.com/legacy.png',
+            name: 'legacy.png',
+            size: 1024,
+            mimeType: 'image/png',
+          },
+        ],
+      },
+    },
+    recoveries: {
+      'order-legacy': {
+        stage: 'send',
+        message: 'retry later',
+      },
+    },
+  });
+  const sharedOptions = {
+    now: Date.parse('2026-04-04T12:00:00.000Z'),
+    maxPersistedThreads: 12,
+    maxPersistedAgeMs: 7 * 24 * 60 * 60 * 1000,
+    maxLegacyAnonymousPersistedAgeMs: 24 * 60 * 60 * 1000,
+  };
+
+  assert.deepEqual(parsePersistedPetPalMessageComposerSnapshot(rawValue, sharedOptions), {
+    drafts: {},
+    recoveries: {
+      [buildPetPalMessageComposerStorageKey({
+        orderId: 'order-legacy',
+        userId: '',
+        scope: 'shared',
+      })]: {
+        stage: 'send',
+        message: 'retry later',
+      },
+    },
+  });
+
+  assert.deepEqual(parsePersistedPetPalMessageComposerSnapshot(rawValue, {
+    ...sharedOptions,
+    fallbackDraftAttachmentUploadedAtToNow: true,
+  }), {
+    drafts: {
+      [buildPetPalMessageComposerStorageKey({
+        orderId: 'order-legacy',
+        userId: '',
+        scope: 'shared',
+      })]: {
+        content: '',
+        attachments: [
+          {
+            fileId: 'file-legacy',
+            url: 'https://cdn.example.com/legacy.png',
+            name: 'legacy.png',
+            size: 1024,
+            mimeType: 'image/png',
+            uploadedAt: '2026-04-04T12:00:00.000Z',
+          },
+        ],
+      },
+    },
+    recoveries: {
+      [buildPetPalMessageComposerStorageKey({
+        orderId: 'order-legacy',
+        userId: '',
+        scope: 'shared',
+      })]: {
+        stage: 'send',
+        message: 'retry later',
+      },
+    },
+  });
+});
+
+test('adopts legacy persisted petpal message composer snapshots for scoped identities', () => {
+  assert.deepEqual(adoptLegacyPetPalMessageComposerSnapshot({
+    drafts: {
+      'order-adopt': {
+        content: 'legacy draft',
+        attachments: [],
+      },
+    },
+    recoveries: {
+      'order-adopt': {
+        stage: 'upload',
+        message: 'legacy recovery',
+      },
+    },
+  }, {
+    orderId: 'order-adopt',
+    userId: 'user-1',
+    scope: 'owner',
+  }, {
+    now: Date.parse('2026-04-04T12:00:00.000Z'),
+    maxPersistedThreads: 12,
+    maxPersistedAgeMs: 7 * 24 * 60 * 60 * 1000,
+    maxLegacyAnonymousPersistedAgeMs: 24 * 60 * 60 * 1000,
+  }), {
+    drafts: {
+      [buildPetPalMessageComposerStorageKey({
+        orderId: 'order-adopt',
+        userId: 'user-1',
+        scope: 'owner',
+      })]: {
+        content: 'legacy draft',
+        attachments: [],
+      },
+    },
+    recoveries: {
+      [buildPetPalMessageComposerStorageKey({
+        orderId: 'order-adopt',
+        userId: 'user-1',
+        scope: 'owner',
+      })]: {
+        stage: 'upload',
+        message: 'legacy recovery',
       },
     },
   });

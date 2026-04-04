@@ -46,6 +46,14 @@ export type PersistedPetPalMessageComposerRecords = {
   recoveries: Record<string, PersistedPetPalMessageRecoveryRecord>;
 };
 
+export type ParsePersistedPetPalMessageComposerOptions = {
+  maxPersistedThreads: number;
+  maxPersistedAgeMs: number;
+  maxLegacyAnonymousPersistedAgeMs: number;
+  now?: number;
+  fallbackDraftAttachmentUploadedAtToNow?: boolean;
+};
+
 export const PETPAL_MESSAGE_COMPOSER_STORAGE_KEY_PREFIX = 'petpal-message-composer';
 export const PETPAL_MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR = '::';
 
@@ -548,3 +556,168 @@ export const toPublicPersistedPetPalMessageComposerSnapshot = (
     ]),
   ),
 });
+
+const normalizePersistedPetPalMessageComposerValue = (rawValue: unknown) => {
+  if (typeof rawValue !== 'string') {
+    return rawValue;
+  }
+
+  try {
+    return JSON.parse(rawValue) as unknown;
+  }
+  catch {
+    return null;
+  }
+};
+
+const toPersistedPetPalMessageDraftRecord = (
+  storageKey: string,
+  rawValue: unknown,
+  fallbackUpdatedAt: string,
+  options: {
+    fallbackDraftAttachmentUploadedAtToNow?: boolean;
+  } = {},
+): PersistedPetPalMessageDraftRecord | null => {
+  if (!isRecord(rawValue)) {
+    return null;
+  }
+
+  const draft = parsePetPalMessageDraftState(rawValue, options.fallbackDraftAttachmentUploadedAtToNow
+    ? { fallbackUploadedAt: fallbackUpdatedAt }
+    : undefined);
+  if (!draft) {
+    return null;
+  }
+
+  const identity = resolvePersistedPetPalMessageComposerIdentity(storageKey, rawValue);
+  if (!identity) {
+    return null;
+  }
+
+  const updatedAt = typeof rawValue.updatedAt === 'string' && toTimestamp(rawValue.updatedAt)
+    ? rawValue.updatedAt
+    : fallbackUpdatedAt;
+
+  return {
+    ...clonePetPalMessageDraftState(draft),
+    orderId: identity.orderId,
+    userId: identity.userId,
+    updatedAt,
+    scope: identity.scope,
+  };
+};
+
+const toPersistedPetPalMessageRecoveryRecord = (
+  storageKey: string,
+  rawValue: unknown,
+  fallbackUpdatedAt: string,
+): PersistedPetPalMessageRecoveryRecord | null => {
+  if (!isRecord(rawValue)) {
+    return null;
+  }
+
+  const recovery = parsePetPalMessageRecoveryState(rawValue);
+  if (!recovery) {
+    return null;
+  }
+
+  const identity = resolvePersistedPetPalMessageComposerIdentity(storageKey, rawValue);
+  if (!identity) {
+    return null;
+  }
+
+  const updatedAt = typeof rawValue.updatedAt === 'string' && toTimestamp(rawValue.updatedAt)
+    ? rawValue.updatedAt
+    : fallbackUpdatedAt;
+
+  return {
+    orderId: identity.orderId,
+    userId: identity.userId,
+    stage: recovery.stage,
+    message: recovery.message,
+    updatedAt,
+    scope: identity.scope,
+  };
+};
+
+export const parsePersistedPetPalMessageComposerRecords = (
+  rawValue: unknown,
+  options: ParsePersistedPetPalMessageComposerOptions,
+): PersistedPetPalMessageComposerRecords => {
+  const {
+    maxPersistedThreads,
+    maxPersistedAgeMs,
+    maxLegacyAnonymousPersistedAgeMs,
+    now = Date.now(),
+    fallbackDraftAttachmentUploadedAtToNow = false,
+  } = options;
+  const normalized = normalizePersistedPetPalMessageComposerValue(rawValue);
+  if (!isRecord(normalized)) {
+    return createEmptyPersistedPetPalMessageComposerRecords();
+  }
+
+  const fallbackUpdatedAt = new Date(now).toISOString();
+  const rawDrafts = isRecord(normalized.drafts) ? normalized.drafts : {};
+  const drafts = Object.fromEntries(
+    Object.entries(rawDrafts).flatMap(([storageKey, rawDraft]) => {
+      const draft = toPersistedPetPalMessageDraftRecord(storageKey, rawDraft, fallbackUpdatedAt, {
+        fallbackDraftAttachmentUploadedAtToNow,
+      });
+      if (!draft) {
+        return [];
+      }
+
+      return [[buildPetPalMessageComposerStorageKey({
+        orderId: draft.orderId,
+        userId: draft.userId,
+        scope: draft.scope,
+      }), draft] as const];
+    }),
+  );
+
+  const rawRecoveries = isRecord(normalized.recoveries) ? normalized.recoveries : {};
+  const recoveries = Object.fromEntries(
+    Object.entries(rawRecoveries).flatMap(([storageKey, rawRecovery]) => {
+      const recovery = toPersistedPetPalMessageRecoveryRecord(storageKey, rawRecovery, fallbackUpdatedAt);
+      if (!recovery) {
+        return [];
+      }
+
+      return [[buildPetPalMessageComposerStorageKey({
+        orderId: recovery.orderId,
+        userId: recovery.userId,
+        scope: recovery.scope,
+      }), recovery] as const];
+    }),
+  );
+
+  return compactPersistedPetPalMessageComposerRecords({
+    drafts,
+    recoveries,
+  }, {
+    now,
+    maxPersistedThreads,
+    maxPersistedAgeMs,
+    maxLegacyAnonymousPersistedAgeMs,
+  });
+};
+
+export const parsePersistedPetPalMessageComposerSnapshot = (
+  rawValue: unknown,
+  options: ParsePersistedPetPalMessageComposerOptions,
+): PersistedPetPalMessageComposerSnapshot =>
+  toPublicPersistedPetPalMessageComposerSnapshot(
+    parsePersistedPetPalMessageComposerRecords(rawValue, options),
+  );
+
+export const adoptLegacyPetPalMessageComposerSnapshot = (
+  rawValue: unknown,
+  identity: PetPalMessageComposerIdentity,
+  options: ParsePersistedPetPalMessageComposerOptions,
+): PersistedPetPalMessageComposerSnapshot => {
+  const snapshot = parsePersistedPetPalMessageComposerRecords(rawValue, options);
+  return toPublicPersistedPetPalMessageComposerSnapshot({
+    drafts: adoptLegacyPetPalMessageComposerRecordsForIdentity(snapshot.drafts, identity),
+    recoveries: adoptLegacyPetPalMessageComposerRecordsForIdentity(snapshot.recoveries, identity),
+  });
+};
