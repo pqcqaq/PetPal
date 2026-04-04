@@ -4,15 +4,14 @@ import {
   cloneManagedAttachmentRecords,
   clonePetPalMessageDraftState as cloneSharedPetPalMessageDraftState,
   compactPersistedPetPalMessageComposerRecords as compactSharedPersistedPetPalMessageComposerRecords,
+  clearPetPalMessageComposerRecordsForIdentity,
   createPersistedPetPalMessageComposerCompactionOptions,
   createPersistedPetPalMessageComposerParseOptions,
   createEmptyPersistedPetPalMessageComposerRecords,
   getPetPalMessageComposerEntryWithLegacyAdoption,
-  getPetPalMessageComposerKeysToClear,
   parsePersistedPetPalMessageComposerRecords as parseSharedPersistedPetPalMessageComposerRecords,
   parsePersistedPetPalMessageComposerSnapshot as parseSharedPersistedPetPalMessageComposerSnapshot,
   resolvePetPalMessageComposerIdentity,
-  stripSharedPetPalMessageComposerRecord,
   type PetPalMessageComposerIdentity as SharedPetPalMessageComposerIdentity,
   type PetPalMessageComposerScope as SharedPetPalMessageComposerScope,
   type PetPalMessageComposerVersionedRecord,
@@ -24,6 +23,8 @@ import {
   type PetPalMessageDraftState as SharedPetPalMessageDraftState,
   type PetPalMessageRecoveryStage as SharedPetPalMessageRecoveryStage,
   type PetPalMessageRecoveryState as SharedPetPalMessageRecoveryState,
+  upsertPersistedPetPalMessageDraftRecord,
+  upsertPersistedPetPalMessageRecoveryRecord,
 } from '@rbac/api-common'
 import { ref } from 'vue'
 
@@ -208,15 +209,11 @@ export function restorePetPalMessageDraft(identity: PetPalMessageComposerIdentit
 }
 
 export function clearPetPalMessageDraft(identity: PetPalMessageComposerIdentity) {
-  const keysToClear = getPetPalMessageComposerKeysToClear(messageDrafts.value, identity)
-  if (!keysToClear.length) {
+  const nextDrafts = clearPetPalMessageComposerRecordsForIdentity(messageDrafts.value, identity)
+  if (nextDrafts === messageDrafts.value) {
     return
   }
 
-  const nextDrafts = { ...messageDrafts.value }
-  keysToClear.forEach((storageKey) => {
-    delete nextDrafts[storageKey]
-  })
   messageDrafts.value = nextDrafts
   syncPersistedPetPalMessageComposerSnapshot()
 }
@@ -247,17 +244,10 @@ export function persistPetPalMessageDraft(
     return
   }
 
-  messageDrafts.value = {
-    ...stripSharedPetPalMessageComposerRecord(messageDrafts.value, resolvedIdentity),
-    [buildPetPalMessageComposerStorageKey(resolvedIdentity)]: {
-      orderId: resolvedIdentity.orderId,
-      userId: resolvedIdentity.userId,
-      content,
-      attachments: nextAttachments,
-      updatedAt: new Date().toISOString(),
-      scope: resolvedIdentity.scope,
-    },
-  }
+  messageDrafts.value = upsertPersistedPetPalMessageDraftRecord(messageDrafts.value, resolvedIdentity, {
+    content,
+    attachments: nextAttachments,
+  })
   syncPersistedPetPalMessageComposerSnapshot()
 }
 
@@ -279,15 +269,11 @@ export function getPetPalMessageRecovery(identity: PetPalMessageComposerIdentity
 }
 
 export function clearPetPalMessageRecovery(identity: PetPalMessageComposerIdentity) {
-  const keysToClear = getPetPalMessageComposerKeysToClear(messageRecoveries.value, identity)
-  if (!keysToClear.length) {
+  const nextRecoveries = clearPetPalMessageComposerRecordsForIdentity(messageRecoveries.value, identity)
+  if (nextRecoveries === messageRecoveries.value) {
     return
   }
 
-  const nextRecoveries = { ...messageRecoveries.value }
-  keysToClear.forEach((storageKey) => {
-    delete nextRecoveries[storageKey]
-  })
   messageRecoveries.value = nextRecoveries
   syncPersistedPetPalMessageComposerSnapshot()
 }
@@ -305,16 +291,9 @@ export function setPetPalMessageRecovery(
     return
   }
 
-  messageRecoveries.value = {
-    ...stripSharedPetPalMessageComposerRecord(messageRecoveries.value, resolvedIdentity),
-    [buildPetPalMessageComposerStorageKey(resolvedIdentity)]: {
-      orderId: resolvedIdentity.orderId,
-      userId: resolvedIdentity.userId,
-      stage,
-      message,
-      updatedAt: new Date().toISOString(),
-      scope: resolvedIdentity.scope,
-    },
-  }
+  messageRecoveries.value = upsertPersistedPetPalMessageRecoveryRecord(messageRecoveries.value, resolvedIdentity, {
+    stage,
+    message,
+  })
   syncPersistedPetPalMessageComposerSnapshot()
 }

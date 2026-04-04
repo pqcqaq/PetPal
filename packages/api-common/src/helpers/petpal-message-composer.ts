@@ -394,6 +394,24 @@ export const getPetPalMessageComposerKeysToClear = <
     .filter((storageKey, index, source) => source.indexOf(storageKey) === index);
 };
 
+export const clearPetPalMessageComposerRecordsForIdentity = <
+  T extends PetPalMessageComposerVersionedRecord,
+>(
+  records: Record<string, T>,
+  identity: PetPalMessageComposerIdentity,
+) => {
+  const keysToClear = getPetPalMessageComposerKeysToClear(records, identity);
+  if (!keysToClear.length) {
+    return records;
+  }
+
+  const nextRecords = { ...records };
+  keysToClear.forEach((storageKey) => {
+    delete nextRecords[storageKey];
+  });
+  return nextRecords;
+};
+
 export const createEmptyPersistedPetPalMessageComposerRecords = (): PersistedPetPalMessageComposerRecords => ({
   drafts: {},
   recoveries: {},
@@ -448,6 +466,43 @@ export const parsePetPalMessageRecoveryState = (
     message,
   };
 };
+
+export const upsertPersistedPetPalMessageDraftRecord = (
+  records: Record<string, PersistedPetPalMessageDraftRecord>,
+  identity: ResolvedPetPalMessageComposerIdentity,
+  draft: PetPalMessageDraftState,
+  options: {
+    updatedAt?: string;
+  } = {},
+) => ({
+  ...stripSharedPetPalMessageComposerRecord(records, identity),
+  [buildPetPalMessageComposerStorageKey(identity)]: {
+    ...clonePetPalMessageDraftState(draft),
+    orderId: identity.orderId,
+    userId: identity.userId,
+    updatedAt: options.updatedAt ?? new Date().toISOString(),
+    scope: identity.scope,
+  } satisfies PersistedPetPalMessageDraftRecord,
+});
+
+export const upsertPersistedPetPalMessageRecoveryRecord = (
+  records: Record<string, PersistedPetPalMessageRecoveryRecord>,
+  identity: ResolvedPetPalMessageComposerIdentity,
+  recovery: PetPalMessageRecoveryState,
+  options: {
+    updatedAt?: string;
+  } = {},
+) => ({
+  ...stripSharedPetPalMessageComposerRecord(records, identity),
+  [buildPetPalMessageComposerStorageKey(identity)]: {
+    orderId: identity.orderId,
+    userId: identity.userId,
+    stage: recovery.stage,
+    message: recovery.message,
+    updatedAt: options.updatedAt ?? new Date().toISOString(),
+    scope: identity.scope,
+  } satisfies PersistedPetPalMessageRecoveryRecord,
+});
 
 export const compactPersistedPetPalMessageComposerRecords = (
   snapshot: PersistedPetPalMessageComposerRecords,

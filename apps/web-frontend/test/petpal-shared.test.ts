@@ -4,6 +4,7 @@ import {
   adoptLegacyPetPalMessageComposerSnapshot,
   adoptLegacyPetPalMessageComposerRecordsForIdentity,
   buildPetPalMessageComposerStorageKey,
+  clearPetPalMessageComposerRecordsForIdentity,
   cloneManagedAttachmentRecords,
   clonePetPalMessageDraftState,
   compactPersistedPetPalMessageComposerRecords,
@@ -40,6 +41,8 @@ import {
   resolvePersistedPetPalMessageComposerIdentity,
   resolvePetPalMessageComposerIdentity,
   toPublicPersistedPetPalMessageComposerSnapshot,
+  upsertPersistedPetPalMessageDraftRecord,
+  upsertPersistedPetPalMessageRecoveryRecord,
 } from '@rbac/api-common';
 import {
   getPetPalCaregiverAuditLabel,
@@ -380,6 +383,85 @@ test('resolves petpal message composer entries with legacy adoption when needed'
       attachments: [],
     },
   });
+});
+
+test('upserts and clears persisted petpal message composer records predictably', () => {
+  const ownerIdentity = {
+    orderId: 'order-mutate',
+    userId: 'user-1',
+    scope: 'owner',
+  } as const;
+  const sharedIdentity = {
+    orderId: 'order-mutate',
+    userId: 'user-1',
+    scope: 'shared',
+  } as const;
+
+  const draftRecords = upsertPersistedPetPalMessageDraftRecord({
+    [buildPetPalMessageComposerStorageKey(sharedIdentity)]: {
+      orderId: 'order-mutate',
+      userId: 'user-1',
+      scope: 'shared',
+      updatedAt: '2026-04-04T08:00:00.000Z',
+      content: 'shared draft',
+      attachments: [],
+    },
+  }, ownerIdentity, {
+    content: 'owner draft',
+    attachments: [],
+  }, {
+    updatedAt: '2026-04-04T10:00:00.000Z',
+  });
+
+  assert.deepEqual(draftRecords, {
+    [buildPetPalMessageComposerStorageKey(ownerIdentity)]: {
+      orderId: 'order-mutate',
+      userId: 'user-1',
+      scope: 'owner',
+      updatedAt: '2026-04-04T10:00:00.000Z',
+      content: 'owner draft',
+      attachments: [],
+    },
+  });
+
+  const recoveryRecords = upsertPersistedPetPalMessageRecoveryRecord({
+    [buildPetPalMessageComposerStorageKey(sharedIdentity)]: {
+      orderId: 'order-mutate',
+      userId: 'user-1',
+      scope: 'shared',
+      updatedAt: '2026-04-04T08:30:00.000Z',
+      stage: 'upload',
+      message: 'shared recovery',
+    },
+  }, ownerIdentity, {
+    stage: 'send',
+    message: 'owner recovery',
+  }, {
+    updatedAt: '2026-04-04T10:30:00.000Z',
+  });
+
+  assert.deepEqual(recoveryRecords, {
+    [buildPetPalMessageComposerStorageKey(ownerIdentity)]: {
+      orderId: 'order-mutate',
+      userId: 'user-1',
+      scope: 'owner',
+      updatedAt: '2026-04-04T10:30:00.000Z',
+      stage: 'send',
+      message: 'owner recovery',
+    },
+  });
+
+  assert.deepEqual(clearPetPalMessageComposerRecordsForIdentity({
+    ...draftRecords,
+    [buildPetPalMessageComposerStorageKey(sharedIdentity)]: {
+      orderId: 'order-mutate',
+      userId: 'user-1',
+      scope: 'shared',
+      updatedAt: '2026-04-04T07:00:00.000Z',
+      content: 'older shared draft',
+      attachments: [],
+    },
+  }, ownerIdentity), {});
 });
 
 test('creates, compacts and exposes persisted petpal message composer snapshots', () => {
