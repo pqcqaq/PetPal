@@ -5,6 +5,8 @@ import {
   cloneManagedAttachmentRecords,
   clonePetPalMessageDraftState as cloneSharedPetPalMessageDraftState,
   compactPersistedPetPalMessageComposerRecords as compactSharedPersistedPetPalMessageComposerRecords,
+  createPersistedPetPalMessageComposerCompactionOptions,
+  createPersistedPetPalMessageComposerParseOptions,
   createEmptyPersistedPetPalMessageComposerRecords,
   getPetPalMessageComposerEntry,
   getPetPalMessageComposerKeysToClear,
@@ -44,9 +46,6 @@ type PersistedPetPalMessageRecoveryRecord = SharedPersistedPetPalMessageRecovery
 type PersistedPetPalMessageComposerRecords = SharedPersistedPetPalMessageComposerRecords
 
 const STORAGE_KEY = 'petpal-message-composer-state-v1'
-const MAX_PERSISTED_THREADS = 12
-const MAX_PERSISTED_AGE_MS = 7 * 24 * 60 * 60 * 1000
-const MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS = 24 * 60 * 60 * 1000
 
 export const buildPetPalMessageComposerStorageKey = buildSharedPetPalMessageComposerStorageKey
 
@@ -56,13 +55,6 @@ const cloneMessageDraftAttachments = (attachments: PetPalMessageDraftAttachment[
 const cloneMessageDraftState = (draft: PetPalMessageDraftState): PetPalMessageDraftState =>
   cloneSharedPetPalMessageDraftState(draft)
 
-const getSharedPersistedPetPalMessageComposerParseOptions = (now = Date.now()) => ({
-  now,
-  maxPersistedThreads: MAX_PERSISTED_THREADS,
-  maxPersistedAgeMs: MAX_PERSISTED_AGE_MS,
-  maxLegacyAnonymousPersistedAgeMs: MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS,
-})
-
 export function parsePersistedPetPalMessageComposerSnapshot(
   rawValue: unknown,
   options: {
@@ -71,7 +63,9 @@ export function parsePersistedPetPalMessageComposerSnapshot(
 ): PersistedPetPalMessageComposerSnapshot {
   return parseSharedPersistedPetPalMessageComposerSnapshot(
     rawValue,
-    getSharedPersistedPetPalMessageComposerParseOptions(options.now),
+    createPersistedPetPalMessageComposerParseOptions({
+      now: options.now,
+    }),
   )
 }
 
@@ -85,7 +79,9 @@ export function adoptLegacyPetPalMessageComposerSnapshot(
   return adoptSharedPetPalMessageComposerSnapshot(
     rawValue,
     identity,
-    getSharedPersistedPetPalMessageComposerParseOptions(options.now),
+    createPersistedPetPalMessageComposerParseOptions({
+      now: options.now,
+    }),
   )
 }
 
@@ -102,7 +98,9 @@ const parsePersistedPetPalMessageComposerStorageValue = (
   try {
     return parseSharedPersistedPetPalMessageComposerRecords(
       rawValue,
-      getSharedPersistedPetPalMessageComposerParseOptions(now),
+      createPersistedPetPalMessageComposerParseOptions({
+        now,
+      }),
     )
   }
   catch {
@@ -169,11 +167,7 @@ function syncPersistedPetPalMessageComposerSnapshot() {
     const compactedSnapshot = compactSharedPersistedPetPalMessageComposerRecords({
       drafts: messageDrafts.value,
       recoveries: messageRecoveries.value,
-    }, {
-      maxPersistedThreads: MAX_PERSISTED_THREADS,
-      maxPersistedAgeMs: MAX_PERSISTED_AGE_MS,
-      maxLegacyAnonymousPersistedAgeMs: MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS,
-    })
+    }, createPersistedPetPalMessageComposerCompactionOptions())
 
     messageDrafts.value = compactedSnapshot.drafts
     messageRecoveries.value = compactedSnapshot.recoveries

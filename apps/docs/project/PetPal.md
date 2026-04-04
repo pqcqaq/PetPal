@@ -7883,6 +7883,59 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.257 2026-04-04（P3-M1 Slice 257）
+
+**概述**：上一轮已经把 persisted snapshot 的 parse/adopt scaffolding 下沉到共享层，但 Web / App 两份 `message-composer-state.ts` 里仍各自保留了 retention 默认值、compaction 选项和 parse 选项组装。本轮继续沿同一条收口线，把这批持久化策略默认值和选项工厂也提升到 `@rbac/api-common`，继续避免双端策略口径漂移。
+
+已完成：
+
+- 共享 persisted snapshot retention 默认值与 options helper 已继续落到 `api-common`：
+  - `packages/api-common/src/helpers/petpal-message-composer.ts`
+    - 新增 `CompactPersistedPetPalMessageComposerOptions`。
+    - 新增 `PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_PERSISTED_THREADS`、`PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_PERSISTED_AGE_MS`、`PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS`。
+    - 新增 `createPersistedPetPalMessageComposerCompactionOptions(...)`、`createPersistedPetPalMessageComposerParseOptions(...)`。
+- Web / App 消息状态模块已切到共享 retention 默认值与 options helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts`
+    - 本地不再手写 `12 / 7 天 / 24 小时` retention 常量，也不再手写 parse option / compaction option 组装。
+    - Web 端继续只在调用 parse 选项工厂时追加 `fallbackDraftAttachmentUploadedAtToNow: true`，保持旧附件 `uploadedAt` 兼容回填。
+  - `apps/app-frontend/src/pages/petpal/message-composer-state.ts`
+    - App 端同一批 retention 默认值与 options helper 也已切到共享层，不再维护第二份策略常量和选项组装。
+- 定向测试与文档同步：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补 retention 默认值常量和 options helper 稳定性断言。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-message-composer-state.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改消息发送协议、消息草稿缓存裁剪行为或双端存储介质，只继续收口 persisted snapshot 的 retention 默认值和 options helper。
+- 已确认 Web / App 两端现在都会复用同一套默认 retention 策略和选项工厂，消息状态模块的纯配置重复继续下降。
+- 已确认 Web 端旧附件 `uploadedAt` fallback 仍然只在 Web 端显式开启，App 端不会被动继承这条兼容逻辑。
+
+风险与缓解：
+
+- 风险：当前双端状态模块里剩余的重复已经非常薄，继续强行共享可能开始侵入端侧存储差异。
+- 缓解：本轮先收完策略默认值和 option 组装，下一轮会先重新评估性价比，再决定是否继续推进消息状态共享化或转向其它更高收益的 PetPal 收口点。
+
+- 风险：共享默认值现在会同时影响 Web / App，后续如果要改 retention 策略，需要同步评估双端旧缓存行为。
+- 缓解：本轮已补共享默认值直测和现有消息状态回归测试，后续如要调 retention 口径，仍可先在共享测试里锁住目标行为再推进。
+
+下一步（1-3）：
+
+1. 重新评估消息状态模块里剩余的 storage glue 是否还值得继续抽象，避免为去重牺牲端侧可读性。
+2. 继续检查 PetPal 其它状态模块里是否有类似“共享规则已抽出，但默认值/选项组装仍重复”的模式。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.256 2026-04-04（P3-M1 Slice 256）
 
 **概述**：上一轮已经把 persisted snapshot 类型、空快照工厂、快照裁剪和 public snapshot 转换下沉到共享层，但 Web / App 两份 `message-composer-state.ts` 里仍各自保留了原始值 JSON 归一化、persisted records/snapshot 解析和 legacy snapshot 认领流程。本轮继续沿同一条收口线，把这批 parse scaffolding 也提升到 `@rbac/api-common`，同时继续保留 Web 专属的旧附件 `uploadedAt` 回填开关，避免把兼容策略误扩散到 App。

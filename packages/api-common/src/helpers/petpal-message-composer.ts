@@ -46,16 +46,22 @@ export type PersistedPetPalMessageComposerRecords = {
   recoveries: Record<string, PersistedPetPalMessageRecoveryRecord>;
 };
 
-export type ParsePersistedPetPalMessageComposerOptions = {
+export type CompactPersistedPetPalMessageComposerOptions = {
   maxPersistedThreads: number;
   maxPersistedAgeMs: number;
   maxLegacyAnonymousPersistedAgeMs: number;
   now?: number;
+};
+
+export type ParsePersistedPetPalMessageComposerOptions = CompactPersistedPetPalMessageComposerOptions & {
   fallbackDraftAttachmentUploadedAtToNow?: boolean;
 };
 
 export const PETPAL_MESSAGE_COMPOSER_STORAGE_KEY_PREFIX = 'petpal-message-composer';
 export const PETPAL_MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR = '::';
+export const PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_PERSISTED_THREADS = 12;
+export const PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_PERSISTED_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS = 24 * 60 * 60 * 1000;
 
 const normalizeMessageComposerScope = (value: unknown): PetPalMessageComposerScope =>
   value === 'owner' || value === 'caregiver' ? value : 'shared';
@@ -414,12 +420,7 @@ export const parsePetPalMessageRecoveryState = (
 
 export const compactPersistedPetPalMessageComposerRecords = (
   snapshot: PersistedPetPalMessageComposerRecords,
-  options: {
-    maxPersistedThreads: number;
-    maxPersistedAgeMs: number;
-    maxLegacyAnonymousPersistedAgeMs: number;
-    now?: number;
-  },
+  options: CompactPersistedPetPalMessageComposerOptions,
 ): PersistedPetPalMessageComposerRecords => {
   const {
     maxPersistedThreads,
@@ -536,6 +537,29 @@ export const compactPersistedPetPalMessageComposerRecords = (
     ),
   };
 };
+
+export const createPersistedPetPalMessageComposerCompactionOptions = (
+  options: {
+    now?: number;
+  } = {},
+): CompactPersistedPetPalMessageComposerOptions => ({
+  now: options.now,
+  maxPersistedThreads: PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_PERSISTED_THREADS,
+  maxPersistedAgeMs: PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_PERSISTED_AGE_MS,
+  maxLegacyAnonymousPersistedAgeMs: PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS,
+});
+
+export const createPersistedPetPalMessageComposerParseOptions = (
+  options: {
+    now?: number;
+    fallbackDraftAttachmentUploadedAtToNow?: boolean;
+  } = {},
+): ParsePersistedPetPalMessageComposerOptions => ({
+  ...createPersistedPetPalMessageComposerCompactionOptions({
+    now: options.now,
+  }),
+  fallbackDraftAttachmentUploadedAtToNow: options.fallbackDraftAttachmentUploadedAtToNow,
+});
 
 export const toPublicPersistedPetPalMessageComposerSnapshot = (
   snapshot: PersistedPetPalMessageComposerRecords,

@@ -7,6 +7,8 @@ import {
   cloneManagedAttachmentRecords,
   clonePetPalMessageDraftState,
   compactPersistedPetPalMessageComposerRecords,
+  createPersistedPetPalMessageComposerCompactionOptions,
+  createPersistedPetPalMessageComposerParseOptions,
   createEmptyPersistedPetPalMessageComposerRecords,
   createManagedAttachmentRecord,
   createManagedAttachmentRecordFromMediaAsset,
@@ -23,6 +25,9 @@ import {
   PETPAL_CAREGIVER_QUALIFICATION_UPLOAD_MAX_COUNT,
   PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT,
   PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB,
+  PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS,
+  PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_PERSISTED_AGE_MS,
+  PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_PERSISTED_THREADS,
   PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT,
   PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_MB,
   PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
@@ -233,6 +238,32 @@ test('builds and resolves petpal message composer identities in a stable way', (
     orderId: 'order-legacy',
     userId: 'user-2',
     scope: 'caregiver',
+  });
+});
+
+test('exposes stable persisted petpal message composer retention defaults', () => {
+  assert.equal(PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_PERSISTED_THREADS, 12);
+  assert.equal(PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_PERSISTED_AGE_MS, 7 * 24 * 60 * 60 * 1000);
+  assert.equal(PETPAL_MESSAGE_COMPOSER_DEFAULT_MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS, 24 * 60 * 60 * 1000);
+
+  assert.deepEqual(createPersistedPetPalMessageComposerCompactionOptions({
+    now: 123,
+  }), {
+    now: 123,
+    maxPersistedThreads: 12,
+    maxPersistedAgeMs: 7 * 24 * 60 * 60 * 1000,
+    maxLegacyAnonymousPersistedAgeMs: 24 * 60 * 60 * 1000,
+  });
+
+  assert.deepEqual(createPersistedPetPalMessageComposerParseOptions({
+    now: 456,
+    fallbackDraftAttachmentUploadedAtToNow: true,
+  }), {
+    now: 456,
+    maxPersistedThreads: 12,
+    maxPersistedAgeMs: 7 * 24 * 60 * 60 * 1000,
+    maxLegacyAnonymousPersistedAgeMs: 24 * 60 * 60 * 1000,
+    fallbackDraftAttachmentUploadedAtToNow: true,
   });
 });
 
