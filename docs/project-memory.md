@@ -203,6 +203,7 @@ Last updated: 2026-04-04
 - PetPal Web `shared.ts` 与 App `owner-shared.ts` 里的 tag 文本拆分 / 拼接 / 摘要 helper 当前也已继续收口到 `@rbac/api-common`；共享层现在通过参数保留 Web 的 `/` 分隔策略和 App 的去重策略，不再让双端各自维护第二份近似的 tag 文本处理逻辑。
 - PetPal Web `shared.ts` 与 App `owner-shared.ts` / `rebuild/shared.ts` 里的服务记录标签和订单 tone helper 当前也已继续收口到 `@rbac/api-common`；共享层现在会统一产出 `ServiceLogType` 的中文标签和订单 tone 映射，Web / App 只继续保留各自的 note 文案和页面级组合逻辑。
 - PetPal Web `shared.ts` 与 App `owner-shared.ts` 里的服务类型标签 helper 当前也已继续收口到 `@rbac/api-common`；Web 的 `getPetPalServiceTypeLabel(...)`、Web / App 两端的服务类型选项和 App 的 `serviceTypeLabels` 当前都已开始复用同一套 `PetServiceType -> 中文标签` 映射，不再各自维护第二份同构表。
+- PetPal Web `shared.ts` 与 App `owner-shared.ts` / `rebuild/shared.ts` 里的支付渠道标签 helper 当前也已继续收口到 `@rbac/api-common`；Web / App 两端的支付渠道选项当前都已开始复用同一套 `OwnerPayChannel -> 中文标签` 映射，只继续保留各自的 note 文案差异。
 
 ### 4.5 App 前端
 

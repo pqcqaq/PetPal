@@ -6,6 +6,7 @@ import {
   formatPetPalConversationMeta as formatSharedPetPalConversationMeta,
   formatPetPalConversationPreview as formatSharedPetPalConversationPreview,
   formatPetPalDate as formatSharedPetPalDate,
+  getPetPalOwnerPayChannelLabel as getSharedPetPalOwnerPayChannelLabel,
   getPetPalOrderStatusLabel as getSharedPetPalOrderStatusLabel,
   getPetPalOwnerOrderFilter as getSharedPetPalOwnerOrderFilter,
   getPetPalOrderTone as getSharedPetPalOrderTone,
@@ -26,6 +27,7 @@ import {
   type ComplaintTargetRole,
   type ComplaintType,
   type MatchCaregiverQuery,
+  type OwnerPayChannel,
   type OrderRecord,
   type OrderConversationRecord,
   type OrderStatus,
@@ -174,6 +176,10 @@ export const serviceLogTypeOptions = [
 
 export function formatAmount(value: number | string | null | undefined) {
   return formatSharedPetPalAmount(value)
+}
+
+export function getOwnerPayChannelLabel(channel: OwnerPayChannel) {
+  return getSharedPetPalOwnerPayChannelLabel(channel)
 }
 
 export function openPetPalAction(mode: 'redirect' | 'navigate', url: string) {

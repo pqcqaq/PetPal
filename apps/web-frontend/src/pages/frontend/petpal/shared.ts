@@ -7,6 +7,7 @@ import {
   formatPetPalConversationPreview as formatSharedPetPalConversationPreview,
   formatPetPalDate,
   formatPetPalMoney,
+  getPetPalOwnerPayChannelLabel as getSharedPetPalOwnerPayChannelLabel,
   getPetPalOrderStatusLabel as getSharedPetPalOrderStatusLabel,
   getPetPalRefundProgressStageHint as getSharedPetPalRefundProgressStageHint,
   getPetPalRefundProgressStageLabel as getSharedPetPalRefundProgressStageLabel,
@@ -70,9 +71,9 @@ export const petPalSpeciesOptions: Array<{ label: string; value: PetSpecies }> =
 ];
 
 export const petPalPayChannelOptions: Array<{ label: string; value: OwnerPayChannel; note: string }> = [
-  { label: '微信支付', value: 'WECHAT_PAY', note: '适合快速完成下单' },
-  { label: '支付宝', value: 'ALIPAY', note: '适合常用移动支付' },
-  { label: '余额支付', value: 'BALANCE', note: '适合账户内已有余额' },
+  { label: getSharedPetPalOwnerPayChannelLabel('WECHAT_PAY'), value: 'WECHAT_PAY', note: '适合快速完成下单' },
+  { label: getSharedPetPalOwnerPayChannelLabel('ALIPAY'), value: 'ALIPAY', note: '适合常用移动支付' },
+  { label: getSharedPetPalOwnerPayChannelLabel('BALANCE'), value: 'BALANCE', note: '适合账户内已有余额' },
 ];
 
 export const petPalReviewTagOptions = [

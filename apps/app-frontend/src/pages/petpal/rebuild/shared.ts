@@ -30,6 +30,7 @@ import {
   getConversationHint,
   getConversationPreview,
   getConversationUnreadCount,
+  getOwnerPayChannelLabel,
   getOrderTone,
   getOrderStatusLabel,
   getRefundProgressStageHint,
@@ -55,9 +56,9 @@ export const REGISTER_PAGE = '/pages/auth/register'
 export const PETPAL_SETTINGS_PAGE = '/pages/settings/index'
 
 export const payChannelOptions: Array<{ label: string, value: OwnerPayChannel, note: string }> = [
-  { label: '微信支付', value: 'WECHAT_PAY', note: '适合快速完成下单' },
-  { label: '支付宝', value: 'ALIPAY', note: '适合常用移动支付' },
-  { label: '余额支付', value: 'BALANCE', note: '如果账户余额已充值' },
+  { label: getOwnerPayChannelLabel('WECHAT_PAY'), value: 'WECHAT_PAY', note: '适合快速完成下单' },
+  { label: getOwnerPayChannelLabel('ALIPAY'), value: 'ALIPAY', note: '适合常用移动支付' },
+  { label: getOwnerPayChannelLabel('BALANCE'), value: 'BALANCE', note: '如果账户余额已充值' },
 ]
 
 export const reviewTagOptions = [

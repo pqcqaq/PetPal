@@ -7883,6 +7883,59 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.268 2026-04-04（P3-M1 Slice 268）
+
+**概述**：上一轮已经把服务类型标签收口到共享层，但 Web `shared.ts` 与 App `owner-shared.ts` / `rebuild/shared.ts` 里仍各自保留了一份支付渠道中文标签。本轮继续沿“只抽纯展示 helper、不碰端侧 note 文案”的原则，把 `OwnerPayChannel` 标签 helper 提升到 `@rbac/api-common`，让双端的支付渠道选项都复用同一套标签来源。
+
+已完成：
+
+- 共享支付渠道标签 helper 已继续落到 `api-common`：
+  - `packages/api-common/src/helpers/petpal-display.ts`
+    - 新增 `getPetPalOwnerPayChannelLabel(...)`。
+    - 共享层现在会统一处理 `WECHAT_PAY / ALIPAY / BALANCE` 到中文标签的映射，不再让 Web / App 平行维护第二份相同表。
+- Web / App 已切到共享支付渠道标签 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - `petPalPayChannelOptions` 已改为通过共享 helper 生成 label。
+    - Web 端继续保留自己的支付渠道 note 文案，不把 note 抽进共享层。
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - 已新增 `getOwnerPayChannelLabel(...)` wrapper，用于给 App rebuild 层继续复用共享支付渠道标签。
+  - `apps/app-frontend/src/pages/petpal/rebuild/shared.ts`
+    - `payChannelOptions` 已改为通过共享标签 wrapper 生成 label，继续保留 App 端已有的 note 文案。
+- 定向测试与文档同步：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补支付渠道标签 helper 的稳定性断言，锁住共享展示口径。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改页面结构、支付流程或状态存储，只继续收口跨端纯展示 helper。
+- 已确认 Web / App 两端现在都会复用同一套支付渠道中文标签，但两端的 note 文案和页面布局仍保留在各自前端层。
+- 已确认本轮没有把支付渠道说明文案或其它端侧语义误抽到共享层，`api-common` 仍保持纯函数边界。
+
+风险与缓解：
+
+- 风险：支付渠道中文标签已经集中到共享层，后续若调整命名，会同时影响 Web / App 的支付选择区展示。
+- 缓解：本轮已补共享 helper 直测，后续如要调整文案，先在共享测试里锁住目标输出再推进。
+
+- 风险：展示层剩余还能继续共享的 helper 已经越来越零散，继续细拆的收益正在下降。
+- 缓解：本轮之后优先重新评估共享展示层剩余收益，必要时切回消息状态或更真实的业务页面闭环做下一块开发。
+
+下一步（1-3）：
+
+1. 继续检查共享展示层是否还有少量高收益、低风险的纯函数重复。
+2. 如果展示层剩余收益继续下降，就切回消息状态模块或订单闭环页面，选择下一块更有价值的业务收口点。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.267 2026-04-04（P3-M1 Slice 267）
 
 **概述**：上一轮已经把服务记录标签和订单 tone 收口到共享层，但 Web `shared.ts` 与 App `owner-shared.ts` 里仍各自保留了一份同构的服务类型中文映射。本轮继续沿“只抽纯展示 helper、不碰页面描述文案”的原则，把 `PetServiceType` 标签 helper 提升到 `@rbac/api-common`，并让 Web / App 的服务类型选项与 App 的 `serviceTypeLabels` 一起切到共享标签来源。

@@ -3,6 +3,7 @@ import type {
   ComplaintTargetRole,
   ComplaintType,
   OrderConversationRecord,
+  OwnerPayChannel,
   OrderStatus,
   PetServiceType,
   RefundProgressStage,
@@ -172,6 +173,12 @@ const petPalServiceTypeLabels: Record<PetServiceType, string> = {
   DOOR_VISIT: '上门陪伴',
 };
 
+const petPalOwnerPayChannelLabels: Record<OwnerPayChannel, string> = {
+  WECHAT_PAY: '微信支付',
+  ALIPAY: '支付宝',
+  BALANCE: '余额支付',
+};
+
 export const getPetPalOrderStatusLabel = (status: OrderStatus) =>
   petPalOrderStatusLabels[status] ?? status;
 
@@ -195,6 +202,9 @@ export const getPetPalComplaintStatusLabel = (status: ComplaintStatus) =>
 
 export const getPetPalServiceTypeLabel = (serviceType: PetServiceType) =>
   petPalServiceTypeLabels[serviceType] ?? serviceType;
+
+export const getPetPalOwnerPayChannelLabel = (channel: OwnerPayChannel) =>
+  petPalOwnerPayChannelLabels[channel] ?? channel;
 
 export const isPetPalOutstandingOrder = (order: {
   amountTotal: number | string | null | undefined;

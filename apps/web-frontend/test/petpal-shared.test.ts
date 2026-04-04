@@ -29,6 +29,7 @@ import {
   getPetPalMessageComposerEntryWithLegacyAdoption,
   getPetPalMessageComposerKeysToClear,
   getPetPalMessageComposerScopeWithLegacyAdoption,
+  getPetPalOwnerPayChannelLabel,
   getPetPalConversationUnreadCount,
   getPetPalOrderStatusLabel,
   getPetPalOrderTone,
@@ -192,6 +193,7 @@ test('exposes stable petpal amount, time and conversation display helpers', () =
   assert.equal(formatPetPalTagSummary(), '暂无偏好标签');
   assert.equal(getPetPalServiceLogTypeLabel('PLAY'), '互动陪伴');
   assert.equal(getPetPalServiceTypeLabel('DOOR_VISIT'), '上门陪伴');
+  assert.equal(getPetPalOwnerPayChannelLabel('BALANCE'), '余额支付');
   assert.equal(getPetPalOrderTone('PARTIAL_REFUNDED'), 'danger');
 });
 
