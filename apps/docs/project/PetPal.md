@@ -7883,6 +7883,46 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.250 2026-04-04（P3-M1 Slice 250）
+
+**概述**：上一轮已经把资质上传、投诉证据上传、后台整改材料详情和 backend 整改附件解析切到共享 `ManagedAttachmentRecord` builder，但 Web 消息链路里仍有两处残留页面继续手写消息附件快照对象。本轮继续沿同一条线，把订单详情与跨订单消息中心的上传回填也切到共享 helper，结束这一批 Web 消息附件字段拷贝。
+
+已完成：
+
+- Web 消息附件上传回填已切到共享 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/OrderDetailView.vue`
+    - 订单详情沟通区上传成功后的消息附件快照改走 `createManagedAttachmentRecord(...)`。
+    - 页面不再内联拷贝 `fileId / url / name / size / mimeType` 五个字段。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalMessagesView.vue`
+    - 跨订单消息中心上传成功后的消息附件快照也改走同一 helper。
+    - 与订单详情页现在共享同一套消息附件回填口径，不再保留第二份页面内联对象构造。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+  - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改消息发送协议、草稿持久化结构或后端消息接口，只继续收口 Web 侧上传成功后的附件快照构造。
+- 已确认订单详情页和跨订单消息中心现在都会复用同一套 `ManagedAttachmentRecord` builder，消息附件回填字段不再在两个页面平行维护。
+
+风险与缓解：
+
+- 风险：Web 消息草稿持久化类型本身仍是页面专用 `PetPalMessageDraftAttachment`，尚未直接提升为共享附件类型。
+- 缓解：这层当前仍承载本地缓存语义；先把上传回填口径统一，后续若要推进草稿结构共享，再单独开新 slice 处理状态层，不在本轮混改。
+
+下一步（1-3）：
+
+1. 继续评估 Web / App 消息草稿附件类型是否也要逐步向共享附件类型收口。
+2. 继续评估是否还有残余 `MediaAsset -> 业务附件快照` 映射仍散落在其他页面或测试辅助里。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.249 2026-04-04（P3-M1 Slice 249）
 
 **概述**：前两轮已经把 PetPal 附件标签、限额和处罚整改数量上限收口到 `@rbac/api-common`，但 Web / App / backend 里把上传结果或 `MediaAsset` 明细再拼成 `ManagedAttachmentRecord` 的逻辑仍然重复存在。本轮继续沿同一条收口线，把受管附件快照构造抽成共享 helper，并把各端现有调用点切到同一来源。

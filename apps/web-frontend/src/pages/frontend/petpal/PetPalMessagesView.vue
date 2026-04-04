@@ -261,6 +261,7 @@
 <script setup lang="ts">
 import type { CaregiverOrderRecord, OrderConversationDetailRecord, OrderRecord } from '@rbac/api-common';
 import {
+  createManagedAttachmentRecord,
   PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_COUNT,
   PETPAL_ORDER_MESSAGE_ATTACHMENT_MAX_SIZE_BYTES,
   PETPAL_ORDER_MESSAGE_ATTACHMENT_TAG,
@@ -781,13 +782,14 @@ async function handleMessageAttachmentChange(event: Event) {
       reportProgress();
       messageAttachments.value = [
         ...messageAttachments.value,
-        {
+        createManagedAttachmentRecord({
           fileId: uploaded.fileId,
           url: uploaded.url,
           name: file.name,
           size: file.size,
           mimeType: file.type || 'application/octet-stream',
-        },
+          uploadedAt: new Date(),
+        }),
       ];
     }
 
