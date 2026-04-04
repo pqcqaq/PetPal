@@ -21,6 +21,7 @@ import {
   type AftersalesFilter,
   type ConversationRole,
   type MessagesFilter,
+  type PetPalOrderDetailEntryReason,
   type PetPalNotificationDrivenOrderDetailSource,
   type PetPalOrderDetailTab,
   type ReminderScope,
@@ -65,6 +66,7 @@ export interface AppNotificationItem {
   actionAftersalesFilter?: AftersalesFilter
   actionReminderScope?: ReminderScope
   actionOrderTab?: PetPalOrderDetailTab
+  actionOrderReason?: PetPalOrderDetailEntryReason
   sortAt: number
   updatedAtKey: string
 }
@@ -236,6 +238,7 @@ function buildNotificationItems(payload: {
       actionMode: 'navigate',
       actionOrderId: upcomingOrder.id,
       actionOrderTab: 'overview',
+      actionOrderReason: 'upcoming-order',
       sortAt: dayjs(upcomingOrder.appointmentStart).valueOf(),
       updatedAtKey: `owner-upcoming:${upcomingOrder.id}:${upcomingOrder.updatedAt}`,
     }))
@@ -255,7 +258,9 @@ function buildNotificationItems(payload: {
       actionOrderId: topOwnerUnreadOrder?.id,
       actionRole: 'owner',
       actionMessagesFilter: 'UNREAD',
-      ...(ownerUnreadOrders.length === 1 && topOwnerUnreadOrder?.id ? { actionOrderTab: 'chat' as const } : {}),
+      ...(ownerUnreadOrders.length === 1 && topOwnerUnreadOrder?.id
+        ? { actionOrderTab: 'chat' as const, actionOrderReason: 'unread-messages' as const }
+        : {}),
       sortAt: ownerUnreadLatestAt ? dayjs(ownerUnreadLatestAt).valueOf() : 3,
       updatedAtKey: `owner-unread:${ownerUnreadCount}:${ownerUnreadLatestAt || 'none'}`,
     }))
@@ -278,7 +283,9 @@ function buildNotificationItems(payload: {
       actionMode: 'redirect',
       actionOrderId: topOwnerAftersalesOrder?.id,
       actionAftersalesFilter: 'HIGH',
-      ...(ownerAftersalesOrders.length === 1 && topOwnerAftersalesOrder?.id ? { actionOrderTab: 'aftersales' as const } : {}),
+      ...(ownerAftersalesOrders.length === 1 && topOwnerAftersalesOrder?.id
+        ? { actionOrderTab: 'aftersales' as const, actionOrderReason: 'aftersales-followup' as const }
+        : {}),
       sortAt: latestAftersalesAt ? dayjs(latestAftersalesAt).valueOf() : 4,
       updatedAtKey: `owner-aftersales:${ownerAftersalesOrders.length}:${latestAftersalesAt || 'none'}`,
     }))
@@ -365,7 +372,9 @@ function buildNotificationItems(payload: {
       actionUrl: PETPAL_CAREGIVER_ORDERS_PAGE,
       actionMode: 'redirect',
       actionOrderId: topCaregiverPendingOrder?.id,
-      ...(caregiverPendingOrders.length === 1 && topCaregiverPendingOrder?.id ? { actionOrderTab: 'service' as const } : {}),
+      ...(caregiverPendingOrders.length === 1 && topCaregiverPendingOrder?.id
+        ? { actionOrderTab: 'service' as const, actionOrderReason: 'pending-accept' as const }
+        : {}),
       sortAt: latestPendingAt ? dayjs(latestPendingAt).valueOf() : 7,
       updatedAtKey: `caregiver-pending:${caregiverPendingOrders.length}:${latestPendingAt || 'none'}`,
     }))
@@ -387,7 +396,9 @@ function buildNotificationItems(payload: {
       actionUrl: PETPAL_CAREGIVER_ORDERS_PAGE,
       actionMode: 'redirect',
       actionOrderId: topCaregiverServingOrder?.id,
-      ...(caregiverServingOrders.length === 1 && topCaregiverServingOrder?.id ? { actionOrderTab: 'service' as const } : {}),
+      ...(caregiverServingOrders.length === 1 && topCaregiverServingOrder?.id
+        ? { actionOrderTab: 'service' as const, actionOrderReason: 'serving-followup' as const }
+        : {}),
       sortAt: latestServingAt ? dayjs(latestServingAt).valueOf() : 8,
       updatedAtKey: `caregiver-serving:${caregiverServingOrders.length}:${latestServingAt || 'none'}`,
     }))
@@ -407,7 +418,9 @@ function buildNotificationItems(payload: {
       actionOrderId: topCaregiverUnreadOrder?.id,
       actionRole: 'caregiver',
       actionMessagesFilter: 'UNREAD',
-      ...(caregiverUnreadOrders.length === 1 && topCaregiverUnreadOrder?.id ? { actionOrderTab: 'chat' as const } : {}),
+      ...(caregiverUnreadOrders.length === 1 && topCaregiverUnreadOrder?.id
+        ? { actionOrderTab: 'chat' as const, actionOrderReason: 'unread-messages' as const }
+        : {}),
       sortAt: caregiverUnreadLatestAt ? dayjs(caregiverUnreadLatestAt).valueOf() : 9,
       updatedAtKey: `caregiver-unread:${caregiverUnreadCount}:${caregiverUnreadLatestAt || 'none'}`,
     }))
@@ -435,7 +448,7 @@ function buildNotificationItems(payload: {
 
 export function openAppNotificationAction(item: Pick<
   AppNotificationItem,
-  'actionMode' | 'actionUrl' | 'actionOrderId' | 'actionOrderTab' | 'actionRole' | 'actionMessagesFilter' | 'actionAftersalesFilter' | 'actionReminderScope' | 'id'
+  'actionMode' | 'actionUrl' | 'actionOrderId' | 'actionOrderTab' | 'actionOrderReason' | 'actionRole' | 'actionMessagesFilter' | 'actionAftersalesFilter' | 'actionReminderScope' | 'id'
 >, options?: {
   orderDetailSource?: PetPalNotificationDrivenOrderDetailSource
 }) {
@@ -445,6 +458,7 @@ export function openAppNotificationAction(item: Pick<
       orderId: item.actionOrderId,
       tab: item.actionOrderTab,
       ...(options?.orderDetailSource ? { source: options.orderDetailSource } : {}),
+      ...(item.actionOrderReason ? { reason: item.actionOrderReason } : {}),
     })
     return
   }

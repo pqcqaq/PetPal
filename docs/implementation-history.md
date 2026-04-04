@@ -328,6 +328,11 @@ Last updated: 2026-04-04
   - `apps/app-frontend/src/store/notifications.ts` 现在会为“单笔订单即可处理”的通知补 `actionOrderTab`，单条未读沟通、单条售后、最近待接单、最近履约中订单和即将开始的订单，都会优先直达详情的对应分栏，而不是先停在消息中心、售后中心或履约队列。
   - `apps/app-frontend/src/pages/notifications/index.vue` 与 `apps/app-frontend/src/pages/petpal/reminders.vue` 打开这类单笔订单待办时，已分别带 `notifications / reminders` 来源写入订单详情 page context。
   - `apps/app-frontend/src/pages/order-detail/index.vue` 已继续补通知中心与提醒中心来源说明；`apps/web-frontend/test/petpal-shared.test.ts` 也已继续补 `source=notifications` 的回归断言。
+- 2026-04-04 已继续补 App 订单详情动态 reason 提示：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts` 的订单详情 page context 已继续补入 `reason`，支持暂存“为什么把你带到这个分栏”的轻量原因枚举。
+  - `apps/app-frontend/src/store/notifications.ts` 已开始为单笔未读沟通、即将开始订单、售后跟进、待接单和履约中订单写入更细的 `actionOrderReason`。
+  - `apps/app-frontend/src/pages/petpal/payment-result.vue`、`refund-result.vue`、`complaint-result.vue`、`review-result.vue` 进入订单详情时也已开始补 `payment / refund / complaint / review` 这类 followup reason。
+  - `apps/app-frontend/src/pages/order-detail/index.vue` 已根据 `reason` 渲染“现在先做什么”的动态提示；`apps/web-frontend/test/petpal-shared.test.ts` 也已继续补 `reason` 的 page-context 回归断言。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

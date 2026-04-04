@@ -45,6 +45,7 @@ import {
   serviceTypeLabels,
   speciesLabels,
   splitTagText,
+  type PetPalOrderDetailEntryReason,
   type PetPalOrderDetailEntrySource,
   type PetPalOrderDetailTab,
 } from '../owner-shared'
@@ -197,11 +198,17 @@ export function openRoleHome(role: 'owner' | 'caregiver') {
   openPetPalAction('redirect', role === 'caregiver' ? PETPAL_CAREGIVER_HOME_PAGE : PETPAL_OWNER_HOME_PAGE)
 }
 
-export function openOrderDetailPage(orderId: string, tab: OrderDetailTab = 'overview', source?: PetPalOrderDetailEntrySource) {
+export function openOrderDetailPage(
+  orderId: string,
+  tab: OrderDetailTab = 'overview',
+  source?: PetPalOrderDetailEntrySource,
+  reason?: PetPalOrderDetailEntryReason,
+) {
   openPetPalOrderDetailPage({
     orderId,
     tab,
     source,
+    reason,
     mode: 'navigate',
   })
 }

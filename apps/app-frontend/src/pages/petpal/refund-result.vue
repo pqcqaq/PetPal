@@ -121,7 +121,7 @@ function openComplaintResult(orderId: string) {
             v-else
             class="petpal-btn petpal-btn--secondary"
             hover-class="none"
-            @click="openOrderDetailPage(order.id, 'aftersales', 'refund-result')"
+            @click="openOrderDetailPage(order.id, 'aftersales', 'refund-result', 'refund-followup')"
           >
             回订单售后
           </button>

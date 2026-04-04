@@ -14252,3 +14252,59 @@ flowchart TD
 1. 继续评估结果页和剩余聚合待办里哪些高频动作也适合直接落到订单详情分栏。
 2. 继续补通知 / 提醒 / 结果页到订单详情之间更细的动态 notice，让当前阶段与下一步动作表达更具体。
 3. 在系统待办直达链稳定后，再继续补系统级主动提醒、推送触达和更多验收向测试。
+
+### 14.126 2026-04-04（P3-M1 Slice 274）
+
+**概述**：继续推进 App 订单详情 notice 收口，本轮在已有来源说明之外，再补一层轻量 `reason`，让通知直达和结果页回流进入详情时，首屏能直接解释“现在先做什么”。
+
+已完成：
+
+- 扩展订单详情 page-context 的动态 reason：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - 订单详情上下文已新增 `reason`，并补齐 `PetPalOrderDetailEntryReason`、校验、暂存与消费逻辑。
+  - `apps/app-frontend/src/pages/petpal/rebuild/shared.ts`
+    - `openOrderDetailPage(...)` 已开始支持可选 `reason`，后续结果页与通知直达都可共用。
+- 通知直达详情时开始补 action reason：
+  - `apps/app-frontend/src/store/notifications.ts`
+    - 即将开始订单会写入 `upcoming-order`。
+    - 单笔未读沟通会写入 `unread-messages`。
+    - 单笔售后待办会写入 `aftersales-followup`。
+    - 单笔待接单与履约中订单会分别写入 `pending-accept`、`serving-followup`。
+    - `openAppNotificationAction(...)` 直达详情时会把 `actionOrderReason` 一并写入详情 page context。
+- 结果页回流详情时开始补 followup reason：
+  - `apps/app-frontend/src/pages/petpal/payment-result.vue`
+  - `apps/app-frontend/src/pages/petpal/refund-result.vue`
+  - `apps/app-frontend/src/pages/petpal/complaint-result.vue`
+  - `apps/app-frontend/src/pages/petpal/review-result.vue`
+    - 进入订单详情时已分别补入 `payment-followup`、`refund-followup`、`complaint-followup`、`review-followup`。
+- 订单详情首屏继续补动态动作提示：
+  - `apps/app-frontend/src/pages/order-detail/index.vue`
+    - 现在会同时消费 `source + reason`。
+    - 首屏除了“从哪来”外，也会直接提示“这笔订单现在先做什么”，例如先消化未读消息、先确认退款结论、先决定是否接单等。
+- 回归测试继续覆盖：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已把订单详情 page-context 回归断言补到 `reason=refund-followup`，继续兜底上下文结构升级不会退化。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，全部改动仍停留在 App 跳转壳层、通知 store、订单详情首屏提示和共享回归测试。
+- 已确认 `reason` 是轻量 page-context，不会改变未带 reason 的现有详情入口行为。
+- 已确认通知直达和结果页回流现在都能给出更细的动作提示，详情页的动态 notice 不再只停留在来源说明。
+
+风险与缓解：
+
+- 风险：当前结果页和单笔订单直达已经开始带 `reason`，但剩余聚合待办和更多跨角色辅助入口仍需继续评估是否值得补同一层动态动作提示。
+- 缓解：下一轮继续只挑“订单目标明确、下一步也明确”的入口补 `reason`，避免把聚合入口过早硬编码成错误动作提示。
+
+下一步（1-3）：
+
+1. 继续评估剩余聚合待办和高频辅助入口里哪些动作也适合补 `reason`。
+2. 继续补通知 / 提醒 / 结果页到订单详情之间更细的动态 notice，让动作提示和当前分栏更一致。
+3. 在动态 reason 链稳定后，再继续补系统级主动提醒、推送触达和更多验收向测试。

@@ -85,6 +85,7 @@ export type ReminderScope = 'ALL' | 'OWNER' | 'CAREGIVER' | 'ACCOUNT'
 export type PetPalOrderDetailTab = 'overview' | 'chat' | 'service' | 'aftersales'
 export type PetPalNotificationDrivenOrderDetailSource = 'notifications' | 'reminders'
 export type PetPalOrderDetailEntrySource = 'messages' | 'payment-result' | 'refund-result' | 'complaint-result' | 'review-result' | 'owner-home' | 'orders' | 'aftersales' | 'caregiver-home' | 'caregiver-orders' | 'caregiver-earnings' | PetPalNotificationDrivenOrderDetailSource
+export type PetPalOrderDetailEntryReason = 'upcoming-order' | 'unread-messages' | 'aftersales-followup' | 'pending-accept' | 'serving-followup' | 'payment-followup' | 'refund-followup' | 'complaint-followup' | 'review-followup'
 
 export interface PetPalOrdersPageContext {
   filter?: OwnerOrderFilter
@@ -111,6 +112,7 @@ export interface PetPalOrderDetailPageContext {
   orderId?: string
   tab?: PetPalOrderDetailTab
   source?: PetPalOrderDetailEntrySource
+  reason?: PetPalOrderDetailEntryReason
 }
 
 const ownerOrderFilters: OwnerOrderFilter[] = ['ALL', 'ACTIVE', 'COMPLETED', 'AFTERSALES']
@@ -119,6 +121,7 @@ const messagesFilters: MessagesFilter[] = ['ALL', 'UNREAD']
 const reminderScopes: ReminderScope[] = ['ALL', 'OWNER', 'CAREGIVER', 'ACCOUNT']
 const orderDetailTabs: PetPalOrderDetailTab[] = ['overview', 'chat', 'service', 'aftersales']
 const orderDetailEntrySources: PetPalOrderDetailEntrySource[] = ['messages', 'payment-result', 'refund-result', 'complaint-result', 'review-result', 'owner-home', 'orders', 'aftersales', 'caregiver-home', 'caregiver-orders', 'caregiver-earnings', 'notifications', 'reminders']
+const orderDetailEntryReasons: PetPalOrderDetailEntryReason[] = ['upcoming-order', 'unread-messages', 'aftersales-followup', 'pending-accept', 'serving-followup', 'payment-followup', 'refund-followup', 'complaint-followup', 'review-followup']
 
 export const serviceTypeLabels: Record<PetServiceType, string> = {
   BOARDING: getSharedPetPalServiceTypeLabel('BOARDING'),
@@ -262,6 +265,10 @@ export function isPetPalOrderDetailEntrySource(value: string | null | undefined)
   return orderDetailEntrySources.includes(value as PetPalOrderDetailEntrySource)
 }
 
+export function isPetPalOrderDetailEntryReason(value: string | null | undefined): value is PetPalOrderDetailEntryReason {
+  return orderDetailEntryReasons.includes(value as PetPalOrderDetailEntryReason)
+}
+
 function stashPetPalPageContext(page: 'orders', context: PetPalOrdersPageContext): void
 function stashPetPalPageContext(page: 'aftersales', context: PetPalAftersalesPageContext): void
 function stashPetPalPageContext(page: 'messages', context: PetPalMessagesPageContext): void
@@ -276,12 +283,13 @@ function stashPetPalPageContext(
   const hasScope = 'scope' in context && typeof context.scope === 'string' && context.scope.length > 0
   const hasTab = 'tab' in context && typeof context.tab === 'string' && context.tab.length > 0
   const hasSource = 'source' in context && typeof context.source === 'string' && context.source.length > 0
+  const hasReason = 'reason' in context && typeof context.reason === 'string' && context.reason.length > 0
   const focusOrderId = 'focusOrderId' in context ? normalizePageContextId(context.focusOrderId) : ''
   const focusNotificationId = 'focusNotificationId' in context ? normalizePageContextId(context.focusNotificationId) : ''
   const orderId = 'orderId' in context ? normalizePageContextId(context.orderId) : ''
   const key = getPetPalPageContextStorageKey(page)
 
-  if (!hasFilter && !hasRole && !hasScope && !hasTab && !hasSource && !focusOrderId && !focusNotificationId && !orderId) {
+  if (!hasFilter && !hasRole && !hasScope && !hasTab && !hasSource && !hasReason && !focusOrderId && !focusNotificationId && !orderId) {
     uni.removeStorageSync(key)
     return
   }
@@ -292,6 +300,7 @@ function stashPetPalPageContext(
     ...(hasScope ? { scope: context.scope } : {}),
     ...(hasTab ? { tab: context.tab } : {}),
     ...(hasSource ? { source: context.source } : {}),
+    ...(hasReason ? { reason: context.reason } : {}),
     ...(focusOrderId ? { focusOrderId } : {}),
     ...(focusNotificationId ? { focusNotificationId } : {}),
     ...(orderId ? { orderId } : {}),
@@ -407,6 +416,9 @@ export function consumePetPalOrderDetailPageContext(): PetPalOrderDetailPageCont
   const source = isPetPalOrderDetailEntrySource(record.source as string)
     ? record.source as PetPalOrderDetailEntrySource
     : undefined
+  const reason = isPetPalOrderDetailEntryReason(record.reason as string)
+    ? record.reason as PetPalOrderDetailEntryReason
+    : undefined
 
   if (!orderId || !source) {
     return null
@@ -416,6 +428,7 @@ export function consumePetPalOrderDetailPageContext(): PetPalOrderDetailPageCont
     orderId,
     ...(tab ? { tab } : {}),
     source,
+    ...(reason ? { reason } : {}),
   }
 }
 
@@ -449,6 +462,7 @@ export function openPetPalOrderDetailPage(params: PetPalOrderDetailPageContext &
     orderId,
     tab = 'overview',
     source,
+    reason,
   } = params
   const normalizedOrderId = normalizePageContextId(orderId)
 
@@ -456,11 +470,12 @@ export function openPetPalOrderDetailPage(params: PetPalOrderDetailPageContext &
     return
   }
 
-  if (source) {
+  if (source || reason) {
     stashPetPalPageContext('order-detail', {
       orderId: normalizedOrderId,
       tab,
-      source,
+      ...(source ? { source } : {}),
+      ...(reason ? { reason } : {}),
     })
   }
 

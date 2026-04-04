@@ -72,6 +72,7 @@ const actionLoading = ref(false)
 const orderId = ref('')
 const activeTab = ref<DetailTab>('overview')
 const entrySource = ref('')
+const entryReason = ref('')
 const order = ref<OrderDetailRecord | null>(null)
 const refundProgress = ref<OrderRefundProgressRecord | null>(null)
 const complaints = ref<ComplaintRecord[]>([])
@@ -155,6 +156,36 @@ const entryHint = computed(() => {
   }
   if (entrySource.value === 'review-result') {
     return '你刚才查看的是评价结果，当前可以回看订单收尾状态，或继续沟通这笔订单。'
+  }
+  return ''
+})
+const entryReasonHint = computed(() => {
+  if (entryReason.value === 'upcoming-order') {
+    return '这笔订单即将开始，当前先确认预约时间、交接细节和沟通是否已对齐。'
+  }
+  if (entryReason.value === 'unread-messages') {
+    return '这笔订单还有未处理消息，先把沟通分栏里的未读内容消化完。'
+  }
+  if (entryReason.value === 'aftersales-followup') {
+    return '这笔订单还有退款或投诉待跟进，先看售后分栏里的处理结论和下一步。'
+  }
+  if (entryReason.value === 'pending-accept') {
+    return '当前最紧急的是决定是否接单，先在履约分栏里处理这笔订单。'
+  }
+  if (entryReason.value === 'serving-followup') {
+    return '这笔订单仍在服务中，当前先补服务记录、异常说明或签退动作。'
+  }
+  if (entryReason.value === 'payment-followup') {
+    return '支付刚完成，当前先确认订单状态，再继续补沟通或交接细节。'
+  }
+  if (entryReason.value === 'refund-followup') {
+    return '退款结果刚更新，当前先确认售后分栏里的退款阶段和后续动作。'
+  }
+  if (entryReason.value === 'complaint-followup') {
+    return '投诉结果刚更新，当前先确认平台处理结论，再决定是否继续补充材料。'
+  }
+  if (entryReason.value === 'review-followup') {
+    return '评价刚提交完成，当前先确认这笔订单是否还需要继续沟通或售后跟进。'
   }
   return ''
 })
@@ -477,6 +508,7 @@ onLoad((options) => {
   const context = consumePetPalOrderDetailPageContext()
   const contextMatchesOrder = context?.orderId === orderId.value
   entrySource.value = contextMatchesOrder ? (context?.source || '') : ''
+  entryReason.value = contextMatchesOrder ? (context?.reason || '') : ''
   activeTab.value = (options?.tab as DetailTab) || (contextMatchesOrder ? (context?.tab as DetailTab) : undefined) || 'overview'
   void loadPage()
 })
@@ -502,6 +534,7 @@ onPullDownRefresh(() => {
           <text class="petpal-banner__meta">{{ helpers.serviceTypeLabels[order.serviceType] }} · {{ currentStatusLabel }}</text>
           <text class="petpal-note">{{ focusHint }}</text>
           <text v-if="entryHint" class="petpal-note">{{ entryHint }}</text>
+          <text v-if="entryReasonHint" class="petpal-note">{{ entryReasonHint }}</text>
         </view>
         <view class="petpal-stat-row">
           <view class="petpal-stat">
