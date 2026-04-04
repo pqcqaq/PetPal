@@ -14086,3 +14086,60 @@ flowchart TD
 1. 继续补 App 订单详情、结果页、消息中心与提醒中心之间更细的 page notice 和主动引导。
 2. 继续评估哪些高频通知应进一步带上订单详情分栏或结果页阶段上下文，减少落页后再二次判断。
 3. 在 App 主动引导链进一步稳定后，再继续补系统级主动提醒、推送触达和更多验收向测试。
+
+### 14.126 2026-04-04（P3-M1 Slice 271）
+
+**概述**：继续推进 App 主动引导收口，本轮把订单详情也接进 page-context 链路，让用户从消息中心和几类结果页进入后，详情页首屏能解释来源和当前落点，而不再只是无说明切到某个分栏。
+
+已完成：
+
+- App 订单详情 page context 落地：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - 已新增 `PetPalOrderDetailTab`、`PetPalOrderDetailEntrySource`、`PetPalOrderDetailPageContext`。
+    - 已新增 `consumePetPalOrderDetailPageContext(...)` 与 `openPetPalOrderDetailPage(...)`。
+    - 订单详情上下文当前会暂存 `orderId + tab + source`，只在一次进入时消费。
+- App 详情打开 helper 升级：
+  - `apps/app-frontend/src/pages/petpal/rebuild/shared.ts`
+    - `openOrderDetailPage(...)` 已开始支持可选 `source` 参数，并统一走详情页 context-aware opener。
+- App 订单详情首屏开始解释来源：
+  - `apps/app-frontend/src/pages/order-detail/index.vue`
+    - 现在会消费详情页 page context，并在 orderId 匹配时生成来源说明。
+    - 页面 subtitle 与当前订单焦点区已开始解释：当前是从消息中心、支付结果、退款结果、投诉结果还是评价结果进入，以及为什么落在当前工作区。
+- 首批入口已切到带来源上下文的订单详情打开：
+  - `apps/app-frontend/src/pages/petpal/messages.vue`
+    - “看订单”与当前线程“看订单”动作已带 `source=messages`。
+  - `apps/app-frontend/src/pages/petpal/payment-result.vue`
+    - 订单摘要与“去沟通”动作已带 `source=payment-result`。
+  - `apps/app-frontend/src/pages/petpal/refund-result.vue`
+    - “回订单售后”动作已带 `source=refund-result`。
+  - `apps/app-frontend/src/pages/petpal/complaint-result.vue`
+    - “回订单售后”动作已带 `source=complaint-result`。
+  - `apps/app-frontend/src/pages/petpal/review-result.vue`
+    - “回订单详情”动作已带 `source=review-result`。
+- 回归测试补齐：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已新增 `openPetPalOrderDetailPage / consumePetPalOrderDetailPageContext` 的 page-context 存取断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，全部改动基于既有 App 跳转壳层、订单详情页和 page-context 暂存完成。
+- 已确认旧的 `openOrderDetailPage(orderId, tab)` 调用仍可用；只有消息页和几类结果页开始额外携带来源说明，不会把其它详情入口一起改成大范围行为变更。
+- 已确认订单详情只会在 context 里的 `orderId` 与当前订单匹配时展示来源说明，避免不同订单之间串用上一条说明。
+
+风险与缓解：
+
+- 风险：当前订单详情已经能解释消息页和结果页回流来源，但提醒中心、更多摘要卡片和系统级主动提醒仍未完全接入详情来源说明。
+- 缓解：下一轮继续优先评估提醒中心和更多高频结果动作是否需要带详情来源说明或分栏上下文，把“为什么落在这里”的解释继续扩到更多入口。
+
+下一步（1-3）：
+
+1. 继续补提醒中心和更多高频摘要入口进入订单详情时的来源说明与分栏上下文。
+2. 继续补结果页与详情页之间更细的动态 notice，让当前阶段和下一步动作表达更具体。
+3. 在详情页来源说明稳定后，再继续补系统级主动提醒、推送触达和更多验收向测试。

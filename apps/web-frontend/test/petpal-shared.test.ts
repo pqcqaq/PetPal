@@ -80,15 +80,18 @@ import {
 } from '../src/pages/frontend/petpal/shared.ts';
 import {
   consumePetPalAftersalesPageContext,
+  consumePetPalOrderDetailPageContext,
   consumePetPalMessagesPageContext,
   consumePetPalOrdersPageContext,
   consumePetPalRemindersPageContext,
   openPetPalAftersalesPage,
+  openPetPalOrderDetailPage,
   openPetPalMessagesPage,
   openPetPalOrdersPage,
   openPetPalRemindersPage,
   PETPAL_AFTERSALES_PAGE,
   PETPAL_MESSAGES_PAGE,
+  PETPAL_ORDER_DETAIL_PAGE,
   PETPAL_ORDERS_PAGE,
   PETPAL_REMINDERS_PAGE,
 } from '../../app-frontend/src/pages/petpal/owner-shared.ts';
@@ -965,6 +968,19 @@ test('stashes and consumes app petpal page context for focused return flows', ()
       focusNotificationId: 'notice-1',
     });
     assert.equal(consumePetPalRemindersPageContext(), null);
+
+    openPetPalOrderDetailPage({
+      orderId: ' order-4 ',
+      tab: 'chat',
+      source: 'messages',
+    });
+    assert.deepEqual(navigationCalls[4], { kind: 'navigateTo', url: `${PETPAL_ORDER_DETAIL_PAGE}?id=order-4&tab=chat` });
+    assert.deepEqual(consumePetPalOrderDetailPageContext(), {
+      orderId: 'order-4',
+      tab: 'chat',
+      source: 'messages',
+    });
+    assert.equal(consumePetPalOrderDetailPageContext(), null);
   } finally {
     if (previousUni === undefined) {
       delete (globalThis as typeof globalThis & { uni?: unknown }).uni;

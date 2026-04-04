@@ -81,7 +81,7 @@ function returnToOrders() {
           >
             {{ order.review ? '回订单列表' : '去评价' }}
           </button>
-          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(order.id)">
+          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(order.id, 'overview', 'review-result')">
             回订单详情
           </button>
         </view>

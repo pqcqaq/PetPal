@@ -109,7 +109,7 @@ function returnToAftersales() {
           <button
             class="petpal-btn petpal-btn--secondary"
             hover-class="none"
-            @click="activeComplaint.status === 'REJECTED' ? openOrderComplaintPage(order.id) : openOrderDetailPage(order.id, 'aftersales')"
+            @click="activeComplaint.status === 'REJECTED' ? openOrderComplaintPage(order.id) : openOrderDetailPage(order.id, 'aftersales', 'complaint-result')"
           >
             {{ activeComplaint.status === 'REJECTED' ? '重新提交' : '回订单售后' }}
           </button>

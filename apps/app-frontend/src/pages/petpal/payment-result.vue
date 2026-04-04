@@ -72,7 +72,7 @@ onPullDownRefresh(() => {
       </view>
 
       <PetpalSection title="订单摘要">
-        <button class="petpal-row-btn" hover-class="none" @click="openOrderDetailPage(order.id)">
+        <button class="petpal-row-btn" hover-class="none" @click="openOrderDetailPage(order.id, 'overview', 'payment-result')">
           <view class="petpal-row__copy">
             <text class="petpal-row__title">{{ order.orderNo }}</text>
             <text class="petpal-row__meta">{{ helpers.getOrderStatusLabel(order.orderStatus) }} · {{ helpers.formatRange(order.appointmentStart, order.appointmentEnd) }}</text>
@@ -111,7 +111,7 @@ onPullDownRefresh(() => {
             v-else
             class="petpal-btn petpal-btn--secondary"
             hover-class="none"
-            @click="openOrderDetailPage(order.id, 'chat')"
+            @click="openOrderDetailPage(order.id, 'chat', 'payment-result')"
           >
             去沟通
           </button>

@@ -353,7 +353,7 @@ function openSelectedOrder() {
   if (!currentThreadOrder.value) {
     return
   }
-  openOrderDetailPage(currentThreadOrder.value.id, 'chat')
+  openOrderDetailPage(currentThreadOrder.value.id, 'chat', 'messages')
 }
 
 function previewImages(urls: string[], current?: string) {
@@ -569,7 +569,7 @@ watch(selectedOrderId, (value, previousValue) => {
         </view>
         <view class="petpal-action-row">
           <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openPriorityThread">打开线程</button>
-          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(priorityRow.order.id, 'chat')">看订单</button>
+          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(priorityRow.order.id, 'chat', 'messages')">看订单</button>
         </view>
       </PetpalSection>
 

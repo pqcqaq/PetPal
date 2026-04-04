@@ -32,6 +32,7 @@ import PetpalPage from '../petpal/rebuild/petpal-page.vue'
 import PetpalSection from '../petpal/rebuild/petpal-section.vue'
 import PetpalSegmented from '../petpal/rebuild/petpal-segmented.vue'
 import {
+  consumePetPalOrderDetailPageContext,
   getErrorMessage,
   helpers,
   openLoginPage,
@@ -70,6 +71,7 @@ const loading = ref(false)
 const actionLoading = ref(false)
 const orderId = ref('')
 const activeTab = ref<DetailTab>('overview')
+const entrySource = ref('')
 const order = ref<OrderDetailRecord | null>(null)
 const refundProgress = ref<OrderRefundProgressRecord | null>(null)
 const complaints = ref<ComplaintRecord[]>([])
@@ -109,6 +111,28 @@ const focusHint = computed(() => {
   if (order.value.orderStatus === 'ACCEPTED') return '已接单，下一步是按约定时间签到。'
   if (order.value.orderStatus === 'SERVING') return '服务中，持续补充服务记录并在结束时签退。'
   return '当前订单以查看记录为主，详细动作按状态决定。'
+})
+const pageSubtitle = computed(() =>
+  entrySource.value
+    ? '已根据你刚才的动作，把这笔订单直接带到对应工作区。'
+    : '一笔订单拆成四个标签处理，不再把所有动作塞在一个长页里。')
+const entryHint = computed(() => {
+  if (entrySource.value === 'messages') {
+    return '你刚才是从消息中心进来的，这里会优先承接当前订单的沟通上下文。'
+  }
+  if (entrySource.value === 'payment-result') {
+    return '你刚才查看的是支付结果，当前可以继续确认状态，或直接转到沟通分栏继续对接。'
+  }
+  if (entrySource.value === 'refund-result') {
+    return '你刚才查看的是退款进度，当前重点仍是售后分栏里的退款与投诉状态。'
+  }
+  if (entrySource.value === 'complaint-result') {
+    return '你刚才查看的是投诉结果，当前重点仍是售后分栏里的处理结论和下一步动作。'
+  }
+  if (entrySource.value === 'review-result') {
+    return '你刚才查看的是评价结果，当前可以回看订单收尾状态，或继续沟通这笔订单。'
+  }
+  return ''
 })
 
 const tabOptions = computed(() => [
@@ -426,7 +450,10 @@ watch(orderId, (value, previousValue) => {
 
 onLoad((options) => {
   orderId.value = options?.id || options?.orderId || ''
-  activeTab.value = (options?.tab as DetailTab) || 'overview'
+  const context = consumePetPalOrderDetailPageContext()
+  const contextMatchesOrder = context?.orderId === orderId.value
+  entrySource.value = contextMatchesOrder ? (context?.source || '') : ''
+  activeTab.value = (options?.tab as DetailTab) || (contextMatchesOrder ? (context?.tab as DetailTab) : undefined) || 'overview'
   void loadPage()
 })
 
@@ -436,7 +463,7 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <PetpalPage title="订单详情" subtitle="一笔订单拆成四个标签处理，不再把所有动作塞在一个长页里。" eyebrow="Order" back :back-url="'/pages/petpal/orders'">
+  <PetpalPage title="订单详情" :subtitle="pageSubtitle" eyebrow="Order" back :back-url="'/pages/petpal/orders'">
     <template v-if="!tokenStore.hasLogin">
       <PetpalSection title="需要登录">
         <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openLoginPage">去登录</button>
@@ -450,6 +477,7 @@ onPullDownRefresh(() => {
           <text class="petpal-banner__title">{{ order.orderNo }}</text>
           <text class="petpal-banner__meta">{{ helpers.serviceTypeLabels[order.serviceType] }} · {{ currentStatusLabel }}</text>
           <text class="petpal-note">{{ focusHint }}</text>
+          <text v-if="entryHint" class="petpal-note">{{ entryHint }}</text>
         </view>
         <view class="petpal-stat-row">
           <view class="petpal-stat">

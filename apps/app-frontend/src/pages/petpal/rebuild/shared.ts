@@ -38,17 +38,20 @@ import {
   getRequestStatusLabel,
   getServiceLogTypeLabel,
   joinTagText,
+  openPetPalOrderDetailPage,
   openPetPalAction,
   PETPAL_CAREGIVER_HOME_PAGE,
   PETPAL_OWNER_HOME_PAGE,
   serviceTypeLabels,
   speciesLabels,
   splitTagText,
+  type PetPalOrderDetailEntrySource,
+  type PetPalOrderDetailTab,
 } from '../owner-shared'
 
 export * from '../owner-shared'
 
-export type OrderDetailTab = 'overview' | 'chat' | 'service' | 'aftersales'
+export type OrderDetailTab = PetPalOrderDetailTab
 export type ResultTone = 'accent' | 'success' | 'warning' | 'danger'
 
 export const LOGIN_PAGE = '/pages/auth/login'
@@ -194,8 +197,13 @@ export function openRoleHome(role: 'owner' | 'caregiver') {
   openPetPalAction('redirect', role === 'caregiver' ? PETPAL_CAREGIVER_HOME_PAGE : PETPAL_OWNER_HOME_PAGE)
 }
 
-export function openOrderDetailPage(orderId: string, tab: OrderDetailTab = 'overview') {
-  uni.navigateTo({ url: `/pages/order-detail/index?id=${orderId}&tab=${tab}` })
+export function openOrderDetailPage(orderId: string, tab: OrderDetailTab = 'overview', source?: PetPalOrderDetailEntrySource) {
+  openPetPalOrderDetailPage({
+    orderId,
+    tab,
+    source,
+    mode: 'navigate',
+  })
 }
 
 export function openOrderReviewPage(orderId: string) {
