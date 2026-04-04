@@ -221,3 +221,32 @@ export const getPetPalOwnerOrderFilter = (order: {
 
   return 'ACTIVE';
 };
+
+export const splitPetPalTagText = (
+  value: string | null | undefined,
+  options?: {
+    slashAsSeparator?: boolean;
+    dedupe?: boolean;
+  },
+) => {
+  const pattern = options?.slashAsSeparator ? /[\n,，、/]+/g : /[\n,，、]+/g;
+  const tags = (value ?? '')
+    .split(pattern)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return options?.dedupe ? [...new Set(tags)] : tags;
+};
+
+export const joinPetPalTagText = (
+  tags?: string[] | null,
+  separator = '，',
+) => (tags ?? []).join(separator);
+
+export const formatPetPalTagSummary = (
+  tags?: string[] | null,
+  options?: {
+    separator?: string;
+    emptyText?: string;
+  },
+) => (tags?.length ? joinPetPalTagText(tags, options?.separator ?? ' / ') : options?.emptyText ?? '暂无偏好标签');

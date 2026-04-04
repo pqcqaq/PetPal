@@ -23,6 +23,7 @@ import {
   formatPetPalMoney,
   getPetPalOwnerOrderFilter,
   formatPetPalRange,
+  formatPetPalTagSummary,
   formatPetPalTime,
   getPetPalMessageComposerEntry,
   getPetPalMessageComposerEntryWithLegacyAdoption,
@@ -36,6 +37,8 @@ import {
   isPetPalAftersalesStatus,
   isPetPalOrderAftersalesTracked,
   isPetPalOutstandingOrder,
+  joinPetPalTagText,
+  splitPetPalTagText,
   parsePetPalMessageDraftState,
   parsePersistedPetPalMessageComposerSnapshot,
   parsePetPalMessageComposerStorageKey,
@@ -175,6 +178,15 @@ test('exposes stable petpal amount, time and conversation display helpers', () =
     refunds: [],
     amountRefunded: 0,
   }), 'COMPLETED');
+  assert.deepEqual(splitPetPalTagText('怕生, 需要喂药，固定作息 / 高回传', {
+    slashAsSeparator: true,
+  }), ['怕生', '需要喂药', '固定作息', '高回传']);
+  assert.deepEqual(splitPetPalTagText('怕生, 怕生，固定作息', {
+    dedupe: true,
+  }), ['怕生', '固定作息']);
+  assert.equal(joinPetPalTagText(['怕生', '固定作息']), '怕生，固定作息');
+  assert.equal(formatPetPalTagSummary(['怕生', '固定作息']), '怕生 / 固定作息');
+  assert.equal(formatPetPalTagSummary(), '暂无偏好标签');
 });
 
 test('exposes stable message and caregiver attachment governance constants for shared uploads', () => {

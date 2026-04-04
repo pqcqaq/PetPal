@@ -13,7 +13,10 @@ import {
   formatPetPalRange as formatSharedPetPalRange,
   formatPetPalTime as formatSharedPetPalTime,
   getPetPalConversationUnreadCount as getSharedPetPalConversationUnreadCount,
+  formatPetPalTagSummary as formatSharedPetPalTagSummary,
   isPetPalOrderAftersalesTracked as isSharedPetPalOrderAftersalesTracked,
+  joinPetPalTagText as joinSharedPetPalTagText,
+  splitPetPalTagText as splitSharedPetPalTagText,
   getPetPalServiceRequestStatusLabel as getSharedPetPalServiceRequestStatusLabel,
   type CaregiverAuditStatus,
   type ComplaintStatus,
@@ -376,20 +379,17 @@ export function formatCaregiverNoticeHours(hours: number | null | undefined) {
 }
 
 export function splitTagText(value: string) {
-  return [...new Set(
-    value
-      .split(/[\n,，、]/)
-      .map(item => item.trim())
-      .filter(Boolean),
-  )]
+  return splitSharedPetPalTagText(value, {
+    dedupe: true,
+  })
 }
 
 export function joinTagText(tags?: string[]) {
-  return (tags ?? []).join('，')
+  return joinSharedPetPalTagText(tags)
 }
 
 export function formatPetTagSummary(tags?: string[]) {
-  return tags?.length ? tags.join(' / ') : '暂无偏好标签'
+  return formatSharedPetPalTagSummary(tags)
 }
 
 export function getOrderStatusLabel(status: OrderStatus) {

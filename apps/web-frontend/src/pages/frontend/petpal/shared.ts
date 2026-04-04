@@ -13,6 +13,7 @@ import {
   formatPetPalRange,
   formatPetPalTime,
   getPetPalConversationUnreadCount,
+  splitPetPalTagText as splitSharedPetPalTagText,
   isPetPalAftersalesStatus as isSharedPetPalAftersalesStatus,
   isPetPalOutstandingOrder as isSharedPetPalOutstandingOrder,
   getPetPalServiceRequestStatusLabel as getSharedPetPalServiceRequestStatusLabel,
@@ -275,10 +276,9 @@ export const getPetPalComplaintStatusType = (
 };
 
 export const normalizePetPalTagText = (value: string | null | undefined) =>
-  (value ?? '')
-    .split(/[\n,，、/]+/g)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  splitSharedPetPalTagText(value, {
+    slashAsSeparator: true,
+  });
 
 export const isPetPalOutstandingOrder = isSharedPetPalOutstandingOrder;
 

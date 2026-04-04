@@ -283,6 +283,10 @@ Last updated: 2026-04-04
   - Web `shared.ts` 与 App `owner-shared.ts` 现在都已直接复用这组共享 helper，不再各自维护第二份“未结清 / 售后状态 / ACTIVE vs AFTERSALES”判定逻辑。
   - `apps/app-frontend/src/pages/petpal/aftersales.vue` 已改为直接复用共享售后跟踪 helper，不再在页面里手写一段售后筛选条件。
   - `apps/web-frontend/test/petpal-shared.test.ts` 已补这组 predicate/helper 的稳定性断言，继续兜底共享判断口径不会漂移。
+- 2026-04-04 已继续收口 PetPal tag 文本 helper：
+  - `packages/api-common/src/helpers/petpal-display.ts` 已新增 tag 文本拆分、拼接和摘要的共享 helper。
+  - Web `shared.ts` 与 App `owner-shared.ts` 现在都已直接复用这组共享 helper，不再各自维护第二份近似的 tag 文本处理逻辑；共享层通过参数保留 Web 的 `/` 分隔策略和 App 的去重策略。
+  - `apps/web-frontend/test/petpal-shared.test.ts` 已补 tag helper 的稳定性断言，继续兜底共享文本处理口径不会漂移。
 - 2026-04-04 已继续对齐 Web 照料者资质上传：
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverProfileView.vue` 已从手填材料名称 / URL 改成受管资质附件上传，上传时会绑定当前照料者档案 ID 和 `petpal-caregiver-qualification` 标签。
   - 页面现在会直接展示材料大小 / 日期，并支持查看 / 移除；首次上传前如果档案还没生成 ID，会先提示保存一次基础资料。
