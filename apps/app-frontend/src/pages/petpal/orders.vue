@@ -106,7 +106,7 @@ onPullDownRefresh(() => {
       <PetpalSection :title="filter === 'AFTERSALES' ? '售后相关订单' : '订单列表'" :subtitle="focusOrderId ? '已把你刚关注的订单顶到前面。' : '查看、支付、沟通分别进入对应页面。'">
         <template v-if="visibleOrders.length">
           <view v-for="item in visibleOrders" :key="item.id" class="petpal-stack">
-            <button class="petpal-row-btn" hover-class="none" @click="openOrderDetailPage(item.id)">
+            <button class="petpal-row-btn" hover-class="none" @click="openOrderDetailPage(item.id, 'overview', 'orders')">
               <view class="petpal-row__copy">
                 <text class="petpal-row__title">{{ item.orderNo }}</text>
                 <text class="petpal-row__meta">{{ describeOrder(item) }}</text>
@@ -115,8 +115,8 @@ onPullDownRefresh(() => {
               <text class="petpal-row__value">{{ describeConversation(item, 'owner').unread ? `${describeConversation(item, 'owner').unread} 未读` : '详情' }}</text>
             </button>
             <view class="petpal-action-row">
-              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(item.id)">查看</button>
-              <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="openOrderDetailPage(item.id, 'chat')">沟通</button>
+              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(item.id, 'overview', 'orders')">查看</button>
+              <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="openOrderDetailPage(item.id, 'chat', 'orders')">沟通</button>
               <button
                 v-if="item.orderStatus === 'PENDING_ACCEPT'"
                 class="petpal-btn petpal-btn--primary"

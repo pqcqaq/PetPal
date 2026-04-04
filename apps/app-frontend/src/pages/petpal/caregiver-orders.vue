@@ -127,8 +127,8 @@ onPullDownRefresh(() => {
             <text class="petpal-banner__meta">{{ item.ownerNickname }} · {{ item.petName || '宠物待同步' }}</text>
             <text class="petpal-note">{{ item.locationText || '地点待同步' }}</text>
             <view class="petpal-action-row">
-              <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="openOrderDetailPage(item.id, 'service')">订单详情</button>
-              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(item.id, 'chat')">沟通</button>
+              <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="openOrderDetailPage(item.id, 'service', 'caregiver-orders')">订单详情</button>
+              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(item.id, 'chat', 'caregiver-orders')">沟通</button>
               <button v-if="item.orderStatus === 'PENDING_ACCEPT'" class="petpal-btn petpal-btn--primary" hover-class="none" @click="runAction(() => acceptCaregiverOrder(item.id).then(() => undefined), '已接单')">接单</button>
               <button v-if="item.orderStatus === 'ACCEPTED'" class="petpal-btn petpal-btn--primary" hover-class="none" @click="runAction(() => checkInCaregiverOrder(item.id, { note: '移动端签到' }).then(() => undefined), '签到成功')">签到</button>
               <button v-if="item.orderStatus === 'SERVING'" class="petpal-btn petpal-btn--ghost" hover-class="none" @click="runAction(() => checkOutCaregiverOrder(item.id, { note: '移动端签退' }).then(() => undefined), '签退成功')">签退</button>

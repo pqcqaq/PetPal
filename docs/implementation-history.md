@@ -319,6 +319,11 @@ Last updated: 2026-04-04
   - `apps/app-frontend/src/pages/petpal/rebuild/shared.ts` 的 `openOrderDetailPage(...)` 已开始支持可选 `source`，消息页与支付 / 退款 / 投诉 / 评价结果页进入订单详情时会统一写入来源上下文。
   - `apps/app-frontend/src/pages/order-detail/index.vue` 已开始消费详情页 page context；首屏 subtitle 与订单焦点说明现在会明确解释当前是从消息中心还是哪类结果页进入，并提示为什么落在当前工作区。
   - `apps/web-frontend/test/petpal-shared.test.ts` 已继续补 `openPetPalOrderDetailPage / consumePetPalOrderDetailPageContext` 回归断言，继续兜底订单详情来源上下文不会退化。
+- 2026-04-04 已继续扩展 App 订单详情高频入口来源说明：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts` 的详情来源枚举已继续补入 `owner-home / orders / aftersales / caregiver-home / caregiver-orders / caregiver-earnings`。
+  - `apps/app-frontend/src/pages/order-detail/index.vue` 已继续补这批来源对应的 entry hint，主人首页、订单队列、售后中心、照料者首页、履约队列和收益页进入详情时，也会解释当前为什么落在这个工作区。
+  - `apps/app-frontend/src/pages/petpal/owner-home.vue`、`orders.vue`、`aftersales.vue`、`caregiver-home.vue`、`caregiver-orders.vue`、`caregiver-earnings.vue` 的订单详情入口已切到带来源上下文的打开方式。
+  - `apps/web-frontend/test/petpal-shared.test.ts` 已把详情页上下文回归断言切到非消息来源，继续兜底新增来源值不会被消费层拒绝。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

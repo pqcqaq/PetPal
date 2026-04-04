@@ -972,13 +972,13 @@ test('stashes and consumes app petpal page context for focused return flows', ()
     openPetPalOrderDetailPage({
       orderId: ' order-4 ',
       tab: 'chat',
-      source: 'messages',
+      source: 'orders',
     });
     assert.deepEqual(navigationCalls[4], { kind: 'navigateTo', url: `${PETPAL_ORDER_DETAIL_PAGE}?id=order-4&tab=chat` });
     assert.deepEqual(consumePetPalOrderDetailPageContext(), {
       orderId: 'order-4',
       tab: 'chat',
-      source: 'messages',
+      source: 'orders',
     });
     assert.equal(consumePetPalOrderDetailPageContext(), null);
   } finally {

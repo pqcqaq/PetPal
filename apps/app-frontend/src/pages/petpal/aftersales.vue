@@ -157,7 +157,7 @@ onPullDownRefresh(() => {
             <text class="petpal-banner__meta">{{ describeOrder(item) }}</text>
             <text class="petpal-note">已退款 {{ helpers.formatMoney(item.amountRefunded) }} · 退款记录 {{ item.refunds.length }}</text>
             <view class="petpal-action-row">
-              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(item.id, 'aftersales')">订单售后</button>
+              <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(item.id, 'aftersales', 'aftersales')">订单售后</button>
               <button class="petpal-btn petpal-btn--ghost" hover-class="none" @click="openRefund(item.id)">退款进度</button>
               <button class="petpal-btn petpal-btn--danger" hover-class="none" @click="openComplaint(item.id)">投诉结果</button>
             </view>

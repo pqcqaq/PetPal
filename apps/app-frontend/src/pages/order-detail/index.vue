@@ -120,6 +120,24 @@ const entryHint = computed(() => {
   if (entrySource.value === 'messages') {
     return '你刚才是从消息中心进来的，这里会优先承接当前订单的沟通上下文。'
   }
+  if (entrySource.value === 'owner-home') {
+    return '你刚才是从主人首页点进来的，这里会继续承接这笔当前最需要处理的订单。'
+  }
+  if (entrySource.value === 'orders') {
+    return '你刚才是从订单队列进来的，这里会继续承接这笔订单的当前处理上下文。'
+  }
+  if (entrySource.value === 'aftersales') {
+    return '你刚才是从售后中心进来的，这里会继续承接当前订单的退款或投诉处理。'
+  }
+  if (entrySource.value === 'caregiver-home') {
+    return '你刚才是从照料者首页进来的，这里会继续承接当前最需要处理的履约订单。'
+  }
+  if (entrySource.value === 'caregiver-orders') {
+    return '你刚才是从履约队列进来的，这里会继续承接当前订单的履约动作。'
+  }
+  if (entrySource.value === 'caregiver-earnings') {
+    return '你刚才是从收益页进来的，这里会继续承接刚才复盘的那笔订单。'
+  }
   if (entrySource.value === 'payment-result') {
     return '你刚才查看的是支付结果，当前可以继续确认状态，或直接转到沟通分栏继续对接。'
   }

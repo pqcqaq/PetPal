@@ -83,7 +83,7 @@ export type AftersalesFilter = 'ALL' | 'HIGH' | 'REFUND' | 'COMPLAINT'
 export type MessagesFilter = 'ALL' | 'UNREAD'
 export type ReminderScope = 'ALL' | 'OWNER' | 'CAREGIVER' | 'ACCOUNT'
 export type PetPalOrderDetailTab = 'overview' | 'chat' | 'service' | 'aftersales'
-export type PetPalOrderDetailEntrySource = 'messages' | 'payment-result' | 'refund-result' | 'complaint-result' | 'review-result'
+export type PetPalOrderDetailEntrySource = 'messages' | 'payment-result' | 'refund-result' | 'complaint-result' | 'review-result' | 'owner-home' | 'orders' | 'aftersales' | 'caregiver-home' | 'caregiver-orders' | 'caregiver-earnings'
 
 export interface PetPalOrdersPageContext {
   filter?: OwnerOrderFilter
@@ -117,7 +117,7 @@ const aftersalesFilters: AftersalesFilter[] = ['ALL', 'HIGH', 'REFUND', 'COMPLAI
 const messagesFilters: MessagesFilter[] = ['ALL', 'UNREAD']
 const reminderScopes: ReminderScope[] = ['ALL', 'OWNER', 'CAREGIVER', 'ACCOUNT']
 const orderDetailTabs: PetPalOrderDetailTab[] = ['overview', 'chat', 'service', 'aftersales']
-const orderDetailEntrySources: PetPalOrderDetailEntrySource[] = ['messages', 'payment-result', 'refund-result', 'complaint-result', 'review-result']
+const orderDetailEntrySources: PetPalOrderDetailEntrySource[] = ['messages', 'payment-result', 'refund-result', 'complaint-result', 'review-result', 'owner-home', 'orders', 'aftersales', 'caregiver-home', 'caregiver-orders', 'caregiver-earnings']
 
 export const serviceTypeLabels: Record<PetServiceType, string> = {
   BOARDING: getSharedPetPalServiceTypeLabel('BOARDING'),

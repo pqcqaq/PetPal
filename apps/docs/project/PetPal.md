@@ -14143,3 +14143,63 @@ flowchart TD
 1. 继续补提醒中心和更多高频摘要入口进入订单详情时的来源说明与分栏上下文。
 2. 继续补结果页与详情页之间更细的动态 notice，让当前阶段和下一步动作表达更具体。
 3. 在详情页来源说明稳定后，再继续补系统级主动提醒、推送触达和更多验收向测试。
+
+### 14.126 2026-04-04（P3-M1 Slice 272）
+
+**概述**：继续推进 App 订单详情来源说明，本轮把来源上下文从“消息中心 + 结果页”继续扩到高频摘要与队列入口，让主人与照料者两侧常用入口进入详情时都能说明来路。
+
+已完成：
+
+- 扩展订单详情来源枚举：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - `PetPalOrderDetailEntrySource` 已继续补入：
+      - `owner-home`
+      - `orders`
+      - `aftersales`
+      - `caregiver-home`
+      - `caregiver-orders`
+      - `caregiver-earnings`
+- 订单详情首屏继续补高频入口说明：
+  - `apps/app-frontend/src/pages/order-detail/index.vue`
+    - 已继续补上述六类来源的 entry hint。
+    - 详情页现在能解释“你刚才是从主人首页 / 订单队列 / 售后中心 / 照料者首页 / 履约队列 / 收益页进来的”，不再只区分消息和结果页回流。
+- 首批高频入口已切到带来源上下文的详情打开：
+  - `apps/app-frontend/src/pages/petpal/owner-home.vue`
+    - 主人首页的待处理订单入口已带 `source=owner-home`。
+  - `apps/app-frontend/src/pages/petpal/orders.vue`
+    - 订单列表行、查看和沟通动作已带 `source=orders`。
+  - `apps/app-frontend/src/pages/petpal/aftersales.vue`
+    - “订单售后”动作已带 `source=aftersales`。
+  - `apps/app-frontend/src/pages/petpal/caregiver-home.vue`
+    - 照料者首页的最新待办订单入口已带 `source=caregiver-home`。
+  - `apps/app-frontend/src/pages/petpal/caregiver-orders.vue`
+    - 履约队列里的“订单详情 / 沟通”动作已带 `source=caregiver-orders`。
+  - `apps/app-frontend/src/pages/petpal/caregiver-earnings.vue`
+    - 最近完成订单里的“查看订单”动作已带 `source=caregiver-earnings`。
+- 回归测试继续覆盖：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 详情页 page-context 回归断言已切到 `source=orders`，继续兜底新增来源枚举值可被消费。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，全部改动仍停留在 App 跳转壳层、订单详情页首屏提示和共享回归测试。
+- 已确认订单详情来源说明现在已同时覆盖主人侧和照料者侧的高频队列/摘要入口，不再只在消息或结果页回流时生效。
+- 已确认现有未带 `source` 的详情入口仍可保持原行为，本轮没有强制把所有详情入口一起改成大范围行为变更。
+
+风险与缓解：
+
+- 风险：当前高频摘要/队列入口已经能解释来路，但提醒中心与更多通知分发仍主要落到消息页、售后页或提醒页，尚未继续细化到更多详情来源说明。
+- 缓解：下一轮继续优先评估提醒中心与通知动作里哪些入口值得直接落到订单详情并带来源说明，继续减少用户二次判断下一步的成本。
+
+下一步（1-3）：
+
+1. 继续评估提醒中心和通知动作里哪些高频入口应直接落到订单详情并带来源说明。
+2. 继续补结果页、提醒页与订单详情之间更细的动态 notice，让“为什么到这里、现在做什么”表达更完整。
+3. 在详情页来源链稳定后，再继续补系统级主动提醒、推送触达和更多验收向测试。

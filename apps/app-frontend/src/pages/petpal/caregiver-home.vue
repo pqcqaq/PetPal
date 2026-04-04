@@ -158,7 +158,7 @@ onPullDownRefresh(() => {
             :key="item.id"
             class="petpal-row-btn"
             hover-class="none"
-            @click="openOrderDetailPage(item.id, 'service')"
+            @click="openOrderDetailPage(item.id, 'service', 'caregiver-home')"
           >
             <view class="petpal-row__copy">
               <text class="petpal-row__title">{{ item.orderNo }}</text>

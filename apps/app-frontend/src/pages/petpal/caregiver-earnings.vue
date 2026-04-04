@@ -243,7 +243,7 @@ onPullDownRefresh(() => {
               <button
                 class="petpal-btn petpal-btn--secondary"
                 hover-class="none"
-                @click="openOrderDetailPage(item.id)"
+                @click="openOrderDetailPage(item.id, 'overview', 'caregiver-earnings')"
               >
                 查看订单
               </button>
