@@ -120,6 +120,12 @@ const entryHint = computed(() => {
   if (entrySource.value === 'messages') {
     return '你刚才是从消息中心进来的，这里会优先承接当前订单的沟通上下文。'
   }
+  if (entrySource.value === 'notifications') {
+    return '你刚才是从通知中心进来的，这里会直接承接那条订单通知对应的工作区。'
+  }
+  if (entrySource.value === 'reminders') {
+    return '你刚才是从提醒中心进来的，这里会直接承接当前待办对应的订单工作区。'
+  }
   if (entrySource.value === 'owner-home') {
     return '你刚才是从主人首页点进来的，这里会继续承接这笔当前最需要处理的订单。'
   }

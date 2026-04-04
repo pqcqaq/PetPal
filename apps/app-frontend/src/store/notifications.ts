@@ -21,6 +21,8 @@ import {
   type AftersalesFilter,
   type ConversationRole,
   type MessagesFilter,
+  type PetPalNotificationDrivenOrderDetailSource,
+  type PetPalOrderDetailTab,
   type ReminderScope,
   formatRange,
   getCaregiverAuditLabel,
@@ -28,6 +30,7 @@ import {
   isOrderAftersalesTracked,
   openPetPalAftersalesPage,
   openPetPalMessagesPage,
+  openPetPalOrderDetailPage,
   openPetPalRemindersPage,
   openPetPalAction,
   PETPAL_AFTERSALES_PAGE,
@@ -61,6 +64,7 @@ export interface AppNotificationItem {
   actionMessagesFilter?: MessagesFilter
   actionAftersalesFilter?: AftersalesFilter
   actionReminderScope?: ReminderScope
+  actionOrderTab?: PetPalOrderDetailTab
   sortAt: number
   updatedAtKey: string
 }
@@ -111,7 +115,7 @@ function buildNotificationItems(payload: {
     item.status === 'OPEN'
     || item.status === 'MATCHED'
   ))
-  const topOwnerUnreadOrder = ownerOrders
+  const ownerUnreadOrders = ownerOrders
     .filter(item => getConversationUnreadCount(item.conversation, 'owner') > 0)
     .sort((left, right) => {
       const unreadGap = getConversationUnreadCount(right.conversation, 'owner') - getConversationUnreadCount(left.conversation, 'owner')
@@ -119,7 +123,8 @@ function buildNotificationItems(payload: {
         return unreadGap
       }
       return dayjs(right.conversation?.lastMessageAt || right.updatedAt).valueOf() - dayjs(left.conversation?.lastMessageAt || left.updatedAt).valueOf()
-    })[0]
+    })
+  const topOwnerUnreadOrder = ownerUnreadOrders[0]
   const ownerUnreadCount = ownerOrders.reduce((total, item) => (
     total + getConversationUnreadCount(item.conversation, 'owner')
   ), 0)
@@ -127,6 +132,9 @@ function buildNotificationItems(payload: {
     .map(item => item.conversation?.lastMessageAt || item.updatedAt)
     .sort((left, right) => dayjs(right).valueOf() - dayjs(left).valueOf())[0]
   const ownerAftersalesOrders = ownerOrders.filter(item => isOrderAftersalesTracked(item))
+  const topOwnerAftersalesOrder = [...ownerAftersalesOrders].sort((left, right) => (
+    dayjs(right.updatedAt).valueOf() - dayjs(left.updatedAt).valueOf()
+  ))[0]
   const ownerUpcomingOrders = ownerOrders
     .filter(item => (
       ['PENDING_ACCEPT', 'ACCEPTED', 'SERVING'].includes(item.orderStatus)
@@ -135,10 +143,7 @@ function buildNotificationItems(payload: {
     ))
     .sort((left, right) => dayjs(left.appointmentStart).valueOf() - dayjs(right.appointmentStart).valueOf())
 
-  const caregiverUnreadCount = caregiverOrders.reduce((total, item) => (
-    total + getConversationUnreadCount(item.conversation, 'caregiver')
-  ), 0)
-  const topCaregiverUnreadOrder = caregiverOrders
+  const caregiverUnreadOrders = caregiverOrders
     .filter(item => getConversationUnreadCount(item.conversation, 'caregiver') > 0)
     .sort((left, right) => {
       const unreadGap = getConversationUnreadCount(right.conversation, 'caregiver') - getConversationUnreadCount(left.conversation, 'caregiver')
@@ -146,12 +151,22 @@ function buildNotificationItems(payload: {
         return unreadGap
       }
       return dayjs(right.conversation?.lastMessageAt || right.updatedAt).valueOf() - dayjs(left.conversation?.lastMessageAt || left.updatedAt).valueOf()
-    })[0]
+    })
+  const caregiverUnreadCount = caregiverOrders.reduce((total, item) => (
+    total + getConversationUnreadCount(item.conversation, 'caregiver')
+  ), 0)
+  const topCaregiverUnreadOrder = caregiverUnreadOrders[0]
   const caregiverUnreadLatestAt = caregiverOrders
     .map(item => item.conversation?.lastMessageAt || item.updatedAt)
     .sort((left, right) => dayjs(right).valueOf() - dayjs(left).valueOf())[0]
   const caregiverPendingOrders = caregiverOrders.filter(item => item.orderStatus === 'PENDING_ACCEPT')
+  const topCaregiverPendingOrder = [...caregiverPendingOrders].sort((left, right) => (
+    dayjs(right.updatedAt).valueOf() - dayjs(left.updatedAt).valueOf()
+  ))[0]
   const caregiverServingOrders = caregiverOrders.filter(item => item.orderStatus === 'SERVING')
+  const topCaregiverServingOrder = [...caregiverServingOrders].sort((left, right) => (
+    dayjs(right.updatedAt).valueOf() - dayjs(left.updatedAt).valueOf()
+  ))[0]
   const activeCaregiverServiceCount = caregiverServices.filter(item => item.isActive).length
 
   if (!userEmail) {
@@ -219,6 +234,8 @@ function buildNotificationItems(payload: {
       actionLabel: '查看订单',
       actionUrl: `/pages/order-detail/index?id=${upcomingOrder.id}&tab=overview`,
       actionMode: 'navigate',
+      actionOrderId: upcomingOrder.id,
+      actionOrderTab: 'overview',
       sortAt: dayjs(upcomingOrder.appointmentStart).valueOf(),
       updatedAtKey: `owner-upcoming:${upcomingOrder.id}:${upcomingOrder.updatedAt}`,
     }))
@@ -232,12 +249,13 @@ function buildNotificationItems(payload: {
       title: `主人侧有 ${ownerUnreadCount} 条未读沟通`,
       summary: '订单交接、履约补充和售后说明可能仍在等待处理。',
       detail: '建议先统一进入消息中心处理未读，再决定是否回到具体订单继续沟通。',
-      actionLabel: '进入消息中心',
+      actionLabel: ownerUnreadOrders.length === 1 ? '查看沟通' : '进入消息中心',
       actionUrl: PETPAL_MESSAGES_PAGE,
       actionMode: 'redirect',
       actionOrderId: topOwnerUnreadOrder?.id,
       actionRole: 'owner',
       actionMessagesFilter: 'UNREAD',
+      ...(ownerUnreadOrders.length === 1 && topOwnerUnreadOrder?.id ? { actionOrderTab: 'chat' as const } : {}),
       sortAt: ownerUnreadLatestAt ? dayjs(ownerUnreadLatestAt).valueOf() : 3,
       updatedAtKey: `owner-unread:${ownerUnreadCount}:${ownerUnreadLatestAt || 'none'}`,
     }))
@@ -255,11 +273,12 @@ function buildNotificationItems(payload: {
       title: `有 ${ownerAftersalesOrders.length} 笔售后订单待跟进`,
       summary: '退款、争议和投诉订单已经从普通订单流里拆出。',
       detail: '优先进入售后中心处理争议订单、退款失败和仍在审核中的售后事项。',
-      actionLabel: '进入售后中心',
+      actionLabel: ownerAftersalesOrders.length === 1 ? '查看售后' : '进入售后中心',
       actionUrl: PETPAL_AFTERSALES_PAGE,
       actionMode: 'redirect',
-      actionOrderId: ownerAftersalesOrders[0]?.id,
+      actionOrderId: topOwnerAftersalesOrder?.id,
       actionAftersalesFilter: 'HIGH',
+      ...(ownerAftersalesOrders.length === 1 && topOwnerAftersalesOrder?.id ? { actionOrderTab: 'aftersales' as const } : {}),
       sortAt: latestAftersalesAt ? dayjs(latestAftersalesAt).valueOf() : 4,
       updatedAtKey: `owner-aftersales:${ownerAftersalesOrders.length}:${latestAftersalesAt || 'none'}`,
     }))
@@ -342,9 +361,11 @@ function buildNotificationItems(payload: {
       title: `有 ${caregiverPendingOrders.length} 笔待接单订单`,
       summary: '待接单过久会直接影响成单率与主人信任。',
       detail: '建议统一进入履约订单页，尽快确认是否接单和是否需要补充沟通。',
-      actionLabel: '处理接单',
+      actionLabel: caregiverPendingOrders.length === 1 ? '去处理订单' : '处理接单',
       actionUrl: PETPAL_CAREGIVER_ORDERS_PAGE,
       actionMode: 'redirect',
+      actionOrderId: topCaregiverPendingOrder?.id,
+      ...(caregiverPendingOrders.length === 1 && topCaregiverPendingOrder?.id ? { actionOrderTab: 'service' as const } : {}),
       sortAt: latestPendingAt ? dayjs(latestPendingAt).valueOf() : 7,
       updatedAtKey: `caregiver-pending:${caregiverPendingOrders.length}:${latestPendingAt || 'none'}`,
     }))
@@ -362,9 +383,11 @@ function buildNotificationItems(payload: {
       title: `有 ${caregiverServingOrders.length} 笔服务中订单待回传`,
       summary: '服务日志越及时，主人确认与售后透明度就越高。',
       detail: '建议回到履约订单页继续补服务记录和异常说明。',
-      actionLabel: '继续履约',
+      actionLabel: caregiverServingOrders.length === 1 ? '继续当前订单' : '继续履约',
       actionUrl: PETPAL_CAREGIVER_ORDERS_PAGE,
       actionMode: 'redirect',
+      actionOrderId: topCaregiverServingOrder?.id,
+      ...(caregiverServingOrders.length === 1 && topCaregiverServingOrder?.id ? { actionOrderTab: 'service' as const } : {}),
       sortAt: latestServingAt ? dayjs(latestServingAt).valueOf() : 8,
       updatedAtKey: `caregiver-serving:${caregiverServingOrders.length}:${latestServingAt || 'none'}`,
     }))
@@ -378,12 +401,13 @@ function buildNotificationItems(payload: {
       title: `照料者侧有 ${caregiverUnreadCount} 条未读沟通`,
       summary: '待接单确认、交接细节和异常反馈都可能阻塞履约。',
       detail: '建议先统一进入消息中心消化未读，避免在多个订单之间来回切换。',
-      actionLabel: '进入消息中心',
+      actionLabel: caregiverUnreadOrders.length === 1 ? '查看沟通' : '进入消息中心',
       actionUrl: PETPAL_MESSAGES_PAGE,
       actionMode: 'redirect',
       actionOrderId: topCaregiverUnreadOrder?.id,
       actionRole: 'caregiver',
       actionMessagesFilter: 'UNREAD',
+      ...(caregiverUnreadOrders.length === 1 && topCaregiverUnreadOrder?.id ? { actionOrderTab: 'chat' as const } : {}),
       sortAt: caregiverUnreadLatestAt ? dayjs(caregiverUnreadLatestAt).valueOf() : 9,
       updatedAtKey: `caregiver-unread:${caregiverUnreadCount}:${caregiverUnreadLatestAt || 'none'}`,
     }))
@@ -411,8 +435,20 @@ function buildNotificationItems(payload: {
 
 export function openAppNotificationAction(item: Pick<
   AppNotificationItem,
-  'actionMode' | 'actionUrl' | 'actionOrderId' | 'actionRole' | 'actionMessagesFilter' | 'actionAftersalesFilter' | 'actionReminderScope' | 'id'
->) {
+  'actionMode' | 'actionUrl' | 'actionOrderId' | 'actionOrderTab' | 'actionRole' | 'actionMessagesFilter' | 'actionAftersalesFilter' | 'actionReminderScope' | 'id'
+>, options?: {
+  orderDetailSource?: PetPalNotificationDrivenOrderDetailSource
+}) {
+  if (item.actionOrderId && item.actionOrderTab) {
+    openPetPalOrderDetailPage({
+      mode: item.actionMode,
+      orderId: item.actionOrderId,
+      tab: item.actionOrderTab,
+      ...(options?.orderDetailSource ? { source: options.orderDetailSource } : {}),
+    })
+    return
+  }
+
   if (item.actionUrl === PETPAL_MESSAGES_PAGE) {
     openPetPalMessagesPage({
       mode: item.actionMode,

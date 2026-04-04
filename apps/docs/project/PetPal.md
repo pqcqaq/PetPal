@@ -14203,3 +14203,52 @@ flowchart TD
 1. 继续评估提醒中心和通知动作里哪些高频入口应直接落到订单详情并带来源说明。
 2. 继续补结果页、提醒页与订单详情之间更细的动态 notice，让“为什么到这里、现在做什么”表达更完整。
 3. 在详情页来源链稳定后，再继续补系统级主动提醒、推送触达和更多验收向测试。
+
+### 14.126 2026-04-04（P3-M1 Slice 273）
+
+**概述**：继续推进 App 系统待办分发收口，本轮把通知中心和提醒中心里的单笔订单高频动作接到订单详情对应分栏，让用户处理系统待办时不必总先经过消息中心、售后中心或履约队列再二次定位。
+
+已完成：
+
+- 收口通知数据里的单笔订单直达规则：
+  - `apps/app-frontend/src/store/notifications.ts`
+    - 通知项已新增 `actionOrderTab`，用于声明系统待办应该直接落到订单详情的哪个分栏。
+    - 即将开始的订单、单条未读沟通、单笔售后、单笔待接单和单笔履约中订单，现在会优先直达详情的 `overview / chat / service / aftersales` 分栏。
+    - 仍然是多订单聚合的通知则保持原策略，继续先落到消息中心、售后中心或履约队列，避免一次跳到错误订单。
+- 通知中心 / 提醒中心带详情来源打开：
+  - `apps/app-frontend/src/pages/notifications/index.vue`
+    - 打开单笔订单类通知时，已带 `source=notifications` 写入订单详情 page context。
+  - `apps/app-frontend/src/pages/petpal/reminders.vue`
+    - 打开单笔订单类提醒时，已带 `source=reminders` 写入订单详情 page context。
+- 订单详情补齐系统待办来源说明：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - 订单详情来源枚举已新增 `notifications / reminders`。
+  - `apps/app-frontend/src/pages/order-detail/index.vue`
+    - 首屏 entry hint 已开始解释当前是从通知中心还是提醒中心进入，并说明系统为什么把用户直接带到当前分栏。
+- 回归测试继续覆盖：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已新增 `source=notifications` 的订单详情 page-context 回归断言，继续兜底新增来源值不会被消费层拒绝。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，全部改动仍停留在 App 通知 store、订单详情来源说明和共享 page-context 回归测试。
+- 已确认只有“单笔订单即可处理”的系统待办会直达订单详情；多订单聚合项仍保留中心页 / 队列页分发，不会把用户错误地直接送进某一笔订单。
+- 已确认通知中心与提醒中心进入订单详情时会分别写入 `notifications / reminders` 来源说明，不会继续退化成无说明的裸跳详情。
+
+风险与缓解：
+
+- 风险：当前系统待办里的单笔订单高频动作已能直达详情，但更多结果页、聚合待办和跨角色辅助入口仍需继续细化“是否该直达详情、该落在哪个分栏”。
+- 缓解：下一轮继续优先评估结果页和剩余聚合待办里的直达详情机会，只在“单笔订单目标明确”时继续扩展直达规则。
+
+下一步（1-3）：
+
+1. 继续评估结果页和剩余聚合待办里哪些高频动作也适合直接落到订单详情分栏。
+2. 继续补通知 / 提醒 / 结果页到订单详情之间更细的动态 notice，让当前阶段与下一步动作表达更具体。
+3. 在系统待办直达链稳定后，再继续补系统级主动提醒、推送触达和更多验收向测试。

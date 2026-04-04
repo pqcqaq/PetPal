@@ -981,6 +981,20 @@ test('stashes and consumes app petpal page context for focused return flows', ()
       source: 'orders',
     });
     assert.equal(consumePetPalOrderDetailPageContext(), null);
+
+    openPetPalOrderDetailPage({
+      mode: 'redirect',
+      orderId: ' order-5 ',
+      tab: 'aftersales',
+      source: 'notifications',
+    });
+    assert.deepEqual(navigationCalls[5], { kind: 'redirectTo', url: `${PETPAL_ORDER_DETAIL_PAGE}?id=order-5&tab=aftersales` });
+    assert.deepEqual(consumePetPalOrderDetailPageContext(), {
+      orderId: 'order-5',
+      tab: 'aftersales',
+      source: 'notifications',
+    });
+    assert.equal(consumePetPalOrderDetailPageContext(), null);
   } finally {
     if (previousUni === undefined) {
       delete (globalThis as typeof globalThis & { uni?: unknown }).uni;

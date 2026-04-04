@@ -324,6 +324,10 @@ Last updated: 2026-04-04
   - `apps/app-frontend/src/pages/order-detail/index.vue` 已继续补这批来源对应的 entry hint，主人首页、订单队列、售后中心、照料者首页、履约队列和收益页进入详情时，也会解释当前为什么落在这个工作区。
   - `apps/app-frontend/src/pages/petpal/owner-home.vue`、`orders.vue`、`aftersales.vue`、`caregiver-home.vue`、`caregiver-orders.vue`、`caregiver-earnings.vue` 的订单详情入口已切到带来源上下文的打开方式。
   - `apps/web-frontend/test/petpal-shared.test.ts` 已把详情页上下文回归断言切到非消息来源，继续兜底新增来源值不会被消费层拒绝。
+- 2026-04-04 已继续收口 App 通知 / 提醒到订单详情的直达分流：
+  - `apps/app-frontend/src/store/notifications.ts` 现在会为“单笔订单即可处理”的通知补 `actionOrderTab`，单条未读沟通、单条售后、最近待接单、最近履约中订单和即将开始的订单，都会优先直达详情的对应分栏，而不是先停在消息中心、售后中心或履约队列。
+  - `apps/app-frontend/src/pages/notifications/index.vue` 与 `apps/app-frontend/src/pages/petpal/reminders.vue` 打开这类单笔订单待办时，已分别带 `notifications / reminders` 来源写入订单详情 page context。
+  - `apps/app-frontend/src/pages/order-detail/index.vue` 已继续补通知中心与提醒中心来源说明；`apps/web-frontend/test/petpal-shared.test.ts` 也已继续补 `source=notifications` 的回归断言。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

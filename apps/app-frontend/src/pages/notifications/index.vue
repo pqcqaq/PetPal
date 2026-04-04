@@ -39,7 +39,9 @@ function openItem(id: string) {
   const item = notificationStore.items.find(row => row.id === id)
   if (!item) return
   notificationStore.markAsRead(item)
-  openAppNotificationAction(item)
+  openAppNotificationAction(item, {
+    orderDetailSource: 'notifications',
+  })
 }
 
 onShow(() => {
