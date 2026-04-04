@@ -3,9 +3,10 @@ import {
   buildPetPalMessageComposerStorageKey as buildSharedPetPalMessageComposerStorageKey,
   cloneManagedAttachmentRecords,
   clonePetPalMessageDraftState as cloneSharedPetPalMessageDraftState,
+  compactPersistedPetPalMessageComposerRecords as compactSharedPersistedPetPalMessageComposerRecords,
+  createEmptyPersistedPetPalMessageComposerRecords,
   getPetPalMessageComposerEntry,
   getPetPalMessageComposerKeysToClear,
-  PETPAL_MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR,
   parsePetPalMessageDraftState,
   parsePetPalMessageRecoveryState,
   resolvePersistedPetPalMessageComposerIdentity,
@@ -14,11 +15,16 @@ import {
   type PetPalMessageComposerIdentity as SharedPetPalMessageComposerIdentity,
   type PetPalMessageComposerScope as SharedPetPalMessageComposerScope,
   type PetPalMessageComposerVersionedRecord,
+  type PersistedPetPalMessageComposerRecords as SharedPersistedPetPalMessageComposerRecords,
+  type PersistedPetPalMessageComposerSnapshot as SharedPersistedPetPalMessageComposerSnapshot,
+  type PersistedPetPalMessageDraftRecord as SharedPersistedPetPalMessageDraftRecord,
+  type PersistedPetPalMessageRecoveryRecord as SharedPersistedPetPalMessageRecoveryRecord,
   type ManagedAttachmentRecord,
   type PetPalMessageDraftState as SharedPetPalMessageDraftState,
   type PetPalMessageRecoveryStage as SharedPetPalMessageRecoveryStage,
   type PetPalMessageRecoveryState as SharedPetPalMessageRecoveryState,
   type ResolvedPetPalMessageComposerIdentity,
+  toPublicPersistedPetPalMessageComposerSnapshot,
 } from '@rbac/api-common'
 import { ref } from 'vue'
 
@@ -31,39 +37,18 @@ export type PetPalMessageRecoveryState = SharedPetPalMessageRecoveryState
 export type PetPalMessageComposerScope = SharedPetPalMessageComposerScope
 export type PetPalMessageComposerIdentity = SharedPetPalMessageComposerIdentity
 
-export type PersistedPetPalMessageComposerSnapshot = {
-  drafts: Record<string, PetPalMessageDraftState>
-  recoveries: Record<string, PetPalMessageRecoveryState>
-}
+export type PersistedPetPalMessageComposerSnapshot = SharedPersistedPetPalMessageComposerSnapshot
 
-type PersistedPetPalMessageDraftRecord = PetPalMessageDraftState & {
-  orderId: string
-  userId: string
-  updatedAt: string
-  scope: PetPalMessageComposerScope
-}
+type PersistedPetPalMessageDraftRecord = SharedPersistedPetPalMessageDraftRecord
 
-type PersistedPetPalMessageRecoveryRecord = PetPalMessageRecoveryState & {
-  orderId: string
-  userId: string
-  updatedAt: string
-  scope: PetPalMessageComposerScope
-}
+type PersistedPetPalMessageRecoveryRecord = SharedPersistedPetPalMessageRecoveryRecord
 
-type PersistedPetPalMessageComposerRecords = {
-  drafts: Record<string, PersistedPetPalMessageDraftRecord>
-  recoveries: Record<string, PersistedPetPalMessageRecoveryRecord>
-}
+type PersistedPetPalMessageComposerRecords = SharedPersistedPetPalMessageComposerRecords
 
 const STORAGE_KEY = 'petpal-message-composer-state-v1'
 const MAX_PERSISTED_THREADS = 12
 const MAX_PERSISTED_AGE_MS = 7 * 24 * 60 * 60 * 1000
 const MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS = 24 * 60 * 60 * 1000
-
-const createEmptyPersistedSnapshot = (): PersistedPetPalMessageComposerRecords => ({
-  drafts: {},
-  recoveries: {},
-})
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -166,146 +151,13 @@ const toRecoveryRecord = (
   }
 }
 
-const compactPersistedPetPalMessageComposerRecords = (
-  snapshot: PersistedPetPalMessageComposerRecords,
-  now = Date.now(),
-): PersistedPetPalMessageComposerRecords => {
-  const identityMetadataByBucket = new Map<string, Map<string, {
-    timestamp: number
-    userId: string
-  }>>()
-  const collectTimestamp = (
-    identity: ResolvedPetPalMessageComposerIdentity,
-    updatedAt: string,
-  ) => {
-    const timestamp = toTimestamp(updatedAt)
-    if (timestamp === null) {
-      return
-    }
-
-    const bucketKey = `${identity.userId}${PETPAL_MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR}${identity.scope}`
-    const identityKey = buildPetPalMessageComposerStorageKey(identity)
-    const bucketMetadata = identityMetadataByBucket.get(bucketKey) ?? new Map<string, {
-      timestamp: number
-      userId: string
-    }>()
-    const previousMetadata = bucketMetadata.get(identityKey)
-    if (previousMetadata === undefined || timestamp > previousMetadata.timestamp) {
-      bucketMetadata.set(identityKey, {
-        timestamp,
-        userId: identity.userId,
-      })
-      identityMetadataByBucket.set(bucketKey, bucketMetadata)
-    }
-  }
-
-  Object.values(snapshot.drafts).forEach((draft) => {
-    collectTimestamp({
-      orderId: draft.orderId,
-      userId: draft.userId,
-      scope: draft.scope,
-    }, draft.updatedAt)
-  })
-  Object.values(snapshot.recoveries).forEach((recovery) => {
-    collectTimestamp({
-      orderId: recovery.orderId,
-      userId: recovery.userId,
-      scope: recovery.scope,
-    }, recovery.updatedAt)
-  })
-
-  const retainedIdentityKeysByBucket = new Map(
-    Array.from(identityMetadataByBucket.entries()).map(([bucketKey, identityMetadata]) => [
-      bucketKey,
-      new Set(
-        Array.from(identityMetadata.entries())
-          .filter(([, metadata]) =>
-            now - metadata.timestamp <= (metadata.userId ? MAX_PERSISTED_AGE_MS : MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS))
-          .sort((left, right) => right[1].timestamp - left[1].timestamp)
-          .slice(0, MAX_PERSISTED_THREADS)
-          .map(([identityKey]) => identityKey),
-      ),
-    ] as const),
-  )
-
-  return {
-    drafts: Object.fromEntries(
-      Object.values(snapshot.drafts).flatMap((draft) => {
-        const identity = {
-          orderId: draft.orderId,
-          userId: draft.userId,
-          scope: draft.scope,
-        } satisfies ResolvedPetPalMessageComposerIdentity
-        const storageKey = buildPetPalMessageComposerStorageKey(identity)
-        const bucketKey = `${draft.userId}${PETPAL_MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR}${draft.scope}`
-        return retainedIdentityKeysByBucket.get(bucketKey)?.has(storageKey)
-          ? [[
-              storageKey,
-              {
-                ...cloneMessageDraftState(draft),
-                orderId: draft.orderId,
-                userId: draft.userId,
-                updatedAt: draft.updatedAt,
-                scope: draft.scope,
-              } satisfies PersistedPetPalMessageDraftRecord,
-            ] as const]
-          : []
-      }),
-    ),
-    recoveries: Object.fromEntries(
-      Object.values(snapshot.recoveries).flatMap((recovery) => {
-        const identity = {
-          orderId: recovery.orderId,
-          userId: recovery.userId,
-          scope: recovery.scope,
-        } satisfies ResolvedPetPalMessageComposerIdentity
-        const storageKey = buildPetPalMessageComposerStorageKey(identity)
-        const bucketKey = `${recovery.userId}${PETPAL_MESSAGE_COMPOSER_STORAGE_KEY_SEPARATOR}${recovery.scope}`
-        return retainedIdentityKeysByBucket.get(bucketKey)?.has(storageKey)
-          ? [[
-              storageKey,
-              {
-                orderId: recovery.orderId,
-                userId: recovery.userId,
-                stage: recovery.stage,
-                message: recovery.message,
-                updatedAt: recovery.updatedAt,
-                scope: recovery.scope,
-              } satisfies PersistedPetPalMessageRecoveryRecord,
-            ] as const]
-          : []
-      }),
-    ),
-  }
-}
-
-const toPublicPersistedSnapshot = (
-  snapshot: PersistedPetPalMessageComposerRecords,
-): PersistedPetPalMessageComposerSnapshot => ({
-  drafts: Object.fromEntries(
-    Object.entries(snapshot.drafts).map(([storageKey, draft]) => [
-      storageKey,
-      cloneMessageDraftState(draft),
-    ]),
-  ),
-  recoveries: Object.fromEntries(
-    Object.entries(snapshot.recoveries).map(([storageKey, recovery]) => [
-      storageKey,
-      {
-        stage: recovery.stage,
-        message: recovery.message,
-      } satisfies PetPalMessageRecoveryState,
-    ]),
-  ),
-})
-
 const parsePersistedPetPalMessageComposerRecords = (
   rawValue: unknown,
   now = Date.now(),
 ): PersistedPetPalMessageComposerRecords => {
   const normalized = normalizePersistedValue(rawValue)
   if (!isRecord(normalized)) {
-    return createEmptyPersistedSnapshot()
+    return createEmptyPersistedPetPalMessageComposerRecords()
   }
 
   const fallbackUpdatedAt = new Date(now).toISOString()
@@ -341,10 +193,15 @@ const parsePersistedPetPalMessageComposerRecords = (
     }),
   )
 
-  return compactPersistedPetPalMessageComposerRecords({
+  return compactSharedPersistedPetPalMessageComposerRecords({
     drafts,
     recoveries,
-  }, now)
+  }, {
+    now,
+    maxPersistedThreads: MAX_PERSISTED_THREADS,
+    maxPersistedAgeMs: MAX_PERSISTED_AGE_MS,
+    maxLegacyAnonymousPersistedAgeMs: MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS,
+  })
 }
 
 export function parsePersistedPetPalMessageComposerSnapshot(
@@ -353,7 +210,7 @@ export function parsePersistedPetPalMessageComposerSnapshot(
     now?: number
   } = {},
 ): PersistedPetPalMessageComposerSnapshot {
-  return toPublicPersistedSnapshot(
+  return toPublicPersistedPetPalMessageComposerSnapshot(
     parsePersistedPetPalMessageComposerRecords(rawValue, options.now),
   )
 }
@@ -366,7 +223,7 @@ export function adoptLegacyPetPalMessageComposerSnapshot(
   } = {},
 ): PersistedPetPalMessageComposerSnapshot {
   const snapshot = parsePersistedPetPalMessageComposerRecords(rawValue, options.now)
-  return toPublicPersistedSnapshot({
+  return toPublicPersistedPetPalMessageComposerSnapshot({
     drafts: adoptLegacyPetPalMessageComposerRecordsForIdentity(snapshot.drafts, identity),
     recoveries: adoptLegacyPetPalMessageComposerRecordsForIdentity(snapshot.recoveries, identity),
   })
@@ -386,7 +243,7 @@ const parsePersistedPetPalMessageComposerStorageValue = (
     return parsePersistedPetPalMessageComposerRecords(rawValue, now)
   }
   catch {
-    return createEmptyPersistedSnapshot()
+    return createEmptyPersistedPetPalMessageComposerRecords()
   }
 }
 
@@ -406,7 +263,7 @@ const writePersistedPetPalMessageComposerSnapshot = (
 
 const readPersistedPetPalMessageComposerSnapshot = (): PersistedPetPalMessageComposerRecords => {
   if (!hasMessageComposerStorage()) {
-    return createEmptyPersistedSnapshot()
+    return createEmptyPersistedPetPalMessageComposerRecords()
   }
 
   return parsePersistedPetPalMessageComposerStorageValue(uni.getStorageSync(STORAGE_KEY))
@@ -446,9 +303,13 @@ function syncPersistedPetPalMessageComposerSnapshot() {
   }
 
   try {
-    const compactedSnapshot = compactPersistedPetPalMessageComposerRecords({
+    const compactedSnapshot = compactSharedPersistedPetPalMessageComposerRecords({
       drafts: messageDrafts.value,
       recoveries: messageRecoveries.value,
+    }, {
+      maxPersistedThreads: MAX_PERSISTED_THREADS,
+      maxPersistedAgeMs: MAX_PERSISTED_AGE_MS,
+      maxLegacyAnonymousPersistedAgeMs: MAX_LEGACY_ANONYMOUS_PERSISTED_AGE_MS,
     })
 
     messageDrafts.value = compactedSnapshot.drafts

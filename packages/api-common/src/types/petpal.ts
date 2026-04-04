@@ -352,6 +352,11 @@ export interface PetPalMessageRecoveryState {
   message: string;
 }
 
+export interface PersistedPetPalMessageComposerSnapshot {
+  drafts: Record<string, PetPalMessageDraftState>;
+  recoveries: Record<string, PetPalMessageRecoveryState>;
+}
+
 export type ComplaintAdminSlaStatus = 'NORMAL' | 'DUE_SOON' | 'OVERDUE';
 
 export interface ComplaintAdminRecord extends ComplaintRecord {

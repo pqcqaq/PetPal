@@ -7883,6 +7883,60 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.255 2026-04-04（P3-M1 Slice 255）
+
+**概述**：上一轮已经把消息草稿 identity、storage key、legacy adoption 和 scoped clear 纯函数下沉到共享层，但 Web / App 两份 `message-composer-state.ts` 里仍各自保留了 persisted snapshot 类型、空快照工厂、快照裁剪和 public snapshot 转换逻辑。本轮继续沿同一条收口线，只把这批无副作用的 persisted snapshot helper 提升到 `@rbac/api-common`，继续避免把 `localStorage` / `uni` 存储差异混在一起。
+
+已完成：
+
+- 共享 persisted snapshot 类型与 helper 已继续落到 `api-common`：
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增共享的 `PersistedPetPalMessageComposerSnapshot`。
+  - `packages/api-common/src/helpers/petpal-message-composer.ts`
+    - 新增 `PersistedPetPalMessageDraftRecord`、`PersistedPetPalMessageRecoveryRecord`、`PersistedPetPalMessageComposerRecords`。
+    - 新增 `createEmptyPersistedPetPalMessageComposerRecords(...)`、`compactPersistedPetPalMessageComposerRecords(...)`、`toPublicPersistedPetPalMessageComposerSnapshot(...)`。
+- Web / App 消息状态模块已切到共享 persisted snapshot helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts`
+    - persisted snapshot 类型别名、空快照工厂、快照裁剪和 public snapshot 转换已切到共享 helper。
+    - Web 端仍继续只在本地保留 `fallbackUploadedAt` 兼容、旧附件 `uploadedAt` 回填和 `localStorage` 读写，不把这些端侧差异抽进共享层。
+  - `apps/app-frontend/src/pages/petpal/message-composer-state.ts`
+    - App 端同一批 persisted snapshot 纯函数也已切到共享 helper，不再维护第二份近似实现。
+- 定向测试与文档同步：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补空快照、快照裁剪和 public snapshot 转换的共享断言。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-message-composer-state.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改消息发送协议、消息草稿缓存淘汰规则或双端存储介质，只继续收口 persisted snapshot 纯函数。
+- 已确认 Web / App 两端现在都会复用同一套 persisted snapshot 类型、空快照工厂、快照裁剪和 public snapshot 转换规则，消息状态模块的纯逻辑重复继续下降。
+- 已确认 Web 端历史附件 `uploadedAt` 回填以及 Web / App 各自的存储读写链路仍保留在端侧，没有被错误抽进共享 helper。
+
+风险与缓解：
+
+- 风险：当前共享层还没有接管 persisted snapshot 的完整原始值归一化与存储值解析，双端状态模块里仍有一批近似的 parse scaffolding。
+- 缓解：本轮继续只抽 persisted snapshot 纯 helper，下一轮若继续推进，再优先处理完全无副作用的原始值归一化与 parse scaffolding。
+
+- 风险：共享 helper 现在承接了更多消息草稿升级语义，后续调整 persisted snapshot 口径时会同时影响 Web / App。
+- 缓解：本轮已补共享层直测和现有消息状态回归测试，后续如要改 persisted snapshot 规则，仍可先在共享测试里锁住期望行为再推进。
+
+下一步（1-3）：
+
+1. 继续评估消息草稿状态里原始值归一化、persisted snapshot parse scaffolding 和存储值解析是否还能再下沉到共享层。
+2. 继续检查导出状态、投诉状态或其余 PetPal 页面里是否还有类似的 snapshot helper 重复值得收口。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.254 2026-04-04（P3-M1 Slice 254）
 
 **概述**：上一轮已经把消息草稿状态本身的 clone / parse 逻辑下沉到共享层，但 Web / App 两份 `message-composer-state.ts` 里仍各自保留了近似的 identity、storage key、legacy adoption 和 clear 纯函数。本轮继续沿消息草稿状态收口线，只把这批无副作用的 identity helper 提升到 `@rbac/api-common`，继续避免把 `localStorage` / `uni` 存储差异混在一起。

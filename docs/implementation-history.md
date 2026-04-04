@@ -242,6 +242,10 @@ Last updated: 2026-04-04
   - `packages/api-common/src/helpers/petpal-message-composer.ts` 已继续补消息草稿 `scope / userId / orderId` identity、storage key、legacy adoption 和 scoped clear 的共享纯 helper。
   - Web / App 两端的 `message-composer-state.ts` 现在都会直接复用同一套 storage key 构造、identity 解析、共享态回退和旧匿名消息记录认领逻辑，不再各自维护第二份近似实现。
   - 这轮仍然没有把 `localStorage` / `uni` 读写抽到共享层，双端状态模块只继续减纯函数重复，不混存储副作用。
+- 2026-04-04 已继续收口消息草稿持久化快照 helper：
+  - `packages/api-common/src/types/petpal.ts` 已新增共享的 `PersistedPetPalMessageComposerSnapshot`，`packages/api-common/src/helpers/petpal-message-composer.ts` 已新增 persisted draft/recovery record 类型、空快照工厂、快照裁剪和 public snapshot 转换 helper。
+  - Web / App 两端的 `message-composer-state.ts` 现在都会直接复用同一套 persisted snapshot helper，不再各自维护第二份快照空值、裁剪和导出逻辑。
+  - Web 端旧附件 `uploadedAt` 回填和 `localStorage` / `uni` 读写差异仍保留在端侧，没有被错误抽进共享层。
 - 2026-04-04 已继续对齐 Web 照料者资质上传：
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverProfileView.vue` 已从手填材料名称 / URL 改成受管资质附件上传，上传时会绑定当前照料者档案 ID 和 `petpal-caregiver-qualification` 标签。
   - 页面现在会直接展示材料大小 / 日期，并支持查看 / 移除；首次上传前如果档案还没生成 ID，会先提示保存一次基础资料。

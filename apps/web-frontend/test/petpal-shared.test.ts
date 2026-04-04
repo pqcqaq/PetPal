@@ -5,6 +5,8 @@ import {
   buildPetPalMessageComposerStorageKey,
   cloneManagedAttachmentRecords,
   clonePetPalMessageDraftState,
+  compactPersistedPetPalMessageComposerRecords,
+  createEmptyPersistedPetPalMessageComposerRecords,
   createManagedAttachmentRecord,
   createManagedAttachmentRecordFromMediaAsset,
   getPetPalMessageComposerEntry,
@@ -29,6 +31,7 @@ import {
   PETPAL_SERVICE_LOG_ATTACHMENT_TAG,
   resolvePersistedPetPalMessageComposerIdentity,
   resolvePetPalMessageComposerIdentity,
+  toPublicPersistedPetPalMessageComposerSnapshot,
 } from '@rbac/api-common';
 import {
   getPetPalCaregiverAuditLabel,
@@ -289,6 +292,84 @@ test('adopts legacy message composer records and clears scoped keys predictably'
     }).sort(),
     [ownerKey, sharedKey].sort(),
   );
+});
+
+test('creates, compacts and exposes persisted petpal message composer snapshots', () => {
+  assert.deepEqual(createEmptyPersistedPetPalMessageComposerRecords(), {
+    drafts: {},
+    recoveries: {},
+  });
+
+  const compacted = compactPersistedPetPalMessageComposerRecords({
+    drafts: {
+      [buildPetPalMessageComposerStorageKey({
+        orderId: 'order-old',
+        userId: 'user-1',
+        scope: 'owner',
+      })]: {
+        orderId: 'order-old',
+        userId: 'user-1',
+        scope: 'owner',
+        updatedAt: '2026-03-20T00:00:00.000Z',
+        content: 'old',
+        attachments: [],
+      },
+      [buildPetPalMessageComposerStorageKey({
+        orderId: 'order-new',
+        userId: 'user-1',
+        scope: 'owner',
+      })]: {
+        orderId: 'order-new',
+        userId: 'user-1',
+        scope: 'owner',
+        updatedAt: '2026-04-04T11:00:00.000Z',
+        content: 'new',
+        attachments: [],
+      },
+    },
+    recoveries: {
+      [buildPetPalMessageComposerStorageKey({
+        orderId: 'order-new',
+        userId: 'user-1',
+        scope: 'owner',
+      })]: {
+        orderId: 'order-new',
+        userId: 'user-1',
+        scope: 'owner',
+        updatedAt: '2026-04-04T11:30:00.000Z',
+        stage: 'send',
+        message: 'retry',
+      },
+    },
+  }, {
+    now: Date.parse('2026-04-04T12:00:00.000Z'),
+    maxPersistedThreads: 12,
+    maxPersistedAgeMs: 7 * 24 * 60 * 60 * 1000,
+    maxLegacyAnonymousPersistedAgeMs: 24 * 60 * 60 * 1000,
+  });
+
+  assert.deepEqual(toPublicPersistedPetPalMessageComposerSnapshot(compacted), {
+    drafts: {
+      [buildPetPalMessageComposerStorageKey({
+        orderId: 'order-new',
+        userId: 'user-1',
+        scope: 'owner',
+      })]: {
+        content: 'new',
+        attachments: [],
+      },
+    },
+    recoveries: {
+      [buildPetPalMessageComposerStorageKey({
+        orderId: 'order-new',
+        userId: 'user-1',
+        scope: 'owner',
+      })]: {
+        stage: 'send',
+        message: 'retry',
+      },
+    },
+  });
 });
 
 test('rejects managed attachment media assets without an accessible url', () => {

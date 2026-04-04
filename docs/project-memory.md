@@ -190,6 +190,7 @@ Last updated: 2026-04-04
 - PetPal Web / App 两端的消息草稿状态当前也已开始复用 `@rbac/api-common` 里的共享附件 clone / parse helper；Web 端仍保留旧缓存缺失 `uploadedAt` 的回填策略，但附件对象级校验和复制口径已经不再分叉。
 - PetPal Web / App 两端的消息草稿 / 恢复态类型、草稿深拷贝、草稿解析和恢复态解析当前也已继续收口到 `@rbac/api-common`；双端状态模块现在主要保留各自的本地存储介质、启动 warmup 和旧缓存迁移差异。
 - PetPal Web / App 两端的消息草稿 identity、storage key、legacy adoption 和 scoped clear 纯函数当前也已继续收口到 `@rbac/api-common`；双端状态模块剩余的核心差异基本已收敛到存储介质读写和启动时机。
+- PetPal Web / App 两端的消息持久化快照类型、空快照工厂、快照裁剪和 public snapshot 转换当前也已继续收口到 `@rbac/api-common`；双端状态模块现在继续只保留本地存储解析、Web 旧附件 `uploadedAt` 回填和存储介质差异。
 
 ### 4.5 App 前端
 
