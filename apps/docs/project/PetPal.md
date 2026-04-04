@@ -7883,6 +7883,51 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.251 2026-04-04（P3-M1 Slice 251）
+
+**概述**：上一轮已经把 Web 消息页上传成功后的附件快照切到共享 builder，但 Web / App 两端本地消息草稿里保存的附件类型仍然没有完全对齐，Web 草稿附件还缺 `uploadedAt`，与共享 `ManagedAttachmentRecord` 和 App 本地草稿结构不一致。本轮继续沿消息附件收口线，把两端消息草稿附件类型统一到共享结构，并补上 Web 旧本地缓存的 `uploadedAt` 兼容回填。
+
+已完成：
+
+- Web / App 消息草稿附件类型已对齐到共享附件结构：
+  - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts`
+  - `apps/app-frontend/src/pages/petpal/message-composer-state.ts`
+    - 两端 `PetPalMessageDraftAttachment` 现在都直接复用 `@rbac/api-common` 的 `ManagedAttachmentRecord`，不再各自平行维护消息草稿附件字段定义。
+- Web 旧版本地消息草稿已补字段升级兼容：
+  - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts`
+    - 解析旧版本地消息草稿附件时，如果历史快照里缺失 `uploadedAt`，现在会自动补成当前回放时刻的 ISO 时间。
+    - 这样既能让 Web 旧缓存继续恢复，也能把当前草稿结构对齐到共享附件对象，不需要一次性清空用户本地草稿。
+- 定向测试已同步：
+  - `apps/web-frontend/test/petpal-message-composer-state.test.ts`
+    - 旧版 JSON 草稿、非法附件过滤和新增的“缺失 `uploadedAt` 自动回填”断言都已更新，继续兜底消息草稿持久化升级链路。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+  - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-message-composer-state.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改消息发送协议、消息接口或消息上传入口，只继续收口本地草稿附件结构和旧缓存兼容逻辑。
+- 已确认 Web / App 两端消息草稿附件现在都能承接共享 `ManagedAttachmentRecord`，消息上传回填、草稿持久化和恢复链路的附件字段口径进一步一致。
+- 已确认 Web 旧版本地草稿不会因为新增 `uploadedAt` 而直接丢失，升级时会自动补齐时间戳后再进入现有解析链路。
+
+风险与缓解：
+
+- 风险：当前只补了 Web 侧旧本地草稿的 `uploadedAt` 兼容，App 侧历史缓存如果未来也出现更老结构，仍需要单独评估迁移策略。
+- 缓解：App 端当前从上传入口开始就一直写入完整附件对象，这轮先优先处理已经确认存在历史缺口的 Web 本地缓存，不扩大迁移面。
+
+下一步（1-3）：
+
+1. 继续评估消息草稿状态模块中其余可共享的逻辑是否值得抽成跨端 helper，而不是继续维护两大份近似实现。
+2. 继续评估 backend 测试辅助和其余页面里是否还有残余的 `ManagedAttachmentRecord` 手写映射。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.250 2026-04-04（P3-M1 Slice 250）
 
 **概述**：上一轮已经把资质上传、投诉证据上传、后台整改材料详情和 backend 整改附件解析切到共享 `ManagedAttachmentRecord` builder，但 Web 消息链路里仍有两处残留页面继续手写消息附件快照对象。本轮继续沿同一条线，把订单详情与跨订单消息中心的上传回填也切到共享 helper，结束这一批 Web 消息附件字段拷贝。

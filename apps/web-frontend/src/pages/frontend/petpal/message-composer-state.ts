@@ -1,12 +1,7 @@
+import type { ManagedAttachmentRecord } from '@rbac/api-common';
 import { ref } from 'vue';
 
-export type PetPalMessageDraftAttachment = {
-  fileId: string;
-  url: string;
-  name: string;
-  size: number;
-  mimeType: string;
-};
+export type PetPalMessageDraftAttachment = ManagedAttachmentRecord;
 
 export type PetPalMessageDraftState = {
   content: string;
@@ -177,6 +172,7 @@ const cloneMessageDraftAttachments = (attachments: PetPalMessageDraftAttachment[
     name: item.name,
     size: item.size,
     mimeType: item.mimeType,
+    uploadedAt: item.uploadedAt,
   }));
 
 const cloneMessageDraftState = (draft: PetPalMessageDraftState): PetPalMessageDraftState => ({
@@ -206,7 +202,7 @@ const toDraftAttachment = (rawValue: unknown): PetPalMessageDraftAttachment | nu
     return null;
   }
 
-  const { fileId, url, name, size, mimeType } = rawValue;
+  const { fileId, url, name, size, mimeType, uploadedAt } = rawValue;
   if (
     typeof fileId !== 'string'
     || typeof url !== 'string'
@@ -229,7 +225,28 @@ const toDraftAttachment = (rawValue: unknown): PetPalMessageDraftAttachment | nu
     name,
     size,
     mimeType,
+    uploadedAt: typeof uploadedAt === 'string' && uploadedAt.trim()
+      ? uploadedAt
+      : new Date().toISOString(),
   };
+};
+
+const toDraftAttachmentRecord = (
+  rawValue: unknown,
+  fallbackUploadedAt: string,
+): PetPalMessageDraftAttachment | null => {
+  if (!isRecord(rawValue)) {
+    return null;
+  }
+
+  const attachment = toDraftAttachment({
+    ...rawValue,
+    uploadedAt:
+      typeof rawValue.uploadedAt === 'string' && rawValue.uploadedAt.trim()
+        ? rawValue.uploadedAt
+        : fallbackUploadedAt,
+  });
+  return attachment;
 };
 
 const toDraftState = (rawValue: unknown): PetPalMessageDraftState | null => {
@@ -285,7 +302,18 @@ const toDraftRecord = (
     return null;
   }
 
-  const draft = toDraftState(rawValue);
+  const content = typeof rawValue.content === 'string' ? rawValue.content : '';
+  const attachments = Array.isArray(rawValue.attachments)
+    ? rawValue.attachments
+      .map((item) => toDraftAttachmentRecord(item, fallbackUpdatedAt))
+      .filter((item): item is PetPalMessageDraftAttachment => Boolean(item))
+    : [];
+  const draft = !content.trim() && !attachments.length
+    ? null
+    : {
+        content,
+        attachments,
+      } satisfies PetPalMessageDraftState;
   if (!draft) {
     return null;
   }

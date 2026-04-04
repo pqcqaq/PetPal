@@ -50,7 +50,9 @@ test('parses persisted petpal message composer snapshots from legacy JSON string
         message: 'Network failed while sending',
       },
     },
-  }));
+  }), {
+    now: Date.parse('2026-04-08T12:00:00.000Z'),
+  });
 
   assert.deepEqual(snapshot, {
     drafts: {
@@ -63,6 +65,7 @@ test('parses persisted petpal message composer snapshots from legacy JSON string
             name: 'message-1.png',
             size: 2048,
             mimeType: 'image/png',
+            uploadedAt: '2026-04-08T12:00:00.000Z',
           },
         ],
       },
@@ -207,6 +210,8 @@ test('drops malformed petpal message composer drafts and recovery entries', () =
         message: 'Need to reselect the image',
       },
     },
+  }, {
+    now: Date.parse('2026-04-08T12:00:00.000Z'),
   });
 
   assert.deepEqual(snapshot, {
@@ -220,6 +225,7 @@ test('drops malformed petpal message composer drafts and recovery entries', () =
             name: 'message-3.png',
             size: 64,
             mimeType: 'image/png',
+            uploadedAt: '2026-04-08T12:00:00.000Z',
           },
         ],
       },
@@ -230,6 +236,47 @@ test('drops malformed petpal message composer drafts and recovery entries', () =
         message: 'Need to reselect the image',
       },
     },
+  });
+});
+
+test('backfills uploadedAt for legacy web message attachments without timestamps', () => {
+  const snapshot = parsePersistedPetPalMessageComposerSnapshot({
+    drafts: {
+      'order-legacy-attachment': {
+        content: '',
+        attachments: [
+          {
+            fileId: 'file-legacy',
+            url: 'https://cdn.example.com/legacy.png',
+            name: 'legacy.png',
+            size: 128,
+            mimeType: 'image/png',
+          },
+        ],
+      },
+    },
+    recoveries: {},
+  }, {
+    now: Date.parse('2026-04-09T09:00:00.000Z'),
+  });
+
+  assert.deepEqual(snapshot, {
+    drafts: {
+      [sharedKey('order-legacy-attachment')]: {
+        content: '',
+        attachments: [
+          {
+            fileId: 'file-legacy',
+            url: 'https://cdn.example.com/legacy.png',
+            name: 'legacy.png',
+            size: 128,
+            mimeType: 'image/png',
+            uploadedAt: '2026-04-09T09:00:00.000Z',
+          },
+        ],
+      },
+    },
+    recoveries: {},
   });
 });
 

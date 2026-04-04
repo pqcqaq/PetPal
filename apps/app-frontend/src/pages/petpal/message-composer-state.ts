@@ -1,13 +1,7 @@
+import type { ManagedAttachmentRecord } from '@rbac/api-common'
 import { ref } from 'vue'
 
-export type PetPalMessageDraftAttachment = {
-  fileId: string
-  url: string
-  name: string
-  mimeType: string
-  size: number
-  uploadedAt: string
-}
+export type PetPalMessageDraftAttachment = ManagedAttachmentRecord
 
 export type PetPalMessageDraftState = {
   content: string
