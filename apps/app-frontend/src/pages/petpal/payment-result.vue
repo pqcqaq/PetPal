@@ -6,7 +6,7 @@ import { getOrderDetail } from '@/api/petpal'
 import { useTokenStore } from '@/store'
 import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
-import { getErrorMessage, helpers, openLoginPage, openOrderDetailPage, PETPAL_CHECKOUT_PAGE, stopPullDown, toast } from './rebuild/shared'
+import { getErrorMessage, getOwnerOrderFilterForOrder, helpers, openLoginPage, openOrderDetailPage, openPetPalOrdersPage, PETPAL_CHECKOUT_PAGE, stopPullDown, toast } from './rebuild/shared'
 
 const tokenStore = useTokenStore()
 const loading = ref(false)
@@ -34,6 +34,14 @@ async function loadPage() {
 function retryPay() {
   if (!order.value) return
   uni.redirectTo({ url: `${PETPAL_CHECKOUT_PAGE}?orderId=${order.value.id}` })
+}
+
+function returnToOrders() {
+  if (!order.value) return
+  openPetPalOrdersPage({
+    filter: getOwnerOrderFilterForOrder(order.value),
+    focusOrderId: order.value.id,
+  })
 }
 
 onLoad((options) => {
@@ -75,9 +83,38 @@ onPullDownRefresh(() => {
 
       <view class="petpal-bottom-bar">
         <view class="petpal-action-row">
-          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openOrderDetailPage(order.id)">查看订单</button>
-          <button v-if="Number(order.amountPaid) <= 0" class="petpal-btn petpal-btn--secondary" hover-class="none" @click="retryPay">继续支付</button>
-          <button v-else class="petpal-btn petpal-btn--ghost" hover-class="none" @click="openOrderDetailPage(order.id, 'chat')">去沟通</button>
+          <button
+            v-if="Number(order.amountPaid) <= 0"
+            class="petpal-btn petpal-btn--primary"
+            hover-class="none"
+            @click="retryPay"
+          >
+            继续支付
+          </button>
+          <button
+            v-else
+            class="petpal-btn petpal-btn--primary"
+            hover-class="none"
+            @click="returnToOrders"
+          >
+            回订单队列
+          </button>
+          <button
+            v-if="Number(order.amountPaid) <= 0"
+            class="petpal-btn petpal-btn--secondary"
+            hover-class="none"
+            @click="returnToOrders"
+          >
+            回订单队列
+          </button>
+          <button
+            v-else
+            class="petpal-btn petpal-btn--secondary"
+            hover-class="none"
+            @click="openOrderDetailPage(order.id, 'chat')"
+          >
+            去沟通
+          </button>
         </view>
       </view>
     </template>

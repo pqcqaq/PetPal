@@ -78,6 +78,14 @@ import {
   petPalCaregiverAuditOptions,
   petPalComplaintSlaStatusOptions,
 } from '../src/pages/frontend/petpal/shared.ts';
+import {
+  consumePetPalAftersalesPageContext,
+  consumePetPalOrdersPageContext,
+  openPetPalAftersalesPage,
+  openPetPalOrdersPage,
+  PETPAL_AFTERSALES_PAGE,
+  PETPAL_ORDERS_PAGE,
+} from '../../app-frontend/src/pages/petpal/owner-shared.ts';
 
 test('exposes complaint SLA options in a stable order for export forms', () => {
   assert.deepEqual(petPalComplaintSlaStatusOptions, [
@@ -866,4 +874,70 @@ test('rejects managed attachment media assets without an accessible url', () => 
     createdAt: '2026-04-04T09:30:00.000Z',
     completedAt: null,
   }), /Managed attachment requires an accessible url/);
+});
+
+test('stashes and consumes app petpal page context for focused return flows', () => {
+  const storage = new Map<string, unknown>();
+  const navigationCalls: Array<{ kind: string; url: string }> = [];
+  const previousUni = (globalThis as typeof globalThis & { uni?: unknown }).uni;
+
+  (globalThis as typeof globalThis & {
+    uni: {
+      setStorageSync: (key: string, value: unknown) => void;
+      getStorageSync: (key: string) => unknown;
+      removeStorageSync: (key: string) => void;
+      switchTab: (options: { url: string }) => void;
+      navigateTo: (options: { url: string }) => void;
+      redirectTo: (options: { url: string; fail?: () => void }) => void;
+    };
+  }).uni = {
+    setStorageSync: (key, value) => {
+      storage.set(key, value);
+    },
+    getStorageSync: key => storage.get(key),
+    removeStorageSync: (key) => {
+      storage.delete(key);
+    },
+    switchTab: ({ url }) => {
+      navigationCalls.push({ kind: 'switchTab', url });
+    },
+    navigateTo: ({ url }) => {
+      navigationCalls.push({ kind: 'navigateTo', url });
+    },
+    redirectTo: ({ url, fail }) => {
+      navigationCalls.push({ kind: 'redirectTo', url });
+      fail?.();
+    },
+  };
+
+  try {
+    openPetPalOrdersPage({
+      filter: 'COMPLETED',
+      focusOrderId: ' order-1 ',
+    });
+    assert.deepEqual(navigationCalls[0], { kind: 'switchTab', url: PETPAL_ORDERS_PAGE });
+    assert.deepEqual(consumePetPalOrdersPageContext(), {
+      filter: 'COMPLETED',
+      focusOrderId: 'order-1',
+    });
+    assert.equal(consumePetPalOrdersPageContext(), null);
+
+    openPetPalAftersalesPage({
+      mode: 'navigate',
+      filter: 'COMPLAINT',
+      focusOrderId: ' order-2 ',
+    });
+    assert.deepEqual(navigationCalls[1], { kind: 'navigateTo', url: PETPAL_AFTERSALES_PAGE });
+    assert.deepEqual(consumePetPalAftersalesPageContext(), {
+      filter: 'COMPLAINT',
+      focusOrderId: 'order-2',
+    });
+    assert.equal(consumePetPalAftersalesPageContext(), null);
+  } finally {
+    if (previousUni === undefined) {
+      delete (globalThis as typeof globalThis & { uni?: unknown }).uni;
+    } else {
+      (globalThis as typeof globalThis & { uni?: unknown }).uni = previousUni;
+    }
+  }
 });

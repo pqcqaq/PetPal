@@ -13973,3 +13973,55 @@ flowchart TD
 1. 继续推进 Web 对应的交易结果 / 售后结果页收口，减少前后端多端体验分裂。
 2. 继续补系统级主动提醒、跨页面主动引导和更细的结果回流。
 3. 在结果页链路基本稳定后，再集中补更多弱网态和最终验收收口。
+
+### 14.126 2026-04-04（P3-M1 Slice 269）
+
+**概述**：继续推进 App 主人端交易后段回流收口，本轮补齐订单列表、售后中心与支付 / 退款 / 投诉 / 评价结果页之间的焦点回流，让用户完成动作后回到正确队列并定位当前订单。
+
+已完成：
+
+- App 订单列表售后入口带上下文：
+  - `apps/app-frontend/src/pages/petpal/orders.vue`
+    - “处理售后”动作已开始带 `focusOrderId + filter` 打开售后中心，不再只做无上下文跳转。
+    - 争议订单会优先落到投诉相关筛选，其它售后订单会优先落到退款筛选。
+- App 售后中心开始消费 page context：
+  - `apps/app-frontend/src/pages/petpal/aftersales.vue`
+    - 已开始消费 `focusOrderId` 与售后筛选上下文，支持把刚处理的售后订单顶到前面。
+    - 售后筛选已从“全部 / 退款 / 争议”扩成“全部 / 优先 / 退款 / 投诉”，更接近当前结果页回流语义。
+    - 售后空态已补回订单队列动作，不再只停留在说明文案。
+- App 结果页回流改成“回正确队列”：
+  - `apps/app-frontend/src/pages/petpal/payment-result.vue`
+    - 支付完成后主动作已改成回订单队列并聚焦当前订单；未支付时也可先回订单队列，再决定是否继续支付。
+  - `apps/app-frontend/src/pages/petpal/refund-result.vue`
+    - 退款结果页主动作已改成回售后队列并聚焦当前订单；如已有投诉，会直接给出投诉结果入口。
+  - `apps/app-frontend/src/pages/petpal/complaint-result.vue`
+    - 投诉结果页主动作已改成回售后队列并聚焦当前订单；驳回场景会直接给出重新提交动作。
+  - `apps/app-frontend/src/pages/petpal/review-result.vue`
+    - 评价结果页主动作已改成回订单列表并聚焦当前订单，不再默认回详情页后再找对应单。
+- 回归测试补齐：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补 App `openPetPalOrdersPage / openPetPalAftersalesPage` 的页面上下文暂存与消费测试，继续兜底 focused return 行为。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，全部改动基于现有 App page context、订单列表与结果页壳层完成。
+- 已确认售后页现在和订单页一样会一次性消费上下文，不会把旧焦点永久残留到后续进入。
+- 已确认支付 / 退款 / 投诉 / 评价四类结果页主动作已经统一回到正确队列，不再退化成默认页裸跳。
+
+风险与缓解：
+
+- 风险：App 结果页虽然已能回到正确队列，但消息中心、订单详情和提醒中心之间还缺更强的 notice 与系统级主动提醒。
+- 缓解：下一轮继续补结果页、消息页和售后页之间的更细主动引导，不再只靠按钮文字表达下一步。
+
+下一步（1-3）：
+
+1. 继续补 App 订单详情、消息中心、结果页之间更细的主动引导和弱网恢复说明。
+2. 继续把提醒中心和更多辅助页接到同一套焦点回流策略，减少回流后再次找入口。
+3. 在 App / Web 回流链稳定后，再集中补更多验收向测试和答辩材料。

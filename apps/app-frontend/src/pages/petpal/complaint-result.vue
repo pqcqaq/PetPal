@@ -7,7 +7,7 @@ import { useTokenStore } from '@/store'
 import PetpalEmpty from './rebuild/petpal-empty.vue'
 import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
-import { getComplaintTone, getErrorMessage, helpers, openLoginPage, openOrderComplaintPage, openOrderDetailPage, stopPullDown, summarizeComplaint, toast } from './rebuild/shared'
+import { getComplaintTone, getErrorMessage, helpers, openLoginPage, openOrderComplaintPage, openOrderDetailPage, openPetPalAftersalesPage, stopPullDown, summarizeComplaint, toast } from './rebuild/shared'
 
 const tokenStore = useTokenStore()
 const loading = ref(false)
@@ -55,6 +55,16 @@ onLoad((options) => {
 onPullDownRefresh(() => {
   void loadPage()
 })
+
+function returnToAftersales() {
+  if (!order.value || !activeComplaint.value) return
+  openPetPalAftersalesPage({
+    focusOrderId: order.value.id,
+    filter: activeComplaint.value.status === 'PROCESSING' || activeComplaint.value.status === 'OPEN'
+      ? 'HIGH'
+      : 'COMPLAINT',
+  })
+}
 </script>
 
 <template>
@@ -95,8 +105,14 @@ onPullDownRefresh(() => {
 
       <view class="petpal-bottom-bar">
         <view class="petpal-action-row">
-          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openOrderDetailPage(order.id, 'aftersales')">回订单售后</button>
-          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderComplaintPage(order.id)">重新提交</button>
+          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="returnToAftersales">回售后队列</button>
+          <button
+            class="petpal-btn petpal-btn--secondary"
+            hover-class="none"
+            @click="activeComplaint.status === 'REJECTED' ? openOrderComplaintPage(order.id) : openOrderDetailPage(order.id, 'aftersales')"
+          >
+            {{ activeComplaint.status === 'REJECTED' ? '重新提交' : '回订单售后' }}
+          </button>
         </view>
       </view>
     </template>

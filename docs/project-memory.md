@@ -220,6 +220,7 @@ Last updated: 2026-04-04
 - PetPal 投诉附件的本地快照结构和前端上传限额当前已收口到 `@rbac/api-common`，Web / App 投诉页不再各自手写 `petpal-order-complaint` 标签和 3 张 / 8 MB 约束
 - PetPal 订单消息附件与照料者资质附件的前端上传标签 / 限额当前也已收口到 `@rbac/api-common`；App 资质页还会按剩余名额限制上传，避免超过 12 份后再静默截断
 - PetPal Web 照料者资料页当前也已切到受管资质附件上传，不再手填材料名称和 URL；历史上已保存的手填链接记录仍会继续显示并可查看 / 移除
+- PetPal App 订单列表、售后中心与支付 / 退款 / 投诉 / 评价结果页当前已接入 `focusOrderId + filter` 页面上下文；用户完成支付、退款、投诉或评价后，会回到正确队列并把当前订单顶到前面，`apps/web-frontend/test/petpal-shared.test.ts` 也已补对应回归断言，避免后续再次退化成裸跳转
 
 ## 5. 关键架构原则
 

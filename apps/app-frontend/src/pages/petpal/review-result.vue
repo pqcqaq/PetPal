@@ -6,7 +6,7 @@ import { getOrderDetail } from '@/api/petpal'
 import { useTokenStore } from '@/store'
 import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
-import { getErrorMessage, openLoginPage, openOrderDetailPage, openOrderReviewPage, stopPullDown, toast } from './rebuild/shared'
+import { getErrorMessage, getOwnerOrderFilterForOrder, openLoginPage, openOrderDetailPage, openOrderReviewPage, openPetPalOrdersPage, stopPullDown, toast } from './rebuild/shared'
 
 const tokenStore = useTokenStore()
 const loading = ref(false)
@@ -39,6 +39,14 @@ onLoad((options) => {
 onPullDownRefresh(() => {
   void loadPage()
 })
+
+function returnToOrders() {
+  if (!order.value) return
+  openPetPalOrdersPage({
+    filter: getOwnerOrderFilterForOrder(order.value),
+    focusOrderId: order.value.id,
+  })
+}
 </script>
 
 <template>
@@ -66,8 +74,16 @@ onPullDownRefresh(() => {
 
       <view class="petpal-bottom-bar">
         <view class="petpal-action-row">
-          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openOrderDetailPage(order.id)">回订单详情</button>
-          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderReviewPage(order.id)">{{ order.review ? '重新查看评价页' : '去评价' }}</button>
+          <button
+            class="petpal-btn petpal-btn--primary"
+            hover-class="none"
+            @click="order.review ? returnToOrders() : openOrderReviewPage(order.id)"
+          >
+            {{ order.review ? '回订单列表' : '去评价' }}
+          </button>
+          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderDetailPage(order.id)">
+            回订单详情
+          </button>
         </view>
       </view>
     </template>

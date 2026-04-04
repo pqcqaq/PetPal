@@ -8,7 +8,7 @@ import PetpalEmpty from './rebuild/petpal-empty.vue'
 import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
 import PetpalSegmented from './rebuild/petpal-segmented.vue'
-import { consumePetPalOrdersPageContext, describeConversation, describeOrder, getOwnerOrderFilterForOrder, openLoginPage, openOrderDetailPage, PETPAL_AFTERSALES_PAGE, PETPAL_CHECKOUT_PAGE, stopPullDown } from './rebuild/shared'
+import { consumePetPalOrdersPageContext, describeConversation, describeOrder, getOwnerOrderFilterForOrder, openLoginPage, openOrderDetailPage, openPetPalAftersalesPage, PETPAL_CHECKOUT_PAGE, stopPullDown } from './rebuild/shared'
 
 type FilterValue = 'ALL' | 'ACTIVE' | 'COMPLETED' | 'AFTERSALES'
 
@@ -62,8 +62,12 @@ async function loadPage() {
   }
 }
 
-function openAftersales() {
-  uni.navigateTo({ url: PETPAL_AFTERSALES_PAGE })
+function openAftersales(order: OrderRecord) {
+  openPetPalAftersalesPage({
+    mode: 'navigate',
+    focusOrderId: order.id,
+    filter: order.orderStatus === 'DISPUTED' ? 'COMPLAINT' : 'REFUND',
+  })
 }
 
 function openPay(orderId: string) {
@@ -125,7 +129,7 @@ onPullDownRefresh(() => {
                 v-else-if="getOwnerOrderFilterForOrder(item) === 'AFTERSALES'"
                 class="petpal-btn petpal-btn--secondary"
                 hover-class="none"
-                @click="openAftersales"
+                @click="openAftersales(item)"
               >
                 处理售后
               </button>

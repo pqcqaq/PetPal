@@ -6,7 +6,7 @@ import { getOrderComplaints, getOrderDetail, getOrderRefundProgress } from '@/ap
 import { useTokenStore } from '@/store'
 import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
-import { getErrorMessage, helpers, openLoginPage, openOrderComplaintPage, openOrderDetailPage, stopPullDown, toast } from './rebuild/shared'
+import { getErrorMessage, helpers, openLoginPage, openOrderComplaintPage, openOrderDetailPage, openPetPalAftersalesPage, PETPAL_COMPLAINT_RESULT_PAGE, stopPullDown, toast } from './rebuild/shared'
 
 const tokenStore = useTokenStore()
 const loading = ref(false)
@@ -48,6 +48,22 @@ onLoad((options) => {
 onPullDownRefresh(() => {
   void loadPage()
 })
+
+function returnToAftersales() {
+  if (!order.value || !refundProgress.value) return
+  openPetPalAftersalesPage({
+    focusOrderId: order.value.id,
+    filter: refundProgress.value.stage === 'REJECTED' || refundProgress.value.stage === 'FAILED'
+      ? 'HIGH'
+      : complaintCount.value > 0
+        ? 'COMPLAINT'
+        : 'REFUND',
+  })
+}
+
+function openComplaintResult(orderId: string) {
+  uni.navigateTo({ url: `${PETPAL_COMPLAINT_RESULT_PAGE}?orderId=${orderId}` })
+}
 </script>
 
 <template>
@@ -84,8 +100,31 @@ onPullDownRefresh(() => {
 
       <view class="petpal-bottom-bar">
         <view class="petpal-action-row">
-          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="openOrderDetailPage(order.id, 'aftersales')">查看订单售后</button>
-          <button class="petpal-btn petpal-btn--secondary" hover-class="none" @click="openOrderComplaintPage(order.id)">继续投诉</button>
+          <button class="petpal-btn petpal-btn--primary" hover-class="none" @click="returnToAftersales">回售后队列</button>
+          <button
+            v-if="complaintCount > 0"
+            class="petpal-btn petpal-btn--secondary"
+            hover-class="none"
+            @click="openComplaintResult(order.id)"
+          >
+            查看投诉结果
+          </button>
+          <button
+            v-else-if="refundProgress.stage === 'REJECTED' || refundProgress.stage === 'FAILED'"
+            class="petpal-btn petpal-btn--secondary"
+            hover-class="none"
+            @click="openOrderComplaintPage(order.id)"
+          >
+            继续投诉
+          </button>
+          <button
+            v-else
+            class="petpal-btn petpal-btn--secondary"
+            hover-class="none"
+            @click="openOrderDetailPage(order.id, 'aftersales')"
+          >
+            回订单售后
+          </button>
         </view>
       </view>
     </template>
