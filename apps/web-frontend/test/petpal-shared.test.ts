@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  createManagedAttachmentRecord,
+  createManagedAttachmentRecordFromMediaAsset,
   PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_MB,
   PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
   PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT,
@@ -68,4 +70,55 @@ test('exposes stable service log and penalty attachment governance constants for
   assert.equal(PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG, 'petpal-penalty');
   assert.equal(PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE, 'rectify');
   assert.equal(PETPAL_PENALTY_RECTIFY_ATTACHMENT_MAX_COUNT, 10);
+});
+
+test('builds managed attachment records from upload metadata and media assets', () => {
+  const fromUpload = createManagedAttachmentRecord({
+    fileId: 'file-1',
+    url: 'https://example.com/a.jpg',
+    name: 'a.jpg',
+    mimeType: 'image/jpeg',
+    size: 123,
+    uploadedAt: new Date('2026-04-04T10:00:00.000Z'),
+  });
+
+  assert.deepEqual(fromUpload, {
+    fileId: 'file-1',
+    url: 'https://example.com/a.jpg',
+    name: 'a.jpg',
+    mimeType: 'image/jpeg',
+    size: 123,
+    uploadedAt: '2026-04-04T10:00:00.000Z',
+  });
+
+  const fromAsset = createManagedAttachmentRecordFromMediaAsset({
+    id: 'file-2',
+    originalName: 'b.pdf',
+    mimeType: 'application/pdf',
+    size: 456,
+    url: 'https://example.com/b.pdf',
+    createdAt: '2026-04-04T09:00:00.000Z',
+    completedAt: null,
+  });
+
+  assert.deepEqual(fromAsset, {
+    fileId: 'file-2',
+    url: 'https://example.com/b.pdf',
+    name: 'b.pdf',
+    mimeType: 'application/pdf',
+    size: 456,
+    uploadedAt: '2026-04-04T09:00:00.000Z',
+  });
+});
+
+test('rejects managed attachment media assets without an accessible url', () => {
+  assert.throws(() => createManagedAttachmentRecordFromMediaAsset({
+    id: 'file-3',
+    originalName: 'missing-url.png',
+    mimeType: 'image/png',
+    size: 789,
+    url: '   ',
+    createdAt: '2026-04-04T09:30:00.000Z',
+    completedAt: null,
+  }), /Managed attachment requires an accessible url/);
 });

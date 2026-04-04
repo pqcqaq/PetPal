@@ -8,6 +8,7 @@ import type {
   PetPalAdminOverviewScope,
   PlatformRuleAdminStats,
 } from '@rbac/api-common';
+import { createManagedAttachmentRecordFromMediaAsset } from '@rbac/api-common';
 import { prisma } from '../lib/prisma';
 import { Prisma, PrismaClient } from '../lib/prisma-generated';
 import type { CaregiverProfile, PetProfile, ServiceRequest } from '../lib/prisma-generated';
@@ -1556,14 +1557,10 @@ const resolvePenaltyRectifyMaterials = async (fileIds: string[]) => {
       throw badRequest('Penalty rectification evidence attachments are invalid');
     }
 
-    return {
-      fileId: asset.id,
-      url: asset.url,
-      name: asset.originalName,
-      mimeType: asset.mimeType,
+    return createManagedAttachmentRecordFromMediaAsset({
+      ...asset,
       size: Number(asset.size),
-      uploadedAt: (asset.completedAt ?? asset.createdAt).toISOString(),
-    };
+    });
   });
 };
 

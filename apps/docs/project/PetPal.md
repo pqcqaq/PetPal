@@ -7883,6 +7883,154 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.249 2026-04-04（P3-M1 Slice 249）
+
+**概述**：前两轮已经把 PetPal 附件标签、限额和处罚整改数量上限收口到 `@rbac/api-common`，但 Web / App / backend 里把上传结果或 `MediaAsset` 明细再拼成 `ManagedAttachmentRecord` 的逻辑仍然重复存在。本轮继续沿同一条收口线，把受管附件快照构造抽成共享 helper，并把各端现有调用点切到同一来源。
+
+已完成：
+
+- `packages/api-common/src/helpers/managed-attachments.ts`
+  - 新增 `createManagedAttachmentRecord(...)`，统一从上传返回值构造 `ManagedAttachmentRecord`。
+  - 新增 `createManagedAttachmentRecordFromMediaAsset(...)`，统一从 `MediaAsset` 明细回填整改材料等受管附件快照。
+  - `uploadedAt / createdAt / completedAt` 现在统一允许传入 `Date | string`，helper 内部会把 `Date` 归一到 ISO 字符串。
+  - 当 `MediaAsset.url` 缺失或只有空白时会直接抛错，避免前后端继续容忍“不可访问附件快照”。
+- `packages/api-common/src/index.ts`
+  - 已对外导出上述 helper，供 Web / App / backend 直接复用。
+- App / Web / backend 现有调用点已切到共享 helper：
+  - `apps/app-frontend/src/composables/useManagedAttachmentUpload.ts`
+    - App 通用受管上传 composable 不再内联拼接 `fileId / url / name / mimeType / size / uploadedAt`。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverProfileView.vue`
+    - Web 资质材料上传完成后的本地快照改走共享 builder。
+  - `apps/web-frontend/src/pages/frontend/petpal/PetPalOrderResultWorkbench.vue`
+    - Web 投诉证据上传完成后的本地快照改走共享 builder。
+  - `apps/web-frontend/src/pages/petpal-admin/penalties/PetPalPenaltyAdminView.vue`
+    - 后台处罚整改材料详情映射改走 `createManagedAttachmentRecordFromMediaAsset(...)`，不再重复手写字段拷贝。
+  - `apps/backend/src/services/petpal-service.ts`
+    - 后端整改附件解析也改走同一 helper，后台与前端对整改材料快照的来源彻底一致。
+- 共享测试已补齐：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补“从上传结果构造快照”和“从 `MediaAsset` 构造快照”的稳定性断言。
+    - 已补 `url` 缺失时的负向断言，继续约束 helper 不会静默产出坏附件记录。
+- 文档同步：
+  - `apps/docs/project/PetPal.md`
+  - `docs/implementation-history.md`
+  - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/files.test.ts test/integration/attachments.test.ts test/integration/petpal-penalty-admin.test.ts` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有新增附件协议、上传入口、白名单或治理标签，只继续收口各端重复的受管附件快照构造。
+- 已确认 Web / App 上传回填和 backend 整改附件解析现在都会产出同一结构的 `ManagedAttachmentRecord`，`uploadedAt` 的时间归一规则不再散落在各文件里。
+- 已确认后台处罚整改详情页和后端服务层对“附件缺少可访问地址”的容错边界现在也对齐到了同一条共享逻辑。
+
+风险与缓解：
+
+- 风险：当前共享 helper 只覆盖受管附件快照构造，还没有进一步统一附件预览文案、历史手填链接兼容展示等更上层 view-model 逻辑。
+- 缓解：这些仍是页面语义差异，不必在这一轮过度抽象；下一轮若出现第二处以上重复 view-model，再继续抽共享层。
+
+- 风险：投诉结果页和部分旧协议仍然要把附件快照再映射回 `evidenceUrls` 这类老字段，协议层还没有彻底升级成附件对象数组。
+- 缓解：本轮先把“上传后快照一致”收口，后续若推进投诉 / 资料协议升级，再在共享 helper 之上继续演进，不反向打散当前构造口径。
+
+下一步（1-3）：
+
+1. 继续评估是否把更多 `MediaAsset -> 业务 view-model` 的重复映射也收口到共享 helper。
+2. 继续评估投诉、整改和资质链路里仍保留的旧协议字段是否需要逐步升级到更完整的附件对象契约。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
+### 14.248 2026-04-04（P3-M1 Slice 248）
+
+**概述**：上一轮已经把三类 PetPal 附件标签收口到 backend 共享来源，但服务记录附件标签和处罚整改 `tag1/tag2/maxCount` 仍然散落在 backend、后台页面和测试里。本轮继续把服务记录与处罚整改附件治理口径补进 `@rbac/api-common`，避免整改上传、白名单和校验规则继续漂移。
+
+已完成：
+
+- `packages/api-common/src/types/petpal.ts`
+  - 新增 `PETPAL_SERVICE_LOG_ATTACHMENT_TAG`。
+  - 新增 `PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG`、`PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE` 和 `PETPAL_PENALTY_RECTIFY_ATTACHMENT_MAX_COUNT`。
+- Backend 已切到共享常量：
+  - `apps/backend/src/routes/files.ts`
+    - 服务记录附件上传白名单改读 `PETPAL_SERVICE_LOG_ATTACHMENT_TAG`。
+  - `apps/backend/src/routes/petpal.ts`
+    - 处罚整改提交时 `rectifyEvidenceFileIds` 的最大数量限制改读 `PETPAL_PENALTY_RECTIFY_ATTACHMENT_MAX_COUNT`。
+  - `apps/backend/src/timers/upload-reconcile/cleanup-orphan-managed-attachments.ts`
+    - 处罚整改孤儿附件回收范围改读共享 `tag1/tag2`。
+- Web 后台整改上传页已切到共享常量：
+  - `apps/web-frontend/src/pages/petpal-admin/penalties/PetPalPenaltyAdminView.vue`
+    - 整改上传 `tag1/tag2` 与前端 10 份上限都不再手写。
+- 定向测试已同步：
+  - `apps/backend/test/integration/files.test.ts`
+  - `apps/backend/test/integration/attachments.test.ts`
+  - `apps/backend/test/integration/petpal-penalty-admin.test.ts`
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 共享测试已补服务记录附件标签和处罚整改共享常量断言。
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/files.test.ts test/integration/attachments.test.ts test/integration/petpal-penalty-admin.test.ts` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮只继续收口服务记录与处罚整改附件标签 / 上限，没有扩大后台处罚治理权限或调整整改业务流程。
+- 已确认服务记录上传白名单、整改上传页、整改提交流程和孤儿附件回收现在都共享同一组 `tag1/tag2/maxCount` 定义。
+
+风险与缓解：
+
+- 风险：虽然后端和后台页已经统一来源，但各端“附件记录对象”的拼装逻辑仍然分散。
+- 缓解：下一轮继续把 `ManagedAttachmentRecord` 构造抽到共享 helper，避免字段拷贝规则再次漂移。
+
+下一步（1-3）：
+
+1. 继续评估 Web / App / backend 里的 `ManagedAttachmentRecord` 构造是否要抽共享 helper。
+2. 继续按 PetPal 附件治理链路做小范围收口，不扩大到无关业务模块。
+3. 每轮只跑相关定向测试并同步文档与本地提交。
+
+### 14.247 2026-04-04（P3-M1 Slice 247）
+
+**概述**：在前台先收口消息 / 投诉 / 资质附件共享配置后，backend 里的上传白名单、孤儿附件清理和集成测试仍然保留三套手写标签字符串。这样后续只要前台和后端任意一侧改名，就会再次出现治理链路不一致。本轮先把 backend 里三类 PetPal 附件标签统一切到 `@rbac/api-common`。
+
+已完成：
+
+- Backend 上传白名单已切到共享常量：
+  - `apps/backend/src/routes/files.ts`
+    - `petpal-caregiver-qualification`
+    - `petpal-order-message`
+    - `petpal-order-complaint`
+    - 三类标签的上传准入判断都改读 `@rbac/api-common`。
+- 后台孤儿附件清理定时器已切到共享常量：
+  - `apps/backend/src/timers/upload-reconcile/cleanup-orphan-managed-attachments.ts`
+    - 资质、消息和投诉附件的清理范围不再手写标签字符串。
+- 定向集成测试已同步：
+  - `apps/backend/test/integration/files.test.ts`
+  - `apps/backend/test/integration/attachments.test.ts`
+    - 测试里的上传标签、断言标签和孤儿附件清理样本都已改读共享常量。
+
+验证结果：
+
+- `pnpm -C apps/backend exec node --import tsx --test --test-concurrency=1 test/integration/files.test.ts test/integration/attachments.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮只收口 backend 侧既有 PetPal 上传标签来源，没有扩大附件权限边界或改变上传校验逻辑。
+- 已确认上传入口、孤儿附件清理和后端测试现在共享同一组标签定义，避免 backend 自己内部继续漂移。
+
+风险与缓解：
+
+- 风险：服务记录附件和处罚整改附件当时仍未纳入同一套共享常量。
+- 缓解：下一轮继续把服务记录与处罚整改 `tag1/tag2/maxCount` 也补进共享层，完成第一轮 backend 附件治理收口。
+
+下一步（1-3）：
+
+1. 继续把服务记录附件和处罚整改附件也补进同一套共享常量。
+2. 继续补共享测试，兜底新增附件治理常量不会再次漂移。
+3. 保持小切片推进，不回到全量上传链路重构。
+
 ### 14.246 2026-04-04（P3-M1 Slice 246）
 
 **概述**：上一轮已经把消息附件和资质附件的共享配置收口到 `api-common`，但 Web 照料者资料页本身仍停留在“手动填材料名称和 URL”的旧形态，和 App 端真实上传的入驻资料流并不一致。本轮继续沿同一条收口链路，把 Web 入驻资料页也切到受管资质附件上传，同时保留对历史手填链接记录的兼容显示。

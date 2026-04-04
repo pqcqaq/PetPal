@@ -560,6 +560,7 @@ import { ElMessage } from 'element-plus';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
+  createManagedAttachmentRecordFromMediaAsset,
   PETPAL_PENALTY_RECTIFY_ATTACHMENT_MAX_COUNT,
   PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE,
   PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG,
@@ -861,18 +862,11 @@ const getRectifyReviewHint = (record: PenaltyAdminRecord) => {
 const RECTIFY_MATERIAL_LIMIT = PETPAL_PENALTY_RECTIFY_ATTACHMENT_MAX_COUNT;
 
 const toRectifyMaterialRecord = (detail: MediaAssetRecord): PenaltyRectifyMaterialRecord => {
-  if (!detail.url) {
+  try {
+    return createManagedAttachmentRecordFromMediaAsset(detail);
+  } catch {
     throw new Error('上传附件缺少可访问地址');
   }
-
-  return {
-    fileId: detail.id,
-    url: detail.url,
-    name: detail.originalName,
-    mimeType: detail.mimeType,
-    size: detail.size,
-    uploadedAt: detail.completedAt ?? detail.createdAt,
-  };
 };
 
 const upsertRectifyMaterial = (material: PenaltyRectifyMaterialRecord) => {

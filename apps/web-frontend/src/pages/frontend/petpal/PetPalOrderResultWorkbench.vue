@@ -265,6 +265,7 @@ import {
   PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT,
   PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_BYTES,
   PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG,
+  createManagedAttachmentRecord,
   type ComplaintRecord,
   type ManagedAttachmentRecord,
   type OrderDetailRecord,
@@ -682,14 +683,14 @@ async function handleComplaintEvidenceChange(event: Event) {
 
       complaintEvidenceAttachments.value = [
         ...complaintEvidenceAttachments.value,
-        {
+        createManagedAttachmentRecord({
           fileId: uploaded.fileId,
           url: uploaded.url,
           name: file.name,
           mimeType: file.type || 'application/octet-stream',
           size: file.size,
-          uploadedAt: new Date().toISOString(),
-        },
+          uploadedAt: new Date(),
+        }),
       ];
     }
 

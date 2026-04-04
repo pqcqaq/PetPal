@@ -116,6 +116,7 @@ import {
   PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
   PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT,
   PETPAL_CAREGIVER_QUALIFICATION_UPLOAD_MAX_COUNT,
+  createManagedAttachmentRecord,
   type CaregiverProfileRecord,
   type CaregiverQualificationMaterialRecord,
 } from '@rbac/api-common';
@@ -297,14 +298,14 @@ async function handleQualificationMaterialChange(event: Event) {
 
       form.qualificationMaterials = [
         ...form.qualificationMaterials,
-        {
+        createManagedAttachmentRecord({
           fileId: uploaded.fileId,
           url: uploaded.url,
           name: file.name,
           mimeType: file.type || 'application/octet-stream',
           size: file.size,
-          uploadedAt: new Date().toISOString(),
-        },
+          uploadedAt: new Date(),
+        }),
       ].slice(0, PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT);
     }
 

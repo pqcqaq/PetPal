@@ -1,4 +1,7 @@
-import type { ManagedAttachmentRecord } from '@rbac/api-common'
+import {
+  createManagedAttachmentRecord,
+  type ManagedAttachmentRecord,
+} from '@rbac/api-common'
 import { ref } from 'vue'
 import { appApi } from '@/api/client'
 import { getErrorMessage } from '@/utils/error'
@@ -170,14 +173,14 @@ export function useManagedAttachmentUpload(options?: {
 
         await uploadPartByUni(plan.parts[0], item.filePath)
         const completed = await appApi.files.completeUpload({ fileId: plan.fileId })
-        uploadedResults.push({
+        uploadedResults.push(createManagedAttachmentRecord({
           fileId: completed.fileId,
           url: completed.url,
           name: item.fileName,
           mimeType: item.contentType,
           size: item.size,
-          uploadedAt: new Date().toISOString(),
-        })
+          uploadedAt: new Date(),
+        }))
       }
 
       return uploadedResults
