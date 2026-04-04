@@ -7883,6 +7883,57 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.252 2026-04-04（P3-M1 Slice 252）
+
+**概述**：上一轮已经把 Web / App 两端消息草稿附件类型统一到共享 `ManagedAttachmentRecord`，但两份 `message-composer-state.ts` 里仍各自保留了近似的附件 clone / parse 逻辑。本轮继续沿消息附件收口线，只把对象级的“附件数组复制 + 原始值解析”下沉到 `@rbac/api-common`，让双端本地草稿状态继续减掉一层平行实现，同时保留 Web 旧缓存 `uploadedAt` 兼容回填的端侧边界。
+
+已完成：
+
+- 共享受管附件 clone / parse helper 已落到 `api-common`：
+  - `packages/api-common/src/helpers/managed-attachments.ts`
+    - 新增 `cloneManagedAttachmentRecord(...)`、`cloneManagedAttachmentRecords(...)` 与 `parseManagedAttachmentRecord(...)`。
+    - 共享解析 helper 现在会统一校验 `fileId / url / name / mimeType / size / uploadedAt`，并支持通过 `fallbackUploadedAt` 兼容旧快照缺失时间戳的场景。
+- Web / App 消息草稿附件解析已切到共享 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts`
+    - 本地草稿附件复制与恢复解析改走共享 helper，不再保留页面内联对象 clone / parse。
+    - Web 端旧缓存缺失 `uploadedAt` 时，仍继续通过本地 `fallbackUploadedAt` 回填当前回放时间，避免既有用户草稿失效。
+  - `apps/app-frontend/src/pages/petpal/message-composer-state.ts`
+    - App 端本地草稿附件复制与恢复解析也已切到同一组共享 helper，对齐 Web 端对象级规则。
+- 定向测试与文档同步：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补共享 clone / parse helper 的定向断言，继续兜底稳定时间戳回填和深拷贝行为。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec tsx --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+- `pnpm exec tsx --test apps/web-frontend/test/petpal-message-composer-state.test.ts` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-message-composer-state.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改消息发送协议、本地存储键设计或 Web / App 存储介质，只继续收口消息草稿里的附件对象级 helper。
+- 已确认 Web / App 两端现在都会复用同一套 `ManagedAttachmentRecord` clone / parse 规则，附件字段校验和深拷贝口径进一步一致。
+- 已确认 Web 端对旧缓存缺失 `uploadedAt` 的兼容仍留在状态模块本身，没有把 Web 专属迁移策略扩散到共享层或 App 端。
+
+风险与缓解：
+
+- 风险：当前只共享了附件对象级 helper，消息草稿状态模块的存储读取、作用域裁剪和旧 key 迁移逻辑仍然是双端平行实现。
+- 缓解：这层仍然直接绑定 `localStorage` / `uni` 差异和各端启动链路；本轮先只抽纯对象 helper，避免过早把状态介质也绑到一起。
+
+下一步（1-3）：
+
+1. 继续评估消息草稿状态里其余纯函数是否还能再下沉到共享层，同时避免把 Web / App 的存储介质差异混入同一个 helper。
+2. 继续评估测试辅助和其余页面里是否还有残余的受管附件 parse / clone 手写逻辑需要收口。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.251 2026-04-04（P3-M1 Slice 251）
 
 **概述**：上一轮已经把 Web 消息页上传成功后的附件快照切到共享 builder，但 Web / App 两端本地消息草稿里保存的附件类型仍然没有完全对齐，Web 草稿附件还缺 `uploadedAt`，与共享 `ManagedAttachmentRecord` 和 App 本地草稿结构不一致。本轮继续沿消息附件收口线，把两端消息草稿附件类型统一到共享结构，并补上 Web 旧本地缓存的 `uploadedAt` 兼容回填。

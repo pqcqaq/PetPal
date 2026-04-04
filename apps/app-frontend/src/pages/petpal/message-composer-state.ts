@@ -1,4 +1,8 @@
-import type { ManagedAttachmentRecord } from '@rbac/api-common'
+import {
+  cloneManagedAttachmentRecords,
+  parseManagedAttachmentRecord,
+  type ManagedAttachmentRecord,
+} from '@rbac/api-common'
 import { ref } from 'vue'
 
 export type PetPalMessageDraftAttachment = ManagedAttachmentRecord
@@ -166,14 +170,7 @@ const parsePetPalMessageComposerStorageKey = (
 }
 
 const cloneMessageDraftAttachments = (attachments: PetPalMessageDraftAttachment[]) =>
-  attachments.map(item => ({
-    fileId: item.fileId,
-    url: item.url,
-    name: item.name,
-    mimeType: item.mimeType,
-    size: item.size,
-    uploadedAt: item.uploadedAt,
-  }))
+  cloneManagedAttachmentRecords(attachments)
 
 const cloneMessageDraftState = (draft: PetPalMessageDraftState): PetPalMessageDraftState => ({
   content: draft.content,
@@ -198,39 +195,6 @@ const normalizePersistedValue = (rawValue: unknown) => {
   }
 }
 
-const toDraftAttachment = (rawValue: unknown): PetPalMessageDraftAttachment | null => {
-  if (!isRecord(rawValue)) {
-    return null
-  }
-
-  const { fileId, url, name, mimeType, size, uploadedAt } = rawValue
-  if (
-    typeof fileId !== 'string'
-    || typeof url !== 'string'
-    || typeof name !== 'string'
-    || typeof mimeType !== 'string'
-    || typeof uploadedAt !== 'string'
-    || typeof size !== 'number'
-    || !Number.isFinite(size)
-    || size < 0
-  ) {
-    return null
-  }
-
-  if (!fileId.trim() || !url.trim() || !name.trim() || !mimeType.trim() || !uploadedAt.trim()) {
-    return null
-  }
-
-  return {
-    fileId,
-    url,
-    name,
-    mimeType,
-    size,
-    uploadedAt,
-  }
-}
-
 const toDraftState = (rawValue: unknown): PetPalMessageDraftState | null => {
   if (!isRecord(rawValue)) {
     return null
@@ -239,7 +203,7 @@ const toDraftState = (rawValue: unknown): PetPalMessageDraftState | null => {
   const content = typeof rawValue.content === 'string' ? rawValue.content : ''
   const attachments = Array.isArray(rawValue.attachments)
     ? rawValue.attachments
-      .map(item => toDraftAttachment(item))
+      .map(item => parseManagedAttachmentRecord(item))
       .filter((item): item is PetPalMessageDraftAttachment => Boolean(item))
     : []
 

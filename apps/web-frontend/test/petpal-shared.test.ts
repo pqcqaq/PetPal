@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  cloneManagedAttachmentRecords,
   createManagedAttachmentRecord,
   createManagedAttachmentRecordFromMediaAsset,
+  parseManagedAttachmentRecord,
   PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_MB,
   PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
   PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT,
@@ -108,6 +110,41 @@ test('builds managed attachment records from upload metadata and media assets', 
     mimeType: 'application/pdf',
     size: 456,
     uploadedAt: '2026-04-04T09:00:00.000Z',
+  });
+});
+
+test('clones and parses managed attachment records with stable timestamps', () => {
+  const original = [{
+    fileId: 'file-3',
+    url: 'https://example.com/c.png',
+    name: 'c.png',
+    mimeType: 'image/png',
+    size: 789,
+    uploadedAt: '2026-04-04T11:00:00.000Z',
+  }];
+
+  const cloned = cloneManagedAttachmentRecords(original);
+  assert.deepEqual(cloned, original);
+  assert.notEqual(cloned, original);
+  assert.notEqual(cloned[0], original[0]);
+
+  const parsedWithFallback = parseManagedAttachmentRecord({
+    fileId: 'file-4',
+    url: 'https://example.com/d.png',
+    name: 'd.png',
+    mimeType: 'image/png',
+    size: 321,
+  }, {
+    fallbackUploadedAt: new Date('2026-04-04T12:00:00.000Z'),
+  });
+
+  assert.deepEqual(parsedWithFallback, {
+    fileId: 'file-4',
+    url: 'https://example.com/d.png',
+    name: 'd.png',
+    mimeType: 'image/png',
+    size: 321,
+    uploadedAt: '2026-04-04T12:00:00.000Z',
   });
 });
 

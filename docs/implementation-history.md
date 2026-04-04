@@ -230,6 +230,10 @@ Last updated: 2026-04-04
   - `packages/api-common` 已继续补订单消息附件与照料者资质附件的标签、上传限额和数量上限共享常量。
   - Web / App 的订单沟通上传入口、App 资质材料上传入口现在都已直接消费这组共享常量，不再各自手写 `petpal-order-message`、`petpal-caregiver-qualification` 和 3 张 / 8 MB 规则。
   - App 照料者资料页已继续按剩余资质名额限制上传，并在达到 12 份上限后直接禁用上传入口，避免继续超额上传后再被前端截断。
+- 2026-04-04 已继续收口消息草稿附件解析 helper：
+  - `packages/api-common/src/helpers/managed-attachments.ts` 已新增受管附件快照的共享克隆与解析 helper，统一处理 `fileId / url / name / mimeType / size / uploadedAt` 校验与对象复制。
+  - Web / App 两端的 `message-composer-state.ts` 现在都会直接复用这组 helper 处理本地草稿附件，不再各自维护近似的附件 clone / parse 逻辑。
+  - Web 端对历史草稿缺失 `uploadedAt` 的兼容回填仍然保留在状态模块内，只把对象级解析规则下沉到共享层，避免把旧缓存迁移策略误扩散到 App 端。
 - 2026-04-04 已继续对齐 Web 照料者资质上传：
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverProfileView.vue` 已从手填材料名称 / URL 改成受管资质附件上传，上传时会绑定当前照料者档案 ID 和 `petpal-caregiver-qualification` 标签。
   - 页面现在会直接展示材料大小 / 日期，并支持查看 / 移除；首次上传前如果档案还没生成 ID，会先提示保存一次基础资料。

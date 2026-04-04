@@ -1,4 +1,8 @@
-import type { ManagedAttachmentRecord } from '@rbac/api-common';
+import {
+  cloneManagedAttachmentRecords,
+  parseManagedAttachmentRecord,
+  type ManagedAttachmentRecord,
+} from '@rbac/api-common';
 import { ref } from 'vue';
 
 export type PetPalMessageDraftAttachment = ManagedAttachmentRecord;
@@ -166,14 +170,7 @@ const parsePetPalMessageComposerStorageKey = (
 };
 
 const cloneMessageDraftAttachments = (attachments: PetPalMessageDraftAttachment[]) =>
-  attachments.map((item) => ({
-    fileId: item.fileId,
-    url: item.url,
-    name: item.name,
-    size: item.size,
-    mimeType: item.mimeType,
-    uploadedAt: item.uploadedAt,
-  }));
+  cloneManagedAttachmentRecords(attachments);
 
 const cloneMessageDraftState = (draft: PetPalMessageDraftState): PetPalMessageDraftState => ({
   content: draft.content,
@@ -197,57 +194,12 @@ const normalizePersistedValue = (rawValue: unknown) => {
   }
 };
 
-const toDraftAttachment = (rawValue: unknown): PetPalMessageDraftAttachment | null => {
-  if (!isRecord(rawValue)) {
-    return null;
-  }
-
-  const { fileId, url, name, size, mimeType, uploadedAt } = rawValue;
-  if (
-    typeof fileId !== 'string'
-    || typeof url !== 'string'
-    || typeof name !== 'string'
-    || typeof mimeType !== 'string'
-    || typeof size !== 'number'
-    || !Number.isFinite(size)
-    || size < 0
-  ) {
-    return null;
-  }
-
-  if (!fileId.trim() || !url.trim() || !name.trim() || !mimeType.trim()) {
-    return null;
-  }
-
-  return {
-    fileId,
-    url,
-    name,
-    size,
-    mimeType,
-    uploadedAt: typeof uploadedAt === 'string' && uploadedAt.trim()
-      ? uploadedAt
-      : new Date().toISOString(),
-  };
-};
-
 const toDraftAttachmentRecord = (
   rawValue: unknown,
   fallbackUploadedAt: string,
-): PetPalMessageDraftAttachment | null => {
-  if (!isRecord(rawValue)) {
-    return null;
-  }
-
-  const attachment = toDraftAttachment({
-    ...rawValue,
-    uploadedAt:
-      typeof rawValue.uploadedAt === 'string' && rawValue.uploadedAt.trim()
-        ? rawValue.uploadedAt
-        : fallbackUploadedAt,
-  });
-  return attachment;
-};
+): PetPalMessageDraftAttachment | null => parseManagedAttachmentRecord(rawValue, {
+  fallbackUploadedAt,
+});
 
 const toDraftState = (rawValue: unknown): PetPalMessageDraftState | null => {
   if (!isRecord(rawValue)) {
@@ -257,7 +209,9 @@ const toDraftState = (rawValue: unknown): PetPalMessageDraftState | null => {
   const content = typeof rawValue.content === 'string' ? rawValue.content : '';
   const attachments = Array.isArray(rawValue.attachments)
     ? rawValue.attachments
-      .map((item) => toDraftAttachment(item))
+      .map((item) => parseManagedAttachmentRecord(item, {
+        fallbackUploadedAt: new Date().toISOString(),
+      }))
       .filter((item): item is PetPalMessageDraftAttachment => Boolean(item))
     : [];
 
