@@ -10,10 +10,10 @@ import {
   initials,
   isCaregiverEnabled,
   openLoginPage,
+  openPetPalRemindersPage,
   openRoleHome,
   PETPAL_HUB_PAGE,
   PETPAL_NOTIFICATIONS_PAGE,
-  PETPAL_REMINDERS_PAGE,
   REGISTER_PAGE,
   roleSummary,
   stopPullDown,
@@ -56,7 +56,10 @@ function openNotifications() {
 }
 
 function openReminders() {
-  uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
+  openPetPalRemindersPage({
+    scope: 'ALL',
+    mode: 'navigate',
+  })
 }
 
 function goRegister() {

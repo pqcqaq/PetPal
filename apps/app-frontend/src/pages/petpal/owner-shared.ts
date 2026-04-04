@@ -80,6 +80,8 @@ export type ConversationRole = 'owner' | 'caregiver'
 export type CaregiverOrderFilterValue = OrderStatus | 'ALL'
 export type OwnerOrderFilter = 'ALL' | 'ACTIVE' | 'COMPLETED' | 'AFTERSALES'
 export type AftersalesFilter = 'ALL' | 'HIGH' | 'REFUND' | 'COMPLAINT'
+export type MessagesFilter = 'ALL' | 'UNREAD'
+export type ReminderScope = 'ALL' | 'OWNER' | 'CAREGIVER' | 'ACCOUNT'
 
 export interface PetPalOrdersPageContext {
   filter?: OwnerOrderFilter
@@ -91,8 +93,21 @@ export interface PetPalAftersalesPageContext {
   focusOrderId?: string
 }
 
+export interface PetPalMessagesPageContext {
+  role?: ConversationRole
+  filter?: MessagesFilter
+  focusOrderId?: string
+}
+
+export interface PetPalRemindersPageContext {
+  scope?: ReminderScope
+  focusNotificationId?: string
+}
+
 const ownerOrderFilters: OwnerOrderFilter[] = ['ALL', 'ACTIVE', 'COMPLETED', 'AFTERSALES']
 const aftersalesFilters: AftersalesFilter[] = ['ALL', 'HIGH', 'REFUND', 'COMPLAINT']
+const messagesFilters: MessagesFilter[] = ['ALL', 'UNREAD']
+const reminderScopes: ReminderScope[] = ['ALL', 'OWNER', 'CAREGIVER', 'ACCOUNT']
 
 export const serviceTypeLabels: Record<PetServiceType, string> = {
   BOARDING: getSharedPetPalServiceTypeLabel('BOARDING'),
@@ -208,7 +223,7 @@ function normalizePageContextId(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function getPetPalPageContextStorageKey(page: 'orders' | 'aftersales') {
+function getPetPalPageContextStorageKey(page: 'orders' | 'aftersales' | 'messages' | 'reminders') {
   return `${PETPAL_PAGE_CONTEXT_STORAGE_PREFIX}:${page}`
 }
 
@@ -220,24 +235,40 @@ export function isAftersalesFilter(value: string | null | undefined): value is A
   return aftersalesFilters.includes(value as AftersalesFilter)
 }
 
+export function isMessagesFilter(value: string | null | undefined): value is MessagesFilter {
+  return messagesFilters.includes(value as MessagesFilter)
+}
+
+export function isReminderScope(value: string | null | undefined): value is ReminderScope {
+  return reminderScopes.includes(value as ReminderScope)
+}
+
 function stashPetPalPageContext(page: 'orders', context: PetPalOrdersPageContext): void
 function stashPetPalPageContext(page: 'aftersales', context: PetPalAftersalesPageContext): void
+function stashPetPalPageContext(page: 'messages', context: PetPalMessagesPageContext): void
+function stashPetPalPageContext(page: 'reminders', context: PetPalRemindersPageContext): void
 function stashPetPalPageContext(
-  page: 'orders' | 'aftersales',
-  context: PetPalOrdersPageContext | PetPalAftersalesPageContext,
+  page: 'orders' | 'aftersales' | 'messages' | 'reminders',
+  context: PetPalOrdersPageContext | PetPalAftersalesPageContext | PetPalMessagesPageContext | PetPalRemindersPageContext,
 ) {
-  const hasFilter = typeof context.filter === 'string' && context.filter.length > 0
-  const focusOrderId = normalizePageContextId(context.focusOrderId)
+  const hasFilter = 'filter' in context && typeof context.filter === 'string' && context.filter.length > 0
+  const hasRole = 'role' in context && typeof context.role === 'string' && context.role.length > 0
+  const hasScope = 'scope' in context && typeof context.scope === 'string' && context.scope.length > 0
+  const focusOrderId = 'focusOrderId' in context ? normalizePageContextId(context.focusOrderId) : ''
+  const focusNotificationId = 'focusNotificationId' in context ? normalizePageContextId(context.focusNotificationId) : ''
   const key = getPetPalPageContextStorageKey(page)
 
-  if (!hasFilter && !focusOrderId) {
+  if (!hasFilter && !hasRole && !hasScope && !focusOrderId && !focusNotificationId) {
     uni.removeStorageSync(key)
     return
   }
 
   uni.setStorageSync(key, {
     ...(hasFilter ? { filter: context.filter } : {}),
+    ...(hasRole ? { role: context.role } : {}),
+    ...(hasScope ? { scope: context.scope } : {}),
     ...(focusOrderId ? { focusOrderId } : {}),
+    ...(focusNotificationId ? { focusNotificationId } : {}),
   })
 }
 
@@ -287,6 +318,54 @@ export function consumePetPalAftersalesPageContext(): PetPalAftersalesPageContex
   }
 }
 
+export function consumePetPalMessagesPageContext(): PetPalMessagesPageContext | null {
+  const key = getPetPalPageContextStorageKey('messages')
+  const rawValue = uni.getStorageSync(key)
+  uni.removeStorageSync(key)
+
+  if (!rawValue || typeof rawValue !== 'object') {
+    return null
+  }
+
+  const record = rawValue as Record<string, unknown>
+  const role = record.role === 'owner' || record.role === 'caregiver' ? record.role : undefined
+  const filter = isMessagesFilter(record.filter as string) ? record.filter as MessagesFilter : undefined
+  const focusOrderId = normalizePageContextId(record.focusOrderId) || undefined
+
+  if (!role && !filter && !focusOrderId) {
+    return null
+  }
+
+  return {
+    ...(role ? { role } : {}),
+    ...(filter ? { filter } : {}),
+    ...(focusOrderId ? { focusOrderId } : {}),
+  }
+}
+
+export function consumePetPalRemindersPageContext(): PetPalRemindersPageContext | null {
+  const key = getPetPalPageContextStorageKey('reminders')
+  const rawValue = uni.getStorageSync(key)
+  uni.removeStorageSync(key)
+
+  if (!rawValue || typeof rawValue !== 'object') {
+    return null
+  }
+
+  const record = rawValue as Record<string, unknown>
+  const scope = isReminderScope(record.scope as string) ? record.scope as ReminderScope : undefined
+  const focusNotificationId = normalizePageContextId(record.focusNotificationId) || undefined
+
+  if (!scope && !focusNotificationId) {
+    return null
+  }
+
+  return {
+    ...(scope ? { scope } : {}),
+    ...(focusNotificationId ? { focusNotificationId } : {}),
+  }
+}
+
 export function openPetPalOrdersPage(params?: PetPalOrdersPageContext & { mode?: 'redirect' | 'navigate' }) {
   const { mode = 'redirect', ...context } = params ?? {}
   stashPetPalPageContext('orders', context)
@@ -297,6 +376,18 @@ export function openPetPalAftersalesPage(params?: PetPalAftersalesPageContext & 
   const { mode = 'redirect', ...context } = params ?? {}
   stashPetPalPageContext('aftersales', context)
   openPetPalAction(mode, PETPAL_AFTERSALES_PAGE)
+}
+
+export function openPetPalMessagesPage(params?: PetPalMessagesPageContext & { mode?: 'redirect' | 'navigate' }) {
+  const { mode = 'redirect', ...context } = params ?? {}
+  stashPetPalPageContext('messages', context)
+  openPetPalAction(mode, PETPAL_MESSAGES_PAGE)
+}
+
+export function openPetPalRemindersPage(params?: PetPalRemindersPageContext & { mode?: 'redirect' | 'navigate' }) {
+  const { mode = 'redirect', ...context } = params ?? {}
+  stashPetPalPageContext('reminders', context)
+  openPetPalAction(mode, PETPAL_REMINDERS_PAGE)
 }
 
 export function openPetPalPetFormPage(options?: {

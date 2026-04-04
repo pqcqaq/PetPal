@@ -18,10 +18,18 @@ import {
   listServiceRequests,
 } from '@/api/petpal'
 import {
+  type AftersalesFilter,
+  type ConversationRole,
+  type MessagesFilter,
+  type ReminderScope,
   formatRange,
   getCaregiverAuditLabel,
   getConversationUnreadCount,
   isOrderAftersalesTracked,
+  openPetPalAftersalesPage,
+  openPetPalMessagesPage,
+  openPetPalRemindersPage,
+  openPetPalAction,
   PETPAL_AFTERSALES_PAGE,
   PETPAL_CAREGIVER_ORDERS_PAGE,
   PETPAL_CAREGIVER_PROFILE_PAGE,
@@ -48,6 +56,11 @@ export interface AppNotificationItem {
   actionLabel: string
   actionUrl: string
   actionMode: AppNotificationActionMode
+  actionOrderId?: string
+  actionRole?: ConversationRole
+  actionMessagesFilter?: MessagesFilter
+  actionAftersalesFilter?: AftersalesFilter
+  actionReminderScope?: ReminderScope
   sortAt: number
   updatedAtKey: string
 }
@@ -98,6 +111,15 @@ function buildNotificationItems(payload: {
     item.status === 'OPEN'
     || item.status === 'MATCHED'
   ))
+  const topOwnerUnreadOrder = ownerOrders
+    .filter(item => getConversationUnreadCount(item.conversation, 'owner') > 0)
+    .sort((left, right) => {
+      const unreadGap = getConversationUnreadCount(right.conversation, 'owner') - getConversationUnreadCount(left.conversation, 'owner')
+      if (unreadGap !== 0) {
+        return unreadGap
+      }
+      return dayjs(right.conversation?.lastMessageAt || right.updatedAt).valueOf() - dayjs(left.conversation?.lastMessageAt || left.updatedAt).valueOf()
+    })[0]
   const ownerUnreadCount = ownerOrders.reduce((total, item) => (
     total + getConversationUnreadCount(item.conversation, 'owner')
   ), 0)
@@ -116,6 +138,15 @@ function buildNotificationItems(payload: {
   const caregiverUnreadCount = caregiverOrders.reduce((total, item) => (
     total + getConversationUnreadCount(item.conversation, 'caregiver')
   ), 0)
+  const topCaregiverUnreadOrder = caregiverOrders
+    .filter(item => getConversationUnreadCount(item.conversation, 'caregiver') > 0)
+    .sort((left, right) => {
+      const unreadGap = getConversationUnreadCount(right.conversation, 'caregiver') - getConversationUnreadCount(left.conversation, 'caregiver')
+      if (unreadGap !== 0) {
+        return unreadGap
+      }
+      return dayjs(right.conversation?.lastMessageAt || right.updatedAt).valueOf() - dayjs(left.conversation?.lastMessageAt || left.updatedAt).valueOf()
+    })[0]
   const caregiverUnreadLatestAt = caregiverOrders
     .map(item => item.conversation?.lastMessageAt || item.updatedAt)
     .sort((left, right) => dayjs(right).valueOf() - dayjs(left).valueOf())[0]
@@ -170,6 +201,7 @@ function buildNotificationItems(payload: {
       actionLabel: '进入提醒中心',
       actionUrl: PETPAL_REMINDERS_PAGE,
       actionMode: 'navigate',
+      actionReminderScope: 'OWNER',
       sortAt: dayjs(latestRequestAt).valueOf(),
       updatedAtKey: `owner-requests:${activeOwnerRequests.length}:${latestRequestAt}`,
     }))
@@ -203,6 +235,9 @@ function buildNotificationItems(payload: {
       actionLabel: '进入消息中心',
       actionUrl: PETPAL_MESSAGES_PAGE,
       actionMode: 'redirect',
+      actionOrderId: topOwnerUnreadOrder?.id,
+      actionRole: 'owner',
+      actionMessagesFilter: 'UNREAD',
       sortAt: ownerUnreadLatestAt ? dayjs(ownerUnreadLatestAt).valueOf() : 3,
       updatedAtKey: `owner-unread:${ownerUnreadCount}:${ownerUnreadLatestAt || 'none'}`,
     }))
@@ -223,6 +258,8 @@ function buildNotificationItems(payload: {
       actionLabel: '进入售后中心',
       actionUrl: PETPAL_AFTERSALES_PAGE,
       actionMode: 'redirect',
+      actionOrderId: ownerAftersalesOrders[0]?.id,
+      actionAftersalesFilter: 'HIGH',
       sortAt: latestAftersalesAt ? dayjs(latestAftersalesAt).valueOf() : 4,
       updatedAtKey: `owner-aftersales:${ownerAftersalesOrders.length}:${latestAftersalesAt || 'none'}`,
     }))
@@ -344,6 +381,9 @@ function buildNotificationItems(payload: {
       actionLabel: '进入消息中心',
       actionUrl: PETPAL_MESSAGES_PAGE,
       actionMode: 'redirect',
+      actionOrderId: topCaregiverUnreadOrder?.id,
+      actionRole: 'caregiver',
+      actionMessagesFilter: 'UNREAD',
       sortAt: caregiverUnreadLatestAt ? dayjs(caregiverUnreadLatestAt).valueOf() : 9,
       updatedAtKey: `caregiver-unread:${caregiverUnreadCount}:${caregiverUnreadLatestAt || 'none'}`,
     }))
@@ -360,12 +400,48 @@ function buildNotificationItems(payload: {
       actionLabel: '进入提醒中心',
       actionUrl: PETPAL_REMINDERS_PAGE,
       actionMode: 'navigate',
+      actionReminderScope: 'ALL',
       sortAt: 0,
       updatedAtKey: 'account-stable',
     }))
   }
 
   return sortNotifications(items)
+}
+
+export function openAppNotificationAction(item: Pick<
+  AppNotificationItem,
+  'actionMode' | 'actionUrl' | 'actionOrderId' | 'actionRole' | 'actionMessagesFilter' | 'actionAftersalesFilter' | 'actionReminderScope' | 'id'
+>) {
+  if (item.actionUrl === PETPAL_MESSAGES_PAGE) {
+    openPetPalMessagesPage({
+      mode: item.actionMode,
+      ...(item.actionRole ? { role: item.actionRole } : {}),
+      ...(item.actionMessagesFilter ? { filter: item.actionMessagesFilter } : {}),
+      ...(item.actionOrderId ? { focusOrderId: item.actionOrderId } : {}),
+    })
+    return
+  }
+
+  if (item.actionUrl === PETPAL_AFTERSALES_PAGE) {
+    openPetPalAftersalesPage({
+      mode: item.actionMode,
+      ...(item.actionAftersalesFilter ? { filter: item.actionAftersalesFilter } : {}),
+      ...(item.actionOrderId ? { focusOrderId: item.actionOrderId } : {}),
+    })
+    return
+  }
+
+  if (item.actionUrl === PETPAL_REMINDERS_PAGE) {
+    openPetPalRemindersPage({
+      mode: item.actionMode,
+      ...(item.actionReminderScope ? { scope: item.actionReminderScope } : {}),
+      focusNotificationId: item.id,
+    })
+    return
+  }
+
+  openPetPalAction(item.actionMode, item.actionUrl)
 }
 
 export const useNotificationStore = defineStore(

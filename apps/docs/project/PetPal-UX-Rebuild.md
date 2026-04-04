@@ -417,6 +417,10 @@ flowchart TD
   - `pages/petpal/orders.vue` 的售后入口现在会带 `focusOrderId + filter` 打开售后中心，不再只是裸跳。
   - `pages/petpal/aftersales.vue` 现在会消费 page context，把刚处理的订单顶到前面，并按“优先 / 退款 / 投诉”承接结果页回流。
   - `pages/petpal/payment-result.vue`、`refund-result.vue`、`complaint-result.vue`、`review-result.vue` 的主动作现在都会回正确队列并聚焦当前订单。
+- App 端消息中心、提醒中心与通知动作已继续补第二轮上下文引导：
+  - `pages/petpal/messages.vue` 现在会消费 `role + filter + focusOrderId`，从通知、首页催办或角色导航进入时会优先落到对应身份和焦点订单，不再停留在上次残留线程。
+  - `pages/petpal/reminders.vue` 现在会消费 `scope + focusNotificationId`，首屏可直接按主人 / 照料者 / 账户范围过滤，并把当前待办顶到前面。
+  - `pages/notifications/index.vue`、`pages/petpal/getting-started.vue`、`pages/petpal/owner-home.vue`、角色导航和应用内催办信号都已改成上下文感知跳转，不再直接裸跳消息页或提醒页 URL。
 - App 端订单详情页顶部决策区已继续收口为“先处理什么”结构：
   - `pages/order-detail/index.vue` 已把顶部从“banner + 分段 chips”重构成“分栏轨道 + 当前先做这个 + 高频动作卡”。
   - 总览首屏不再依赖说明式 chips，用户进入订单后可以更快切到沟通、履约或售后上下文。
@@ -458,7 +462,7 @@ flowchart TD
 ### 10.3 下一步
 
 - 继续补工作台页内部更细的弱网态、动作结果引导与跨页面主动跳转，并评估抽离共享状态 helper，避免当前恢复态停留在局部实现。
-- 继续补 App 订单详情、消息中心、提醒中心与结果页之间更细的 notice 和主动引导，避免 focused return 仍只停留在按钮级别。
+- 继续补 App 订单详情、消息中心、提醒中心与结果页之间更细的 notice 和主动引导，当前已进入消息/提醒 page-context 承接阶段，但结果页与详情页间的更强动态 notice 仍需继续补齐。
 - 继续补主人端需求详情页内部更细的照料者详情展示、更多筛选维度和原地改期能力，避免后续又把逻辑反推回新建页。
 - 再继续完成系统级主动提醒和更主动的跨页面引导收口。
 - 最后集中做多端交互修复、定向测试、审计补充与答辩材料收口。

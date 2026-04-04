@@ -19,9 +19,9 @@ import {
   helpers,
   initials,
   openLoginPage,
+  openPetPalMessagesPage,
   openOrderDetailPage,
   PETPAL_AFTERSALES_PAGE,
-  PETPAL_MESSAGES_PAGE,
   PETPAL_NOTIFICATIONS_PAGE,
   PETPAL_PETS_PAGE,
   PETPAL_REQUEST_DETAIL_PAGE,
@@ -129,7 +129,10 @@ function openRequestDetail(requestId: string) {
 }
 
 function openMessages() {
-  uni.switchTab({ url: PETPAL_MESSAGES_PAGE })
+  openPetPalMessagesPage({
+    role: 'owner',
+    filter: notificationStore.ownerUnreadCount ? 'UNREAD' : 'ALL',
+  })
 }
 
 function openAftersales() {

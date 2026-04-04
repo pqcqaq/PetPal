@@ -14025,3 +14025,64 @@ flowchart TD
 1. 继续补 App 订单详情、消息中心、结果页之间更细的主动引导和弱网恢复说明。
 2. 继续把提醒中心和更多辅助页接到同一套焦点回流策略，减少回流后再次找入口。
 3. 在 App / Web 回流链稳定后，再集中补更多验收向测试和答辩材料。
+
+### 14.126 2026-04-04（P3-M1 Slice 270）
+
+**概述**：继续推进 App 跨页面主动引导收口，本轮把消息中心、提醒中心和通知动作接到同一套 page-context 承接链路，让用户从通知、起步向导、首页催办信号或角色导航进入后能直接落到对应身份、筛选和焦点对象。
+
+已完成：
+
+- App 消息页 / 提醒页 page context 扩展：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - 已新增 `messages / reminders` 两类 page context。
+    - 已新增 `MessagesFilter`、`ReminderScope`、`consumePetPalMessagesPageContext(...)`、`consumePetPalRemindersPageContext(...)`、`openPetPalMessagesPage(...)`、`openPetPalRemindersPage(...)`。
+- App 消息中心开始消费上下文：
+  - `apps/app-frontend/src/pages/petpal/messages.vue`
+    - 进入消息页时已可消费 `role + filter + focusOrderId`。
+    - 页面实例复用时，当前焦点订单会优先于旧 `selectedOrderId` 生效，不再出现通知回流后仍停留在上次线程的问题。
+    - 当前线程与空态文案已补上下文提示，用户能知道系统正在承接哪一笔订单。
+- App 提醒中心开始消费上下文：
+  - `apps/app-frontend/src/pages/petpal/reminders.vue`
+    - 已新增 `ALL / OWNER / CAREGIVER / ACCOUNT` 范围筛选。
+    - 进入提醒页时已可消费 `scope + focusNotificationId`，并把当前待办顶到前面。
+    - 提醒动作已改走通知跳转 helper，不再直接裸跳目标 URL。
+- App 通知动作改成上下文感知打开：
+  - `apps/app-frontend/src/store/notifications.ts`
+    - 通知项已开始携带 `actionOrderId / actionRole / actionMessagesFilter / actionAftersalesFilter / actionReminderScope`。
+    - 已新增 `openAppNotificationAction(...)`，统一把消息、售后、提醒动作路由到对应的 context-aware opener。
+  - 以下入口已切到同一套 helper：
+    - `apps/app-frontend/src/pages/notifications/index.vue`
+    - `apps/app-frontend/src/pages/petpal/getting-started.vue`
+    - `apps/app-frontend/src/pages/petpal/components/action-signal-card.vue`
+    - `apps/app-frontend/src/pages/petpal/owner-home.vue`
+    - `apps/app-frontend/src/pages/petpal/components/owner-flow-nav.vue`
+    - `apps/app-frontend/src/pages/petpal/components/caregiver-flow-nav.vue`
+    - `apps/app-frontend/src/pages/petpal/index.vue`
+    - `apps/app-frontend/src/pages/index/index.vue`
+- 回归测试补齐：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已继续补 `openPetPalMessagesPage / consumePetPalMessagesPageContext` 与 `openPetPalRemindersPage / consumePetPalRemindersPageContext` 的 page-context 存取断言。
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 已确认本轮没有新增后端协议面，全部改动基于现有 App 通知 store、页面上下文暂存和前端跳转壳层完成。
+- 已确认消息页在页面复用场景下会优先承接新的 `focusOrderId`，不会再被旧线程残留状态抢走焦点。
+- 已确认提醒中心、通知中心和首页催办信号已经开始共享同一套上下文感知跳转，不再继续散落裸 URL 打开逻辑。
+
+风险与缓解：
+
+- 风险：App 端消息/提醒中心现在已经能承接上下文，但订单详情、结果页与系统级主动提醒之间还缺更强的 notice、动态引导和真正的推送触达。
+- 缓解：下一轮继续优先补订单详情、结果页和消息/提醒中心之间更细的上下文 notice，把主动引导从“正确落页”继续推进到“正确解释为什么落在这里”。
+
+下一步（1-3）：
+
+1. 继续补 App 订单详情、结果页、消息中心与提醒中心之间更细的 page notice 和主动引导。
+2. 继续评估哪些高频通知应进一步带上订单详情分栏或结果页阶段上下文，减少落页后再二次判断。
+3. 在 App 主动引导链进一步稳定后，再继续补系统级主动提醒、推送触达和更多验收向测试。

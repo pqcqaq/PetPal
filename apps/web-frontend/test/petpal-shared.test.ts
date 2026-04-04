@@ -80,11 +80,17 @@ import {
 } from '../src/pages/frontend/petpal/shared.ts';
 import {
   consumePetPalAftersalesPageContext,
+  consumePetPalMessagesPageContext,
   consumePetPalOrdersPageContext,
+  consumePetPalRemindersPageContext,
   openPetPalAftersalesPage,
+  openPetPalMessagesPage,
   openPetPalOrdersPage,
+  openPetPalRemindersPage,
   PETPAL_AFTERSALES_PAGE,
+  PETPAL_MESSAGES_PAGE,
   PETPAL_ORDERS_PAGE,
+  PETPAL_REMINDERS_PAGE,
 } from '../../app-frontend/src/pages/petpal/owner-shared.ts';
 
 test('exposes complaint SLA options in a stable order for export forms', () => {
@@ -933,6 +939,32 @@ test('stashes and consumes app petpal page context for focused return flows', ()
       focusOrderId: 'order-2',
     });
     assert.equal(consumePetPalAftersalesPageContext(), null);
+
+    openPetPalMessagesPage({
+      mode: 'navigate',
+      role: 'caregiver',
+      filter: 'UNREAD',
+      focusOrderId: ' order-3 ',
+    });
+    assert.deepEqual(navigationCalls[2], { kind: 'switchTab', url: PETPAL_MESSAGES_PAGE });
+    assert.deepEqual(consumePetPalMessagesPageContext(), {
+      role: 'caregiver',
+      filter: 'UNREAD',
+      focusOrderId: 'order-3',
+    });
+    assert.equal(consumePetPalMessagesPageContext(), null);
+
+    openPetPalRemindersPage({
+      mode: 'navigate',
+      scope: 'ACCOUNT',
+      focusNotificationId: ' notice-1 ',
+    });
+    assert.deepEqual(navigationCalls[3], { kind: 'navigateTo', url: PETPAL_REMINDERS_PAGE });
+    assert.deepEqual(consumePetPalRemindersPageContext(), {
+      scope: 'ACCOUNT',
+      focusNotificationId: 'notice-1',
+    });
+    assert.equal(consumePetPalRemindersPageContext(), null);
   } finally {
     if (previousUni === undefined) {
       delete (globalThis as typeof globalThis & { uni?: unknown }).uni;

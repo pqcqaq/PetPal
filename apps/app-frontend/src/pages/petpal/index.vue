@@ -8,7 +8,7 @@ import { useNotificationStore, useTokenStore, useUserStore } from '@/store'
 import PetpalEmpty from './rebuild/petpal-empty.vue'
 import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
-import { helpers, initials, isCaregiverEnabled, openLoginPage, openRoleHome, PETPAL_NOTIFICATIONS_PAGE, PETPAL_REMINDERS_PAGE, REGISTER_PAGE, roleSummary, stopPullDown } from './rebuild/shared'
+import { helpers, initials, isCaregiverEnabled, openLoginPage, openPetPalRemindersPage, openRoleHome, PETPAL_NOTIFICATIONS_PAGE, REGISTER_PAGE, roleSummary, stopPullDown } from './rebuild/shared'
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
@@ -86,7 +86,10 @@ function openNotifications() {
 }
 
 function openReminders() {
-  uni.navigateTo({ url: PETPAL_REMINDERS_PAGE })
+  openPetPalRemindersPage({
+    scope: 'ALL',
+    mode: 'navigate',
+  })
 }
 
 function goToRegister() {

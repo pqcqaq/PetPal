@@ -32,6 +32,7 @@ import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
 import PetpalSegmented from './rebuild/petpal-segmented.vue'
 import {
+  consumePetPalMessagesPageContext,
   describeConversation,
   getErrorMessage,
   helpers,
@@ -63,6 +64,7 @@ const threadError = ref('')
 const sendingMessage = ref(false)
 const role = ref<RoleValue>('owner')
 const filter = ref<FilterValue>('UNREAD')
+const focusOrderId = ref('')
 const ownerOrders = ref<OrderRecord[]>([])
 const caregiverOrders = ref<CaregiverOrderRecord[]>([])
 const selectedOrderId = ref('')
@@ -122,6 +124,7 @@ const visibleRows = computed(() => {
 
 const priorityRow = computed(() => visibleRows.value[0] ?? null)
 const currentThreadOrder = computed(() => currentOrders.value.find(item => item.id === selectedOrderId.value) ?? null)
+const currentRoleLabel = computed(() => role.value === 'owner' ? '主人侧' : '照料者侧')
 const currentThreadSummary = computed(() =>
   currentThreadOrder.value ? describeConversation(currentThreadOrder.value, role.value) : null)
 const currentThreadRecovery = computed(() => {
@@ -234,11 +237,15 @@ function patchConversationSummary(orderId: string, nextConversation: OrderConver
 }
 
 function syncSelectedOrderId() {
-  const availableIds = conversations.value.map(item => item.order.id)
+  const availableIds = currentOrders.value.map(item => item.id)
+  if (focusOrderId.value && availableIds.includes(focusOrderId.value)) {
+    selectedOrderId.value = focusOrderId.value
+    return
+  }
   if (selectedOrderId.value && availableIds.includes(selectedOrderId.value)) {
     return
   }
-  selectedOrderId.value = visibleRows.value[0]?.order.id || conversations.value[0]?.order.id || ''
+  selectedOrderId.value = visibleRows.value[0]?.order.id || conversations.value[0]?.order.id || currentOrders.value[0]?.id || ''
 }
 
 async function loadThread(orderId: string, options?: { resetComposer?: boolean }) {
@@ -298,6 +305,15 @@ async function loadPage() {
 
     ownerOrders.value = nextOwnerOrders
     caregiverOrders.value = nextCaregiverOrders
+
+    const context = consumePetPalMessagesPageContext()
+    if (context?.role === 'owner' || (context?.role === 'caregiver' && nextCaregiverEnabled)) {
+      role.value = context.role
+    }
+    if (context?.filter) {
+      filter.value = context.filter
+    }
+    focusOrderId.value = context?.focusOrderId || ''
 
     if (!nextCaregiverEnabled && role.value === 'caregiver') {
       role.value = 'owner'
@@ -577,7 +593,7 @@ watch(selectedOrderId, (value, previousValue) => {
 
       <PetpalSection
         title="当前线程"
-        :subtitle="currentThreadOrder ? `${role === 'owner' ? '主人侧' : '照料者侧'}当前正在处理的会话` : '先从下面会话队列里选中一条线程。'"
+        :subtitle="currentThreadOrder ? `${currentRoleLabel}当前正在处理的会话` : focusOrderId ? '已帮你定位到刚才那笔订单，当前会话会优先承接这条上下文。' : '先从下面会话队列里选中一条线程。'"
       >
         <template v-if="currentThreadOrder">
           <view class="petpal-banner">
@@ -756,7 +772,7 @@ watch(selectedOrderId, (value, previousValue) => {
         <PetpalEmpty
           v-else
           :title="filter === 'UNREAD' ? '当前没有未读会话' : '当前没有会话'"
-          :description="filter === 'UNREAD' ? '如果要回看最近会话，可以切到“全部”。' : '等订单产生沟通后，会显示在这里。'"
+          :description="focusOrderId ? '你刚才关注的订单当前还没有可显示的会话，仍可在上方线程区直接补发消息。' : filter === 'UNREAD' ? '如果要回看最近会话，可以切到“全部”。' : '等订单产生沟通后，会显示在这里。'"
         />
       </PetpalSection>
     </template>

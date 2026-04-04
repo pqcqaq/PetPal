@@ -1,18 +1,34 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
-import { useNotificationStore, useTokenStore } from '@/store'
+import { openAppNotificationAction, useNotificationStore, useTokenStore } from '@/store'
 import PetpalEmpty from './rebuild/petpal-empty.vue'
 import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
-import { openLoginPage, openPetPalAction, stopPullDown } from './rebuild/shared'
+import PetpalSegmented from './rebuild/petpal-segmented.vue'
+import { consumePetPalRemindersPageContext, openLoginPage, stopPullDown, type ReminderScope } from './rebuild/shared'
 
 const tokenStore = useTokenStore()
 const notificationStore = useNotificationStore()
 const loading = ref(false)
+const scope = ref<ReminderScope>('ALL')
+const focusNotificationId = ref('')
 
-const priorityRows = computed(() => notificationStore.items.filter(item => !notificationStore.isRead(item) && item.priority === 'HIGH'))
-const secondaryRows = computed(() => notificationStore.items.filter(item => !notificationStore.isRead(item) && item.priority !== 'HIGH'))
+function sortReminderRows<T extends { id: string }>(rows: T[]) {
+  if (!focusNotificationId.value) {
+    return rows
+  }
+  return [...rows].sort((left, right) => (left.id === focusNotificationId.value ? -1 : right.id === focusNotificationId.value ? 1 : 0))
+}
+
+const scopedUnreadRows = computed(() => notificationStore.items.filter((item) => {
+  if (notificationStore.isRead(item)) {
+    return false
+  }
+  return scope.value === 'ALL' || item.scope === scope.value
+}))
+const priorityRows = computed(() => sortReminderRows(scopedUnreadRows.value.filter(item => item.priority === 'HIGH')))
+const secondaryRows = computed(() => sortReminderRows(scopedUnreadRows.value.filter(item => item.priority !== 'HIGH')))
 
 async function loadPage() {
   if (!tokenStore.hasLogin || loading.value) {
@@ -22,6 +38,11 @@ async function loadPage() {
   loading.value = true
   try {
     await notificationStore.refreshNotifications()
+    const context = consumePetPalRemindersPageContext()
+    if (context?.scope) {
+      scope.value = context.scope
+    }
+    focusNotificationId.value = context?.focusNotificationId || ''
   }
   finally {
     loading.value = false
@@ -33,7 +54,7 @@ function handleAction(id: string) {
   const item = notificationStore.items.find(row => row.id === id)
   if (!item) return
   notificationStore.markAsRead(item)
-  openPetPalAction(item.actionMode === 'redirect' ? 'redirect' : 'navigate', item.actionUrl)
+  openAppNotificationAction(item)
 }
 
 onShow(() => {
@@ -71,10 +92,22 @@ onPullDownRefresh(() => {
         </view>
       </PetpalSection>
 
+      <PetpalSection title="筛选范围" :subtitle="focusNotificationId ? '已把你刚才点开的待办顶到前面。' : '先按范围聚焦，再处理当前高优先任务。'">
+        <PetpalSegmented
+          v-model="scope"
+          :options="[
+            { label: '全部', value: 'ALL', badge: notificationStore.items.filter(item => !notificationStore.isRead(item)).length },
+            { label: '主人', value: 'OWNER', badge: notificationStore.items.filter(item => !notificationStore.isRead(item) && item.scope === 'OWNER').length },
+            { label: '照料者', value: 'CAREGIVER', badge: notificationStore.items.filter(item => !notificationStore.isRead(item) && item.scope === 'CAREGIVER').length },
+            { label: '账户', value: 'ACCOUNT', badge: notificationStore.items.filter(item => !notificationStore.isRead(item) && item.scope === 'ACCOUNT').length },
+          ]"
+        />
+      </PetpalSection>
+
       <PetpalSection title="高优先级待办" :subtitle="priorityRows.length ? '这一组只保留需要你马上处理的事项。' : '当前没有高优先级待办'">
         <template v-if="priorityRows.length">
           <view v-for="item in priorityRows" :key="item.id" class="petpal-sheet">
-            <text class="petpal-banner__eyebrow">High Priority</text>
+            <text class="petpal-banner__eyebrow">{{ item.id === focusNotificationId ? 'Focus' : 'High Priority' }}</text>
             <text class="petpal-banner__title">{{ item.title }}</text>
             <text class="petpal-banner__meta">{{ item.summary }}</text>
             <text class="petpal-note">{{ item.detail }}</text>
@@ -89,6 +122,7 @@ onPullDownRefresh(() => {
       <PetpalSection title="其他待办" subtitle="这里保留不那么紧急，但仍然未完成的事项。">
         <template v-if="secondaryRows.length">
           <view v-for="item in secondaryRows" :key="item.id" class="petpal-sheet">
+            <text v-if="item.id === focusNotificationId" class="petpal-banner__eyebrow">Focus</text>
             <text class="petpal-banner__title">{{ item.title }}</text>
             <text class="petpal-note">{{ item.summary }}</text>
             <view class="petpal-action-row">

@@ -5,8 +5,8 @@ import PetpalEmpty from '../petpal/rebuild/petpal-empty.vue'
 import PetpalPage from '../petpal/rebuild/petpal-page.vue'
 import PetpalSection from '../petpal/rebuild/petpal-section.vue'
 import PetpalSegmented from '../petpal/rebuild/petpal-segmented.vue'
-import { useNotificationStore, useTokenStore } from '@/store'
-import { openLoginPage, openPetPalAction, stopPullDown } from '../petpal/rebuild/shared'
+import { openAppNotificationAction, useNotificationStore, useTokenStore } from '@/store'
+import { openLoginPage, stopPullDown } from '../petpal/rebuild/shared'
 
 type FilterValue = 'UNREAD' | 'ALL'
 
@@ -39,7 +39,7 @@ function openItem(id: string) {
   const item = notificationStore.items.find(row => row.id === id)
   if (!item) return
   notificationStore.markAsRead(item)
-  openPetPalAction(item.actionMode === 'redirect' ? 'redirect' : 'navigate', item.actionUrl)
+  openAppNotificationAction(item)
 }
 
 onShow(() => {

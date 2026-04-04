@@ -6,10 +6,10 @@ import AppTag from '@/components/app-tag/app-tag.vue'
 import {
   type AppNotificationItem,
   type AppNotificationScope,
+  openAppNotificationAction,
   useNotificationStore,
 } from '@/store'
 import {
-  openPetPalAction,
   PETPAL_NOTIFICATIONS_PAGE,
 } from '../owner-shared'
 
@@ -75,7 +75,7 @@ function getPriorityTagType(priority: AppNotificationItem['priority']) {
 
 function runAction(item: AppNotificationItem) {
   notificationStore.markAsRead(item)
-  openPetPalAction(item.actionMode, item.actionUrl)
+  openAppNotificationAction(item)
 }
 
 function markAsRead(item: AppNotificationItem) {

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
-import { useNotificationStore, useTokenStore } from '@/store'
+import { openAppNotificationAction, useNotificationStore, useTokenStore } from '@/store'
 import PetpalEmpty from './rebuild/petpal-empty.vue'
 import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
-import { openLoginPage, openPetPalAction, stopPullDown } from './rebuild/shared'
+import { openLoginPage, stopPullDown } from './rebuild/shared'
 
 const tokenStore = useTokenStore()
 const notificationStore = useNotificationStore()
@@ -33,7 +33,7 @@ function openTask(id: string) {
   const item = notificationStore.items.find(row => row.id === id)
   if (!item) return
   notificationStore.markAsRead(item)
-  openPetPalAction(item.actionMode === 'redirect' ? 'redirect' : 'navigate', item.actionUrl)
+  openAppNotificationAction(item)
 }
 
 onShow(() => {

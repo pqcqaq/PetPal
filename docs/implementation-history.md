@@ -308,6 +308,12 @@ Last updated: 2026-04-04
   - `apps/app-frontend/src/pages/petpal/aftersales.vue` 已开始消费售后页 page context，支持按 `HIGH / REFUND / COMPLAINT` 聚焦筛选，并把刚处理的订单顶到前面。
   - `apps/app-frontend/src/pages/petpal/payment-result.vue`、`refund-result.vue`、`complaint-result.vue`、`review-result.vue` 的主动作已改成回正确队列并带焦点订单，不再统一回默认页后再让用户自己找当前单。
   - `apps/web-frontend/test/petpal-shared.test.ts` 已补 App page context 存取回归测试，继续兜底订单页 / 售后页上下文链路不会退化。
+- 2026-04-04 已继续收口 App 消息中心与提醒中心的上下文承接：
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts` 已新增 `messages / reminders` 两类 page context，支持 `role / filter / scope / focusOrderId / focusNotificationId` 的暂存与消费。
+  - `apps/app-frontend/src/pages/petpal/messages.vue` 已开始消费消息页 page context，能按主人/照料者视角、未读筛选和焦点订单承接通知或结果页回流；页面实例复用时也会优先采用新的 `focusOrderId`，不再被旧选中线程抢走焦点。
+  - `apps/app-frontend/src/pages/petpal/reminders.vue` 已开始消费提醒页 page context，支持按 `OWNER / CAREGIVER / ACCOUNT` 范围过滤，并把当前焦点待办顶到前面；提醒动作已统一改走通知跳转 helper，而不是直接裸跳 URL。
+  - `apps/app-frontend/src/store/notifications.ts` 已新增 `openAppNotificationAction(...)`，通知项现在会携带消息/售后/提醒的焦点上下文，起步向导、首页催办信号、通知中心和角色导航也已切到同一套上下文感知打开方式。
+  - `apps/web-frontend/test/petpal-shared.test.ts` 已继续补 `openPetPalMessagesPage / openPetPalRemindersPage` 的 page context 回归断言，继续兜底消息页 / 提醒页上下文链路不会退化。
 - 2026-04-02 已继续重构 App 宠物档案页：
   - `apps/app-frontend/src/pages/petpal/pets.vue` 已从“概览 + 整页长表单 + 列表”改成“宠物切换 + 当前档案预览 + 分区编辑 + 底部动作”结构。
   - 当前宠物可直接切换、直接发需求，编辑区已拆成基础 / 照料 / 健康 / 紧急四个分区，不再默认整屏铺开所有字段。

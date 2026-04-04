@@ -5,9 +5,9 @@ import AppTag from '@/components/app-tag/app-tag.vue'
 import {
   caregiverFlowOptions,
   openPetPalAction,
+  openPetPalMessagesPage,
+  openPetPalRemindersPage,
   PETPAL_HUB_PAGE,
-  PETPAL_MESSAGES_PAGE,
-  PETPAL_REMINDERS_PAGE,
 } from '../owner-shared'
 
 defineOptions({
@@ -32,11 +32,15 @@ function openHub() {
 }
 
 function openMessages() {
-  redirectTo(PETPAL_MESSAGES_PAGE)
+  openPetPalMessagesPage({
+    role: 'caregiver',
+  })
 }
 
 function openReminders() {
-  redirectTo(PETPAL_REMINDERS_PAGE)
+  openPetPalRemindersPage({
+    scope: 'CAREGIVER',
+  })
 }
 </script>
 

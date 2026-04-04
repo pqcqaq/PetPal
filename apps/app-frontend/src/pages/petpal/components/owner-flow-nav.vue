@@ -4,10 +4,10 @@ import AppChoiceChips from '@/components/app-choice-chips/app-choice-chips.vue'
 import AppTag from '@/components/app-tag/app-tag.vue'
 import {
   openPetPalAction,
+  openPetPalMessagesPage,
+  openPetPalRemindersPage,
   ownerFlowOptions,
   PETPAL_HUB_PAGE,
-  PETPAL_MESSAGES_PAGE,
-  PETPAL_REMINDERS_PAGE,
 } from '../owner-shared'
 
 defineOptions({
@@ -32,11 +32,15 @@ function openHub() {
 }
 
 function openMessages() {
-  redirectTo(PETPAL_MESSAGES_PAGE)
+  openPetPalMessagesPage({
+    role: 'owner',
+  })
 }
 
 function openReminders() {
-  redirectTo(PETPAL_REMINDERS_PAGE)
+  openPetPalRemindersPage({
+    scope: 'OWNER',
+  })
 }
 </script>
 
