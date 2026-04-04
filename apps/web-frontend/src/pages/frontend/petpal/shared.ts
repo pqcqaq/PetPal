@@ -12,6 +12,7 @@ import {
   getPetPalRefundProgressStageLabel as getSharedPetPalRefundProgressStageLabel,
   formatPetPalRange,
   getPetPalServiceLogTypeLabel as getSharedPetPalServiceLogTypeLabel,
+  getPetPalServiceTypeLabel as getSharedPetPalServiceTypeLabel,
   formatPetPalTime,
   getPetPalConversationUnreadCount,
   splitPetPalTagText as splitSharedPetPalTagText,
@@ -56,10 +57,10 @@ export const petPalCaregiverWorkspaceNav = [
 ] as const;
 
 export const petPalServiceTypeOptions: Array<{ label: string; value: PetServiceType }> = [
-  { label: '寄养', value: 'BOARDING' },
-  { label: '遛宠', value: 'WALKING' },
-  { label: '喂养', value: 'FEEDING' },
-  { label: '上门陪伴', value: 'DOOR_VISIT' },
+  { label: getSharedPetPalServiceTypeLabel('BOARDING'), value: 'BOARDING' },
+  { label: getSharedPetPalServiceTypeLabel('WALKING'), value: 'WALKING' },
+  { label: getSharedPetPalServiceTypeLabel('FEEDING'), value: 'FEEDING' },
+  { label: getSharedPetPalServiceTypeLabel('DOOR_VISIT'), value: 'DOOR_VISIT' },
 ];
 
 export const petPalSpeciesOptions: Array<{ label: string; value: PetSpecies }> = [
@@ -154,12 +155,7 @@ export const petPalServiceLogOptions: Array<{ label: string; value: ServiceLogTy
 
 export const getPetPalOrderStatusLabel = getSharedPetPalOrderStatusLabel;
 
-export const getPetPalServiceTypeLabel = (serviceType: PetServiceType) => ({
-  BOARDING: '寄养',
-  WALKING: '遛宠',
-  FEEDING: '喂养',
-  DOOR_VISIT: '上门陪伴',
-}[serviceType] ?? serviceType);
+export const getPetPalServiceTypeLabel = getSharedPetPalServiceTypeLabel;
 
 export const getPetPalServiceRequestStatusLabel = getSharedPetPalServiceRequestStatusLabel;
 

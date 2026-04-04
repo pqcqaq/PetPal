@@ -4,6 +4,7 @@ import type {
   ComplaintType,
   OrderConversationRecord,
   OrderStatus,
+  PetServiceType,
   RefundProgressStage,
   ServiceLogType,
   ServiceRequestStatus,
@@ -164,6 +165,13 @@ const petPalComplaintStatusLabels: Record<ComplaintStatus, string> = {
   REJECTED: '已驳回',
 };
 
+const petPalServiceTypeLabels: Record<PetServiceType, string> = {
+  BOARDING: '寄养',
+  WALKING: '遛宠',
+  FEEDING: '喂养',
+  DOOR_VISIT: '上门陪伴',
+};
+
 export const getPetPalOrderStatusLabel = (status: OrderStatus) =>
   petPalOrderStatusLabels[status] ?? status;
 
@@ -184,6 +192,9 @@ export const getPetPalComplaintTypeLabel = (type: ComplaintType) =>
 
 export const getPetPalComplaintStatusLabel = (status: ComplaintStatus) =>
   petPalComplaintStatusLabels[status] ?? status;
+
+export const getPetPalServiceTypeLabel = (serviceType: PetServiceType) =>
+  petPalServiceTypeLabels[serviceType] ?? serviceType;
 
 export const isPetPalOutstandingOrder = (order: {
   amountTotal: number | string | null | undefined;

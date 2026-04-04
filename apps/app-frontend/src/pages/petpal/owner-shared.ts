@@ -13,6 +13,7 @@ import {
   getPetPalRefundProgressStageLabel as getSharedPetPalRefundProgressStageLabel,
   formatPetPalRange as formatSharedPetPalRange,
   getPetPalServiceLogTypeLabel as getSharedPetPalServiceLogTypeLabel,
+  getPetPalServiceTypeLabel as getSharedPetPalServiceTypeLabel,
   formatPetPalTime as formatSharedPetPalTime,
   getPetPalConversationUnreadCount as getSharedPetPalConversationUnreadCount,
   formatPetPalTagSummary as formatSharedPetPalTagSummary,
@@ -92,10 +93,10 @@ const ownerOrderFilters: OwnerOrderFilter[] = ['ALL', 'ACTIVE', 'COMPLETED', 'AF
 const aftersalesFilters: AftersalesFilter[] = ['ALL', 'HIGH', 'REFUND', 'COMPLAINT']
 
 export const serviceTypeLabels: Record<PetServiceType, string> = {
-  BOARDING: '寄养',
-  WALKING: '遛宠',
-  FEEDING: '喂养',
-  DOOR_VISIT: '上门陪伴',
+  BOARDING: getSharedPetPalServiceTypeLabel('BOARDING'),
+  WALKING: getSharedPetPalServiceTypeLabel('WALKING'),
+  FEEDING: getSharedPetPalServiceTypeLabel('FEEDING'),
+  DOOR_VISIT: getSharedPetPalServiceTypeLabel('DOOR_VISIT'),
 }
 
 export const speciesLabels: Record<PetSpecies, string> = {
@@ -117,10 +118,10 @@ export const caregiverAuditLabels: Record<CaregiverAuditStatus, string> = {
 }
 
 export const serviceTypeOptions = [
-  { label: '寄养', value: 'BOARDING', description: '短住照料与过夜陪护' },
-  { label: '遛宠', value: 'WALKING', description: '固定时段外出活动' },
-  { label: '喂养', value: 'FEEDING', description: '定时上门喂食换水' },
-  { label: '上门陪伴', value: 'DOOR_VISIT', description: '互动安抚与环境巡视' },
+  { label: getSharedPetPalServiceTypeLabel('BOARDING'), value: 'BOARDING', description: '短住照料与过夜陪护' },
+  { label: getSharedPetPalServiceTypeLabel('WALKING'), value: 'WALKING', description: '固定时段外出活动' },
+  { label: getSharedPetPalServiceTypeLabel('FEEDING'), value: 'FEEDING', description: '定时上门喂食换水' },
+  { label: getSharedPetPalServiceTypeLabel('DOOR_VISIT'), value: 'DOOR_VISIT', description: '互动安抚与环境巡视' },
 ]
 
 export const speciesOptions = [

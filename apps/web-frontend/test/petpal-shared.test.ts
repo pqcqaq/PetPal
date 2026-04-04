@@ -35,6 +35,7 @@ import {
   getPetPalRefundProgressStageHint,
   getPetPalRefundProgressStageLabel,
   getPetPalServiceLogTypeLabel,
+  getPetPalServiceTypeLabel,
   getPetPalServiceRequestStatusLabel,
   isPetPalAftersalesStatus,
   isPetPalOrderAftersalesTracked,
@@ -190,6 +191,7 @@ test('exposes stable petpal amount, time and conversation display helpers', () =
   assert.equal(formatPetPalTagSummary(['怕生', '固定作息']), '怕生 / 固定作息');
   assert.equal(formatPetPalTagSummary(), '暂无偏好标签');
   assert.equal(getPetPalServiceLogTypeLabel('PLAY'), '互动陪伴');
+  assert.equal(getPetPalServiceTypeLabel('DOOR_VISIT'), '上门陪伴');
   assert.equal(getPetPalOrderTone('PARTIAL_REFUNDED'), 'danger');
 });
 
