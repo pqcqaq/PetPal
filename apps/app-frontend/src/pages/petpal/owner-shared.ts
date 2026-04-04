@@ -7,11 +7,13 @@ import {
   formatPetPalConversationPreview as formatSharedPetPalConversationPreview,
   formatPetPalDate as formatSharedPetPalDate,
   getPetPalOrderStatusLabel as getSharedPetPalOrderStatusLabel,
+  getPetPalOwnerOrderFilter as getSharedPetPalOwnerOrderFilter,
   getPetPalRefundProgressStageHint as getSharedPetPalRefundProgressStageHint,
   getPetPalRefundProgressStageLabel as getSharedPetPalRefundProgressStageLabel,
   formatPetPalRange as formatSharedPetPalRange,
   formatPetPalTime as formatSharedPetPalTime,
   getPetPalConversationUnreadCount as getSharedPetPalConversationUnreadCount,
+  isPetPalOrderAftersalesTracked as isSharedPetPalOrderAftersalesTracked,
   getPetPalServiceRequestStatusLabel as getSharedPetPalServiceRequestStatusLabel,
   type CaregiverAuditStatus,
   type ComplaintStatus,
@@ -511,25 +513,13 @@ export function getServiceLogTypeLabel(logType: ServiceLogType) {
 export function isOrderAftersalesTracked(
   order: Pick<OrderRecord, 'orderStatus' | 'refunds' | 'amountRefunded'>,
 ) {
-  return (
-    order.orderStatus === 'DISPUTED'
-    || order.orderStatus === 'PARTIAL_REFUNDED'
-    || order.orderStatus === 'REFUNDED'
-    || (order.refunds?.length ?? 0) > 0
-    || Number(order.amountRefunded ?? 0) > 0
-  )
+  return isSharedPetPalOrderAftersalesTracked(order)
 }
 
 export function getOwnerOrderFilterForOrder(
   order: Pick<OrderRecord, 'orderStatus' | 'refunds' | 'amountRefunded'>,
 ): OwnerOrderFilter {
-  if (isOrderAftersalesTracked(order)) {
-    return 'AFTERSALES'
-  }
-  if (order.orderStatus === 'COMPLETED') {
-    return 'COMPLETED'
-  }
-  return 'ACTIVE'
+  return getSharedPetPalOwnerOrderFilter(order)
 }
 
 export function buildOwnerMatchQuery(params: {

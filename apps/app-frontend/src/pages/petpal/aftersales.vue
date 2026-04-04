@@ -8,7 +8,7 @@ import PetpalEmpty from './rebuild/petpal-empty.vue'
 import PetpalPage from './rebuild/petpal-page.vue'
 import PetpalSection from './rebuild/petpal-section.vue'
 import PetpalSegmented from './rebuild/petpal-segmented.vue'
-import { describeOrder, helpers, openLoginPage, openOrderDetailPage, stopPullDown } from './rebuild/shared'
+import { describeOrder, helpers, isOrderAftersalesTracked, openLoginPage, openOrderDetailPage, stopPullDown } from './rebuild/shared'
 
 type FilterValue = 'ALL' | 'REFUND' | 'DISPUTE'
 
@@ -21,13 +21,7 @@ const refundCount = computed(() => orders.value.filter(item => (item.refunds?.le
 const disputeCount = computed(() => orders.value.filter(item => item.orderStatus === 'DISPUTED').length)
 
 const aftersalesOrders = computed(() => {
-  const rows = orders.value.filter(item => (
-    item.orderStatus === 'DISPUTED'
-    || item.orderStatus === 'PARTIAL_REFUNDED'
-    || item.orderStatus === 'REFUNDED'
-    || (item.refunds?.length ?? 0) > 0
-    || Number(item.amountRefunded ?? 0) > 0
-  ))
+  const rows = orders.value.filter(item => isOrderAftersalesTracked(item))
 
   return rows.filter((item) => {
     if (filter.value === 'REFUND') {
@@ -105,7 +99,7 @@ onPullDownRefresh(() => {
         <PetpalSegmented
           v-model="filter"
           :options="[
-            { label: '全部', value: 'ALL', badge: orders.filter(item => item.orderStatus === 'DISPUTED' || item.orderStatus === 'PARTIAL_REFUNDED' || item.orderStatus === 'REFUNDED' || (item.refunds?.length ?? 0) > 0 || Number(item.amountRefunded ?? 0) > 0).length },
+            { label: '全部', value: 'ALL', badge: orders.filter(item => isOrderAftersalesTracked(item)).length },
             { label: '退款', value: 'REFUND', badge: refundCount },
             { label: '争议', value: 'DISPUTE', badge: disputeCount },
           ]"

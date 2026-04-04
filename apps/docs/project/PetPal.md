@@ -7883,6 +7883,63 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.264 2026-04-04（P3-M1 Slice 264）
+
+**概述**：上一轮已经把订单/需求/退款/投诉这批状态标签收口到共享层，但 Web `shared.ts` 与 App `owner-shared.ts` 里仍各自保留了一段订单判定逻辑，包括“是否待支付”“是否已进入售后”“主人订单属于 ACTIVE/COMPLETED/AFTERSALES 哪一类”。本轮继续沿“只抽纯 predicate、不碰页面交互”的原则，把这批订单过滤 helper 继续提升到 `@rbac/api-common`，并顺手把 App 售后页的内联售后筛选改为复用 helper。
+
+已完成：
+
+- 共享订单过滤 helper 已继续落到 `api-common`：
+  - `packages/api-common/src/helpers/petpal-display.ts`
+    - 新增 `isPetPalOutstandingOrder(...)`。
+    - 新增 `isPetPalAftersalesStatus(...)`。
+    - 新增 `isPetPalOrderAftersalesTracked(...)`。
+    - 新增 `getPetPalOwnerOrderFilter(...)`。
+    - 共享层现在会统一处理订单未结清、售后跟踪和主人订单分组判定，不再让 Web / App 平行维护第二份条件表达式。
+- Web / App 已切到共享订单过滤 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - `isPetPalOutstandingOrder(...)` 与 `isPetPalAftersalesStatus(...)` 已改为复用共享 helper。
+    - Web 端现有订单详情、订单队列、提醒中心和结果页继续通过原有导出名消费，不需要改页面接口。
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - `isOrderAftersalesTracked(...)` 与 `getOwnerOrderFilterForOrder(...)` 已改为复用共享 helper。
+    - App 端订单页继续复用原有 owner-shared 包装名，不需要改现有调用点。
+  - `apps/app-frontend/src/pages/petpal/aftersales.vue`
+    - 售后页里的“全部售后订单”筛选与分段 badge 统计已改为直接复用 `isOrderAftersalesTracked(...)`，不再在页面内联一整段售后条件。
+- 定向测试与文档同步：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补订单待支付、售后跟踪和主人订单过滤 helper 的稳定性断言，锁住共享判断口径。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改页面结构、状态存储或导航流程，只继续收口跨端纯 predicate/helper。
+- 已确认 Web / App 两端现在都会复用同一套“未结清 / 售后跟踪 / 订单过滤”逻辑，避免后续在金额或售后条件调整时双端再次漂移。
+- 已确认 App 售后页已去掉页面内联售后筛选条件，后续如果售后判定规则变化，只需要改共享层和定向测试。
+
+风险与缓解：
+
+- 风险：订单过滤条件已经进一步集中到共享层，后续若调整售后口径，会同时影响 Web / App 的订单聚合与提示。
+- 缓解：本轮已补共享 helper 直测，后续如要调整售后规则，先在共享测试里锁定目标输出再推进。
+
+- 风险：仍有少量 tag 解析和状态语义 helper 没有完全共享，若继续强推，可能会把 Web / App 的分隔符策略或文案差异硬拉到同一口径。
+- 缓解：本轮只抽完全同构的订单过滤 predicate，继续把 tag 文本策略和端侧语义 hint 留在调用侧。
+
+下一步（1-3）：
+
+1. 继续评估 tag 解析与摘要 helper 是否值得在保留分隔符差异的前提下进一步参数化共享。
+2. 如果展示层剩余收益继续下降，就回到消息状态模块，评估是否还有必要继续收口少量存储 glue。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.263 2026-04-04（P3-M1 Slice 263）
 
 **概述**：上一轮已经把会话 preview/meta 拼装逻辑提升到共享层，但 Web `shared.ts` 和 App `owner-shared.ts` 里仍各自保留了一批同构的状态标签映射，包括订单状态、需求状态、退款进度和投诉对象/类型/状态。本轮继续沿“只抽纯展示 helper、不抽端侧流程语义”的原则，把这批 label/hint 逻辑继续提升到 `@rbac/api-common`，并顺手把 App `rebuild/shared.ts` 对旧本地 label record 的消费也切回 helper。

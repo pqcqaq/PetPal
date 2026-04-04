@@ -183,3 +183,41 @@ export const getPetPalComplaintTypeLabel = (type: ComplaintType) =>
 
 export const getPetPalComplaintStatusLabel = (status: ComplaintStatus) =>
   petPalComplaintStatusLabels[status] ?? status;
+
+export const isPetPalOutstandingOrder = (order: {
+  amountTotal: number | string | null | undefined;
+  amountAdjusted: number | string | null | undefined;
+  amountPaid: number | string | null | undefined;
+}) => {
+  const total = Number(order.amountTotal) + Number(order.amountAdjusted);
+  const paid = Number(order.amountPaid);
+  return total - paid > 0.01;
+};
+
+export const isPetPalAftersalesStatus = (status: OrderStatus) =>
+  status === 'DISPUTED' || status === 'PARTIAL_REFUNDED' || status === 'REFUNDED';
+
+export const isPetPalOrderAftersalesTracked = (order: {
+  orderStatus: OrderStatus;
+  refunds?: Array<unknown> | null | undefined;
+  amountRefunded?: number | string | null | undefined;
+}) =>
+  isPetPalAftersalesStatus(order.orderStatus)
+  || (order.refunds?.length ?? 0) > 0
+  || Number(order.amountRefunded ?? 0) > 0;
+
+export const getPetPalOwnerOrderFilter = (order: {
+  orderStatus: OrderStatus;
+  refunds?: Array<unknown> | null | undefined;
+  amountRefunded?: number | string | null | undefined;
+}): 'ACTIVE' | 'COMPLETED' | 'AFTERSALES' => {
+  if (isPetPalOrderAftersalesTracked(order)) {
+    return 'AFTERSALES';
+  }
+
+  if (order.orderStatus === 'COMPLETED') {
+    return 'COMPLETED';
+  }
+
+  return 'ACTIVE';
+};

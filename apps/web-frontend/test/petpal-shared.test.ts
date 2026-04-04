@@ -21,6 +21,7 @@ import {
   formatPetPalConversationPreview,
   formatPetPalDate,
   formatPetPalMoney,
+  getPetPalOwnerOrderFilter,
   formatPetPalRange,
   formatPetPalTime,
   getPetPalMessageComposerEntry,
@@ -32,6 +33,9 @@ import {
   getPetPalRefundProgressStageHint,
   getPetPalRefundProgressStageLabel,
   getPetPalServiceRequestStatusLabel,
+  isPetPalAftersalesStatus,
+  isPetPalOrderAftersalesTracked,
+  isPetPalOutstandingOrder,
   parsePetPalMessageDraftState,
   parsePersistedPetPalMessageComposerSnapshot,
   parsePetPalMessageComposerStorageKey,
@@ -155,6 +159,22 @@ test('exposes stable petpal amount, time and conversation display helpers', () =
   assert.equal(getPetPalComplaintStatusLabel('PROCESSING'), '处理中');
   assert.equal(getPetPalComplaintTypeLabel('FRAUD'), '欺诈风险');
   assert.equal(getPetPalComplaintTargetRoleLabel('PLATFORM'), '平台');
+  assert.equal(isPetPalOutstandingOrder({
+    amountTotal: 88,
+    amountAdjusted: 0,
+    amountPaid: 20,
+  }), true);
+  assert.equal(isPetPalAftersalesStatus('PARTIAL_REFUNDED'), true);
+  assert.equal(isPetPalOrderAftersalesTracked({
+    orderStatus: 'ACCEPTED',
+    refunds: [],
+    amountRefunded: 12,
+  }), true);
+  assert.equal(getPetPalOwnerOrderFilter({
+    orderStatus: 'COMPLETED',
+    refunds: [],
+    amountRefunded: 0,
+  }), 'COMPLETED');
 });
 
 test('exposes stable message and caregiver attachment governance constants for shared uploads', () => {

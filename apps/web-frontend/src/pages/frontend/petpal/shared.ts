@@ -13,6 +13,8 @@ import {
   formatPetPalRange,
   formatPetPalTime,
   getPetPalConversationUnreadCount,
+  isPetPalAftersalesStatus as isSharedPetPalAftersalesStatus,
+  isPetPalOutstandingOrder as isSharedPetPalOutstandingOrder,
   getPetPalServiceRequestStatusLabel as getSharedPetPalServiceRequestStatusLabel,
   type CaregiverAuditStatus,
   type ComplaintAdminSlaStatus,
@@ -278,14 +280,6 @@ export const normalizePetPalTagText = (value: string | null | undefined) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-export const isPetPalOutstandingOrder = (
-  order: Pick<OrderRefundProgressRecord, never> & Pick<{ amountTotal: number | string; amountAdjusted: number | string; amountPaid: number | string }, 'amountTotal' | 'amountAdjusted' | 'amountPaid'>,
-) => {
-  const total = Number(order.amountTotal) + Number(order.amountAdjusted);
-  const paid = Number(order.amountPaid);
-  return total - paid > 0.01;
-};
+export const isPetPalOutstandingOrder = isSharedPetPalOutstandingOrder;
 
-export const isPetPalAftersalesStatus = (status: OrderStatus) => (
-  status === 'DISPUTED' || status === 'PARTIAL_REFUNDED' || status === 'REFUNDED'
-);
+export const isPetPalAftersalesStatus = isSharedPetPalAftersalesStatus;
