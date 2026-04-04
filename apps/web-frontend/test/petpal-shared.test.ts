@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  adoptLegacyPetPalMessageComposerRecordsForIdentity,
+  buildPetPalMessageComposerStorageKey,
   cloneManagedAttachmentRecords,
   clonePetPalMessageDraftState,
   createManagedAttachmentRecord,
   createManagedAttachmentRecordFromMediaAsset,
+  getPetPalMessageComposerEntry,
+  getPetPalMessageComposerKeysToClear,
   parsePetPalMessageDraftState,
+  parsePetPalMessageComposerStorageKey,
   parseManagedAttachmentRecord,
   parsePetPalMessageRecoveryState,
   PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_MB,
@@ -22,6 +27,8 @@ import {
   PETPAL_PENALTY_RECTIFY_ATTACHMENT_SCOPE,
   PETPAL_PENALTY_RECTIFY_ATTACHMENT_TAG,
   PETPAL_SERVICE_LOG_ATTACHMENT_TAG,
+  resolvePersistedPetPalMessageComposerIdentity,
+  resolvePetPalMessageComposerIdentity,
 } from '@rbac/api-common';
 import {
   getPetPalCaregiverAuditLabel,
@@ -190,6 +197,98 @@ test('clones and parses petpal message draft and recovery states', () => {
     stage: 'upload',
     message: 'Upload failed',
   });
+});
+
+test('builds and resolves petpal message composer identities in a stable way', () => {
+  const ownerKey = buildPetPalMessageComposerStorageKey({
+    orderId: 'order-1',
+    userId: 'user-1',
+    scope: 'owner',
+  });
+
+  assert.equal(ownerKey, 'petpal-message-composer::order=order-1::scope=owner::user=user-1');
+  assert.deepEqual(parsePetPalMessageComposerStorageKey(ownerKey), {
+    orderId: 'order-1',
+    userId: 'user-1',
+    scope: 'owner',
+  });
+  assert.deepEqual(resolvePetPalMessageComposerIdentity({
+    orderId: ' order-1 ',
+    userId: ' user-1 ',
+    scope: 'owner',
+  }), {
+    orderId: 'order-1',
+    userId: 'user-1',
+    scope: 'owner',
+  });
+  assert.deepEqual(resolvePersistedPetPalMessageComposerIdentity('order-legacy', {
+    userId: ' user-2 ',
+    scope: 'caregiver',
+  }), {
+    orderId: 'order-legacy',
+    userId: 'user-2',
+    scope: 'caregiver',
+  });
+});
+
+test('adopts legacy message composer records and clears scoped keys predictably', () => {
+  const sharedKey = buildPetPalMessageComposerStorageKey({
+    orderId: 'order-2',
+    userId: 'user-9',
+    scope: 'shared',
+  });
+  const ownerKey = buildPetPalMessageComposerStorageKey({
+    orderId: 'order-2',
+    userId: 'user-9',
+    scope: 'owner',
+  });
+  const adopted = adoptLegacyPetPalMessageComposerRecordsForIdentity({
+    'order-2': {
+      orderId: 'order-2',
+      userId: '',
+      scope: 'shared',
+      updatedAt: '2026-04-04T14:00:00.000Z',
+      stage: 'upload',
+      message: 'retry',
+    },
+  }, {
+    orderId: 'order-2',
+    userId: 'user-9',
+    scope: 'owner',
+  });
+
+  assert.equal(getPetPalMessageComposerEntry(adopted, {
+    orderId: 'order-2',
+    userId: 'user-9',
+    scope: 'owner',
+  })?.[0], ownerKey);
+  assert.equal(adopted[ownerKey]?.userId, 'user-9');
+  assert.equal(adopted[sharedKey], undefined);
+  assert.deepEqual(
+    getPetPalMessageComposerKeysToClear({
+      [sharedKey]: {
+        orderId: 'order-2',
+        userId: 'user-9',
+        scope: 'shared',
+        updatedAt: '2026-04-04T14:00:00.000Z',
+        stage: 'upload',
+        message: 'retry',
+      },
+      [ownerKey]: {
+        orderId: 'order-2',
+        userId: 'user-9',
+        scope: 'owner',
+        updatedAt: '2026-04-04T14:01:00.000Z',
+        stage: 'send',
+        message: 'send again',
+      },
+    }, {
+      orderId: 'order-2',
+      userId: 'user-9',
+      scope: 'owner',
+    }).sort(),
+    [ownerKey, sharedKey].sort(),
+  );
 });
 
 test('rejects managed attachment media assets without an accessible url', () => {

@@ -332,6 +332,14 @@ export interface OrderConversationDetailRecord extends OrderConversationRecord {
 
 export type PetPalMessageDraftAttachment = ManagedAttachmentRecord;
 
+export type PetPalMessageComposerScope = 'owner' | 'caregiver' | 'shared';
+
+export interface PetPalMessageComposerIdentity {
+  orderId: string;
+  userId: string;
+  scope?: PetPalMessageComposerScope;
+}
+
 export interface PetPalMessageDraftState {
   content: string;
   attachments: PetPalMessageDraftAttachment[];

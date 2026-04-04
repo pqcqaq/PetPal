@@ -238,6 +238,10 @@ Last updated: 2026-04-04
   - `packages/api-common/src/types/petpal.ts` 已新增共享的消息草稿 / 恢复态类型，`packages/api-common/src/helpers/petpal-message-composer.ts` 已新增对应的 clone / parse helper。
   - Web / App 两端的 `message-composer-state.ts` 现在都会直接复用共享草稿状态深拷贝、草稿解析和恢复态解析逻辑，不再各自平行维护这些纯函数。
   - Web 端仍只在状态模块内保留“旧草稿缺失 `uploadedAt` 时用 `fallbackUploadedAt` 回填”的本地兼容策略，其余消息草稿对象级规则都已进一步收口到共享层。
+- 2026-04-04 已继续收口消息草稿 identity helper：
+  - `packages/api-common/src/helpers/petpal-message-composer.ts` 已继续补消息草稿 `scope / userId / orderId` identity、storage key、legacy adoption 和 scoped clear 的共享纯 helper。
+  - Web / App 两端的 `message-composer-state.ts` 现在都会直接复用同一套 storage key 构造、identity 解析、共享态回退和旧匿名消息记录认领逻辑，不再各自维护第二份近似实现。
+  - 这轮仍然没有把 `localStorage` / `uni` 读写抽到共享层，双端状态模块只继续减纯函数重复，不混存储副作用。
 - 2026-04-04 已继续对齐 Web 照料者资质上传：
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverProfileView.vue` 已从手填材料名称 / URL 改成受管资质附件上传，上传时会绑定当前照料者档案 ID 和 `petpal-caregiver-qualification` 标签。
   - 页面现在会直接展示材料大小 / 日期，并支持查看 / 移除；首次上传前如果档案还没生成 ID，会先提示保存一次基础资料。
