@@ -6,6 +6,7 @@ export * from './types/files';
 export * from './types/petpal';
 export * from './types/realtime';
 export * from './helpers/managed-attachments';
+export * from './helpers/petpal-message-composer';
 export * from './client/core';
 export * from './client/adapters/fetch';
 export * from './client/adapters/uni';

@@ -1,23 +1,20 @@
 import {
   cloneManagedAttachmentRecords,
-  parseManagedAttachmentRecord,
+  clonePetPalMessageDraftState as cloneSharedPetPalMessageDraftState,
+  parsePetPalMessageDraftState,
+  parsePetPalMessageRecoveryState,
   type ManagedAttachmentRecord,
+  type PetPalMessageDraftState as SharedPetPalMessageDraftState,
+  type PetPalMessageRecoveryStage as SharedPetPalMessageRecoveryStage,
+  type PetPalMessageRecoveryState as SharedPetPalMessageRecoveryState,
 } from '@rbac/api-common';
 import { ref } from 'vue';
 
 export type PetPalMessageDraftAttachment = ManagedAttachmentRecord;
 
-export type PetPalMessageDraftState = {
-  content: string;
-  attachments: PetPalMessageDraftAttachment[];
-};
-
-export type PetPalMessageRecoveryStage = 'upload' | 'send';
-
-export type PetPalMessageRecoveryState = {
-  stage: PetPalMessageRecoveryStage;
-  message: string;
-};
+export type PetPalMessageDraftState = SharedPetPalMessageDraftState;
+export type PetPalMessageRecoveryStage = SharedPetPalMessageRecoveryStage;
+export type PetPalMessageRecoveryState = SharedPetPalMessageRecoveryState;
 
 export type PetPalMessageComposerScope = 'owner' | 'caregiver' | 'shared';
 
@@ -172,10 +169,8 @@ const parsePetPalMessageComposerStorageKey = (
 const cloneMessageDraftAttachments = (attachments: PetPalMessageDraftAttachment[]) =>
   cloneManagedAttachmentRecords(attachments);
 
-const cloneMessageDraftState = (draft: PetPalMessageDraftState): PetPalMessageDraftState => ({
-  content: draft.content,
-  attachments: cloneMessageDraftAttachments(draft.attachments),
-});
+const cloneMessageDraftState = (draft: PetPalMessageDraftState): PetPalMessageDraftState =>
+  cloneSharedPetPalMessageDraftState(draft);
 
 const toTimestamp = (value: string) => {
   const timestamp = Date.parse(value);
@@ -192,37 +187,6 @@ const normalizePersistedValue = (rawValue: unknown) => {
   } catch {
     return null;
   }
-};
-
-const toDraftAttachmentRecord = (
-  rawValue: unknown,
-  fallbackUploadedAt: string,
-): PetPalMessageDraftAttachment | null => parseManagedAttachmentRecord(rawValue, {
-  fallbackUploadedAt,
-});
-
-const toDraftState = (rawValue: unknown): PetPalMessageDraftState | null => {
-  if (!isRecord(rawValue)) {
-    return null;
-  }
-
-  const content = typeof rawValue.content === 'string' ? rawValue.content : '';
-  const attachments = Array.isArray(rawValue.attachments)
-    ? rawValue.attachments
-      .map((item) => parseManagedAttachmentRecord(item, {
-        fallbackUploadedAt: new Date().toISOString(),
-      }))
-      .filter((item): item is PetPalMessageDraftAttachment => Boolean(item))
-    : [];
-
-  if (!content.trim() && !attachments.length) {
-    return null;
-  }
-
-  return {
-    content,
-    attachments,
-  };
 };
 
 const resolvePersistedRecordIdentity = (
@@ -256,18 +220,9 @@ const toDraftRecord = (
     return null;
   }
 
-  const content = typeof rawValue.content === 'string' ? rawValue.content : '';
-  const attachments = Array.isArray(rawValue.attachments)
-    ? rawValue.attachments
-      .map((item) => toDraftAttachmentRecord(item, fallbackUpdatedAt))
-      .filter((item): item is PetPalMessageDraftAttachment => Boolean(item))
-    : [];
-  const draft = !content.trim() && !attachments.length
-    ? null
-    : {
-        content,
-        attachments,
-      } satisfies PetPalMessageDraftState;
+  const draft = parsePetPalMessageDraftState(rawValue, {
+    fallbackUploadedAt: fallbackUpdatedAt,
+  });
   if (!draft) {
     return null;
   }
@@ -290,22 +245,6 @@ const toDraftRecord = (
   };
 };
 
-const toRecoveryState = (rawValue: unknown): PetPalMessageRecoveryState | null => {
-  if (!isRecord(rawValue)) {
-    return null;
-  }
-
-  const { stage, message } = rawValue;
-  if ((stage !== 'upload' && stage !== 'send') || typeof message !== 'string' || !message.trim()) {
-    return null;
-  }
-
-  return {
-    stage,
-    message,
-  };
-};
-
 const toRecoveryRecord = (
   storageKey: string,
   rawValue: unknown,
@@ -315,7 +254,7 @@ const toRecoveryRecord = (
     return null;
   }
 
-  const recovery = toRecoveryState(rawValue);
+  const recovery = parsePetPalMessageRecoveryState(rawValue);
   if (!recovery) {
     return null;
   }

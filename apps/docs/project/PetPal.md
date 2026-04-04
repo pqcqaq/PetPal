@@ -7883,6 +7883,60 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.253 2026-04-04（P3-M1 Slice 253）
+
+**概述**：上一轮已经把消息草稿里的附件 clone / parse 逻辑下沉到共享层，但 Web / App 两份 `message-composer-state.ts` 里仍各自保留了近似的“草稿状态深拷贝、草稿解析、恢复态解析”纯函数。本轮继续沿同一条收口线，只把消息草稿状态对象本身的类型与纯 helper 提升到 `@rbac/api-common`，让双端状态模块继续只剩存储介质和旧缓存迁移差异。
+
+已完成：
+
+- 共享消息草稿状态类型与 helper 已落到 `api-common`：
+  - `packages/api-common/src/types/petpal.ts`
+    - 新增共享的 `PetPalMessageDraftState`、`PetPalMessageRecoveryStage`、`PetPalMessageRecoveryState`。
+  - `packages/api-common/src/helpers/petpal-message-composer.ts`
+    - 新增 `clonePetPalMessageDraftState(...)`、`parsePetPalMessageDraftState(...)`、`parsePetPalMessageRecoveryState(...)`。
+    - 草稿解析 helper 会继续复用前一轮的共享附件 parse helper，并支持通过 `fallbackUploadedAt` 兼容旧草稿附件缺失时间戳的场景。
+- Web / App 消息状态模块已切到共享草稿状态 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/message-composer-state.ts`
+    - 草稿状态深拷贝、草稿解析、恢复态解析已切到共享 helper。
+    - Web 端仍只在本地 `toDraftRecord(...)` 里显式传入 `fallbackUploadedAt`，保留旧草稿时间戳兼容边界。
+  - `apps/app-frontend/src/pages/petpal/message-composer-state.ts`
+    - App 端同一批纯函数也已切到共享 helper，不再平行维护第二份实现。
+- 定向测试与文档同步：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补消息草稿状态 clone / parse 与恢复态解析的共享断言。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-message-composer-state.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改消息发送协议、消息草稿存储键或 Web / App 的存储介质，只继续收口消息草稿状态的对象级纯函数。
+- 已确认 Web / App 两端现在都会复用同一套草稿状态类型、深拷贝和解析规则，双端消息状态模块的纯逻辑重复进一步下降。
+- 已确认 Web 端旧草稿 `uploadedAt` 缺失兼容仍留在 Web 状态模块本身，没有把端侧旧缓存迁移策略硬塞进共享默认行为。
+
+风险与缓解：
+
+- 风险：当前共享层还没有接管消息草稿状态的 identity 解析、容量裁剪和旧 key 迁移，这部分仍然是双端平行实现。
+- 缓解：这些逻辑直接绑定 Web / App 的本地存储形态和升级路径；本轮继续只抽纯对象 helper，避免过早把副作用链路也抽到共享层。
+
+- 风险：`message-composer-state.ts` 里仍保留较多近似的 identity / compaction 纯函数，后续继续下沉时需要小心不要误合并端侧存储差异。
+- 缓解：下一轮如果继续推进，只优先考虑完全无副作用的 identity / snapshot 纯函数，不直接改读写存储入口。
+
+下一步（1-3）：
+
+1. 继续评估消息草稿状态里 identity 解析和快照裁剪这些纯函数是否还能再下沉到共享层，同时严格隔离 Web / App 的存储副作用。
+2. 继续评估其余页面和测试辅助里是否还有残余的消息草稿 / 恢复态手写 clone / parse 逻辑需要收口。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.252 2026-04-04（P3-M1 Slice 252）
 
 **概述**：上一轮已经把 Web / App 两端消息草稿附件类型统一到共享 `ManagedAttachmentRecord`，但两份 `message-composer-state.ts` 里仍各自保留了近似的附件 clone / parse 逻辑。本轮继续沿消息附件收口线，只把对象级的“附件数组复制 + 原始值解析”下沉到 `@rbac/api-common`，让双端本地草稿状态继续减掉一层平行实现，同时保留 Web 旧缓存 `uploadedAt` 兼容回填的端侧边界。

@@ -188,6 +188,7 @@ Last updated: 2026-04-04
 - PetPal Web 订单详情页与跨订单消息中心上传成功后的消息附件快照当前也已改走 `@rbac/api-common` 共享 builder，不再在两页里重复手写 `fileId/url/name/mimeType/size` 映射。
 - PetPal Web / App 两端的消息草稿附件类型当前也已开始对齐到共享 `ManagedAttachmentRecord` 结构；Web 端读取旧本地草稿时会为历史缺失的 `uploadedAt` 自动补齐回放时间戳，避免旧缓存因为字段升级直接失效。
 - PetPal Web / App 两端的消息草稿状态当前也已开始复用 `@rbac/api-common` 里的共享附件 clone / parse helper；Web 端仍保留旧缓存缺失 `uploadedAt` 的回填策略，但附件对象级校验和复制口径已经不再分叉。
+- PetPal Web / App 两端的消息草稿 / 恢复态类型、草稿深拷贝、草稿解析和恢复态解析当前也已继续收口到 `@rbac/api-common`；双端状态模块现在主要保留各自的本地存储介质、启动 warmup 和旧缓存迁移差异。
 
 ### 4.5 App 前端
 

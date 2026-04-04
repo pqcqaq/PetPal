@@ -330,6 +330,20 @@ export interface OrderConversationDetailRecord extends OrderConversationRecord {
   messages: OrderMessageRecord[];
 }
 
+export type PetPalMessageDraftAttachment = ManagedAttachmentRecord;
+
+export interface PetPalMessageDraftState {
+  content: string;
+  attachments: PetPalMessageDraftAttachment[];
+}
+
+export type PetPalMessageRecoveryStage = 'upload' | 'send';
+
+export interface PetPalMessageRecoveryState {
+  stage: PetPalMessageRecoveryStage;
+  message: string;
+}
+
 export type ComplaintAdminSlaStatus = 'NORMAL' | 'DUE_SOON' | 'OVERDUE';
 
 export interface ComplaintAdminRecord extends ComplaintRecord {

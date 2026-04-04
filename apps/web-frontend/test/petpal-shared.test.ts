@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   cloneManagedAttachmentRecords,
+  clonePetPalMessageDraftState,
   createManagedAttachmentRecord,
   createManagedAttachmentRecordFromMediaAsset,
+  parsePetPalMessageDraftState,
   parseManagedAttachmentRecord,
+  parsePetPalMessageRecoveryState,
   PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_MAX_SIZE_MB,
   PETPAL_CAREGIVER_QUALIFICATION_ATTACHMENT_TAG,
   PETPAL_CAREGIVER_QUALIFICATION_MAX_COUNT,
@@ -145,6 +148,47 @@ test('clones and parses managed attachment records with stable timestamps', () =
     mimeType: 'image/png',
     size: 321,
     uploadedAt: '2026-04-04T12:00:00.000Z',
+  });
+});
+
+test('clones and parses petpal message draft and recovery states', () => {
+  const parsedDraft = parsePetPalMessageDraftState({
+    content: 'Need a quick update',
+    attachments: [{
+      fileId: 'file-5',
+      url: 'https://example.com/e.png',
+      name: 'e.png',
+      mimeType: 'image/png',
+      size: 456,
+    }],
+  }, {
+    fallbackUploadedAt: '2026-04-04T13:00:00.000Z',
+  });
+
+  assert.deepEqual(parsedDraft, {
+    content: 'Need a quick update',
+    attachments: [{
+      fileId: 'file-5',
+      url: 'https://example.com/e.png',
+      name: 'e.png',
+      mimeType: 'image/png',
+      size: 456,
+      uploadedAt: '2026-04-04T13:00:00.000Z',
+    }],
+  });
+
+  const clonedDraft = clonePetPalMessageDraftState(parsedDraft!);
+  assert.deepEqual(clonedDraft, parsedDraft);
+  assert.notEqual(clonedDraft, parsedDraft);
+  assert.notEqual(clonedDraft.attachments, parsedDraft?.attachments);
+  assert.notEqual(clonedDraft.attachments[0], parsedDraft?.attachments[0]);
+
+  assert.deepEqual(parsePetPalMessageRecoveryState({
+    stage: 'upload',
+    message: 'Upload failed',
+  }), {
+    stage: 'upload',
+    message: 'Upload failed',
   });
 });
 
