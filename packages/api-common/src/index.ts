@@ -5,6 +5,7 @@ export * from './types/rbac';
 export * from './types/files';
 export * from './types/petpal';
 export * from './types/realtime';
+export * from './helpers/petpal-display';
 export * from './helpers/managed-attachments';
 export * from './helpers/petpal-message-composer';
 export * from './client/core';

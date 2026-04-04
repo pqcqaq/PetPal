@@ -7883,6 +7883,61 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.261 2026-04-04（P3-M1 Slice 261）
+
+**概述**：消息状态链路已经逐步收口到只剩端侧存储 glue，本轮切到更高收益的跨端展示 helper 收口：先把 Web `shared.ts` 和 App `owner-shared.ts` 里已经同构的金额、日期/时间/区间格式化以及订单会话未读数计算提升到 `@rbac/api-common`，继续只做纯函数共享，不碰页面结构和端侧文案差异。
+
+已完成：
+
+- 共享 PetPal 基础展示 helper 已落到 `api-common`：
+  - `packages/api-common/src/helpers/petpal-display.ts`
+    - 新增 `formatPetPalAmount(...)`、`formatPetPalMoney(...)`。
+    - 新增 `formatPetPalDate(...)`、`formatPetPalTime(...)`、`formatPetPalRange(...)`。
+    - 新增 `getPetPalConversationUnreadCount(...)`。
+  - `packages/api-common/src/index.ts`
+    - 已导出新的 `petpal-display` helper。
+- Web / App 已切到共享展示 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - 金额、日期/时间/区间格式化和会话未读数计算已改用共享 helper。
+    - Web 端仍继续保留自己的对话预览/提示文案，不把页面语义文案抽进共享层。
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - `formatAmount`、`formatDate`、`formatDateTime`、`formatRange` 与 `getConversationUnreadCount` 已改为复用共享 helper。
+    - App 端仍继续保留自己的对话提示文案和页面导航 helper。
+- 定向测试与文档同步：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补共享展示 helper 的稳定性断言，锁住金额、时间和未读数的共享口径。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改 PetPal 页面结构、消息状态或导航流程，只继续收口跨端基础展示 helper。
+- 已确认 Web / App 两端现在都会复用同一套金额、时间和未读数计算逻辑，但各自的页面文案差异仍保留在端侧。
+- 已确认本轮没有把 `dayjs`、导航或其它端侧依赖错误抽进共享层，`api-common` 仍保持纯数据/纯展示 helper 边界。
+
+风险与缓解：
+
+- 风险：Web / App 在对话预览和提示文案上仍有产品语义差异，继续强行统一可能会削弱端侧体验差异。
+- 缓解：本轮只抽完全同构的基础展示 helper，不把 preview/hint 文案抽到共享层；后续如要继续推进，可先用可配置文案参数再评估。
+
+- 风险：金额/时间格式化现在开始成为跨端共享口径，后续若要调整日期格式，会同时影响 Web / App。
+- 缓解：本轮已补共享 helper 直测，后续如要调整格式，仍可先在共享测试里锁住目标输出再推进。
+
+下一步（1-3）：
+
+1. 继续检查 Web `shared.ts` 与 App `owner-shared.ts` 中是否还有完全同构的基础展示 helper 值得继续共享。
+2. 若展示 helper 剩余收益下降，再回到消息状态链路评估是否还有必要继续收口存储 glue。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.260 2026-04-04（P3-M1 Slice 260）
 
 **概述**：上一轮已经把 record 清理和 scoped upsert mutation 下沉到共享层，但 Web / App 两份 `message-composer-state.ts` 里仍各自保留了“先根据 drafts/recoveries 解析当前 scope，再按 scope 解析运行时 identity”的流程。本轮继续沿同一条收口线，把这批 scope/runtime identity helper 也提升到 `@rbac/api-common`，继续减少双端状态模块里的纯状态解析重复。

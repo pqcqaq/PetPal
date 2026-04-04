@@ -1,19 +1,25 @@
-import type {
-  CaregiverAuditStatus,
-  ComplaintAdminSlaStatus,
-  ComplaintStatus,
-  ComplaintTargetRole,
-  ComplaintType,
-  OwnerPayChannel,
-  OrderConversationRecord,
-  OrderRefundProgressRecord,
-  OrderStatus,
-  PetSpecies,
-  PetServiceType,
-  RefundStatus,
-  ServiceLogType,
-  RefundType,
-  ServiceRequestStatus,
+import {
+  formatPetPalAmount,
+  formatPetPalDate,
+  formatPetPalMoney,
+  formatPetPalRange,
+  formatPetPalTime,
+  getPetPalConversationUnreadCount,
+  type CaregiverAuditStatus,
+  type ComplaintAdminSlaStatus,
+  type ComplaintStatus,
+  type ComplaintTargetRole,
+  type ComplaintType,
+  type OwnerPayChannel,
+  type OrderConversationRecord,
+  type OrderRefundProgressRecord,
+  type OrderStatus,
+  type PetSpecies,
+  type PetServiceType,
+  type RefundStatus,
+  type ServiceLogType,
+  type RefundType,
+  type ServiceRequestStatus,
 } from '@rbac/api-common';
 
 export const petPalOwnerWorkspaceNav = [
@@ -167,16 +173,6 @@ export const getPetPalCaregiverAuditLabel = (status: CaregiverAuditStatus) => ({
   REJECTED: '已驳回',
 }[status] ?? petPalCaregiverAuditOptions.find((item) => item.value === status)?.label ?? status);
 
-export const getPetPalConversationUnreadCount = (
-  conversation: OrderConversationRecord | null | undefined,
-  role: 'owner' | 'caregiver',
-) => {
-  if (!conversation) {
-    return 0;
-  }
-  return role === 'owner' ? conversation.ownerUnreadCount : conversation.caregiverUnreadCount;
-};
-
 export const formatPetPalConversationPreview = (conversation: OrderConversationRecord | null | undefined) => {
   const preview = conversation?.lastMessagePreview?.trim();
   if (preview) {
@@ -199,6 +195,15 @@ export const formatPetPalConversationMeta = (
     return `${formatTime(conversation.lastMessageAt)} · ${unreadText}`;
   }
   return unreadCount > 0 ? unreadText : '暂无沟通记录';
+};
+
+export {
+  formatPetPalAmount,
+  formatPetPalDate,
+  formatPetPalMoney,
+  formatPetPalRange,
+  formatPetPalTime,
+  getPetPalConversationUnreadCount,
 };
 
 export const getPetPalRefundTypeLabel = (type: RefundType) => ({
@@ -310,42 +315,6 @@ export const getPetPalComplaintStatusType = (
   };
   return map[status];
 };
-
-export const formatPetPalAmount = (value: number | string | null | undefined) => {
-  const amount = Number(value ?? 0);
-  return Number.isFinite(amount) ? amount.toFixed(2) : '0.00';
-};
-
-export const formatPetPalMoney = (value: number | string | null | undefined) => `¥${formatPetPalAmount(value)}`;
-
-export const formatPetPalDate = (value: string | null | undefined) => {
-  if (!value) {
-    return '--';
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '--';
-  }
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
-};
-
-export const formatPetPalTime = (value: string | null | undefined) => {
-  if (!value) {
-    return '--';
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '--';
-  }
-  return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-};
-
-export const formatPetPalRange = (start: string | null | undefined, end: string | null | undefined) =>
-  `${formatPetPalTime(start)} - ${formatPetPalTime(end)}`;
 
 export const normalizePetPalTagText = (value: string | null | undefined) =>
   (value ?? '')

@@ -13,10 +13,16 @@ import {
   createEmptyPersistedPetPalMessageComposerRecords,
   createManagedAttachmentRecord,
   createManagedAttachmentRecordFromMediaAsset,
+  formatPetPalAmount,
+  formatPetPalDate,
+  formatPetPalMoney,
+  formatPetPalRange,
+  formatPetPalTime,
   getPetPalMessageComposerEntry,
   getPetPalMessageComposerEntryWithLegacyAdoption,
   getPetPalMessageComposerKeysToClear,
   getPetPalMessageComposerScopeWithLegacyAdoption,
+  getPetPalConversationUnreadCount,
   parsePetPalMessageDraftState,
   parsePersistedPetPalMessageComposerSnapshot,
   parsePetPalMessageComposerStorageKey,
@@ -80,6 +86,29 @@ test('exposes stable complaint attachment governance constants for web and app u
   assert.equal(PETPAL_ORDER_COMPLAINT_ATTACHMENT_TAG, 'petpal-order-complaint');
   assert.equal(PETPAL_COMPLAINT_ATTACHMENT_MAX_COUNT, 3);
   assert.equal(PETPAL_COMPLAINT_ATTACHMENT_MAX_SIZE_MB, 8);
+});
+
+test('exposes stable petpal amount, time and conversation display helpers', () => {
+  assert.equal(formatPetPalAmount(12.3), '12.30');
+  assert.equal(formatPetPalAmount('bad-number'), '0.00');
+  assert.equal(formatPetPalMoney(12.3), '¥12.30');
+  assert.equal(formatPetPalDate('2026-04-04T09:08:00'), '2026-04-04');
+  assert.equal(formatPetPalTime('2026-04-04T09:08:00'), '04-04 09:08');
+  assert.equal(
+    formatPetPalRange('2026-04-04T09:08:00', '2026-04-04T10:18:00'),
+    '04-04 09:08 - 04-04 10:18',
+  );
+  assert.equal(getPetPalConversationUnreadCount(null, 'owner'), 0);
+  assert.equal(getPetPalConversationUnreadCount({
+    id: 'conversation-1',
+    orderId: 'order-1',
+    ownerUnreadCount: 2,
+    caregiverUnreadCount: 5,
+    lastMessageAt: '2026-04-04T09:08:00',
+    lastMessagePreview: 'hello',
+    createdAt: '2026-04-04T09:00:00',
+    updatedAt: '2026-04-04T09:08:00',
+  }, 'caregiver'), 5);
 });
 
 test('exposes stable message and caregiver attachment governance constants for shared uploads', () => {

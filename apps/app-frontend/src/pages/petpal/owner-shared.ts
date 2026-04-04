@@ -1,20 +1,24 @@
-import type {
-  CaregiverAuditStatus,
-  ComplaintStatus,
-  ComplaintTargetRole,
-  ComplaintType,
-  MatchCaregiverQuery,
-  OrderRecord,
-  OrderConversationRecord,
-  OrderStatus,
-  PetGender,
-  PetServiceType,
-  PetSpecies,
-  RefundProgressStage,
-  ServiceLogType,
-  ServiceRequestStatus,
+import {
+  formatPetPalAmount as formatSharedPetPalAmount,
+  formatPetPalDate as formatSharedPetPalDate,
+  formatPetPalRange as formatSharedPetPalRange,
+  formatPetPalTime as formatSharedPetPalTime,
+  getPetPalConversationUnreadCount as getSharedPetPalConversationUnreadCount,
+  type CaregiverAuditStatus,
+  type ComplaintStatus,
+  type ComplaintTargetRole,
+  type ComplaintType,
+  type MatchCaregiverQuery,
+  type OrderRecord,
+  type OrderConversationRecord,
+  type OrderStatus,
+  type PetGender,
+  type PetServiceType,
+  type PetSpecies,
+  type RefundProgressStage,
+  type ServiceLogType,
+  type ServiceRequestStatus,
 } from '@rbac/api-common'
-import dayjs from 'dayjs'
 
 export const PETPAL_HUB_PAGE = '/pages/petpal/index'
 export const PETPAL_WORKBENCH_PAGE = '/pages/petpal/workbench'
@@ -203,8 +207,7 @@ export const serviceLogTypeOptions = [
 ]
 
 export function formatAmount(value: number | string | null | undefined) {
-  const amount = Number(value ?? 0)
-  return Number.isFinite(amount) ? amount.toFixed(2) : '0.00'
+  return formatSharedPetPalAmount(value)
 }
 
 export function openPetPalAction(mode: 'redirect' | 'navigate', url: string) {
@@ -367,21 +370,15 @@ export function formatPercent(value: number | null | undefined) {
 }
 
 export function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return '--'
-  }
-  return dayjs(value).format('YYYY-MM-DD')
+  return formatSharedPetPalDate(value)
 }
 
 export function formatDateTime(value: string | null | undefined) {
-  if (!value) {
-    return '--'
-  }
-  return dayjs(value).format('MM-DD HH:mm')
+  return formatSharedPetPalTime(value)
 }
 
 export function formatRange(start: string | null | undefined, end: string | null | undefined) {
-  return `${formatDateTime(start)} - ${formatDateTime(end)}`
+  return formatSharedPetPalRange(start, end)
 }
 
 export function formatDistanceKm(distanceKm: number | null | undefined) {
@@ -528,10 +525,7 @@ export function getConversationUnreadCount(
   conversation: OrderConversationRecord | null | undefined,
   role: ConversationRole,
 ) {
-  if (!conversation) {
-    return 0
-  }
-  return role === 'owner' ? conversation.ownerUnreadCount : conversation.caregiverUnreadCount
+  return getSharedPetPalConversationUnreadCount(conversation, role)
 }
 
 export function getConversationPreview(conversation: OrderConversationRecord | null | undefined) {
