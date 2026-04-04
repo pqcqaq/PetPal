@@ -11,8 +11,6 @@ import type {
   ServiceLogType,
 } from '@rbac/api-common'
 import {
-  complaintTargetRoleLabels,
-  complaintTypeLabels,
   formatAmount,
   formatCaregiverExperience,
   formatCaregiverNoticeHours,
@@ -25,6 +23,8 @@ import {
   genderLabels,
   getCaregiverAuditHint,
   getCaregiverAuditLabel,
+  getComplaintTargetRoleLabel,
+  getComplaintTypeLabel,
   getComplaintStatusHint,
   getComplaintStatusLabel,
   getConversationHint,
@@ -37,7 +37,6 @@ import {
   getServiceLogTypeLabel,
   joinTagText,
   openPetPalAction,
-  orderStatusLabels,
   PETPAL_CAREGIVER_HOME_PAGE,
   PETPAL_OWNER_HOME_PAGE,
   serviceTypeLabels,
@@ -264,8 +263,8 @@ export function describeConversation(order: Pick<OrderRecord, 'conversation'>, r
 
 export function summarizeComplaint(item: ComplaintRecord) {
   return [
-    complaintTargetRoleLabels[item.targetRole],
-    complaintTypeLabels[item.complaintType],
+    getComplaintTargetRoleLabel(item.targetRole),
+    getComplaintTypeLabel(item.complaintType),
     getComplaintStatusLabel(item.status),
   ].join(' · ')
 }
@@ -277,7 +276,7 @@ export function getComplaintTone(status: ComplaintRecord['status']): ResultTone 
   return 'accent'
 }
 
-export function getOrderToneClass(status: keyof typeof orderStatusLabels) {
+export function getOrderToneClass(status: OrderRecord['orderStatus']) {
   if (status === 'COMPLETED') return 'success'
   if (status === 'SERVING' || status === 'ACCEPTED') return 'warning'
   if (status === 'DISPUTED' || status === 'PARTIAL_REFUNDED' || status === 'REFUNDED') return 'danger'
@@ -299,11 +298,11 @@ export function roleSummary(user: CurrentUser | null | undefined) {
 }
 
 export function complaintTypeLabel(value: ComplaintType) {
-  return complaintTypeLabels[value] || value
+  return getComplaintTypeLabel(value)
 }
 
 export function complaintTargetLabel(value: ComplaintTargetRole) {
-  return complaintTargetRoleLabels[value] || value
+  return getComplaintTargetRoleLabel(value)
 }
 
 export function caregiverAuditSummary(status: ReturnType<typeof getCaregiverAuditLabel>) {

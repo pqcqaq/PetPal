@@ -1,11 +1,18 @@
 import {
   formatPetPalAmount as formatSharedPetPalAmount,
+  getPetPalComplaintStatusLabel as getSharedPetPalComplaintStatusLabel,
+  getPetPalComplaintTargetRoleLabel as getSharedPetPalComplaintTargetRoleLabel,
+  getPetPalComplaintTypeLabel as getSharedPetPalComplaintTypeLabel,
   formatPetPalConversationMeta as formatSharedPetPalConversationMeta,
   formatPetPalConversationPreview as formatSharedPetPalConversationPreview,
   formatPetPalDate as formatSharedPetPalDate,
+  getPetPalOrderStatusLabel as getSharedPetPalOrderStatusLabel,
+  getPetPalRefundProgressStageHint as getSharedPetPalRefundProgressStageHint,
+  getPetPalRefundProgressStageLabel as getSharedPetPalRefundProgressStageLabel,
   formatPetPalRange as formatSharedPetPalRange,
   formatPetPalTime as formatSharedPetPalTime,
   getPetPalConversationUnreadCount as getSharedPetPalConversationUnreadCount,
+  getPetPalServiceRequestStatusLabel as getSharedPetPalServiceRequestStatusLabel,
   type CaregiverAuditStatus,
   type ComplaintStatus,
   type ComplaintTargetRole,
@@ -96,61 +103,10 @@ export const genderLabels: Record<PetGender, string> = {
   UNKNOWN: '未知',
 }
 
-export const orderStatusLabels: Record<OrderStatus, string> = {
-  PENDING_ACCEPT: '待接单',
-  ACCEPTED: '已接单',
-  SERVING: '服务中',
-  COMPLETED: '已完成',
-  CANCELLED: '已取消',
-  DISPUTED: '纠纷中',
-  PARTIAL_REFUNDED: '部分退款',
-  REFUNDED: '已退款',
-}
-
 export const caregiverAuditLabels: Record<CaregiverAuditStatus, string> = {
   PENDING: '待审核',
   APPROVED: '审核通过',
   REJECTED: '审核驳回',
-}
-
-export const serviceRequestStatusLabels: Record<ServiceRequestStatus, string> = {
-  OPEN: '待匹配',
-  MATCHED: '已匹配',
-  CLOSED: '已关闭',
-  MATCHING: '匹配中',
-  CONFIRMED: '已确认',
-  CANCELLED: '已取消',
-  COMPLETED: '已完成',
-}
-
-export const refundProgressStageLabels: Record<RefundProgressStage, string> = {
-  NONE: '暂无退款',
-  PENDING_REVIEW: '待审核',
-  APPROVED_WAITING: '待退款',
-  PARTIAL_SUCCESS: '部分退款成功',
-  FULL_SUCCESS: '退款完成',
-  REJECTED: '已驳回',
-  FAILED: '退款失败',
-}
-
-export const complaintStatusLabels: Record<ComplaintStatus, string> = {
-  OPEN: '待受理',
-  PROCESSING: '处理中',
-  RESOLVED: '已解决',
-  REJECTED: '已驳回',
-}
-
-export const complaintTypeLabels: Record<ComplaintType, string> = {
-  SAFETY: '安全问题',
-  FEE: '费用争议',
-  SERVICE: '服务质量',
-  FRAUD: '欺诈风险',
-  OTHER: '其他问题',
-}
-
-export const complaintTargetRoleLabels: Record<ComplaintTargetRole, string> = {
-  CAREGIVER: '照料者',
-  PLATFORM: '平台',
 }
 
 export const serviceTypeOptions = [
@@ -435,7 +391,7 @@ export function formatPetTagSummary(tags?: string[]) {
 }
 
 export function getOrderStatusLabel(status: OrderStatus) {
-  return orderStatusLabels[status] || status
+  return getSharedPetPalOrderStatusLabel(status)
 }
 
 export function getCaregiverAuditLabel(status: CaregiverAuditStatus) {
@@ -443,7 +399,7 @@ export function getCaregiverAuditLabel(status: CaregiverAuditStatus) {
 }
 
 export function getRequestStatusLabel(status: ServiceRequestStatus) {
-  return serviceRequestStatusLabels[status] || status
+  return getSharedPetPalServiceRequestStatusLabel(status)
 }
 
 export function isRequestActive(status: ServiceRequestStatus) {
@@ -468,24 +424,15 @@ export function getRequestTagType(status: ServiceRequestStatus) {
 }
 
 export function getRefundProgressStageLabel(stage: RefundProgressStage) {
-  return refundProgressStageLabels[stage] || stage
+  return getSharedPetPalRefundProgressStageLabel(stage)
 }
 
 export function getRefundProgressStageHint(stage: RefundProgressStage) {
-  const hints: Record<RefundProgressStage, string> = {
-    NONE: '当前暂无退款申请，后续售后进度会在这里同步展示。',
-    PENDING_REVIEW: '退款申请已提交，等待平台审核处理。',
-    APPROVED_WAITING: '退款申请已审核通过，等待退款渠道回调。',
-    PARTIAL_SUCCESS: '订单已完成部分退款，可继续查看剩余可退余额。',
-    FULL_SUCCESS: '退款已完成，订单售后金额已经结清。',
-    REJECTED: '最近一笔退款申请已被驳回，可根据原因补充说明后再次联系平台。',
-    FAILED: '退款处理失败，建议尽快联系平台核查渠道回执。',
-  }
-  return hints[stage] || stage
+  return getSharedPetPalRefundProgressStageHint(stage)
 }
 
 export function getComplaintStatusLabel(status: ComplaintStatus) {
-  return complaintStatusLabels[status] || status
+  return getSharedPetPalComplaintStatusLabel(status)
 }
 
 export function getComplaintStatusHint(status: ComplaintStatus) {
@@ -499,11 +446,11 @@ export function getComplaintStatusHint(status: ComplaintStatus) {
 }
 
 export function getComplaintTypeLabel(type: ComplaintType) {
-  return complaintTypeLabels[type] || type
+  return getSharedPetPalComplaintTypeLabel(type)
 }
 
 export function getComplaintTargetRoleLabel(role: ComplaintTargetRole) {
-  return complaintTargetRoleLabels[role] || role
+  return getSharedPetPalComplaintTargetRoleLabel(role)
 }
 
 export function getCaregiverAuditHint(status: CaregiverAuditStatus | null | undefined) {

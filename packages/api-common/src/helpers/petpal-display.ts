@@ -1,4 +1,12 @@
-import type { OrderConversationRecord } from '../types/petpal';
+import type {
+  ComplaintStatus,
+  ComplaintTargetRole,
+  ComplaintType,
+  OrderConversationRecord,
+  OrderStatus,
+  RefundProgressStage,
+  ServiceRequestStatus,
+} from '../types/petpal';
 
 export type PetPalConversationRole = 'owner' | 'caregiver';
 
@@ -93,3 +101,85 @@ export const formatPetPalRange = (
   start: string | null | undefined,
   end: string | null | undefined,
 ) => `${formatPetPalTime(start)} - ${formatPetPalTime(end)}`;
+
+const petPalOrderStatusLabels: Record<OrderStatus, string> = {
+  PENDING_ACCEPT: '待接单',
+  ACCEPTED: '已接单',
+  SERVING: '服务中',
+  COMPLETED: '已完成',
+  CANCELLED: '已取消',
+  DISPUTED: '纠纷中',
+  PARTIAL_REFUNDED: '部分退款',
+  REFUNDED: '已退款',
+};
+
+const petPalServiceRequestStatusLabels: Record<ServiceRequestStatus, string> = {
+  OPEN: '待匹配',
+  MATCHED: '已匹配',
+  CLOSED: '已关闭',
+  MATCHING: '匹配中',
+  CONFIRMED: '已确认',
+  CANCELLED: '已取消',
+  COMPLETED: '已完成',
+};
+
+const petPalRefundProgressStageLabels: Record<RefundProgressStage, string> = {
+  NONE: '暂无退款',
+  PENDING_REVIEW: '待审核',
+  APPROVED_WAITING: '待退款',
+  PARTIAL_SUCCESS: '部分退款成功',
+  FULL_SUCCESS: '退款完成',
+  REJECTED: '已驳回',
+  FAILED: '退款失败',
+};
+
+const petPalRefundProgressStageHints: Record<RefundProgressStage, string> = {
+  NONE: '当前暂无退款申请，后续售后进度会在这里同步展示。',
+  PENDING_REVIEW: '退款申请已提交，等待平台审核处理。',
+  APPROVED_WAITING: '退款申请已审核通过，等待退款渠道回调。',
+  PARTIAL_SUCCESS: '订单已完成部分退款，可继续查看剩余可退余额。',
+  FULL_SUCCESS: '退款已完成，订单售后金额已经结清。',
+  REJECTED: '最近一笔退款申请已被驳回，可根据原因补充说明后再次联系平台。',
+  FAILED: '退款处理失败，建议尽快联系平台核查渠道回执。',
+};
+
+const petPalComplaintTargetRoleLabels: Record<ComplaintTargetRole, string> = {
+  CAREGIVER: '照料者',
+  PLATFORM: '平台',
+};
+
+const petPalComplaintTypeLabels: Record<ComplaintType, string> = {
+  SAFETY: '安全问题',
+  FEE: '费用争议',
+  SERVICE: '服务质量',
+  FRAUD: '欺诈风险',
+  OTHER: '其他问题',
+};
+
+const petPalComplaintStatusLabels: Record<ComplaintStatus, string> = {
+  OPEN: '待受理',
+  PROCESSING: '处理中',
+  RESOLVED: '已解决',
+  REJECTED: '已驳回',
+};
+
+export const getPetPalOrderStatusLabel = (status: OrderStatus) =>
+  petPalOrderStatusLabels[status] ?? status;
+
+export const getPetPalServiceRequestStatusLabel = (status: ServiceRequestStatus) =>
+  petPalServiceRequestStatusLabels[status] ?? status;
+
+export const getPetPalRefundProgressStageLabel = (stage: RefundProgressStage) =>
+  petPalRefundProgressStageLabels[stage] ?? stage;
+
+export const getPetPalRefundProgressStageHint = (stage: RefundProgressStage) =>
+  petPalRefundProgressStageHints[stage] ?? stage;
+
+export const getPetPalComplaintTargetRoleLabel = (role: ComplaintTargetRole) =>
+  petPalComplaintTargetRoleLabels[role] ?? role;
+
+export const getPetPalComplaintTypeLabel = (type: ComplaintType) =>
+  petPalComplaintTypeLabels[type] ?? type;
+
+export const getPetPalComplaintStatusLabel = (status: ComplaintStatus) =>
+  petPalComplaintStatusLabels[status] ?? status;

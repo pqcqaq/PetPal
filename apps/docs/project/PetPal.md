@@ -7883,6 +7883,63 @@ flowchart TD
 2. 继续评估快捷时间窗与日期范围写回之间是否需要更轻量的桥接层，同时避免把收益页特有的 `datePreset` 泛化到所有页面。
 3. 在导出状态层进一步稳定后，再继续推进更细的经营归因导出维度或最终验收收口。
 
+### 14.263 2026-04-04（P3-M1 Slice 263）
+
+**概述**：上一轮已经把会话 preview/meta 拼装逻辑提升到共享层，但 Web `shared.ts` 和 App `owner-shared.ts` 里仍各自保留了一批同构的状态标签映射，包括订单状态、需求状态、退款进度和投诉对象/类型/状态。本轮继续沿“只抽纯展示 helper、不抽端侧流程语义”的原则，把这批 label/hint 逻辑继续提升到 `@rbac/api-common`，并顺手把 App `rebuild/shared.ts` 对旧本地 label record 的消费也切回 helper。
+
+已完成：
+
+- 共享状态展示 helper 已继续落到 `api-common`：
+  - `packages/api-common/src/helpers/petpal-display.ts`
+    - 新增 `getPetPalOrderStatusLabel(...)`。
+    - 新增 `getPetPalServiceRequestStatusLabel(...)`。
+    - 新增 `getPetPalRefundProgressStageLabel(...)` 与 `getPetPalRefundProgressStageHint(...)`。
+    - 新增 `getPetPalComplaintTargetRoleLabel(...)`、`getPetPalComplaintTypeLabel(...)`、`getPetPalComplaintStatusLabel(...)`。
+    - 共享层现在会统一处理订单 / 需求 / 退款 / 投诉这批基础状态展示文案，不再让双端平行维护第二份映射表。
+- Web / App 已切到共享状态展示 helper：
+  - `apps/web-frontend/src/pages/frontend/petpal/shared.ts`
+    - 订单状态、需求状态、退款进度 label/hint 以及投诉对象/类型/状态 label 已改为复用共享 helper。
+    - Web 端仍继续保留退款状态 type、投诉 SLA type、照料者审核文案等带端侧语义差异的本地逻辑。
+  - `apps/app-frontend/src/pages/petpal/owner-shared.ts`
+    - `getOrderStatusLabel(...)`、`getRequestStatusLabel(...)`、`getRefundProgressStageLabel(...)`、`getRefundProgressStageHint(...)`、`getComplaintTypeLabel(...)`、`getComplaintTargetRoleLabel(...)`、`getComplaintStatusLabel(...)` 已改为复用共享 helper。
+    - `owner-shared.ts` 中只为这些函数服务的本地 label record 已移除，保留的本地记录只剩 App 真正仍在页面组合层使用的那部分。
+  - `apps/app-frontend/src/pages/petpal/rebuild/shared.ts`
+    - 已改为直接消费投诉对象/类型和订单状态 helper，不再依赖 `owner-shared.ts` 中那组只用于展示兜底的 label record。
+- 定向测试与文档同步：
+  - `apps/web-frontend/test/petpal-shared.test.ts`
+    - 已补订单状态、需求状态、退款进度和投诉标签 helper 的稳定性断言，锁住共享展示口径。
+  - 文档已同步：
+    - `apps/docs/project/PetPal.md`
+    - `docs/implementation-history.md`
+    - `docs/project-memory.md`
+
+验证结果：
+
+- `pnpm --filter @rbac/api-common build` 通过。
+- `pnpm --filter @rbac/web-frontend lint` 通过。
+- `pnpm --filter @rbac/app-frontend type-check` 通过。
+- `pnpm exec node --test apps/web-frontend/test/petpal-shared.test.ts` 通过。
+
+代码审计结论：
+
+- 本轮没有改页面结构、消息状态或导航流程，只继续收口跨端纯展示 helper。
+- 已确认 Web / App 两端现在都会复用同一套订单 / 需求 / 退款 / 投诉状态展示逻辑，但仍未把 Web 独有的 SLA type、退款 tag type 和 App 独有的审核提示文案硬抽到共享层。
+- 已确认 App `rebuild/shared.ts` 现在也已直接依赖 helper，而不是反向依赖一组“先有映射表、再包一层函数”的中间常量。
+
+风险与缓解：
+
+- 风险：状态标签开始进一步集中到共享层，后续若要调整订单、退款或投诉文案，会同时影响 Web / App。
+- 缓解：本轮已补共享状态 helper 直测，后续如要改文案，先在共享测试里锁住目标输出再推进。
+
+- 风险：照料者审核文案和部分状态 type 仍然存在端侧差异，若后续误把这部分也一并收口，可能会抹平产品语义差异。
+- 缓解：本轮只抽完全同构的 label/hint 逻辑，继续把带产品语义差异的 type/hint 留在端侧调用点。
+
+下一步（1-3）：
+
+1. 继续检查 Web `shared.ts`、App `owner-shared.ts` 与 `rebuild/shared.ts` 中是否还存在完全同构、适合继续下沉到共享层的纯展示 helper。
+2. 如果展示层剩余收益继续下降，就回到消息状态模块，评估是否还有必要继续收口少量存储 glue。
+3. 继续按最小切片推进 PetPal 收口，每轮只做局部改动、定向验证、本地提交和文档同步。
+
 ### 14.262 2026-04-04（P3-M1 Slice 262）
 
 **概述**：上一轮已经把金额、日期/时间和未读数这批基础展示逻辑提升到共享层，但 Web `shared.ts` 和 App `owner-shared.ts` 里仍各自保留了一份结构几乎相同的会话预览与 meta 文本拼装。本轮继续沿“只抽纯展示 helper、不抽端侧 copy 语义”的原则，把这两段 preview/meta 逻辑也提升到 `@rbac/api-common`，让双端只保留各自的文案差异和时间格式化器。

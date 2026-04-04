@@ -14,6 +14,9 @@ import {
   createManagedAttachmentRecord,
   createManagedAttachmentRecordFromMediaAsset,
   formatPetPalAmount,
+  getPetPalComplaintStatusLabel,
+  getPetPalComplaintTargetRoleLabel,
+  getPetPalComplaintTypeLabel,
   formatPetPalConversationMeta,
   formatPetPalConversationPreview,
   formatPetPalDate,
@@ -25,6 +28,10 @@ import {
   getPetPalMessageComposerKeysToClear,
   getPetPalMessageComposerScopeWithLegacyAdoption,
   getPetPalConversationUnreadCount,
+  getPetPalOrderStatusLabel,
+  getPetPalRefundProgressStageHint,
+  getPetPalRefundProgressStageLabel,
+  getPetPalServiceRequestStatusLabel,
   parsePetPalMessageDraftState,
   parsePersistedPetPalMessageComposerSnapshot,
   parsePetPalMessageComposerStorageKey,
@@ -138,6 +145,16 @@ test('exposes stable petpal amount, time and conversation display helpers', () =
     formatTime: (value) => value.slice(11, 16),
     emptyText: 'empty',
   }), '09:08 · 1 条未读');
+  assert.equal(getPetPalOrderStatusLabel('DISPUTED'), '纠纷中');
+  assert.equal(getPetPalServiceRequestStatusLabel('MATCHING'), '匹配中');
+  assert.equal(getPetPalRefundProgressStageLabel('FULL_SUCCESS'), '退款完成');
+  assert.equal(
+    getPetPalRefundProgressStageHint('FAILED'),
+    '退款处理失败，建议尽快联系平台核查渠道回执。',
+  );
+  assert.equal(getPetPalComplaintStatusLabel('PROCESSING'), '处理中');
+  assert.equal(getPetPalComplaintTypeLabel('FRAUD'), '欺诈风险');
+  assert.equal(getPetPalComplaintTargetRoleLabel('PLATFORM'), '平台');
 });
 
 test('exposes stable message and caregiver attachment governance constants for shared uploads', () => {

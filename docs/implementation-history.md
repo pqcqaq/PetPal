@@ -274,6 +274,10 @@ Last updated: 2026-04-04
   - `packages/api-common/src/helpers/petpal-display.ts` 已新增 `formatPetPalConversationPreview(...)` 与 `formatPetPalConversationMeta(...)`，统一处理最近消息回退文案、会话时间和未读状态拼接。
   - Web `shared.ts` 与 App `owner-shared.ts` 现在都已直接复用这组共享 helper，不再各自维护第二份近似的 preview / hint 逻辑；双端只继续保留各自的 copy 和时间格式化器。
   - `apps/web-frontend/test/petpal-shared.test.ts` 已补可配置 preview/meta helper 的直测，继续兜底共享展示逻辑不会漂移。
+- 2026-04-04 已继续收口 PetPal 状态标签 helper：
+  - `packages/api-common/src/helpers/petpal-display.ts` 已新增订单状态、需求状态、退款进度以及投诉类型/对象/状态的共享 label/hint helper。
+  - Web `shared.ts` 与 App `owner-shared.ts` 现在都已直接复用这组共享 helper，不再各自维护第二份近似的状态文案映射；App `rebuild/shared.ts` 也已改为直接消费 helper，而不是回读一组本地 label record。
+  - `apps/web-frontend/test/petpal-shared.test.ts` 已补这组状态展示 helper 的稳定性断言，继续兜底共享口径不会漂移。
 - 2026-04-04 已继续对齐 Web 照料者资质上传：
   - `apps/web-frontend/src/pages/frontend/petpal/PetPalCaregiverProfileView.vue` 已从手填材料名称 / URL 改成受管资质附件上传，上传时会绑定当前照料者档案 ID 和 `petpal-caregiver-qualification` 标签。
   - 页面现在会直接展示材料大小 / 日期，并支持查看 / 移除；首次上传前如果档案还没生成 ID，会先提示保存一次基础资料。

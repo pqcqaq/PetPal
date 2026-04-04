@@ -198,6 +198,7 @@ Last updated: 2026-04-04
 - PetPal Web / App 两端的当前 scope 解析和运行时 identity 解析当前也已继续收口到 `@rbac/api-common`；双端状态模块现在只在共享 helper 返回 drafts/recoveries 变化时负责写回状态和存储，不再各自复制“先读 scope、再按 scope 解析 identity”的流程。
 - PetPal Web `shared.ts` 与 App `owner-shared.ts` 里的一批基础展示 helper 当前也已开始继续收口到 `@rbac/api-common`；金额格式化、日期/时间/区间格式化以及订单会话未读数计算现在已经跨端共享，Web / App 仅保留各自的文案差异和页面级组合逻辑。
 - PetPal Web `shared.ts` 与 App `owner-shared.ts` 里的订单会话预览 / meta 展示 helper 当前也已继续收口到 `@rbac/api-common`；最近消息预览回退、时间 + 未读状态拼接现在已经跨端共享，Web / App 只继续透传各自的 copy 和时间格式化逻辑，避免把端侧语义文案硬编码进共享层。
+- PetPal Web `shared.ts` 与 App `owner-shared.ts` 里的订单状态、需求状态、退款进度和投诉标签 helper 当前也已继续收口到 `@rbac/api-common`；Web / App 现在都会复用同一套状态展示纯函数，App `rebuild/shared.ts` 也已改为直接消费 helper，不再依赖一组只为格式化兜底而保留的本地 label record。
 
 ### 4.5 App 前端
 
